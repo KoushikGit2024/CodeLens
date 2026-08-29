@@ -28,3 +28,11 @@ We decided to adopt a **deterministic-first, AI-augmented** approach for documen
 ### Negative
 - **Context Loss:** The AI does not read the raw source code of functions (only their signatures/names), meaning its summaries rely on good naming conventions in the repository.
 - **UI Complexity:** The frontend must merge two separate data structures (`facts` and `aiInterpretation`) gracefully.
+
+## Alternatives Considered
+
+Not documented for this ADR.
+
+## Related Documentation
+
+Not documented for this ADR.

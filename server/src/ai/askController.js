@@ -88,7 +88,26 @@ async function ask(req, res) {
 
   // ── Parse file references from the answer ─────────────────────────────────
   // Extract [path/to/file.js] and [path/to/file.js:10-25] patterns
-  const references = extractReferences(answer);
+  const extractedReferences = extractReferences(answer);
+  
+  // Validate references against the actual repository files and bounds
+  const references = [];
+  for (const ref of extractedReferences) {
+    const fileNode = record.analysis.files.find(f => f.filePath === ref.path);
+    if (!fileNode) continue; // Drop hallucinated files
+
+    if (ref.lines) {
+      const parts = ref.lines.split('-');
+      const start = parseInt(parts[0], 10);
+      const end = parts.length > 1 ? parseInt(parts[1], 10) : start;
+      
+      // If line bounds are invalid, we can just strip the lines and keep the file reference
+      if (isNaN(start) || start < 1 || start > fileNode.lineCount || (end && end > fileNode.lineCount)) {
+        ref.lines = null;
+      }
+    }
+    references.push(ref);
+  }
 
   // ── Respond ────────────────────────────────────────────────────────────────
   return res.json({
@@ -118,7 +137,7 @@ async function ask(req, res) {
  * @returns {Array<{path: string, lines: string|null}>}
  */
 function extractReferences(answer) {
-  const pattern = /\[([^\]]+\.[a-zA-Z]{1,6}(?::\d+(?:-\d+)?)?)\]/g;
+  const pattern = /\[([a-zA-Z0-9_.\-/]+(?::\d+(?:-\d+)?)?)\]/g;
   const found   = new Map();
   let match;
 

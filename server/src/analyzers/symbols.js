@@ -270,6 +270,7 @@ function createExport({ exportType, name = null, source = null, location }) {
  * Fields:
  *   filePath    {string}     relative path within the repository
  *   language    {string}     detected language, e.g. 'javascript'
+ *   lineCount   {number}     number of lines in the file
  *   symbols     {Symbol[]}   all extracted symbols in source order
  *   hasErrors   {boolean}    true if the tree-sitter parse produced errors
  *                            (file was still analysed as best-effort)
@@ -280,10 +281,11 @@ function createExport({ exportType, name = null, source = null, location }) {
  * @param {object} opts
  * @returns {FileAnalysis}
  */
-function createFileAnalysis({ filePath, language, symbols = [], hasErrors = false, error = null }) {
+function createFileAnalysis({ filePath, language, lineCount = 0, symbols = [], hasErrors = false, error = null }) {
   return {
     filePath,
     language,
+    lineCount,
     symbols,
     hasErrors,
     error,

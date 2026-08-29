@@ -63,6 +63,7 @@ const LANGUAGE_WASM_MAP = {
   python:     path.join(WASMS_OUT, 'tree-sitter-python.wasm'),
   java:       path.join(WASMS_OUT, 'tree-sitter-java.wasm'),
   cpp:        path.join(WASMS_OUT, 'tree-sitter-cpp.wasm'),
+  kotlin:     path.join(WASMS_OUT, 'tree-sitter-kotlin.wasm'),
 };
 
 // ── State ─────────────────────────────────────────────────────────────────────

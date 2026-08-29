@@ -71,22 +71,7 @@ export default function RepositoryAssistantPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-surface text-white">
-      {/* ── Header ───────────────────────────────────────────────────────────── */}
-      <header className="h-12 flex items-center px-4 border-b border-border bg-panel shrink-0 gap-4">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-1 text-muted hover:text-white transition-colors text-sm"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          Back
-        </button>
-        <span className="text-white font-medium flex items-center gap-2">
-          <MessageSquare className="w-4 h-4 text-accent" />
-          Repository Assistant
-        </span>
-        {repo && <span className="text-muted text-xs font-mono">{repo.name}</span>}
-      </header>
+    <div className="flex-1 h-full w-full flex flex-col overflow-hidden bg-surface text-white">
 
       {/* ── Main Chat Area ─────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-6" style={{ background: '#0d1117' }}>

@@ -54,9 +54,15 @@ async function getModuleDocumentation(req, res, next) {
     const requestedPath = req.query.path;
     if (!requestedPath) return res.status(400).json({ error: 'Query parameter "path" is required' });
 
-    // Verify file exists
+    // Verify file exists in analysis (non-source files like .gitignore are skipped)
     const fileAnalysis = record.analysis.files.find(f => f.filePath === requestedPath);
-    if (!fileAnalysis) return res.status(404).json({ error: 'File not found in analysis' });
+    if (!fileAnalysis) {
+      return res.json({
+        unsupported: true,
+        path: requestedPath,
+        reason: 'This file type is not parsed by CodeLens (e.g. config, asset, or binary file).'
+      });
+    }
 
     const cache = getRepoCache(req.params.id);
     if (cache.modules[requestedPath]) {

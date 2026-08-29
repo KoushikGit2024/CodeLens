@@ -3,6 +3,7 @@ const cors = require('cors');
 
 const healthRouter = require('./routes/health');
 const repositoryRouter = require('./routes/repository');
+const docsRouter = require('./routes/docs');
 
 const app = express();
 
@@ -12,8 +13,18 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // ── Routes ────────────────────────────────────────────────────────────────────
+app.get('/', (_req, res) => {
+  res.json({
+    name: 'CodeLens API',
+    description: 'AI-Driven Code Intelligence and Automated Documentation System',
+    version: '1.0.0',
+    docs: 'Available at /api/docs'
+  });
+});
+
 app.use('/api/health', healthRouter);
 app.use('/api/repository', repositoryRouter);
+app.use('/api/docs', docsRouter);
 
 // ── 404 handler ───────────────────────────────────────────────────────────────
 app.use((_req, res) => {

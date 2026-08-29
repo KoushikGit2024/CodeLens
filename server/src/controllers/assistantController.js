@@ -37,6 +37,27 @@ async function askQuestion(req, res, next) {
     // Generate the answer (may hit AI, or answer deterministically)
     const answer = await generateQuestionAnswer(question, routing, contextData);
 
+    // Validate references against actual repository files
+    if (answer.references && Array.isArray(answer.references)) {
+      const validReferences = [];
+      for (const ref of answer.references) {
+        const fileNode = record.analysis.files.find(f => f.filePath === ref.path);
+        if (!fileNode) continue; // Drop hallucinatory paths
+        
+        if (ref.startLine) {
+          const start = parseInt(ref.startLine, 10);
+          const end = ref.endLine ? parseInt(ref.endLine, 10) : start;
+          
+          if (isNaN(start) || start < 1 || start > fileNode.lineCount || (end && end > fileNode.lineCount)) {
+            ref.startLine = null;
+            ref.endLine = null;
+          }
+        }
+        validReferences.push(ref);
+      }
+      answer.references = validReferences;
+    }
+
     return res.json({
       question,
       intent: routing.intent,

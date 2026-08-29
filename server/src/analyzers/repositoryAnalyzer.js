@@ -40,6 +40,7 @@ const { TypeScriptParser } = require('./TypeScriptParser');
 const { PythonParser } = require('./PythonParser');
 const { JavaParser } = require('./JavaParser');
 const { CppParser } = require('./CppParser');
+const { KotlinParser } = require('./KotlinParser');
 const { createFileAnalysis } = require('./symbols');
 const { hashContent } = require('./fingerprint');
 
@@ -69,6 +70,7 @@ const PARSER_FACTORIES = {
   python:     (tsParser) => new PythonParser(tsParser),
   java:       (tsParser) => new JavaParser(tsParser),
   cpp:        (tsParser) => new CppParser(tsParser),
+  kotlin:     (tsParser) => new KotlinParser(tsParser),
 };
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -94,7 +96,8 @@ const PARSER_FACTORIES = {
  *   meta:          { analysisVersion, cacheHits, cacheMisses, addedFiles, modifiedFiles, deletedFiles, unchangedFiles }
  * }
  */
-async function analyzeRepository(rootDir, previousAnalysis = null) {
+async function analyzeRepository(rootDir, previousAnalysis = null, onProgress = null) {
+  if (onProgress) onProgress('scanning_files');
   const result = {
     status:        'ready',
     error:         null,
@@ -128,7 +131,14 @@ async function analyzeRepository(rootDir, previousAnalysis = null) {
 
   result.totalFiles = sourceFiles.length;
 
+  if (onProgress) onProgress('analyzing_ast', { total: sourceFiles.length, current: 0 });
+
+  let currentIndex = 0;
   for (const absPath of sourceFiles) {
+    currentIndex++;
+    if (onProgress && currentIndex % 10 === 0) {
+      onProgress('analyzing_ast', { total: sourceFiles.length, current: currentIndex });
+    }
     const relPath  = path.relative(rootDir, absPath).replace(/\\/g, '/');
     const language = detectLanguage(absPath);
 
@@ -145,6 +155,7 @@ async function analyzeRepository(rootDir, previousAnalysis = null) {
       result.files.push(createFileAnalysis({
         filePath: relPath,
         language,
+        lineCount: 0,
         error: `File skipped: size ${stat.size} bytes exceeds limit of ${MAX_FILE_BYTES} bytes`,
       }));
       continue;
@@ -159,6 +170,7 @@ async function analyzeRepository(rootDir, previousAnalysis = null) {
       result.files.push(createFileAnalysis({
         filePath: relPath,
         language,
+        lineCount: 0,
         error: `Cannot read file: ${err.message}`,
       }));
       continue;
@@ -218,6 +230,8 @@ async function analyzeRepository(rootDir, previousAnalysis = null) {
     }
   }
 
+  if (onProgress) onProgress('finalizing_analysis');
+
   return result;
 }
 
@@ -230,6 +244,8 @@ async function analyzeRepository(rootDir, previousAnalysis = null) {
  * @returns {Promise<FileAnalysis>}
  */
 async function analyzeFileContent(source, relPath, language) {
+  const lineCount = source.split(/\r\n|\n/).length;
+
   let tsParser;
   try {
     tsParser = await getParser(language);
@@ -237,6 +253,7 @@ async function analyzeFileContent(source, relPath, language) {
     return createFileAnalysis({
       filePath: relPath,
       language,
+      lineCount,
       error: `Parser unavailable: ${err.message}`,
     });
   }
@@ -244,7 +261,9 @@ async function analyzeFileContent(source, relPath, language) {
   const factory = PARSER_FACTORIES[language];
   const parser  = factory(tsParser);
 
-  return parser.parseFile(source, relPath);
+  const fileAnalysis = await parser.parseFile(source, relPath);
+  fileAnalysis.lineCount = lineCount;
+  return fileAnalysis;
 }
 
 /**
@@ -258,6 +277,7 @@ async function analyzeFile(absPath, relPath, language) {
     return createFileAnalysis({
       filePath: relPath,
       language,
+      lineCount: 0,
       error: `Cannot read file: ${err.message}`,
     });
   }

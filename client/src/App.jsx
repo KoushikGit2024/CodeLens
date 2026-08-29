@@ -6,18 +6,35 @@ import ArchitecturePage from './pages/ArchitecturePage';
 import DocumentationPage from './pages/DocumentationPage';
 import RepositoryAssistantPage from './pages/RepositoryAssistantPage';
 import ImpactPage from './pages/ImpactPage';
+import EngineeringHealthPage from './pages/EngineeringHealthPage';
+import RefactoringPage from './pages/RefactoringPage';
+import RepositoryIntelligencePage from './pages/RepositoryIntelligencePage';
+import HelpPage from './pages/HelpPage';
+import { AIProvider } from './components/AIContext';
+import RepositoryShell from './components/layout/RepositoryShell';
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<UploadPage />} />
-      <Route path="/explore/:repoId" element={<ExplorerPage />} />
-      <Route path="/explore/:repoId/graph" element={<DependencyGraphPage />} />
-      <Route path="/explore/:repoId/architecture" element={<ArchitecturePage />} />
-      <Route path="/explore/:repoId/documentation" element={<DocumentationPage />} />
-      <Route path="/explore/:repoId/assistant" element={<RepositoryAssistantPage />} />
-      <Route path="/explore/:repoId/impact" element={<ImpactPage />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <AIProvider>
+      <Routes>
+        <Route path="/" element={<UploadPage />} />
+        
+        {/* The Canonical Repository Routes */}
+        <Route path="/explore/:repoId" element={<RepositoryShell />}>
+          <Route index element={<RepositoryIntelligencePage />} />
+          <Route path="source" element={<ExplorerPage />} />
+          <Route path="graph" element={<DependencyGraphPage />} />
+          <Route path="architecture" element={<ArchitecturePage />} />
+          <Route path="documentation" element={<DocumentationPage />} />
+          <Route path="assistant" element={<RepositoryAssistantPage />} />
+          <Route path="impact" element={<ImpactPage />} />
+          <Route path="health" element={<EngineeringHealthPage />} />
+          <Route path="refactoring" element={<RefactoringPage />} />
+        </Route>
+
+        <Route path="/help" element={<HelpPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </AIProvider>
   );
 }

@@ -116,3 +116,11 @@ path without special characters, or `node-gyp` issues are resolved), the
 `parserRegistry` can be updated to use the native `tree-sitter` package
 instead of `web-tree-sitter`. The `JavaScriptParser` and `TypeScriptParser`
 classes use the same API for both and would require no changes.
+
+## Alternatives Considered
+
+Not documented for this ADR.
+
+## Related Documentation
+
+Not documented for this ADR.

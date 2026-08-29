@@ -8,13 +8,37 @@
  * for the AI documentation generator.
  */
 
+const { getIsolatedFiles, detectCycles } = require('../analyzers/dependencyGraph');
+const { buildEngineeringRiskModel } = require('../analyzers/engineeringRiskAnalyzer');
+const { buildRefactoringIntelligence } = require('../analyzers/refactoringAnalyzer');
+const { buildRepositoryIntelligence } = require('../analyzers/repositoryIntelligence');
+
 function buildOverviewContext(analysis, graph, architectureModel) {
+  const riskModel = buildEngineeringRiskModel(analysis, graph, architectureModel);
+  const refactoringIntel = buildRefactoringIntelligence(riskModel);
+  const unifiedIntel = buildRepositoryIntelligence(analysis, graph, architectureModel);
+
   return {
     projectName: analysis.name || 'Repository',
     meta: {
       totalFiles: analysis.files.length,
       totalEdges: graph.edges.length,
       unresolvedImports: graph.meta.unresolvedImports,
+      languages: Object.keys(unifiedIntel.repository.languages),
+      healthScore: unifiedIntel.engineeringHealth.score
+    },
+    engineeringRisks: {
+      cycles: detectCycles(graph).length,
+      isolatedFiles: getIsolatedFiles(graph).length,
+    },
+    refactoringCandidates: {
+      total: refactoringIntel.candidateCount,
+      critical: refactoringIntel.critical,
+      topCandidates: refactoringIntel.candidates.slice(0, 3).map(c => ({
+        title: c.title,
+        priority: c.priority,
+        files: c.files
+      }))
     },
     entryPoints: architectureModel.entryPoints,
     apiBoundaries: architectureModel.apiBoundaries.map(b => ({
@@ -25,6 +49,10 @@ function buildOverviewContext(analysis, graph, architectureModel) {
       name: c.name,
       layer: c.layer,
       fileCount: c.files.length,
+    })),
+    hotspots: unifiedIntel.hotspots.slice(0, 5).map(h => ({
+      filePath: h.filePath,
+      reasons: h.reasons
     })),
     keyExternalPackages: getTopExternalPackages(graph, 10),
   };
@@ -122,7 +150,9 @@ Generate a structured JSON output with the following exact keys:
   "summary": "A 2-3 sentence high-level summary of what this repository appears to do.",
   "technologies": ["List of inferred main technologies/frameworks"],
   "architectureSummary": "A brief explanation of how the components and layers interact.",
-  "observations": ["List of interesting architectural facts or tight couplings inferred"]
+  "observations": ["List of interesting architectural facts or tight couplings inferred"],
+  "technicalDebtSummary": "A brief summary of the most critical refactoring candidates and cycles provided in the facts.",
+  "hotspotsSummary": "A brief sentence identifying the most important/central files based on the hotspots array."
 }
 
 Do NOT output any markdown blocks (e.g. \`\`\`json). Output raw valid JSON only. Do NOT hallucinate packages or components that are not in the facts.`;

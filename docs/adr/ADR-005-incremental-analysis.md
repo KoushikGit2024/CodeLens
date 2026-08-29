@@ -21,3 +21,11 @@ As CodeLens supports larger repositories and integrates with CI/CD, running a fu
 **Negative**:
 - The initial analysis of a repository still pays the full parsing cost.
 - Building the dependency graph still occurs dynamically, so graph generation time is not eliminated (though AST parsing time, which is much slower, is).
+
+## Alternatives Considered
+
+Not documented for this ADR.
+
+## Related Documentation
+
+Not documented for this ADR.

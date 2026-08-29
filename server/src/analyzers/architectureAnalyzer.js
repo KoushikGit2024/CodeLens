@@ -7,7 +7,7 @@
  * identifies layers, detects entry points, and surfaces API boundaries.
  */
 
-const { getIsolatedFiles } = require('./dependencyGraph');
+const { getIsolatedFiles, detectCycles } = require('./dependencyGraph');
 
 // ── Heuristics Configuration ──────────────────────────────────────────────────
 
@@ -180,6 +180,8 @@ function buildArchitectureModel(analysis, graph) {
     entryPoints,
     apiBoundaries,
     isolatedFiles: getIsolatedFiles(graph),
+    cycles: detectCycles(graph),
+    unresolvedDependencies: graph.meta?.unresolvedImports || 0,
     meta: {
       totalComponents: components.length,
       builtAt: new Date().toISOString()

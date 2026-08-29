@@ -12,6 +12,8 @@ const INTENTS = {
   METRICS: 'METRICS',
   DEPENDENCY: 'DEPENDENCY',
   ARCHITECTURE: 'ARCHITECTURE',
+  REFACTORING: 'REFACTORING',
+  REPOSITORY_OVERVIEW: 'REPOSITORY_OVERVIEW',
   FILE_EXPLANATION: 'FILE_EXPLANATION',
   GENERAL: 'GENERAL',
 };
@@ -42,7 +44,20 @@ function routeQuestion(question, analysis) {
     }
   }
 
-  // 1. Metrics / Counts (Deterministic)
+  // 1. Repository Overview
+  if (
+    q.match(/overview of this repository/) ||
+    q.match(/how is this project structured/) ||
+    q.match(/most important parts/) ||
+    q.match(/what should i understand first/) ||
+    q.match(/where should i start/) ||
+    q.match(/most important files/)
+  ) {
+    result.intent = INTENTS.REPOSITORY_OVERVIEW;
+    return result;
+  }
+
+  // 2. Metrics / Counts (Deterministic)
   if (
     q.match(/how many (files|modules|components|packages)/) ||
     q.match(/count of (files|modules)/)
@@ -73,7 +88,10 @@ function routeQuestion(question, analysis) {
     q.match(/layer/) ||
     q.match(/component/) ||
     q.match(/structure/) ||
-    q.match(/entry points/)
+    q.match(/entry points/) ||
+    q.match(/circular dependencies/) ||
+    q.match(/biggest risks/) ||
+    q.match(/coupled files/)
   ) {
     result.intent = INTENTS.ARCHITECTURE;
     // We let AI explain architecture, though we could make entry points deterministic
@@ -83,7 +101,18 @@ function routeQuestion(question, analysis) {
     return result;
   }
 
-  // 4. File Explanation
+  // 4. Refactoring
+  if (
+    q.match(/refactor/) ||
+    q.match(/technical debt/) ||
+    q.match(/fix first/) ||
+    q.match(/safest refactoring/)
+  ) {
+    result.intent = INTENTS.REFACTORING;
+    return result;
+  }
+
+  // 5. File Explanation
   if (
     q.match(/what does .* do/) ||
     q.match(/explain /) ||

@@ -11,6 +11,9 @@ const { buildDependencyGraph, getFileDependencies } = require('../analyzers/depe
 const { buildArchitectureModel } = require('../analyzers/architectureAnalyzer');
 const { INTENTS, routeQuestion } = require('./questionRouter');
 const { buildContext: buildSourceContext } = require('./contextBuilder');
+const { buildEngineeringRiskModel } = require('../analyzers/engineeringRiskAnalyzer');
+const { buildRefactoringIntelligence } = require('../analyzers/refactoringAnalyzer');
+const { buildRepositoryIntelligence } = require('../analyzers/repositoryIntelligence');
 
 /**
  * Assembles the context for a given question.
@@ -36,7 +39,20 @@ function buildQuestionContext(analysis, question, extractPath) {
   };
 
   // 1. Gather facts based on intent
-  if (routing.intent === INTENTS.METRICS) {
+  if (routing.intent === INTENTS.REPOSITORY_OVERVIEW) {
+    const unifiedIntel = buildRepositoryIntelligence(analysis, graph, architecture);
+    
+    contextData.facts.push(`Files: ${unifiedIntel.repository.fileCount}`);
+    contextData.facts.push(`Languages: ${Object.keys(unifiedIntel.repository.languages).join(', ')}`);
+    contextData.facts.push(`Components: ${unifiedIntel.architecture.components}`);
+    contextData.facts.push(`Health Score: ${unifiedIntel.engineeringHealth.score}`);
+    
+    if (unifiedIntel.hotspots.length > 0) {
+      contextData.facts.push(`Top Hotspots: ${unifiedIntel.hotspots.slice(0, 3).map(h => h.filePath).join(', ')}`);
+    }
+  }
+
+  else if (routing.intent === INTENTS.METRICS) {
     contextData.facts.push(`The repository contains ${analysis.files.length} files.`);
     contextData.facts.push(`Languages used: ${Object.keys(analysis.languageSummary || {}).join(', ')}.`);
   } 
@@ -65,11 +81,24 @@ function buildQuestionContext(analysis, question, extractPath) {
     });
   }
 
+  else if (routing.intent === INTENTS.REFACTORING) {
+    const riskModel = buildEngineeringRiskModel(analysis, graph, architecture);
+    const refactoringIntel = buildRefactoringIntelligence(riskModel);
+    contextData.facts.push(`Refactoring Candidates: ${refactoringIntel.candidateCount}`);
+    contextData.facts.push(`Critical: ${refactoringIntel.critical}, High: ${refactoringIntel.high}`);
+    
+    // Pass top candidates explicitly
+    const topCandidates = refactoringIntel.candidates.slice(0, 5);
+    topCandidates.forEach((c, idx) => {
+      contextData.facts.push(`[Priority ${idx+1}] ${c.title} (Score: ${c.priorityScore}). Files involved: ${c.files.join(', ')}`);
+    });
+  }
+
   // 2. Gather source code selectively
   // We use the original contextBuilder to score files and extract source snippets.
   if (routing.requiresAi) {
     // Only fetch raw source code for general or file explanations
-    if (routing.intent === INTENTS.FILE_EXPLANATION || routing.intent === INTENTS.GENERAL || routing.intent === INTENTS.ARCHITECTURE) {
+    if (routing.intent === INTENTS.FILE_EXPLANATION || routing.intent === INTENTS.GENERAL || routing.intent === INTENTS.ARCHITECTURE || routing.intent === INTENTS.REFACTORING) {
       const sourceCtx = buildSourceContext(analysis, question, extractPath, { maxFiles: 5, maxSourceChars: 15000 });
       contextData.files = sourceCtx.files;
     }

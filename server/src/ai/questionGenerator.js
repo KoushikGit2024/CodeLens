@@ -138,7 +138,7 @@ function buildQuestionPrompt(question, contextData) {
 }
 
 function extractReferences(answer) {
-  const pattern = /\[([^\]]+\.[a-zA-Z]{1,6}(?::\d+(?:-\d+)?)?)\]/g;
+  const pattern = /\[([a-zA-Z0-9_.\-/]+(?::\d+(?:-\d+)?)?)\]/g;
   const found   = new Map();
   let match;
 

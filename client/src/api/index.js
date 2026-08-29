@@ -66,12 +66,21 @@ export const repositoryApi = {
   analyzeIncremental: (id) => {
     return api.post(`/repository/${id}/analyze`, { mode: 'incremental' });
   },
-  getChangeImpact: (id) => {
-    return api.get(`/repository/${id}/impact`);
-  },
-  getCiReport: (id) => {
-    return api.get(`/repository/${id}/ci-report`);
-  }
+  getChangeImpact: (repoId) => api.get(`/repository/${repoId}/impact`),
+  getCiReport: (repoId) => api.get(`/repository/${repoId}/ci-report`),
+  getIntelligence: (repoId) => api.get(`/repository/${repoId}/intelligence`),
+  getRisks: (repoId) => api.get(`/repository/${repoId}/risks`)
 };
+
+export const getAiHealth = () => api.get('/health/ai').then(res => res.data);
+
+export const getEngineeringRisks = (id) => api.get(`/repository/${id}/risks`).then(res => res.data);
+export const getEngineeringInsights = (id) => api.get(`/repository/${id}/risks/insights`).then(res => res.data);
+
+// Step 13
+export const getRefactoringIntelligence = (id) => api.get(`/repository/${id}/refactoring`).then(res => res.data);
+export const getRefactoringCandidate = (id, candidateId) => api.get(`/repository/${id}/refactoring/${candidateId}`).then(res => res.data);
+export const getRefactoringImpact = (id, candidateId) => api.get(`/repository/${id}/refactoring/${candidateId}/impact`).then(res => res.data);
+export const getRefactoringInsights = (id, candidateId) => api.get(`/repository/${id}/refactoring/${candidateId}/insights`).then(res => res.data);
 
 export default api;

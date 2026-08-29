@@ -1,9 +1,9 @@
 const path = require('path');
 const fs = require('fs');
-const os = require('os');
 const { v4: uuidv4 } = require('uuid');
 
 const repositoryStore    = require('../repositories/repositoryStore');
+const persistence        = require('../repositories/persistenceStore');
 const { safeExtract }    = require('../utils/zipExtractor');
 const { analyzeRepository } = require('../analyzers/repositoryAnalyzer');
 const {
@@ -26,7 +26,7 @@ async function upload(req, res, next) {
 
     const id          = uuidv4();
     const name        = path.basename(req.file.originalname, '.zip');
-    const extractPath = path.join(os.tmpdir(), `codelens_${id}`);
+    const extractPath = persistence.getExtractPath(id);  // persistent .data/repos/<id>/files/
 
     // Store record immediately so the client can poll status
     repositoryStore.set(id, {
@@ -37,10 +37,12 @@ async function upload(req, res, next) {
       extractPath,
       analysis: null,
       analysisVersion: 1,
+      phase: 'uploading',
     });
 
     // Extract the ZIP safely (path-traversal protection inside)
     try {
+      repositoryStore.update(id, { phase: 'extracting' });
       await safeExtract(req.file.path, extractPath);
     } catch (extractErr) {
       repositoryStore.update(id, { status: 'error', error: extractErr.message });
@@ -48,11 +50,13 @@ async function upload(req, res, next) {
     }
 
     // Begin AST analysis (async — do not block the HTTP response)
-    repositoryStore.update(id, { status: 'analyzing' });
+    repositoryStore.update(id, { status: 'analyzing', phase: 'scanning_files' });
     setImmediate(async () => {
       try {
-        const analysis = await analyzeRepository(extractPath);
-        repositoryStore.update(id, { status: 'ready', analysis });
+        const analysis = await analyzeRepository(extractPath, null, (phase, details) => {
+          repositoryStore.update(id, { phase, phaseDetails: details });
+        });
+        repositoryStore.update(id, { status: 'ready', phase: 'ready', analysis });
       } catch (err) {
         console.error(`[repositoryController] Analysis failed for ${id}:`, err);
         repositoryStore.update(id, { status: 'error', error: err.message });

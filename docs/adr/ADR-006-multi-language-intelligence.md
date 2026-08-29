@@ -26,3 +26,11 @@ We will:
 - The initial bundle size (or WASM cache size) increases by a few megabytes due to the additional grammar files.
 - `moduleResolver.js` becomes slightly more complex to handle disparate import conventions (e.g., Java packages vs C++ includes).
 - Our Monaco Editor implementation in the frontend can seamlessly highlight these files using standard extensions, providing an immediate UI benefit.
+
+## Alternatives Considered
+
+Not documented for this ADR.
+
+## Related Documentation
+
+Not documented for this ADR.

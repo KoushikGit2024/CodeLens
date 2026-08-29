@@ -50,6 +50,7 @@ function makeAnalysis(fileCount = 2) {
     language: 'javascript',
     hasErrors: false,
     error: null,
+    lineCount: 100,
     symbols: [{ kind: 'function', name: `fn${i}`, location: { startLine: 1, startColumn: 0, endLine: 3, endColumn: 1 } }],
   }));
   return {
@@ -124,6 +125,27 @@ describe('POST /api/repository/:id/ask — valid requests', () => {
     const ref = res.body.references.find(r => r.path === 'src/file1.js');
     expect(ref).toBeDefined();
     expect(ref.lines).toBe('10-20');
+  });
+
+  test('references strips line info when out of bounds', async () => {
+    generateAnswer.mockResolvedValueOnce('See [src/file1.js:150-200].');
+    const res = await request(app)
+      .post(`/api/repository/${repoId}/ask`)
+      .send({ question: 'Out of bounds test' });
+
+    const ref = res.body.references.find(r => r.path === 'src/file1.js');
+    expect(ref).toBeDefined();
+    expect(ref.lines).toBeNull();
+  });
+
+  test('references drops hallucinated files', async () => {
+    generateAnswer.mockResolvedValueOnce('See [src/fake-file.js:10-20].');
+    const res = await request(app)
+      .post(`/api/repository/${repoId}/ask`)
+      .send({ question: 'Hallucinated test' });
+
+    const ref = res.body.references.find(r => r.path === 'src/fake-file.js');
+    expect(ref).toBeUndefined();
   });
 
   test('context metadata contains filesConsidered', async () => {

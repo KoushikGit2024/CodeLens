@@ -49,6 +49,10 @@ const EXTENSION_MAP = new Map([
   ['.cxx',  'cpp'],
   ['.h',    'cpp'],
   ['.hpp',  'cpp'],
+
+  // Kotlin
+  ['.kt',   'kotlin'],
+  ['.kts',  'kotlin'],
 ]);
 
 /**

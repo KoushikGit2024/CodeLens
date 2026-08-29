@@ -1,8 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import mermaid from 'mermaid';
-import { ChevronLeft, RefreshCw, AlertCircle, Loader2, File, Box, BookOpen } from 'lucide-react';
+import { ChevronLeft, RefreshCw, AlertCircle, Loader2, File, Box, BookOpen, Wrench, LayoutDashboard } from 'lucide-react';
+import { Panel, Group as PanelGroup } from 'react-resizable-panels';
+import { PanelResizer } from '../components/PanelResizer';
 import { repositoryApi } from '../api';
+import AIStatusIndicator from '../components/AIStatusIndicator';
 
 // Initialize mermaid
 mermaid.initialize({ startOnLoad: false, theme: 'dark' });
@@ -71,40 +74,21 @@ export default function ArchitecturePage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-surface text-white">
-      {/* ── Header ───────────────────────────────────────────────────────────── */}
-      <header className="h-12 flex items-center px-4 border-b border-border bg-panel shrink-0 gap-4">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-1 text-muted hover:text-white transition-colors text-sm"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          Back
-        </button>
-        <span className="text-white font-medium">Architecture Intelligence</span>
-        <div className="ml-auto flex items-center gap-2">
-          <Link
-            to={`/explore/${repoId}/documentation`}
-            className="flex items-center gap-1.5 text-xs text-accent hover:text-white transition-colors border border-accent/40 hover:border-white/40 rounded px-2 py-1"
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            Docs
-          </Link>
-          <button
-            onClick={loadArchitecture}
-            className="flex items-center gap-1 text-muted hover:text-white transition-colors text-xs"
-            title="Reload architecture"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            Reload
-          </button>
-        </div>
-      </header>
-
-      <div className="flex flex-1 overflow-hidden">
-        {/* ── Left Panel — Architecture Data ─────────────────────────────────── */}
-        <aside className="w-72 border-r border-border bg-panel shrink-0 overflow-y-auto p-4 flex flex-col gap-6">
+    <PanelGroup direction="horizontal" className="h-full w-full">
+          {/* ── Left Panel — Architecture Data ─────────────────────────────────── */}
+          <Panel defaultSize={20} minSize={15} className="bg-panel flex flex-col">
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-6 custom-scrollbar">
           <section>
+             <div className="bg-surface/50 p-3 rounded border border-border/50 flex flex-col gap-2 mb-4">
+               <div className="flex items-center justify-between">
+                 <span className="text-xs text-muted flex items-center gap-1.5"><AlertCircle className="w-3.5 h-3.5"/> Health</span>
+                 <Link to={`/explore/${repoId}/health`} className="text-[10px] text-accent hover:underline">View Health</Link>
+               </div>
+               <div className="flex items-center justify-between">
+                 <span className="text-xs text-muted flex items-center gap-1.5"><Wrench className="w-3.5 h-3.5"/> Refactoring</span>
+                 <Link to={`/explore/${repoId}/refactoring`} className="text-[10px] text-accent hover:underline">View Refactoring</Link>
+               </div>
+             </div>
             <p className="text-xs text-muted uppercase tracking-wider mb-3">Entry Points</p>
             {data?.model?.entryPoints?.length > 0 ? (
               <div className="flex flex-col gap-2">
@@ -163,17 +147,25 @@ export default function ArchitecturePage() {
               <span className="text-xs text-muted">No components detected.</span>
             )}
           </section>
-        </aside>
+            </div>
+          </Panel>
 
-        {/* ── Main Canvas — Mermaid Diagram ──────────────────────────────────── */}
-        <main className="flex-1 overflow-auto bg-[#0d1117] relative flex justify-center p-8">
+          <PanelResizer />
+
+          {/* ── Main Canvas — Mermaid Diagram ──────────────────────────────────── */}
+          <Panel defaultSize={55} minSize={30} className="bg-[#0d1117] flex flex-col">
+            <main className="flex-1 overflow-auto bg-[#0d1117] relative flex justify-center p-8 custom-scrollbar">
           <div ref={mermaidRef} className="mermaid flex justify-center w-full max-w-4xl">
             {/* Mermaid renders here */}
           </div>
-        </main>
+            </main>
+          </Panel>
 
-        {/* ── Right Panel — AI Insights ──────────────────────────────────────── */}
-        <aside className="w-80 border-l border-border bg-panel shrink-0 overflow-y-auto p-5 flex flex-col gap-4">
+          <PanelResizer />
+
+          {/* ── Right Panel — AI Insights ──────────────────────────────────────── */}
+          <Panel defaultSize={25} minSize={15} className="bg-panel flex flex-col">
+            <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4 custom-scrollbar">
           <p className="text-xs text-muted uppercase tracking-wider mb-2">AI Architectural Insights</p>
           
           {data?.insights?.status === 'unavailable' || data?.insights?.status === 'error' ? (
@@ -198,9 +190,9 @@ export default function ArchitecturePage() {
                 return <p key={idx} className="text-muted text-xs leading-relaxed mb-3">{line}</p>;
               })}
             </div>
-          )}
-        </aside>
-      </div>
-    </div>
+              )}
+            </div>
+          </Panel>
+    </PanelGroup>
   );
 }

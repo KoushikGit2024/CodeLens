@@ -31,7 +31,7 @@ export default function ImpactPage() {
   if (error) return <div className="p-8 text-red-400">Error: {error}</div>;
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-300 p-8 font-sans">
+    <div className="flex-1 h-full overflow-y-auto custom-scrollbar bg-surface text-slate-300 p-8 font-sans">
       <div className="max-w-5xl mx-auto space-y-8">
         
         <header className="flex justify-between items-end border-b border-slate-700 pb-4">
@@ -39,9 +39,6 @@ export default function ImpactPage() {
             <h1 className="text-3xl font-bold text-white tracking-tight">Change Impact Analysis</h1>
             <p className="text-slate-400 mt-1">Repository: {status?.name}</p>
           </div>
-          <Link to={`/explore/${id}`} className="text-blue-400 hover:text-blue-300 transition-colors text-sm font-medium">
-            &larr; Back to Explorer
-          </Link>
         </header>
 
         {impact?.changedFiles?.length === 0 ? (

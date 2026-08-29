@@ -3,6 +3,9 @@ const repositoryController = require('../controllers/repositoryController');
 const documentationController = require('../controllers/documentationController');
 const assistantController = require('../controllers/assistantController');
 const ciController = require('../controllers/ciController');
+const engineeringHealthController = require('../controllers/engineeringHealthController');
+const refactoringController = require('../controllers/refactoringController');
+const repositoryIntelligenceController = require('../controllers/repositoryIntelligenceController');
 const { uploadMiddleware } = require('../middleware/upload');
 const { ask } = require('../ai/askController');
 
@@ -47,6 +50,12 @@ router.post('/:id/ask', ask);
 // POST /api/repository/:id/question        — AI Repository Intelligence Q&A
 router.post('/:id/question', assistantController.askQuestion);
 
+// GET /api/repository/:id/risks            — Deterministic engineering risks
+router.get('/:id/risks', engineeringHealthController.getRisks);
+
+// GET /api/repository/:id/risks/insights   — AI insights on risks
+router.get('/:id/risks/insights', engineeringHealthController.getAiInsights);
+
 // POST /api/repository/:id/analyze         — Incremental/Full Analysis (CI)
 router.post('/:id/analyze', ciController.analyze);
 
@@ -55,5 +64,14 @@ router.get('/:id/impact', ciController.getImpact);
 
 // GET /api/repository/:id/ci-report        — Machine-readable CI Report
 router.get('/:id/ci-report', ciController.getCiReport);
+
+// --- Refactoring Intelligence (Step 13) ---
+router.get('/:id/refactoring', refactoringController.getRefactoring);
+router.get('/:id/refactoring/:candidateId', refactoringController.getCandidate);
+router.get('/:id/refactoring/:candidateId/impact', refactoringController.getCandidateImpact);
+router.get('/:id/refactoring/:candidateId/insights', refactoringController.getCandidateInsights);
+
+// --- Unified Repository Intelligence (Step 14) ---
+router.get('/:id/intelligence', repositoryIntelligenceController.getIntelligence);
 
 module.exports = router;

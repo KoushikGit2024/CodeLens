@@ -33,8 +33,11 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
-import { Loader2, ChevronLeft, Package, File, AlertCircle, RefreshCw, Layers, BookOpen } from 'lucide-react';
+import { ChevronLeft, Loader2, AlertCircle, LayoutDashboard, Database, Package, File, RefreshCw, Layers, BookOpen } from 'lucide-react';
+import { Panel, Group as PanelGroup } from 'react-resizable-panels';
+import AIStatusIndicator from '../components/AIStatusIndicator';
 import { repositoryApi } from '../api';
+import { PanelResizer } from '../components/PanelResizer';
 
 // ── Layout constants ──────────────────────────────────────────────────────────
 
@@ -245,46 +248,10 @@ export default function DependencyGraphPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-surface text-white">
-      {/* ── Header ───────────────────────────────────────────────────────────── */}
-      <header className="h-12 flex items-center px-4 border-b border-border bg-panel shrink-0 gap-4">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-1 text-muted hover:text-white transition-colors text-sm"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          Back
-        </button>
-        <span className="text-white font-medium">Dependency Graph</span>
-        <div className="ml-auto flex items-center gap-2">
-          <Link
-            to={`/explore/${repoId}/documentation`}
-            className="flex items-center gap-1.5 text-xs text-accent hover:text-white transition-colors border border-accent/40 hover:border-white/40 rounded px-2 py-1"
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            Docs
-          </Link>
-          <Link
-            to={`/explore/${repoId}/architecture`}
-            className="flex items-center gap-1.5 text-xs text-accent hover:text-white transition-colors border border-accent/40 hover:border-white/40 rounded px-2 py-1"
-          >
-            <Layers className="w-3.5 h-3.5" />
-            Architecture
-          </Link>
-          <button
-            onClick={loadGraph}
-            className="flex items-center gap-1 text-muted hover:text-white transition-colors text-xs ml-2"
-            title="Reload graph"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            Reload
-          </button>
-        </div>
-      </header>
-
-      <div className="flex flex-1 overflow-hidden">
-        {/* ── Left sidebar — stats & legend ──────────────────────────────────── */}
-        <aside className="w-52 border-r border-border bg-panel shrink-0 overflow-y-auto p-3 flex flex-col gap-4">
+    <PanelGroup direction="horizontal" className="h-full w-full">
+          {/* ── Left sidebar — stats & legend ──────────────────────────────────── */}
+          <Panel defaultSize={15} minSize={10} className="bg-panel flex flex-col">
+            <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-4 custom-scrollbar">
           {stats && (
             <section>
               <p className="text-xs text-muted uppercase tracking-wider mb-2">Stats</p>
@@ -315,9 +282,17 @@ export default function DependencyGraphPage() {
 
           {graph?.cycles?.length > 0 && (
             <section>
-              <p className="text-xs text-warning uppercase tracking-wider mb-2">
-                ⚠ Cycles ({graph.cycles.length})
-              </p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-warning uppercase tracking-wider m-0">
+                  ⚠ Cycles ({graph.cycles.length})
+                </p>
+                <Link 
+                  to={`/explore/${repoId}/refactoring`}
+                  className="text-[10px] text-warning underline hover:text-white"
+                >
+                  Refactor
+                </Link>
+              </div>
               {graph.cycles.map((cycle, i) => (
                 <p key={i} className="text-xs text-muted mb-1 truncate" title={cycle.join(' → ')}>
                   {cycle.map(f => f.split('/').pop()).join(' → ')}
@@ -325,13 +300,20 @@ export default function DependencyGraphPage() {
               ))}
             </section>
           )}
-        </aside>
+            </div>
+          </Panel>
 
-        {/* ── Graph canvas ──────────────────────────────────────────────────── */}
-        <main className="flex-1 relative" style={{ background: '#0d1117' }}>
+          <PanelResizer />
+
+          {/* ── Graph canvas ───────────────────────────────────────────────────── */}
+          <Panel defaultSize={60} minSize={30} className="relative bg-[#0d1117] flex flex-col">
           {nodes.length === 0 ? (
-            <div className="absolute inset-0 flex items-center justify-center text-muted text-sm">
-              No dependency data available for this repository.
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+              <Database className="w-12 h-12 text-muted" />
+              <h2 className="text-white text-lg font-medium">No dependencies detected</h2>
+              <p className="text-muted text-sm max-w-sm text-center">
+                This repository currently contains no resolvable internal dependency relationships.
+              </p>
             </div>
           ) : (
             <ReactFlow
@@ -342,15 +324,12 @@ export default function DependencyGraphPage() {
               onNodeClick={onNodeClick}
               onPaneClick={onPaneClick}
               fitView
-              fitViewOptions={{ padding: 0.2 }}
+              className="bg-transparent"
               minZoom={0.1}
-              maxZoom={3}
-              attributionPosition="bottom-right"
+              maxZoom={2}
             >
-              <Background color="#30363d" gap={24} size={1} />
-              <Controls
-                style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 6 }}
-              />
+              <Background color="#30363d" gap={16} size={1} />
+              <Controls className="bg-panel border-border fill-white" />
               <MiniMap
                 nodeColor={n => n.data?.nodeType === 'package' ? PKG_NODE_COLOR : FILE_NODE_COLOR}
                 maskColor="rgba(13,17,23,0.8)"
@@ -358,10 +337,13 @@ export default function DependencyGraphPage() {
               />
             </ReactFlow>
           )}
-        </main>
+          </Panel>
 
-        {/* ── Right panel — file detail ─────────────────────────────────────── */}
-        <aside className="w-72 border-l border-border bg-panel shrink-0 overflow-y-auto p-3">
+          <PanelResizer />
+
+          {/* ── Right panel — file detail ─────────────────────────────────────── */}
+          <Panel defaultSize={25} minSize={15} className="bg-panel flex flex-col">
+            <div className="flex-1 overflow-y-auto p-3 custom-scrollbar">
           {!selected && (
             <p className="text-xs text-muted mt-4 text-center">
               Click a node to inspect its dependencies
@@ -383,9 +365,9 @@ export default function DependencyGraphPage() {
             /* Package node — show package name */
             <PackageDetailPanel nodeId={selected} graph={graph} />
           )}
-        </aside>
-      </div>
-    </div>
+            </div>
+          </Panel>
+    </PanelGroup>
   );
 }
 

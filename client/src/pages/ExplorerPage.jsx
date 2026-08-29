@@ -22,8 +22,11 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
-import { Loader2, ChevronLeft, GitBranch, Send, File, AlertTriangle, Layers, BookOpen, MessageSquare, Brain, Database, Activity, RefreshCw } from 'lucide-react';
+import { Loader2, File, FileText, Brain, Database } from 'lucide-react';
+import { Panel, Group as PanelGroup } from 'react-resizable-panels';
 import { repositoryApi } from '../api';
+import { FileTree } from '../components/FileTree';
+import { PanelResizer } from '../components/PanelResizer';
 
 // ── Monaco language map ───────────────────────────────────────────────────────
 // Maps file extensions to Monaco language IDs.
@@ -213,7 +216,7 @@ export default function ExplorerPage() {
   // ── Error / loading states ─────────────────────────────────────────────────
   if (pageError) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="h-screen flex items-center justify-center">
         <div className="text-center">
           <p className="text-danger mb-4 text-sm">{pageError}</p>
           <button onClick={() => navigate('/')} className="text-sm text-accent hover:underline">
@@ -226,7 +229,7 @@ export default function ExplorerPage() {
 
   if (!repo || !fileTree) {
     return (
-      <div className="min-h-screen flex items-center justify-center gap-3">
+      <div className="h-screen flex items-center justify-center gap-3">
         <Loader2 className="w-5 h-5 text-accent animate-spin" />
         <span className="text-muted text-sm">Loading repository…</span>
       </div>
@@ -236,109 +239,45 @@ export default function ExplorerPage() {
   const fileCount = countFiles(fileTree);
 
   return (
-    <div className="min-h-screen flex flex-col bg-surface text-white">
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className="h-12 flex items-center px-4 border-b border-border bg-panel shrink-0 gap-4">
-        <button
-          onClick={() => navigate('/')}
-          className="flex items-center gap-1 text-muted hover:text-white transition-colors text-sm"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          Back
-        </button>
-        <span className="text-white font-medium">{repo.name}</span>
-        <span className="text-muted text-xs">{fileCount} files detected</span>
+    <PanelGroup direction="horizontal" className="h-full w-full">
+          {/* Sidebar — file tree: independently scrollable */}
+          <Panel defaultSize={20} minSize={15} className="bg-panel flex flex-col">
+            <div className="flex-1 overflow-y-auto overflow-x-auto p-3 custom-scrollbar">
+              <p className="text-xs text-muted uppercase tracking-wider mb-2 px-1">Files</p>
+              <FileTree
+                nodes={fileTree}
+                selectedPath={selectedPath}
+                onSelectFile={(p) => openFile(p)}
+              />
+            </div>
+          </Panel>
 
-        {/* Currently open file breadcrumb */}
-        {selectedPath && (
-          <span className="text-xs text-muted font-mono truncate max-w-xs" title={selectedPath}>
-            {selectedPath}
-          </span>
-        )}
+          <PanelResizer />
 
-        <div className="ml-auto flex items-center gap-2">
-          <Link
-            to={`/explore/${repoId}/documentation`}
-            className="flex items-center gap-1.5 text-xs text-accent hover:text-white transition-colors border border-accent/40 hover:border-white/40 rounded px-2 py-1"
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            Docs
-          </Link>
-          <Link
-            to={`/explore/${repoId}/assistant`}
-            className="flex items-center gap-1.5 text-xs text-accent hover:text-white transition-colors border border-accent/40 hover:border-white/40 rounded px-2 py-1"
-          >
-            <MessageSquare className="w-3.5 h-3.5" />
-            Assistant
-          </Link>
-          <Link
-            to={`/explore/${repoId}/architecture`}
-            className="flex items-center gap-1.5 text-xs text-accent hover:text-white transition-colors border border-accent/40 hover:border-white/40 rounded px-2 py-1"
-          >
-            <Layers className="w-3.5 h-3.5" />
-            Architecture
-          </Link>
-          <Link
-            to={`/explore/${repoId}/graph`}
-            className="flex items-center gap-1.5 text-xs text-accent hover:text-white transition-colors border border-accent/40 hover:border-white/40 rounded px-2 py-1"
-          >
-            <GitBranch className="w-3.5 h-3.5" />
-            Dependency Graph
-          </Link>
-          <Link
-            to={`/explore/${repoId}/impact`}
-            className="flex items-center gap-1.5 text-xs text-orange-400 hover:text-white transition-colors border border-orange-400/40 hover:border-white/40 rounded px-2 py-1"
-          >
-            <Activity className="w-3.5 h-3.5" />
-            Impact
-          </Link>
-          <button
-            onClick={handleIncrementalAnalyze}
-            disabled={reanalyzing}
-            className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-white transition-colors border border-blue-400/40 hover:border-white/40 rounded px-2 py-1 disabled:opacity-50"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${reanalyzing ? 'animate-spin' : ''}`} />
-            {reanalyzing ? 'Analyzing...' : 'Re-Analyze'}
-          </button>
-        </div>
-      </header>
+          {/* Center — Monaco editor: fills remaining space, Monaco handles its own scroll */}
+          <Panel defaultSize={55} minSize={30} className="min-w-0 flex flex-col overflow-hidden bg-surface">
+            <CodeViewer
+              filePath={selectedPath}
+              fileContent={fileContent}
+              loading={fileLoading}
+              error={fileError}
+              onEditorMount={handleEditorMount}
+            />
+          </Panel>
 
-      {/* ── Main layout ────────────────────────────────────────────────────── */}
-      <div className="flex flex-1 overflow-hidden">
+          <PanelResizer />
 
-        {/* Sidebar — file tree */}
-        <aside className="w-60 border-r border-border bg-panel overflow-y-auto shrink-0 p-3">
-          <p className="text-xs text-muted uppercase tracking-wider mb-2 px-1">Files</p>
-          <FileTree
-            nodes={fileTree}
-            selectedPath={selectedPath}
-            onSelectFile={(p) => openFile(p)}
-          />
-        </aside>
-
-        {/* Center — Monaco editor */}
-        <main className="flex-1 min-w-0 flex flex-col">
-          <CodeViewer
-            filePath={selectedPath}
-            fileContent={fileContent}
-            loading={fileLoading}
-            error={fileError}
-            onEditorMount={handleEditorMount}
-          />
-        </main>
-
-        {/* Right panel — AI Q&A */}
-        <aside className="w-80 border-l border-border bg-panel shrink-0 flex flex-col">
-          <AiPanel
-            repoId={repoId}
-            onOpenFile={(filePath, line) => openFile(filePath, line)}
-            onHighlightRange={(filePath, start, end) => {
-              openFile(filePath).then(() => highlightRange(start, end));
-            }}
-          />
-        </aside>
-      </div>
-    </div>
+          {/* Right panel — AI Q&A: independently scrollable (chat messages) */}
+          <Panel defaultSize={25} minSize={20} className="bg-panel flex flex-col">
+            <AiPanel
+              repoId={repoId}
+              onOpenFile={(filePath, line) => openFile(filePath, line)}
+              onHighlightRange={(filePath, start, end) => {
+                openFile(filePath).then(() => highlightRange(start, end));
+              }}
+            />
+          </Panel>
+    </PanelGroup>
   );
 }
 
@@ -565,70 +504,6 @@ function Message({ msg, onOpenFile }) {
         </div>
       )}
     </div>
-  );
-}
-
-// ── File tree ─────────────────────────────────────────────────────────────────
-
-function FileTree({ nodes, selectedPath, onSelectFile, depth = 0 }) {
-  return (
-    <ul>
-      {nodes.map((node) => (
-        <FileTreeNode
-          key={node.path}
-          node={node}
-          depth={depth}
-          selectedPath={selectedPath}
-          onSelectFile={onSelectFile}
-        />
-      ))}
-    </ul>
-  );
-}
-
-function FileTreeNode({ node, depth, selectedPath, onSelectFile }) {
-  const [open, setOpen] = useState(true);
-  const indent = depth * 12;
-  const isSelected = node.path === selectedPath;
-
-  if (node.type === 'directory') {
-    return (
-      <li>
-        <button
-          onClick={() => setOpen((o) => !o)}
-          style={{ paddingLeft: `${indent + 4}px` }}
-          className="w-full text-left flex items-center gap-1 py-0.5 text-muted hover:text-white text-xs transition-colors"
-        >
-          <span>{open ? '▾' : '▸'}</span>
-          <span>{node.name}/</span>
-        </button>
-        {open && node.children?.length > 0 && (
-          <FileTree
-            nodes={node.children}
-            depth={depth + 1}
-            selectedPath={selectedPath}
-            onSelectFile={onSelectFile}
-          />
-        )}
-      </li>
-    );
-  }
-
-  return (
-    <li>
-      <button
-        onClick={() => onSelectFile(node.path)}
-        style={{ paddingLeft: `${indent + 16}px` }}
-        className={`w-full text-left block py-0.5 text-xs truncate transition-colors ${
-          isSelected
-            ? 'text-accent bg-accent/10 rounded'
-            : 'text-white/70 hover:text-white'
-        }`}
-        title={node.path}
-      >
-        {node.name}
-      </button>
-    </li>
   );
 }
 

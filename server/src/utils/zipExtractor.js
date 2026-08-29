@@ -50,6 +50,12 @@ async function safeExtract(zipPath, destDir) {
       continue;
     }
 
+    // Reject absolute paths early
+    if (path.isAbsolute(entryName)) {
+      console.warn(`[zipExtractor] Blocked absolute path entry: ${entryName}`);
+      continue;
+    }
+
     const targetPath = path.resolve(destDir, entryName);
 
     // Path traversal guard

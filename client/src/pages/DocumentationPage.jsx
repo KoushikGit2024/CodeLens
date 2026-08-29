@@ -1,7 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Loader2, ChevronLeft, BookOpen, Layers, GitBranch, FileText, AlertTriangle, Cpu } from 'lucide-react';
+import { Panel, Group as PanelGroup } from 'react-resizable-panels';
 import { repositoryApi } from '../api';
+import { FileTree } from '../components/FileTree';
+import { PanelResizer } from '../components/PanelResizer';
 
 export default function DocumentationPage() {
   const { repoId } = useParams();
@@ -77,74 +80,41 @@ export default function DocumentationPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-surface text-white">
-      {/* ── Header ───────────────────────────────────────────────────────────── */}
-      <header className="h-12 flex items-center px-4 border-b border-border bg-panel shrink-0 gap-4">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-1 text-muted hover:text-white transition-colors text-sm"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          Back
-        </button>
-        <span className="text-white font-medium flex items-center gap-2">
-          <BookOpen className="w-4 h-4 text-accent" />
-          Documentation {repo ? `— ${repo.name}` : ''}
-        </span>
+    <PanelGroup direction="horizontal" className="h-full w-full">
+          {/* ── Sidebar Navigation ─────────────────────────────────────────────── */}
+          <Panel defaultSize={20} minSize={15} className="bg-panel flex flex-col">
+            <div className="flex-1 overflow-y-auto p-3 custom-scrollbar">
+              <div className="mb-4">
+                <button
+                  onClick={() => setSelectedPath(null)}
+                  className={`w-full text-left block py-1.5 px-2 text-sm rounded transition-colors ${
+                    !selectedPath ? 'text-accent bg-accent/10 font-medium' : 'text-white/80 hover:text-white hover:bg-surface'
+                  }`}
+                >
+                  Project Overview
+                </button>
+              </div>
+              
+              <p className="text-xs text-muted uppercase tracking-wider mb-2 px-1">Modules</p>
+              {fileTree ? (
+                <div className="overflow-x-auto">
+                  <FileTree 
+                    nodes={fileTree} 
+                    selectedPath={selectedPath} 
+                    onSelectFile={setSelectedPath} 
+                  />
+                </div>
+              ) : (
+                <div className="px-2 text-xs text-muted">Loading files...</div>
+              )}
+            </div>
+          </Panel>
 
-        <div className="ml-auto flex items-center gap-2">
-          <Link
-            to={`/explore/${repoId}/architecture`}
-            className="flex items-center gap-1.5 text-xs text-accent hover:text-white transition-colors border border-accent/40 hover:border-white/40 rounded px-2 py-1"
-          >
-            <Layers className="w-3.5 h-3.5" />
-            Architecture
-          </Link>
-          <Link
-            to={`/explore/${repoId}/graph`}
-            className="flex items-center gap-1.5 text-xs text-accent hover:text-white transition-colors border border-accent/40 hover:border-white/40 rounded px-2 py-1"
-          >
-            <GitBranch className="w-3.5 h-3.5" />
-            Dependency Graph
-          </Link>
-          <Link
-            to={`/explore/${repoId}`}
-            className="flex items-center gap-1.5 text-xs text-accent hover:text-white transition-colors border border-accent/40 hover:border-white/40 rounded px-2 py-1"
-          >
-            <FileText className="w-3.5 h-3.5" />
-            Explorer
-          </Link>
-        </div>
-      </header>
+          <PanelResizer />
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* ── Sidebar Navigation ─────────────────────────────────────────────── */}
-        <aside className="w-64 border-r border-border bg-panel shrink-0 overflow-y-auto p-3">
-          <div className="mb-4">
-            <button
-              onClick={() => setSelectedPath(null)}
-              className={`w-full text-left block py-1.5 px-2 text-sm rounded transition-colors ${
-                !selectedPath ? 'text-accent bg-accent/10 font-medium' : 'text-white/80 hover:text-white hover:bg-surface'
-              }`}
-            >
-              Project Overview
-            </button>
-          </div>
-          
-          <p className="text-xs text-muted uppercase tracking-wider mb-2 px-1">Modules</p>
-          {fileTree ? (
-            <FileTree 
-              nodes={fileTree} 
-              selectedPath={selectedPath} 
-              onSelectFile={setSelectedPath} 
-            />
-          ) : (
-            <div className="px-2 text-xs text-muted">Loading files...</div>
-          )}
-        </aside>
-
-        {/* ── Documentation Content ──────────────────────────────────────────── */}
-        <main className="flex-1 overflow-y-auto p-8" style={{ background: '#0d1117' }}>
+          {/* ── Documentation Content ──────────────────────────────────────────── */}
+          <Panel defaultSize={80} minSize={30} className="flex flex-col bg-[#0d1117]">
+            <main className="flex-1 overflow-y-auto p-8 custom-scrollbar">
           <div className="max-w-4xl mx-auto">
             {loading ? (
               <div className="flex items-center gap-3 mt-10">
@@ -160,9 +130,9 @@ export default function DocumentationPage() {
               !selectedPath ? <OverviewDoc docs={docs} repoId={repoId} /> : <ModuleDoc docs={docs} repoId={repoId} />
             )}
           </div>
-        </main>
-      </div>
-    </div>
+            </main>
+          </Panel>
+    </PanelGroup>
   );
 }
 
@@ -397,9 +367,9 @@ function ModuleDoc({ docs, repoId }) {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div>
-            <h3 className="text-sm font-medium mb-2">Dependencies ({facts.dependencies.length})</h3>
+            <h3 className="text-sm font-medium mb-2">Dependencies ({facts.dependencies?.length || 0})</h3>
             <div className="bg-panel border border-border rounded max-h-64 overflow-y-auto p-2 space-y-1">
-              {facts.dependencies.length === 0 ? (
+              {!facts.dependencies || facts.dependencies.length === 0 ? (
                 <p className="text-xs text-muted p-2">No dependencies</p>
               ) : (
                 facts.dependencies.map((dep, i) => (
@@ -409,9 +379,9 @@ function ModuleDoc({ docs, repoId }) {
             </div>
           </div>
           <div>
-            <h3 className="text-sm font-medium mb-2">Dependents ({facts.dependents.length})</h3>
+            <h3 className="text-sm font-medium mb-2">Dependents ({facts.dependents?.length || 0})</h3>
             <div className="bg-panel border border-border rounded max-h-64 overflow-y-auto p-2 space-y-1">
-              {facts.dependents.length === 0 ? (
+              {!facts.dependents || facts.dependents.length === 0 ? (
                 <p className="text-xs text-muted p-2">No dependents</p>
               ) : (
                 facts.dependents.map((dep, i) => (
@@ -453,64 +423,3 @@ function SourceLink({ path, repoId, compact = false }) {
   );
 }
 
-function FileTree({ nodes, selectedPath, onSelectFile, depth = 0 }) {
-  return (
-    <ul>
-      {nodes.map((node) => (
-        <FileTreeNode
-          key={node.path}
-          node={node}
-          depth={depth}
-          selectedPath={selectedPath}
-          onSelectFile={onSelectFile}
-        />
-      ))}
-    </ul>
-  );
-}
-
-function FileTreeNode({ node, depth, selectedPath, onSelectFile }) {
-  const [open, setOpen] = useState(false);
-  const indent = depth * 12;
-  const isSelected = node.path === selectedPath;
-
-  if (node.type === 'directory') {
-    return (
-      <li>
-        <button
-          onClick={() => setOpen((o) => !o)}
-          style={{ paddingLeft: `${indent + 4}px` }}
-          className="w-full text-left flex items-center gap-1 py-1 text-muted hover:text-white text-xs transition-colors"
-        >
-          <span>{open ? '▾' : '▸'}</span>
-          <span>{node.name}/</span>
-        </button>
-        {open && node.children?.length > 0 && (
-          <FileTree
-            nodes={node.children}
-            depth={depth + 1}
-            selectedPath={selectedPath}
-            onSelectFile={onSelectFile}
-          />
-        )}
-      </li>
-    );
-  }
-
-  return (
-    <li>
-      <button
-        onClick={() => onSelectFile(node.path)}
-        style={{ paddingLeft: `${indent + 16}px` }}
-        className={`w-full text-left block py-1 text-xs truncate transition-colors ${
-          isSelected
-            ? 'text-accent font-medium'
-            : 'text-white/70 hover:text-white'
-        }`}
-        title={node.path}
-      >
-        {node.name}
-      </button>
-    </li>
-  );
-}

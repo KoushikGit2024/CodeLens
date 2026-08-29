@@ -20,3 +20,11 @@ We decided to implement an **Architecture Intelligence** layer that bridges the 
   - Resilient UI: if watsonx is unavailable, the user still sees the architecture diagram and component list.
 - **Cons:**
   - Component detection relies on heuristics (e.g., `controllers`, `services` directories). Codebases with non-standard structures might all be lumped into `Core/Other`, reducing the usefulness of layer colors.
+
+## Alternatives Considered
+
+Not documented for this ADR.
+
+## Related Documentation
+
+Not documented for this ADR.

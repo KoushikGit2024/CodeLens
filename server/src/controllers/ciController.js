@@ -5,6 +5,9 @@ const { analyzeRepository } = require('../analyzers/repositoryAnalyzer');
 const { buildDependencyGraph, detectCycles } = require('../analyzers/dependencyGraph');
 const { analyzeChangeImpact } = require('../analyzers/changeImpact');
 const { buildArchitectureModel } = require('../analyzers/architectureAnalyzer');
+const { buildEngineeringRiskModel } = require('../analyzers/engineeringRiskAnalyzer');
+const { buildRefactoringIntelligence } = require('../analyzers/refactoringAnalyzer');
+const { buildRepositoryIntelligence } = require('../analyzers/repositoryIntelligence');
 
 /**
  * ciController.js
@@ -109,14 +112,36 @@ async function getCiReport(req, res, next) {
     const changedFiles = record.lastChangedFiles || [];
     const impact = analyzeChangeImpact(record.analysis, graph, changedFiles);
 
+    const architecture = buildArchitectureModel(record.analysis, graph);
+    const engineeringHealth = buildEngineeringRiskModel(record.analysis, graph, architecture);
+    const refactoringIntel = buildRefactoringIntelligence(engineeringHealth);
+    const unifiedIntel = buildRepositoryIntelligence(record.analysis, graph, architecture);
+
     const report = {
-      status: (cycles.length > 0 || graph.meta.unresolvedImports > 0) ? 'fail' : 'pass',
+      status: (cycles.length > 0 || graph.meta.unresolvedImports > 0 || engineeringHealth.score < 50) ? 'fail' : 'pass',
       summary: `Analysis Version ${record.analysis.meta.analysisVersion}`,
       changedFiles: changedFiles,
+      engineeringHealth: {
+        score: engineeringHealth.score,
+        riskLevel: engineeringHealth.riskLevel,
+        metrics: engineeringHealth.metrics
+      },
+      refactoring: {
+        candidateCount: refactoringIntel.candidateCount,
+        critical: refactoringIntel.critical,
+        high: refactoringIntel.high,
+        topPriorityScore: refactoringIntel.topPriorityScore
+      },
       dependencyCycles: cycles,
       unresolvedImports: graph.meta.unresolvedImports,
       architectureIssues: [], // Placeholder for future rules
       documentationImpact: impact.affectedComponents, // Components whose docs might need an update
+      intelligence: {
+        healthScore: unifiedIntel.engineeringHealth.score,
+        criticalRisks: unifiedIntel.engineeringHealth.critical,
+        refactoringCandidates: unifiedIntel.refactoring.candidateCount,
+        topHotspot: unifiedIntel.hotspots.length > 0 ? unifiedIntel.hotspots[0].filePath : null
+      },
       analysisVersion: record.analysis.meta.analysisVersion,
       meta: record.analysis.meta
     };

@@ -23,3 +23,11 @@ We implemented a **Deterministic-First Repository Intelligence** system.
 ### Negative
 - **Routing Complexity:** The heuristic router is simple but may misclassify nuanced questions. A more advanced classifier may be needed in the future.
 - **UI Complexity:** The frontend must render complex structured JSON instead of simple markdown prose.
+
+## Alternatives Considered
+
+Not documented for this ADR.
+
+## Related Documentation
+
+Not documented for this ADR.
