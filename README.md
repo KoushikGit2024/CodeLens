@@ -55,17 +55,15 @@ graph TD
 CodeLens/
 ├── client/              # React frontend
 │   ├── src/
-│   │   ├── api/         # Axios API definitions
-│   │   ├── components/  # Reusable UI elements
-│   │   └── pages/       # Route-level pages (Explorer, Architecture, Health)
+│   │   ├── app/         # Application entry and routing
+│   │   ├── shared/      # Shared components, APIs, and layouts
+│   │   └── features/    # Feature-driven UI components and pages
 │   └── package.json
 ├── server/              # Node.js backend
 │   ├── src/
-│   │   ├── analyzers/   # Pure deterministic engines (Tree-sitter, Graphs)
-│   │   ├── ai/          # Context Builders and Watsonx integration
-│   │   ├── controllers/ # Express route controllers
-│   │   └── routes/      # Express API definitions
-│   ├── tests/           # Jest test suites
+│   │   ├── core/        # System infrastructure (server, app, base ai)
+│   │   └── domains/     # Feature-oriented vertical slices (repository, parsing, dependencies, architecture, engineering, assistant)
+│   ├── tests/           # Jest test suites mirroring domains/
 │   └── package.json
 ├── docs/                # Comprehensive Knowledge Base
 ├── README.md            # You are here

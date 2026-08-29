@@ -1,9 +1,9 @@
 const express = require('express');
 const cors = require('cors');
 
-const healthRouter = require('./routes/health');
-const repositoryRouter = require('./routes/repository');
-const docsRouter = require('./routes/docs');
+const healthRouter = require('./domains/engineering/engineering.routes');
+const repositoryRouter = require('./domains/repository/repository.routes');
+const docsRouter = require('./domains/assistant/docs.routes');
 
 const app = express();
 

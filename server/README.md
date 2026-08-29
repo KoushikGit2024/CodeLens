@@ -20,33 +20,29 @@ The backend orchestrates the entire intelligence pipeline. It extracts uploaded 
 ```text
 server/
 ├── src/
-│   ├── analyzers/            # Deterministic code analysis engines
-│   │   ├── repositoryAnalyzer.js
-│   │   ├── dependencyGraph.js
-│   │   ├── engineeringRiskAnalyzer.js
-│   │   ├── refactoringAnalyzer.js
-│   │   ├── architectureAnalyzer.js
-│   │   └── repositoryIntelligence.js
-│   ├── ai/                   # AI Prompt Builders and Generators
-│   │   ├── aiProvider.js
-│   │   ├── questionRouter.js
-│   │   ├── questionContextBuilder.js
-│   │   └── repositoryIntelligenceGenerator.js
-│   ├── controllers/          # Express route handlers
-│   ├── routes/               # Express API route definitions
-│   ├── repositories/         # Local file storage / extraction logic
-│   ├── app.js                # Express app configuration
-│   └── index.js              # Server entry point
-├── tests/                    # Jest unit and integration tests
+│   ├── core/                 # Infrastructure, server setup, and base AI
+│   │   ├── server.js         # Server entry point
+│   │   ├── app.js            # Express app configuration
+│   │   ├── utils/            # Shared utilities
+│   │   ├── middleware/       # Express middleware
+│   │   └── ai/               # AI provider clients (Watsonx)
+│   ├── domains/              # Feature-oriented vertical slices
+│   │   ├── repository/       # Upload, storage, and persistence
+│   │   ├── parsing/          # AST generation and language detection
+│   │   ├── dependencies/     # Dependency graph construction
+│   │   ├── architecture/     # Component mapping and diagrams
+│   │   ├── engineering/      # Health, risks, and refactoring
+│   │   └── assistant/        # Q&A routing and generators
+├── tests/                    # Jest test suites (mirroring domains/)
 ├── .data/                    # Runtime extracted repositories (git-ignored)
 └── package.json
 ```
 
 ## The "Deterministic First" Principle
 
-The backend is strictly divided between `analyzers/` and `ai/`. 
-The `analyzers` directory contains zero AI logic. It computes absolute, deterministic facts about the codebase.
-The `ai` directory contains context builders that take the deterministic output of the analyzers and pass it to IBM watsonx as structured JSON context. **Code is never blindly dumped into the LLM.**
+The backend is strictly divided between deterministic domains (e.g., `parsing/`, `dependencies/`) and AI generation (e.g., `assistant/generators/`). 
+The core domains contain zero AI logic. They compute absolute, deterministic facts about the codebase.
+The `assistant/context/` builders take the deterministic output of the domains and pass it to IBM watsonx as structured JSON context. **Code is never blindly dumped into the LLM.**
 
 ## Running Locally
 

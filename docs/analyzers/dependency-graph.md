@@ -388,7 +388,7 @@ for (const [filePath, imports] of resolved) {
 
 ### Adding a new resolution rule
 
-All resolution logic lives in [`server/src/analyzers/moduleResolver.js`](../../server/src/analyzers/moduleResolver.js) in the `resolveImport()` function.
+All resolution logic lives in [`../../server/src/domains/dependencies/module.resolver.js`](../../server/src/domains/dependencies/module.resolver.js) in the `resolveImport()` function.
 
 To add a new rule (e.g. support `.mjs` extension):
 

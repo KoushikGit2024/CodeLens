@@ -6,7 +6,7 @@ The analysis layer produces a `RepositoryAnalysis` object containing one
 `FileAnalysis` per source file. Each `FileAnalysis` contains an array of
 `Symbol` objects.
 
-All types are defined in [`server/src/analyzers/symbols.js`](../server/src/analyzers/symbols.js).
+All types are defined in [`server/src/analyzers/symbols.js`](../server/src/domains/parsing/symbols.js).
 
 ---
 
@@ -267,7 +267,7 @@ The top-level result of analysing an entire repository.
 ## Dependency Graph (Step 3)
 
 The dependency graph is built on top of `RepositoryAnalysis` by
-[`server/src/analyzers/dependencyGraph.js`](../server/src/analyzers/dependencyGraph.js).
+[`server/src/analyzers/dependencyGraph.js`](../server/src/domains/dependencies/dependency.analyzer.js).
 
 ### Node
 
