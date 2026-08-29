@@ -186,3 +186,12 @@ codelens/
 
 4. The `parserRegistry` caches language objects after first load. If you need
    a clean slate, restart the server (there's no in-process cache invalidation).
+
+---
+
+## Version Control
+
+- **Independent Repository**: CodeLens is independently version-controlled.
+- **Git Root**: Its Git root is the CodeLens project directory (`AIDrivenCodeIntelligence_AutomatedDocumentationSystem`).
+- **Security**: `.env`, API credentials, and generated artifacts (like `node_modules` or uploaded temp files) must **never** be committed.
+- **Management**: The project should be cloned/managed independently from any parent directory it may reside in.

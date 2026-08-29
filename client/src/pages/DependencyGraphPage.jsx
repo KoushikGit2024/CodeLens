@@ -22,7 +22,7 @@
  */
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import ReactFlow, {
   Background,
   Controls,
@@ -360,7 +360,7 @@ export default function DependencyGraphPage() {
           )}
 
           {selected && !infoLoading && fileInfo && (
-            <FileDetailPanel info={fileInfo} />
+            <FileDetailPanel info={fileInfo} repoId={repoId} />
           )}
 
           {selected && !infoLoading && !fileInfo && (
@@ -404,12 +404,21 @@ function LegendItem({ color, label, shape }) {
   );
 }
 
-function FileDetailPanel({ info }) {
+function FileDetailPanel({ info, repoId }) {
+  const explorerUrl = `/explore/${repoId}?path=${encodeURIComponent(info.filePath)}`;
+
   return (
     <div className="flex flex-col gap-3">
       <div>
         <p className="text-xs text-muted uppercase tracking-wider mb-1">File</p>
-        <p className="text-xs text-white font-mono break-all">{info.filePath}</p>
+        <p className="text-xs text-white font-mono break-all mb-2">{info.filePath}</p>
+        <Link 
+          to={explorerUrl}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-accent/10 border border-accent/40 rounded text-xs text-accent hover:bg-accent/20 transition-colors"
+        >
+          <File className="w-3.5 h-3.5" />
+          View in Explorer
+        </Link>
       </div>
 
       <div className="flex gap-4">
@@ -423,7 +432,7 @@ function FileDetailPanel({ info }) {
             Dependencies ({info.dependencyCount})
           </p>
           {info.dependencies.map((dep, i) => (
-            <DepEntry key={i} dep={dep} />
+            <DepEntry key={i} dep={dep} repoId={repoId} />
           ))}
         </section>
       )}
@@ -434,7 +443,7 @@ function FileDetailPanel({ info }) {
             Used by ({info.dependentCount})
           </p>
           {info.dependents.map((dep, i) => (
-            <DepEntry key={i} dep={dep} reverse />
+            <DepEntry key={i} dep={dep} reverse repoId={repoId} />
           ))}
         </section>
       )}
@@ -500,20 +509,29 @@ function PackageDetailPanel({ nodeId, graph }) {
   return null;
 }
 
-function DepEntry({ dep, reverse = false }) {
+function DepEntry({ dep, reverse = false, repoId }) {
   const name  = dep.filePath ? dep.filePath.split('/').pop() : dep.package;
   const Icon  = dep.package ? Package : File;
   const color = dep.package ? 'text-warning' : 'text-accent';
   const badge = dep.edgeType === 'requires' ? 'cjs' : null;
 
   return (
-    <div className="flex items-center gap-1.5 py-0.5">
+    <div className="flex items-center gap-1.5 py-0.5 group">
       <Icon className={`w-3 h-3 ${color} shrink-0`} />
       <span className="text-xs text-white font-mono truncate flex-1" title={dep.filePath || dep.package}>
         {name}
       </span>
       {badge && (
         <span className="text-xs text-muted bg-surface rounded px-1">{badge}</span>
+      )}
+      {dep.filePath && (
+        <Link
+          to={`/explore/${repoId}?path=${encodeURIComponent(dep.filePath)}`}
+          className="opacity-0 group-hover:opacity-100 text-xs text-accent hover:underline shrink-0"
+          title={`View in Explorer`}
+        >
+          View
+        </Link>
       )}
     </div>
   );
