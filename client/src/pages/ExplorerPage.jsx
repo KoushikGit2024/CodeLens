@@ -22,7 +22,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
-import { Loader2, ChevronLeft, GitBranch, Send, File, AlertTriangle, Layers, BookOpen } from 'lucide-react';
+import { Loader2, ChevronLeft, GitBranch, Send, File, AlertTriangle, Layers, BookOpen, MessageSquare, Brain, Database } from 'lucide-react';
 import { repositoryApi } from '../api';
 
 // ── Monaco language map ───────────────────────────────────────────────────────
@@ -240,6 +240,13 @@ export default function ExplorerPage() {
             Docs
           </Link>
           <Link
+            to={`/explore/${repoId}/assistant`}
+            className="flex items-center gap-1.5 text-xs text-accent hover:text-white transition-colors border border-accent/40 hover:border-white/40 rounded px-2 py-1"
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            Assistant
+          </Link>
+          <Link
             to={`/explore/${repoId}/architecture`}
             className="flex items-center gap-1.5 text-xs text-accent hover:text-white transition-colors border border-accent/40 hover:border-white/40 rounded px-2 py-1"
           >
@@ -374,13 +381,18 @@ function AiPanel({ repoId, onOpenFile, onHighlightRange }) {
     setLoading(true);
 
     try {
-      const res = await repositoryApi.ask(repoId, q);
-      const { answer, references, context } = res.data;
+      // Use the new Step 8 endpoint
+      const res = await repositoryApi.askQuestion(repoId, q);
+      const ans = res.data.answer;
+      
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: answer,
-        references: references || [],
-        context,
+        content: ans.summary + (ans.explanation ? `\n\n${ans.explanation}` : ''),
+        references: ans.references || [],
+        facts: ans.facts || [],
+        inferences: ans.inferences || [],
+        intent: res.data.intent,
+        isDeterministic: !res.data.requiresAi
       }]);
     } catch (err) {
       const msg = err?.response?.data?.error || err.message || 'Request failed';
@@ -457,50 +469,59 @@ function Message({ msg, onOpenFile }) {
 
   if (msg.role === 'error') {
     return (
-      <div className="text-xs text-danger bg-danger/10 border border-danger/20 rounded px-2.5 py-1.5">
-        {msg.content}
+      <div className="text-xs text-danger bg-danger/10 border border-danger/20 rounded px-2.5 py-1.5 flex gap-2">
+        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+        <span>{msg.content}</span>
       </div>
     );
   }
 
-  // assistant — render references as clickable file links
+  // assistant — render structured response compactly
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-2 bg-surface/30 border border-border rounded p-2.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-medium text-white/80 flex items-center gap-1">
+          {msg.isDeterministic ? <Database className="w-3 h-3 text-success" /> : <Brain className="w-3 h-3 text-accent" />}
+          {msg.isDeterministic ? 'Deterministic' : 'AI Inference'}
+        </span>
+        {msg.intent && (
+          <span className="text-[9px] text-muted uppercase tracking-wider">{msg.intent}</span>
+        )}
+      </div>
+
       <div className="text-xs text-white/90 whitespace-pre-wrap leading-relaxed">
         {msg.content}
       </div>
 
-      {msg.references && msg.references.length > 0 && (
-        <div className="flex flex-col gap-0.5 mt-1">
-          {msg.references.map((ref, i) => {
-            // Parse optional line number from "10" or "10-25"
-            let startLine = null;
-            if (ref.lines) {
-              const m = String(ref.lines).match(/^(\d+)/);
-              if (m) startLine = parseInt(m[1], 10);
-            }
-
-            return (
-              <button
-                key={i}
-                onClick={() => onOpenFile(ref.path, startLine)}
-                className="flex items-center gap-1 text-xs text-accent/80 hover:text-accent transition-colors text-left"
-                title={`Open ${ref.path}${startLine ? ` at line ${startLine}` : ''}`}
-              >
-                <File className="w-3 h-3 shrink-0" />
-                <span className="font-mono truncate">
-                  {ref.path}{ref.lines ? `:${ref.lines}` : ''}
-                </span>
-              </button>
-            );
-          })}
+      {msg.facts && msg.facts.length > 0 && (
+        <div className="mt-1">
+          <span className="text-[10px] font-medium text-muted uppercase">Facts</span>
+          <ul className="list-disc list-inside text-[11px] text-white/70 space-y-0.5 mt-0.5">
+            {msg.facts.slice(0, 3).map((f, i) => <li key={i} className="truncate">{f}</li>)}
+            {msg.facts.length > 3 && <li className="italic">+{msg.facts.length - 3} more</li>}
+          </ul>
         </div>
       )}
 
-      {msg.context && (
-        <div className="text-xs text-muted mt-0.5">
-          {msg.context.filesConsidered} file{msg.context.filesConsidered !== 1 ? 's' : ''} analysed
-          {msg.context.truncated ? ' (truncated)' : ''}
+      {msg.references && msg.references.length > 0 && (
+        <div className="flex flex-col gap-0.5 mt-2 pt-2 border-t border-border">
+          <span className="text-[10px] font-medium text-muted uppercase mb-0.5">References</span>
+          {msg.references.map((ref, i) => (
+            <button
+              key={i}
+              onClick={() => onOpenFile(ref.path, ref.startLine)}
+              className="flex items-center gap-1 text-[11px] text-accent/80 hover:text-accent transition-colors text-left group"
+              title={`Open ${ref.path}${ref.startLine ? ` at line ${ref.startLine}` : ''}`}
+            >
+              <File className="w-3 h-3 shrink-0" />
+              <span className="font-mono truncate">
+                {ref.path}{ref.startLine ? `:${ref.startLine}` : ''}
+              </span>
+              {ref.reason && (
+                <span className="text-[9px] text-muted ml-1 truncate group-hover:text-accent/60">({ref.reason})</span>
+              )}
+            </button>
+          ))}
         </div>
       )}
     </div>

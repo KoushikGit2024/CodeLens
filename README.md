@@ -120,20 +120,20 @@ codelens/
 
 ## API Reference
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/health` | Health check |
-| POST | `/api/repository/upload` | Upload ZIP — returns `{id, name, status:'analyzing'}` |
-| GET | `/api/repository/:id` | Repository record + status |
-| GET | `/api/repository/:id/files` | File tree (status must be `ready`) |
-| GET | `/api/repository/:id/file?path=…` | Raw file content |
-| GET | `/api/repository/:id/analysis` | Full analysis (symbols for all files) |
-| GET | `/api/repository/:id/analysis/file?path=…` | Analysis for one file |
-| GET | `/api/repository/:id/graph` | Full node/edge dependency graph |
-| GET | `/api/repository/:id/architecture` | Architectural models and component grouping |
-| GET | `/api/repository/:id/documentation/overview` | High-level repository documentation |
-| GET | `/api/repository/:id/documentation/file` | File-level architectural documentation |
-| POST | `/api/repository/:id/ask` | Ask questions about the repository |
+CodeLens exposes its analysis through a REST API (default port 3001).
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/repository/upload` | POST | Upload a ZIP file containing the repository |
+| `/api/repository/:id` | GET | Check analysis status |
+| `/api/repository/:id/files` | GET | Retrieve the file tree |
+| `/api/repository/:id/file?path=...` | GET | Retrieve raw file content securely |
+| `/api/repository/:id/analysis` | GET | Retrieve the AST-based symbol analysis |
+| `/api/repository/:id/graph` | GET | Retrieve the module dependency graph |
+| `/api/repository/:id/architecture` | GET | Retrieve architectural components and insights |
+| `/api/repository/:id/documentation/overview` | GET | Retrieve generated repository docs |
+| `/api/repository/:id/documentation/file?path=...` | GET | Retrieve generated module docs |
+| `/api/repository/:id/question` | POST | Ask a contextual question about the repository |
 
 **Upload flow:**
 1. POST upload → response is `status: 'analyzing'`
@@ -205,3 +205,4 @@ codelens/
 * **Step 5:** Interface — Code viewer (Monaco), repository Q&A panel, dependency graph visualization (React Flow).
 * **Step 6:** Architectural Intelligence — Automatic component detection, architectural layer mapping, and Mermaid.js diagram generation with AI insights.
 * **Step 7:** Documentation Intelligence — Automated hierarchical documentation, architectural deep-dives, and AI-driven repository overviews.
+* **Step 8:** Evolution — CI/CD integration, incremental analysis caching, and multi-language support expansion.

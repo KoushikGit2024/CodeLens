@@ -107,6 +107,7 @@ codelens/
 | 5 | Code viewer, AI file references, deep-linking | ✅ |
 | 6 | Architecture Intelligence — Component detection, Mermaid generation, AI insights | ✅ |
 | 7 | Automated Documentation Intelligence — Deterministic context + AI interpretation | ✅ |
+| 8 | AI Repository Intelligence & Contextual Code Q&A — Deterministic routing + Structured AI | ✅ |
 
 ---
 
@@ -126,7 +127,8 @@ codelens/
 | GET | `/api/repository/:id/architecture` | Architectural model + insights |
 | GET | `/api/repository/:id/documentation/overview` | Generated repository docs |
 | GET | `/api/repository/:id/documentation/file?path=…` | Generated module docs |
-| POST | `/api/repository/:id/ask` | AI Q&A — `{ question }` → `{ answer, references, context }` |
+| POST | `/api/repository/:id/ask` | (Legacy) AI Q&A |
+| POST | `/api/repository/:id/question` | AI Repository Intelligence Q&A — `{ question }` → structured answer |
 
 ---
 

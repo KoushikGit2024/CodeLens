@@ -4,6 +4,7 @@ import ExplorerPage from './pages/ExplorerPage';
 import DependencyGraphPage from './pages/DependencyGraphPage';
 import ArchitecturePage from './pages/ArchitecturePage';
 import DocumentationPage from './pages/DocumentationPage';
+import RepositoryAssistantPage from './pages/RepositoryAssistantPage';
 
 export default function App() {
   return (
@@ -13,6 +14,7 @@ export default function App() {
       <Route path="/explore/:repoId/graph" element={<DependencyGraphPage />} />
       <Route path="/explore/:repoId/architecture" element={<ArchitecturePage />} />
       <Route path="/explore/:repoId/documentation" element={<DocumentationPage />} />
+      <Route path="/explore/:repoId/assistant" element={<RepositoryAssistantPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

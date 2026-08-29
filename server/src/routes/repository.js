@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const repositoryController = require('../controllers/repositoryController');
 const documentationController = require('../controllers/documentationController');
+const assistantController = require('../controllers/assistantController');
 const { uploadMiddleware } = require('../middleware/upload');
 const { ask } = require('../ai/askController');
 
@@ -39,7 +40,10 @@ router.get('/:id/documentation/overview', documentationController.getOverviewDoc
 // GET  /api/repository/:id/documentation/file?path=... — AI docs (Module)
 router.get('/:id/documentation/file', documentationController.getModuleDocumentation);
 
-// POST /api/repository/:id/ask             — AI Q&A for repository
+// POST /api/repository/:id/ask             — (Legacy) AI Q&A for repository
 router.post('/:id/ask', ask);
+
+// POST /api/repository/:id/question        — AI Repository Intelligence Q&A
+router.post('/:id/question', assistantController.askQuestion);
 
 module.exports = router;

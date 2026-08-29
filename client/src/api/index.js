@@ -52,10 +52,15 @@ export const repositoryApi = {
   getModuleDocumentation: (id, path) =>
     api.get(`/repository/${id}/documentation/file`, { params: { path } }),
 
-  // AI
+  // AI (Legacy)
   ask: (id, question) =>{
     return api.post(`/repository/${id}/ask`, { question });
   },
+
+  // AI Repository Intelligence (Step 8)
+  askQuestion: (id, question) => {
+    return api.post(`/repository/${id}/question`, { question });
+  }
 };
 
 export default api;
