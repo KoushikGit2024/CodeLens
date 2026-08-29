@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import mermaid from 'mermaid';
-import { ChevronLeft, RefreshCw, AlertCircle, Loader2, File, Box } from 'lucide-react';
+import { ChevronLeft, RefreshCw, AlertCircle, Loader2, File, Box, BookOpen } from 'lucide-react';
 import { repositoryApi } from '../api';
 
 // Initialize mermaid
@@ -82,14 +82,23 @@ export default function ArchitecturePage() {
           Back
         </button>
         <span className="text-white font-medium">Architecture Intelligence</span>
-        <button
-          onClick={loadArchitecture}
-          className="ml-auto flex items-center gap-1 text-muted hover:text-white transition-colors text-xs"
-          title="Reload architecture"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          Reload
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <Link
+            to={`/explore/${repoId}/documentation`}
+            className="flex items-center gap-1.5 text-xs text-accent hover:text-white transition-colors border border-accent/40 hover:border-white/40 rounded px-2 py-1"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            Docs
+          </Link>
+          <button
+            onClick={loadArchitecture}
+            className="flex items-center gap-1 text-muted hover:text-white transition-colors text-xs"
+            title="Reload architecture"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Reload
+          </button>
+        </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">

@@ -106,6 +106,7 @@ codelens/
 | 4 | AI context builder, IBM watsonx provider, repository Q&A, ExplorerPage panel | ✅ |
 | 5 | Code viewer, AI file references, deep-linking | ✅ |
 | 6 | Architecture Intelligence — Component detection, Mermaid generation, AI insights | ✅ |
+| 7 | Automated Documentation Intelligence — Deterministic context + AI interpretation | ✅ |
 
 ---
 
@@ -122,6 +123,9 @@ codelens/
 | GET | `/api/repository/:id/analysis/file?path=…` | Single-file analysis |
 | GET | `/api/repository/:id/graph` | Full dependency graph |
 | GET | `/api/repository/:id/graph/file?path=…` | File dependencies/dependents |
+| GET | `/api/repository/:id/architecture` | Architectural model + insights |
+| GET | `/api/repository/:id/documentation/overview` | Generated repository docs |
+| GET | `/api/repository/:id/documentation/file?path=…` | Generated module docs |
 | POST | `/api/repository/:id/ask` | AI Q&A — `{ question }` → `{ answer, references, context }` |
 
 ---

@@ -46,8 +46,14 @@ export const repositoryApi = {
     return api.get(`/repository/${id}/architecture`);
   },
 
-  /** Ask a natural-language question about the repository */
-  ask(id, question) {
+  // Documentation
+  getOverviewDocumentation: (id) =>
+    api.get(`/repository/${id}/documentation/overview`),
+  getModuleDocumentation: (id, path) =>
+    api.get(`/repository/${id}/documentation/file`, { params: { path } }),
+
+  // AI
+  ask: (id, question) =>{
     return api.post(`/repository/${id}/ask`, { question });
   },
 };

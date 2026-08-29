@@ -129,10 +129,11 @@ codelens/
 | GET | `/api/repository/:id/file?path=…` | Raw file content |
 | GET | `/api/repository/:id/analysis` | Full analysis (symbols for all files) |
 | GET | `/api/repository/:id/analysis/file?path=…` | Analysis for one file |
-| `GET` | `/api/repository/:id/graph` | Full dependency graph |
-| `GET` | `/api/repository/:id/graph/file?path=…` | File dependencies/dependents |
-| `GET` | `/api/repository/:id/architecture` | Architecture model, Mermaid diagram, and AI insights |
-| `POST` | `/api/repository/:id/ask` | AI Q&A (`{ question }` → `{ answer, references, context }`) |
+| GET | `/api/repository/:id/graph` | Full node/edge dependency graph |
+| GET | `/api/repository/:id/architecture` | Architectural models and component grouping |
+| GET | `/api/repository/:id/documentation/overview` | High-level repository documentation |
+| GET | `/api/repository/:id/documentation/file` | File-level architectural documentation |
+| POST | `/api/repository/:id/ask` | Ask questions about the repository |
 
 **Upload flow:**
 1. POST upload → response is `status: 'analyzing'`
@@ -198,8 +199,9 @@ codelens/
 - **Management**: The project should be cloned/managed independently from any parent directory it may reside in.
 
 * **Step 1:** Foundation — ZIP upload, extraction, file tree, repository data store.
-* **Step 2:** Structural Intelligence — Tree-sitter AST parsing (JavaScript & TypeScript) for symbols, imports, and exports.
+* **Step 2:** Structural Intelligence — **Tree-sitter AST Parsing**: Fully deterministic analysis of JavaScript, JSX, TypeScript, and TSX files.
 * **Step 3:** Relational Intelligence — Module resolution, deterministic dependency graph, cycle detection.
 * **Step 4:** Contextual Intelligence — Intelligent context assembly, IBM watsonx AI provider.
 * **Step 5:** Interface — Code viewer (Monaco), repository Q&A panel, dependency graph visualization (React Flow).
 * **Step 6:** Architectural Intelligence — Automatic component detection, architectural layer mapping, and Mermaid.js diagram generation with AI insights.
+* **Step 7:** Documentation Intelligence — Automated hierarchical documentation, architectural deep-dives, and AI-driven repository overviews.

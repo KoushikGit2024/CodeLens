@@ -1,5 +1,6 @@
 const { Router } = require('express');
 const repositoryController = require('../controllers/repositoryController');
+const documentationController = require('../controllers/documentationController');
 const { uploadMiddleware } = require('../middleware/upload');
 const { ask } = require('../ai/askController');
 
@@ -31,6 +32,12 @@ router.get('/:id/graph/file', repositoryController.getFileDependencyInfo);
 
 // GET  /api/repository/:id/architecture    — architecture model + mermaid + ai insights
 router.get('/:id/architecture', repositoryController.getArchitecture);
+
+// GET  /api/repository/:id/documentation/overview — AI docs (Overview + Architecture)
+router.get('/:id/documentation/overview', documentationController.getOverviewDocumentation);
+
+// GET  /api/repository/:id/documentation/file?path=... — AI docs (Module)
+router.get('/:id/documentation/file', documentationController.getModuleDocumentation);
 
 // POST /api/repository/:id/ask             — AI Q&A for repository
 router.post('/:id/ask', ask);
