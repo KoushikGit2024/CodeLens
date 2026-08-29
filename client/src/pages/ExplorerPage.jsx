@@ -22,7 +22,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
-import { Loader2, ChevronLeft, GitBranch, Send, File, AlertTriangle } from 'lucide-react';
+import { Loader2, ChevronLeft, GitBranch, Send, File, AlertTriangle, Layers } from 'lucide-react';
 import { repositoryApi } from '../api';
 
 // ── Monaco language map ───────────────────────────────────────────────────────
@@ -231,13 +231,22 @@ export default function ExplorerPage() {
           </span>
         )}
 
-        <Link
-          to={`/explore/${repoId}/graph`}
-          className="ml-auto flex items-center gap-1.5 text-xs text-accent hover:text-white transition-colors border border-accent/40 hover:border-white/40 rounded px-2 py-1"
-        >
-          <GitBranch className="w-3.5 h-3.5" />
-          Dependency Graph
-        </Link>
+        <div className="ml-auto flex items-center gap-2">
+          <Link
+            to={`/explore/${repoId}/architecture`}
+            className="flex items-center gap-1.5 text-xs text-accent hover:text-white transition-colors border border-accent/40 hover:border-white/40 rounded px-2 py-1"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            Architecture
+          </Link>
+          <Link
+            to={`/explore/${repoId}/graph`}
+            className="flex items-center gap-1.5 text-xs text-accent hover:text-white transition-colors border border-accent/40 hover:border-white/40 rounded px-2 py-1"
+          >
+            <GitBranch className="w-3.5 h-3.5" />
+            Dependency Graph
+          </Link>
+        </div>
       </header>
 
       {/* ── Main layout ────────────────────────────────────────────────────── */}

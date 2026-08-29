@@ -13,6 +13,9 @@ const {
   detectCycles,
 } = require('../analyzers/dependencyGraph');
 const { detectLanguage } = require('../analyzers/languageDetector');
+const { buildArchitectureModel } = require('../analyzers/architectureAnalyzer');
+const { generateSystemOverview } = require('../analyzers/mermaidGenerator');
+const { getArchitectureInsights } = require('../ai/architectureInsights');
 
 // ── POST /api/repository/upload ───────────────────────────────────────────────
 async function upload(req, res, next) {
@@ -245,6 +248,31 @@ function getFileDependencyInfo(req, res) {
   }
 }
 
+// ── GET /api/repository/:id/architecture ──────────────────────────────────────
+async function getArchitecture(req, res) {
+  const record = repositoryStore.get(req.params.id);
+  if (!record) return res.status(404).json({ error: 'Repository not found' });
+  if (record.status === 'analyzing') return res.status(202).json({ status: 'analyzing' });
+  if (record.status !== 'ready') return res.status(409).json({ error: 'Repository not ready', status: record.status });
+  if (!record.analysis) return res.status(404).json({ error: 'Analysis not available' });
+
+  try {
+    const graph = buildDependencyGraph(record.analysis);
+    const architectureModel = buildArchitectureModel(record.analysis, graph);
+    const mermaid = generateSystemOverview(architectureModel);
+    
+    const insights = await getArchitectureInsights(architectureModel);
+
+    return res.json({
+      model: architectureModel,
+      mermaid,
+      insights
+    });
+  } catch (err) {
+    return res.status(500).json({ error: `Architecture analysis failed: ${err.message}` });
+  }
+}
+
 module.exports = {
   upload,
   getRepository,
@@ -254,4 +282,5 @@ module.exports = {
   getFileAnalysis,
   getDependencyGraph,
   getFileDependencyInfo,
+  getArchitecture,
 };

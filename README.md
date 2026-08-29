@@ -129,9 +129,10 @@ codelens/
 | GET | `/api/repository/:id/file?path=…` | Raw file content |
 | GET | `/api/repository/:id/analysis` | Full analysis (symbols for all files) |
 | GET | `/api/repository/:id/analysis/file?path=…` | Analysis for one file |
-| GET | `/api/repository/:id/graph` | Full dependency graph (nodes, edges, cycles, isolated) |
-| GET | `/api/repository/:id/graph/file?path=…` | Dependencies + dependents for one file |
-| POST | `/api/repository/:id/ask` | AI Q&A — body: `{ question }`, response: `{ answer, references, context }` |
+| `GET` | `/api/repository/:id/graph` | Full dependency graph |
+| `GET` | `/api/repository/:id/graph/file?path=…` | File dependencies/dependents |
+| `GET` | `/api/repository/:id/architecture` | Architecture model, Mermaid diagram, and AI insights |
+| `POST` | `/api/repository/:id/ask` | AI Q&A (`{ question }` → `{ answer, references, context }`) |
 
 **Upload flow:**
 1. POST upload → response is `status: 'analyzing'`
@@ -195,3 +196,10 @@ codelens/
 - **Git Root**: Its Git root is the CodeLens project directory (`AIDrivenCodeIntelligence_AutomatedDocumentationSystem`).
 - **Security**: `.env`, API credentials, and generated artifacts (like `node_modules` or uploaded temp files) must **never** be committed.
 - **Management**: The project should be cloned/managed independently from any parent directory it may reside in.
+
+* **Step 1:** Foundation — ZIP upload, extraction, file tree, repository data store.
+* **Step 2:** Structural Intelligence — Tree-sitter AST parsing (JavaScript & TypeScript) for symbols, imports, and exports.
+* **Step 3:** Relational Intelligence — Module resolution, deterministic dependency graph, cycle detection.
+* **Step 4:** Contextual Intelligence — Intelligent context assembly, IBM watsonx AI provider.
+* **Step 5:** Interface — Code viewer (Monaco), repository Q&A panel, dependency graph visualization (React Flow).
+* **Step 6:** Architectural Intelligence — Automatic component detection, architectural layer mapping, and Mermaid.js diagram generation with AI insights.

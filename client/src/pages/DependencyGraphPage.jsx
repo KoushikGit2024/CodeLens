@@ -33,7 +33,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
-import { Loader2, ChevronLeft, Package, File, AlertCircle, RefreshCw } from 'lucide-react';
+import { Loader2, ChevronLeft, Package, File, AlertCircle, RefreshCw, Layers } from 'lucide-react';
 import { repositoryApi } from '../api';
 
 // ── Layout constants ──────────────────────────────────────────────────────────
@@ -256,14 +256,23 @@ export default function DependencyGraphPage() {
           Back
         </button>
         <span className="text-white font-medium">Dependency Graph</span>
-        <button
-          onClick={loadGraph}
-          className="ml-auto flex items-center gap-1 text-muted hover:text-white transition-colors text-xs"
-          title="Reload graph"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          Reload
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <Link
+            to={`/explore/${repoId}/architecture`}
+            className="flex items-center gap-1.5 text-xs text-accent hover:text-white transition-colors border border-accent/40 hover:border-white/40 rounded px-2 py-1"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            Architecture
+          </Link>
+          <button
+            onClick={loadGraph}
+            className="flex items-center gap-1 text-muted hover:text-white transition-colors text-xs ml-2"
+            title="Reload graph"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Reload
+          </button>
+        </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">

@@ -29,6 +29,9 @@ router.get('/:id/graph', repositoryController.getDependencyGraph);
 // GET  /api/repository/:id/graph/file?path=…  — deps/dependents for one file
 router.get('/:id/graph/file', repositoryController.getFileDependencyInfo);
 
+// GET  /api/repository/:id/architecture    — architecture model + mermaid + ai insights
+router.get('/:id/architecture', repositoryController.getArchitecture);
+
 // POST /api/repository/:id/ask             — AI Q&A for repository
 router.post('/:id/ask', ask);
 

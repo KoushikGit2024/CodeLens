@@ -41,6 +41,11 @@ export const repositoryApi = {
     return api.get(`/repository/${id}/graph/file`, { params: { path: filePath } });
   },
 
+  /** Get repository architecture */
+  getArchitecture(id) {
+    return api.get(`/repository/${id}/architecture`);
+  },
+
   /** Ask a natural-language question about the repository */
   ask(id, question) {
     return api.post(`/repository/${id}/ask`, { question });

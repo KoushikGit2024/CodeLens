@@ -104,6 +104,8 @@ codelens/
 | 2 | Tree-sitter AST analysis — JS/TS symbols, imports, exports, CJS | ✅ |
 | 3 | Dependency graph — module resolver, graph builder, graph API, React Flow UI | ✅ |
 | 4 | AI context builder, IBM watsonx provider, repository Q&A, ExplorerPage panel | ✅ |
+| 5 | Code viewer, AI file references, deep-linking | ✅ |
+| 6 | Architecture Intelligence — Component detection, Mermaid generation, AI insights | ✅ |
 
 ---
 
