@@ -52,7 +52,7 @@
 const path = require('path');
 
 // Supported extensions tried in order during extension probing.
-const RESOLUTION_EXTENSIONS = ['.js', '.jsx', '.ts', '.tsx'];
+const RESOLUTION_EXTENSIONS = ['.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.cpp', '.cc', '.cxx', '.h', '.hpp'];
 
 /**
  * Classify a module specifier.
@@ -60,7 +60,20 @@ const RESOLUTION_EXTENSIONS = ['.js', '.jsx', '.ts', '.tsx'];
  * @param {string} specifier
  * @returns {'relative'|'external'}
  */
-function classifySpecifier(specifier) {
+function classifySpecifier(specifier, isCpp = false, isJava = false, isPython = false) {
+  if (isCpp) {
+    // C++ includes are either absolute (system) or relative to current file usually
+    // But our parser extracts external as 'external' and internal as 'internal' already via type
+    // We will just let C++ imports pass through as relative if they aren't marked external by parser
+    return specifier.startsWith('/') || specifier.startsWith('./') || specifier.startsWith('../') ? 'relative' : 'relative';
+  }
+  if (isPython || isJava) {
+    // Python and Java use dotted paths. They are typically absolute from root, or relative if starting with '.' (Python).
+    // Let's treat them all as relative to the repo root if they are not explicitly relative.
+    // Actually, we'll handle them inside resolveImport specifically.
+    return 'relative';
+  }
+
   if (specifier.startsWith('./') || specifier.startsWith('../')) {
     return 'relative';
   }
@@ -85,18 +98,53 @@ function classifySpecifier(specifier) {
  *   reason:     string|null  — why resolution failed (kind === 'unresolved')
  * }
  */
-function resolveImport({ importingFile, specifier, knownFiles }) {
-  const kind = classifySpecifier(specifier);
+function resolveImport({ importingFile, specifier, knownFiles, type }) {
+  const ext = path.posix.extname(importingFile).toLowerCase();
+  const isPython = ext === '.py';
+  const isJava = ext === '.java';
+  const isCpp = ['.cpp', '.cc', '.cxx', '.h', '.hpp'].includes(ext);
 
-  if (kind === 'external') {
+  // C++ parser already classifies internal vs external via 'type'
+  if (isCpp && type === 'external') {
     return { specifier, kind: 'external', resolvedTo: null, reason: null };
   }
 
-  // Relative import — compute the base directory of the importing file
+  const kind = classifySpecifier(specifier, isCpp, isJava, isPython);
+
+  if (kind === 'external' && !isPython && !isJava && !isCpp) {
+    return { specifier, kind: 'external', resolvedTo: null, reason: null };
+  }
+
+  let rawCandidate;
   const importDir = path.posix.dirname(importingFile);
 
-  // Raw join (may or may not have an extension)
-  const rawCandidate = normalisePath(path.posix.join(importDir, specifier));
+  if (isPython) {
+    // Python dotted paths: `foo.bar` -> `foo/bar`
+    // If it's relative like `.foo`, it means sibling. `..foo` means parent.
+    // Actually, `from . import foo` gives specifier `.` or `.foo`.
+    // Tree-sitter might give `foo.bar`.
+    let pyPath = specifier;
+    if (pyPath.startsWith('.')) {
+      // Relative import
+      pyPath = pyPath.replace(/^\.+/, (match) => {
+         return '../'.repeat(match.length - 1) + './';
+      });
+      pyPath = pyPath.replace(/\./g, '/');
+      rawCandidate = normalisePath(path.posix.join(importDir, pyPath));
+    } else {
+      // Absolute import from repo root
+      pyPath = pyPath.replace(/\./g, '/');
+      rawCandidate = normalisePath(pyPath);
+    }
+  } else if (isJava) {
+    // Java dotted paths: `com.example.Foo` -> `com/example/Foo`
+    let javaPath = specifier.replace(/\./g, '/');
+    rawCandidate = normalisePath(javaPath);
+  } else if (isCpp) {
+    rawCandidate = normalisePath(path.posix.join(importDir, specifier));
+  } else {
+    rawCandidate = normalisePath(path.posix.join(importDir, specifier));
+  }
 
   // Step 2 — exact match
   if (knownFiles.has(rawCandidate)) {
@@ -104,19 +152,37 @@ function resolveImport({ importingFile, specifier, knownFiles }) {
   }
 
   // Step 3 — extension probing
-  for (const ext of RESOLUTION_EXTENSIONS) {
+  let extensionsToTry = RESOLUTION_EXTENSIONS;
+  if (isPython) extensionsToTry = ['.py'];
+  else if (isJava) extensionsToTry = ['.java'];
+  else if (isCpp) extensionsToTry = ['.cpp', '.cc', '.cxx', '.h', '.hpp'];
+  else extensionsToTry = ['.js', '.jsx', '.ts', '.tsx'];
+
+  for (const ext of extensionsToTry) {
     const candidate = rawCandidate + ext;
     if (knownFiles.has(candidate)) {
       return { specifier, kind: 'internal', resolvedTo: candidate, reason: null };
     }
   }
 
-  // Step 4 — index file resolution
-  for (const ext of RESOLUTION_EXTENSIONS) {
-    const candidate = normalisePath(path.posix.join(rawCandidate, `index${ext}`));
+  // Step 4 — index file resolution (JS/TS and Python __init__)
+  if (isPython) {
+    const candidate = normalisePath(path.posix.join(rawCandidate, `__init__.py`));
     if (knownFiles.has(candidate)) {
       return { specifier, kind: 'internal', resolvedTo: candidate, reason: null };
     }
+  } else if (!isJava && !isCpp) {
+    for (const ext of extensionsToTry) {
+      const candidate = normalisePath(path.posix.join(rawCandidate, `index${ext}`));
+      if (knownFiles.has(candidate)) {
+        return { specifier, kind: 'internal', resolvedTo: candidate, reason: null };
+      }
+    }
+  }
+
+  // If Java/Python and not found, maybe it's external (e.g. `import requests` or `import java.util.*`)
+  if (isPython || isJava) {
+     return { specifier, kind: 'external', resolvedTo: null, reason: null };
   }
 
   // Step 5 — unresolved
@@ -170,6 +236,7 @@ function resolveAllImports(analysis, knownFiles) {
         importingFile: normalisePath(filePath),
         specifier:     sym.source,
         knownFiles,
+        type:          sym.specifiers && sym.specifiers.length > 0 ? sym.specifiers[0].type : undefined
       });
 
       resolvedImports.push({

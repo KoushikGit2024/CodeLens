@@ -11,6 +11,7 @@
  *   status:      'pending' | 'analyzing' | 'ready' | 'error'
  *   error?:      string
  *   extractPath: string         — temporary extraction directory
+ *   analysisVersion: number     — monotonic version counter
  *   analysis?:   AnalysisResult — populated after analysis completes
  * }
  */

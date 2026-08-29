@@ -37,7 +37,11 @@ const { detectLanguage }  = require('./languageDetector');
 const { getParser }       = require('./parserRegistry');
 const { JavaScriptParser } = require('./JavaScriptParser');
 const { TypeScriptParser } = require('./TypeScriptParser');
+const { PythonParser } = require('./PythonParser');
+const { JavaParser } = require('./JavaParser');
+const { CppParser } = require('./CppParser');
 const { createFileAnalysis } = require('./symbols');
+const { hashContent } = require('./fingerprint');
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -62,6 +66,9 @@ const MAX_FILE_BYTES = 512 * 1024; // 512 KB
 const PARSER_FACTORIES = {
   javascript: (tsParser) => new JavaScriptParser(tsParser),
   typescript: (tsParser) => new TypeScriptParser(tsParser),
+  python:     (tsParser) => new PythonParser(tsParser),
+  java:       (tsParser) => new JavaParser(tsParser),
+  cpp:        (tsParser) => new CppParser(tsParser),
 };
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -84,9 +91,10 @@ const PARSER_FACTORIES = {
  *   errorFiles:    number   — files where analysis threw an exception
  *   files:         FileAnalysis[]
  *   languageSummary: { [lang]: number }  — file count per language
+ *   meta:          { analysisVersion, cacheHits, cacheMisses, addedFiles, modifiedFiles, deletedFiles, unchangedFiles }
  * }
  */
-async function analyzeRepository(rootDir) {
+async function analyzeRepository(rootDir, previousAnalysis = null) {
   const result = {
     status:        'ready',
     error:         null,
@@ -98,6 +106,15 @@ async function analyzeRepository(rootDir) {
     errorFiles:    0,
     files:         [],
     languageSummary: {},
+    meta: {
+      analysisVersion: previousAnalysis ? previousAnalysis.meta.analysisVersion + 1 : 1,
+      cacheHits: 0,
+      cacheMisses: 0,
+      addedFiles: 0,
+      modifiedFiles: 0,
+      deletedFiles: 0,
+      unchangedFiles: 0
+    }
   };
 
   let sourceFiles;
@@ -133,7 +150,54 @@ async function analyzeRepository(rootDir) {
       continue;
     }
 
-    const fileAnalysis = await analyzeFile(absPath, relPath, language);
+    // ── Incremental Hash Check ──────────────────────────────────────────────
+    let content;
+    try {
+      content = fs.readFileSync(absPath, 'utf8');
+    } catch (err) {
+      result.errorFiles++;
+      result.files.push(createFileAnalysis({
+        filePath: relPath,
+        language,
+        error: `Cannot read file: ${err.message}`,
+      }));
+      continue;
+    }
+
+    const hash = hashContent(content);
+    let cachedAnalysis = null;
+
+    if (previousAnalysis && previousAnalysis.files) {
+      cachedAnalysis = previousAnalysis.files.find(f => f.filePath === relPath);
+    }
+
+    if (cachedAnalysis && cachedAnalysis.hash === hash && cachedAnalysis.language === language) {
+      // Cache HIT! Reuse previous analysis exactly as is.
+      result.files.push(cachedAnalysis);
+      
+      result.meta.cacheHits++;
+      result.meta.unchangedFiles++;
+      
+      if (cachedAnalysis.error && !cachedAnalysis.symbols?.length) {
+        result.errorFiles++;
+      } else {
+        result.analyzedFiles++;
+      }
+      result.languageSummary[language] = (result.languageSummary[language] ?? 0) + 1;
+      continue;
+    }
+
+    // Cache MISS! Reparse the file
+    result.meta.cacheMisses++;
+    if (cachedAnalysis) {
+      result.meta.modifiedFiles++;
+    } else {
+      result.meta.addedFiles++;
+    }
+
+    const fileAnalysis = await analyzeFileContent(content, relPath, language);
+    fileAnalysis.hash = hash; // Tag with hash for future incremental runs
+    
     result.files.push(fileAnalysis);
 
     if (fileAnalysis.error && !fileAnalysis.symbols?.length) {
@@ -145,29 +209,27 @@ async function analyzeRepository(rootDir) {
     result.languageSummary[language] = (result.languageSummary[language] ?? 0) + 1;
   }
 
+  // Detect deleted files
+  if (previousAnalysis && previousAnalysis.files) {
+    for (const oldFile of previousAnalysis.files) {
+      if (!result.files.some(f => f.filePath === oldFile.filePath)) {
+        result.meta.deletedFiles++;
+      }
+    }
+  }
+
   return result;
 }
 
 /**
- * Analyse a single file.  Never throws — always returns a FileAnalysis.
+ * Analyse a single file's content directly. Never throws — always returns a FileAnalysis.
  *
- * @param {string} absPath   — absolute path to the file
+ * @param {string} source    — file content
  * @param {string} relPath   — relative path for the FileAnalysis record
  * @param {string} language  — detected language ID
  * @returns {Promise<FileAnalysis>}
  */
-async function analyzeFile(absPath, relPath, language) {
-  let source;
-  try {
-    source = fs.readFileSync(absPath, 'utf8');
-  } catch (err) {
-    return createFileAnalysis({
-      filePath: relPath,
-      language,
-      error: `Cannot read file: ${err.message}`,
-    });
-  }
-
+async function analyzeFileContent(source, relPath, language) {
   let tsParser;
   try {
     tsParser = await getParser(language);
@@ -183,6 +245,23 @@ async function analyzeFile(absPath, relPath, language) {
   const parser  = factory(tsParser);
 
   return parser.parseFile(source, relPath);
+}
+
+/**
+ * Legacy wrapper for analyzeFile
+ */
+async function analyzeFile(absPath, relPath, language) {
+  let source;
+  try {
+    source = fs.readFileSync(absPath, 'utf8');
+  } catch (err) {
+    return createFileAnalysis({
+      filePath: relPath,
+      language,
+      error: `Cannot read file: ${err.message}`,
+    });
+  }
+  return analyzeFileContent(source, relPath, language);
 }
 
 // ── File scanner ──────────────────────────────────────────────────────────────

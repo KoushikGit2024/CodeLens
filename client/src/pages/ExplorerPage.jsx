@@ -22,7 +22,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
-import { Loader2, ChevronLeft, GitBranch, Send, File, AlertTriangle, Layers, BookOpen, MessageSquare, Brain, Database } from 'lucide-react';
+import { Loader2, ChevronLeft, GitBranch, Send, File, AlertTriangle, Layers, BookOpen, MessageSquare, Brain, Database, Activity, RefreshCw } from 'lucide-react';
 import { repositoryApi } from '../api';
 
 // ── Monaco language map ───────────────────────────────────────────────────────
@@ -38,6 +38,13 @@ const EXT_TO_MONACO = {
   '.tsx':  'typescript',
   '.mts':  'typescript',
   '.cts':  'typescript',
+  '.py':   'python',
+  '.java': 'java',
+  '.cpp':  'cpp',
+  '.cc':   'cpp',
+  '.cxx':  'cpp',
+  '.h':    'cpp',
+  '.hpp':  'cpp',
   '.json': 'json',
   '.md':   'markdown',
   '.css':  'css',
@@ -77,6 +84,7 @@ const MONACO_OPTIONS = {
 
 export default function ExplorerPage() {
   const { repoId }        = useParams();
+  const [reanalyzing, setReanalyzing] = useState(false);
   const navigate          = useNavigate();
   const [searchParams]    = useSearchParams();
 
@@ -113,6 +121,23 @@ export default function ExplorerPage() {
     load();
     return () => { cancelled = true; };
   }, [repoId]);
+
+  const handleIncrementalAnalyze = async () => {
+    setReanalyzing(true);
+    try {
+      await repositoryApi.analyzeIncremental(repoId);
+      const [repoRes, treeRes] = await Promise.all([
+        repositoryApi.get(repoId),
+        repositoryApi.listFiles(repoId),
+      ]);
+      setRepo(repoRes.data);
+      setFileTree(treeRes.data.tree);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setReanalyzing(false);
+    }
+  };
 
   // ── Handle ?path= and ?line= from deep-links (e.g. DependencyGraphPage) ───
   useEffect(() => {
@@ -260,6 +285,21 @@ export default function ExplorerPage() {
             <GitBranch className="w-3.5 h-3.5" />
             Dependency Graph
           </Link>
+          <Link
+            to={`/explore/${repoId}/impact`}
+            className="flex items-center gap-1.5 text-xs text-orange-400 hover:text-white transition-colors border border-orange-400/40 hover:border-white/40 rounded px-2 py-1"
+          >
+            <Activity className="w-3.5 h-3.5" />
+            Impact
+          </Link>
+          <button
+            onClick={handleIncrementalAnalyze}
+            disabled={reanalyzing}
+            className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-white transition-colors border border-blue-400/40 hover:border-white/40 rounded px-2 py-1 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${reanalyzing ? 'animate-spin' : ''}`} />
+            {reanalyzing ? 'Analyzing...' : 'Re-Analyze'}
+          </button>
         </div>
       </header>
 

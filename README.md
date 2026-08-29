@@ -43,6 +43,32 @@ node ../node_modules/jest/bin/jest.js --runInBand --forceExit
 > Jest must be invoked via `node <path-to-jest>` rather than `npm test`.
 > See [ADR-001](docs/adr/ADR-001-tree-sitter.md) for details.
 
+### Step 9: Incremental Repository Analysis & CI/CD Intelligence
+- SHA-256 fingerprinting for FileAnalysis caching
+- Direct and Transitive Dependency Impact Analysis
+- `client/src/pages/ImpactPage.jsx` for blast-radius visualization
+- `/api/repository/:id/ci-report` endpoint for pipeline integration
+
+### Step 10: Multi-Language Code Intelligence
+- Extensible Tree-sitter architecture supporting `python`, `java`, `cpp`.
+- Language-aware import resolution (`moduleResolver.js`) mapping Python/Java/C++ conventions.
+- Unified canonical symbol schema (`INTERFACE`, `STRUCT`, `NAMESPACE`).
+- Syntax-highlighted file viewing and cross-language dependency graphs.
+
+- [Data Model](docs/data-model.md)
+- [Dependency Graph API](docs/dependency-graph.md)
+- [AI Architecture & Context](docs/ai-context.md)
+- [Architecture & Analysis Layer](docs/architecture/analysis-layer.md)
+- [Automated Documentation Intelligence](docs/automated-documentation.md)
+- [Incremental Analysis & CI/CD](docs/incremental-analysis.md)
+- [ADR 001: Web Tree-sitter](docs/adr/ADR-001-tree-sitter.md)
+- [ADR 002: Context Builder](docs/adr/ADR-002-context-builder.md)
+- [ADR 003: Architecture Layer](docs/adr/ADR-003-architecture-layer.md)
+- [ADR 004: Automated Documentation](docs/adr/ADR-004-automated-documentation.md)
+- [ADR 005: Incremental Analysis](docs/adr/ADR-005-incremental-analysis.md)
+- [ADR 006: Multi-Language Intelligence](docs/adr/ADR-006-multi-language-intelligence.md)
+- [Multi-Language Intelligence](docs/multi-language-intelligence.md)
+
 ---
 
 ## Architecture Overview
@@ -133,6 +159,9 @@ CodeLens exposes its analysis through a REST API (default port 3001).
 | `/api/repository/:id/architecture` | GET | Retrieve architectural components and insights |
 | `/api/repository/:id/documentation/overview` | GET | Retrieve generated repository docs |
 | `/api/repository/:id/documentation/file?path=...` | GET | Retrieve generated module docs |
+| `/api/repository/:id/analyze` | POST | Run full or incremental analysis |
+| `/api/repository/:id/impact` | GET | Get change impact for modified files |
+| `/api/repository/:id/ci-report` | GET | Get headless CI/CD intelligence report |
 | `/api/repository/:id/question` | POST | Ask a contextual question about the repository |
 
 **Upload flow:**
@@ -205,4 +234,6 @@ CodeLens exposes its analysis through a REST API (default port 3001).
 * **Step 5:** Interface — Code viewer (Monaco), repository Q&A panel, dependency graph visualization (React Flow).
 * **Step 6:** Architectural Intelligence — Automatic component detection, architectural layer mapping, and Mermaid.js diagram generation with AI insights.
 * **Step 7:** Documentation Intelligence — Automated hierarchical documentation, architectural deep-dives, and AI-driven repository overviews.
-* **Step 8:** Evolution — CI/CD integration, incremental analysis caching, and multi-language support expansion.
+* **Step 8:** AI Repository Intelligence — Contextual code Q&A, intent routing, dynamic RAG.
+* **Step 9:** Incremental Analysis & CI/CD — Intelligent caching and transitive change impact tracking for CI pipelines.
+* **Step 10:** Multi-Language Intelligence — Extensible parser integration for Python, Java, and C++.

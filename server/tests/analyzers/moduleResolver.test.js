@@ -271,7 +271,7 @@ describe('resolveAllImports', () => {
 // ── RESOLUTION_EXTENSIONS constant ───────────────────────────────────────────
 
 describe('RESOLUTION_EXTENSIONS', () => {
-  test('contains all four JS/TS extensions', () => {
-    expect(RESOLUTION_EXTENSIONS).toEqual(['.js', '.jsx', '.ts', '.tsx']);
+  test('contains all supported extensions', () => {
+    expect(RESOLUTION_EXTENSIONS).toEqual(['.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.cpp', '.cc', '.cxx', '.h', '.hpp']);
   });
 });

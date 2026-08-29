@@ -154,6 +154,7 @@ function buildContext(analysis, question, extractPath, opts = {}) {
         .map(d => d.filePath),
       dependents:   depInfo.dependents.map(d => d.filePath),
       source:       source || null,
+      language:     fileAnalysis.language,
     });
   }
 
@@ -424,7 +425,7 @@ function buildPrompt(context) {
     lines.push('');
 
     for (const f of context.files) {
-      lines.push(`--- FILE: ${f.path} ---`);
+      lines.push(`--- FILE: ${f.path} (Language: ${f.language || 'unknown'}) ---`);
       lines.push(`Reason included: ${f.reason}`);
       if (f.symbols.length > 0) {
         lines.push(`Symbols: ${f.symbols.join(', ')}`);

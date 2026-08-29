@@ -36,6 +36,7 @@ async function upload(req, res, next) {
       status: 'pending',
       extractPath,
       analysis: null,
+      analysisVersion: 1,
     });
 
     // Extract the ZIP safely (path-traversal protection inside)

@@ -72,6 +72,7 @@ function buildModuleContext(analysis, graph, architectureModel, filePath) {
 
   return {
     filePath,
+    language: file.language || 'unknown',
     component: componentName,
     layer,
     isApiBoundary,

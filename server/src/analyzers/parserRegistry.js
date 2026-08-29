@@ -60,8 +60,9 @@ const TS_WASM_FILE = (() => {
 const LANGUAGE_WASM_MAP = {
   javascript: path.join(WASMS_OUT, 'tree-sitter-javascript.wasm'),
   typescript: path.join(WASMS_OUT, 'tree-sitter-typescript.wasm'),
-  // python:  path.join(WASMS_OUT, 'tree-sitter-python.wasm'),
-  // java:    path.join(WASMS_OUT, 'tree-sitter-java.wasm'),
+  python:     path.join(WASMS_OUT, 'tree-sitter-python.wasm'),
+  java:       path.join(WASMS_OUT, 'tree-sitter-java.wasm'),
+  cpp:        path.join(WASMS_OUT, 'tree-sitter-cpp.wasm'),
 };
 
 // ── State ─────────────────────────────────────────────────────────────────────

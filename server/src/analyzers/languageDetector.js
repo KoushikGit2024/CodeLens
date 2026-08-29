@@ -37,11 +37,18 @@ const EXTENSION_MAP = new Map([
   ['.mts',  'typescript'],
   ['.cts',  'typescript'],
 
-  // Future languages (not yet supported — here for documentation)
-  // ['.py',  'python'],
-  // ['.java','java'],
-  // ['.cpp', 'cpp'],
-  // ['.c',   'c'],
+  // Python
+  ['.py',   'python'],
+
+  // Java
+  ['.java', 'java'],
+
+  // C++
+  ['.cpp',  'cpp'],
+  ['.cc',   'cpp'],
+  ['.cxx',  'cpp'],
+  ['.h',    'cpp'],
+  ['.hpp',  'cpp'],
 ]);
 
 /**

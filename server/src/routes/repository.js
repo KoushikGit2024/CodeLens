@@ -2,6 +2,7 @@ const { Router } = require('express');
 const repositoryController = require('../controllers/repositoryController');
 const documentationController = require('../controllers/documentationController');
 const assistantController = require('../controllers/assistantController');
+const ciController = require('../controllers/ciController');
 const { uploadMiddleware } = require('../middleware/upload');
 const { ask } = require('../ai/askController');
 
@@ -45,5 +46,14 @@ router.post('/:id/ask', ask);
 
 // POST /api/repository/:id/question        — AI Repository Intelligence Q&A
 router.post('/:id/question', assistantController.askQuestion);
+
+// POST /api/repository/:id/analyze         — Incremental/Full Analysis (CI)
+router.post('/:id/analyze', ciController.analyze);
+
+// GET /api/repository/:id/impact           — Change Impact Analysis (CI)
+router.get('/:id/impact', ciController.getImpact);
+
+// GET /api/repository/:id/ci-report        — Machine-readable CI Report
+router.get('/:id/ci-report', ciController.getCiReport);
 
 module.exports = router;

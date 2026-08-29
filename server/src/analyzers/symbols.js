@@ -41,6 +41,12 @@ const SymbolKind = Object.freeze({
   METHOD:   'method',
   IMPORT:   'import',
   EXPORT:   'export',
+  INTERFACE:'interface',
+  STRUCT:   'struct',
+  NAMESPACE:'namespace',
+  PACKAGE:  'package',
+  CONSTRUCTOR:'constructor',
+  VARIABLE: 'variable',
 });
 
 // ── Location factory ──────────────────────────────────────────────────────────
@@ -144,9 +150,51 @@ function createClass({ name, superClass = null, location }) {
  * @returns {MethodSymbol}
  */
 function createMethod({ name, className, static: isStatic = false, async: isAsync = false,
-                        generator = false, visibility = 'public', params = [], location }) {
+                        generator = false, visibility = 'public', params = [], location, decorators = [] }) {
   return { kind: SymbolKind.METHOD, name, className, static: isStatic,
-           async: isAsync, generator, visibility, params, location };
+           async: isAsync, generator, visibility, params, location, decorators };
+}
+
+/**
+ * InterfaceSymbol
+ */
+function createInterface({ name, location }) {
+  return { kind: SymbolKind.INTERFACE, name, location };
+}
+
+/**
+ * StructSymbol
+ */
+function createStruct({ name, location }) {
+  return { kind: SymbolKind.STRUCT, name, location };
+}
+
+/**
+ * NamespaceSymbol
+ */
+function createNamespace({ name, location }) {
+  return { kind: SymbolKind.NAMESPACE, name, location };
+}
+
+/**
+ * PackageSymbol
+ */
+function createPackage({ name, location }) {
+  return { kind: SymbolKind.PACKAGE, name, location };
+}
+
+/**
+ * ConstructorSymbol
+ */
+function createConstructor({ className, params = [], visibility = 'public', location }) {
+  return { kind: SymbolKind.CONSTRUCTOR, name: 'constructor', className, params, visibility, location };
+}
+
+/**
+ * VariableSymbol
+ */
+function createVariable({ name, location }) {
+  return { kind: SymbolKind.VARIABLE, name, location };
 }
 
 /**
@@ -252,5 +300,11 @@ module.exports = {
   createMethod,
   createImport,
   createExport,
+  createInterface,
+  createStruct,
+  createNamespace,
+  createPackage,
+  createConstructor,
+  createVariable,
   createFileAnalysis,
 };

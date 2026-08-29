@@ -108,6 +108,8 @@ codelens/
 | 6 | Architecture Intelligence — Component detection, Mermaid generation, AI insights | ✅ |
 | 7 | Automated Documentation Intelligence — Deterministic context + AI interpretation | ✅ |
 | 8 | AI Repository Intelligence & Contextual Code Q&A — Deterministic routing + Structured AI | ✅ |
+| 9 | Incremental Repository Analysis & CI/CD Intelligence — File Fingerprinting + Change Impact | ✅ |
+| 10 | Multi-Language Intelligence — Python, Java, C++ parsing + AI context integration | ✅ |
 
 ---
 
@@ -127,6 +129,9 @@ codelens/
 | GET | `/api/repository/:id/architecture` | Architectural model + insights |
 | GET | `/api/repository/:id/documentation/overview` | Generated repository docs |
 | GET | `/api/repository/:id/documentation/file?path=…` | Generated module docs |
+| POST | `/api/repository/:id/analyze` | Run full or incremental analysis |
+| GET | `/api/repository/:id/impact` | Get change impact for modified files |
+| GET | `/api/repository/:id/ci-report` | Get headless CI/CD intelligence report |
 | POST | `/api/repository/:id/ask` | (Legacy) AI Q&A |
 | POST | `/api/repository/:id/question` | AI Repository Intelligence Q&A — `{ question }` → structured answer |
 

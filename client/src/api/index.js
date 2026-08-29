@@ -60,6 +60,17 @@ export const repositoryApi = {
   // AI Repository Intelligence (Step 8)
   askQuestion: (id, question) => {
     return api.post(`/repository/${id}/question`, { question });
+  },
+
+  // CI / Incremental Analysis
+  analyzeIncremental: (id) => {
+    return api.post(`/repository/${id}/analyze`, { mode: 'incremental' });
+  },
+  getChangeImpact: (id) => {
+    return api.get(`/repository/${id}/impact`);
+  },
+  getCiReport: (id) => {
+    return api.get(`/repository/${id}/ci-report`);
   }
 };
 
