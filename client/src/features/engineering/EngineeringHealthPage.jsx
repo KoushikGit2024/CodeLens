@@ -3,6 +3,7 @@ import { ChevronLeft, Loader2, AlertCircle, RefreshCw, ShieldAlert, CheckCircle,
 import AIStatusIndicator from '../assistant/AIStatusIndicator';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getEngineeringRisks, getEngineeringInsights } from '../../shared/api';
+import AiResponse from '../../shared/components/ai/AiResponse';
 
 const EngineeringHealthPage = () => {
   const { repoId } = useParams();
@@ -117,35 +118,17 @@ const EngineeringHealthPage = () => {
 
       {insights && (
         <div className="mb-8 rounded-lg border border-blue-500/30 bg-blue-500/10 p-6">
-          <h2 className="mb-4 flex items-center text-lg font-semibold text-blue-400">
-            <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            AI Architecture Insights
-          </h2>
-          <p className="mb-4 text-gray-300">{insights.summary}</p>
-          
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div>
-              <h3 className="mb-2 text-sm font-semibold text-gray-400 uppercase tracking-wider">Priority Actions</h3>
-              <ul className="list-inside list-disc space-y-1 text-gray-300">
-                {insights.recommendations?.map((rec, i) => (
-                  <li key={i}>{rec}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3 className="mb-2 text-sm font-semibold text-gray-400 uppercase tracking-wider">Observations</h3>
-              <ul className="list-inside list-disc space-y-1 text-gray-300">
-                {insights.observations?.map((obs, i) => (
-                  <li key={i}>{obs}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-          <div className="mt-4 text-xs text-gray-500 italic">
-            Limitations: {insights.limitations}
-          </div>
+          <AiResponse
+            repoId={repoId}
+            chatId={`health-${repoId}`}
+            data={{
+              summary: insights.summary,
+              recommendations: insights.recommendations,
+              inferences: insights.observations,
+              risks: insights.limitations ? [insights.limitations] : []
+            }}
+            title="AI Architecture Insights"
+          />
         </div>
       )}
 

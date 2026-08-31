@@ -33,26 +33,22 @@ const path = require('path');
 const fs   = require('fs');
 
 // ── WASM path resolution ──────────────────────────────────────────────────────
-// web-tree-sitter@0.24.7 is installed in server/node_modules/.
-// tree-sitter-wasms@0.1.13 is hoisted to the workspace root node_modules/.
-const SERVER_NM   = path.join(__dirname, '..', '..', '..', 'node_modules');
-const WORKSPACE_NM = path.join(__dirname, '..', '..', '..', '..', 'node_modules');
-
-// Resolve the directory that actually contains the tree-sitter-wasms package
 const WASMS_OUT = (() => {
-  const local = path.join(SERVER_NM, 'tree-sitter-wasms', 'out');
-  const root  = path.join(WORKSPACE_NM, 'tree-sitter-wasms', 'out');
-  if (fs.existsSync(local)) return local;
-  if (fs.existsSync(root))  return root;
-  throw new Error('[parserRegistry] Cannot locate tree-sitter-wasms package. Run npm install.');
+  try {
+    const pkgPath = require.resolve('tree-sitter-wasms/package.json');
+    return path.join(path.dirname(pkgPath), 'out');
+  } catch (e) {
+    throw new Error('[parserRegistry] Cannot locate tree-sitter-wasms package. Run npm install.');
+  }
 })();
 
 const TS_WASM_FILE = (() => {
-  const local = path.join(SERVER_NM, 'web-tree-sitter', 'tree-sitter.wasm');
-  const root  = path.join(WORKSPACE_NM, 'web-tree-sitter', 'tree-sitter.wasm');
-  if (fs.existsSync(local)) return local;
-  if (fs.existsSync(root))  return root;
-  throw new Error('[parserRegistry] Cannot locate web-tree-sitter WASM. Run npm install.');
+  try {
+    const pkgPath = require.resolve('web-tree-sitter/package.json');
+    return path.join(path.dirname(pkgPath), 'tree-sitter.wasm');
+  } catch (e) {
+    throw new Error('[parserRegistry] Cannot locate web-tree-sitter WASM. Run npm install.');
+  }
 })();
 
 // ── Language → WASM file map ──────────────────────────────────────────────────

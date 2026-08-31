@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { repositoryApi } from '../../shared/api';
+import AiResponse from '../../shared/components/ai/AiResponse';
 import { 
   ChevronLeft, Loader2, AlertCircle, RefreshCw, CheckCircle, Wrench,
   Box, GitMerge, FileText, AlertTriangle, ShieldAlert, BookOpen
 } from 'lucide-react';
 import AIStatusIndicator from '../assistant/AIStatusIndicator';
 import { useAIState } from '../../shared/context/AIContext';
+import { useRepository } from '../../shared/context/RepositoryContext';
 import AnalysisProgress from './AnalysisProgress';
 
 export default function RepositoryIntelligencePage() {
   const { repoId } = useParams();
+  const { repo, loading: repoLoading, error: repoError } = useRepository();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
@@ -75,7 +78,7 @@ export default function RepositoryIntelligencePage() {
     }
   };
 
-  if (loading) {
+  if (loading || repoLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface text-white">
         <AnalysisProgress currentPhase={currentPhase} phaseDetails={phaseDetails} />
@@ -83,12 +86,12 @@ export default function RepositoryIntelligencePage() {
     );
   }
 
-  if (error) {
+  if (error || repoError) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface">
         <div className="text-center">
           <AlertCircle className="w-6 h-6 text-danger mx-auto mb-3" />
-          <p className="text-danger mb-4 text-sm">{error}</p>
+          <p className="text-danger mb-4 text-sm">{error || repoError}</p>
           <button onClick={() => navigate(-1)} className="text-sm text-accent hover:underline">
             ← Go back
           </button>
@@ -278,8 +281,8 @@ export default function RepositoryIntelligencePage() {
                  <div className="flex flex-col gap-3">
                    {data.hotspots.slice(0, 5).map((h, i) => (
                      <div key={i} className="flex flex-col gap-1 pb-3 border-b border-border/50 last:border-0 last:pb-0">
-                       <div className="flex items-center justify-between">
-                         <span className="text-xs font-mono text-white truncate max-w-[80%]">{h.filePath}</span>
+                        <div className="flex items-center justify-between min-w-0">
+                          <span className="text-xs font-mono text-white truncate max-w-[80%]" title={h.filePath}>{h.filePath}</span>
                          <span className="text-xs font-bold text-warning">{h.score}</span>
                        </div>
                        <div className="flex justify-between items-end">
@@ -330,25 +333,41 @@ export default function RepositoryIntelligencePage() {
              </section>
           </div>
 
-          {/* ── Recommended Exploration ────────────────────────────────────────── */}
-          <section className="bg-panel border border-border p-5 rounded mt-4">
-            <h3 className="text-sm font-semibold text-white mb-3">Recommended Exploration</h3>
+          {/* ── Guided Workflow ────────────────────────────────────────── */}
+          <section className="bg-panel border border-border p-5 rounded mt-4 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-success"></div>
+            <div className="flex items-center gap-2 mb-4">
+              <CheckCircle className="w-5 h-5 text-success" />
+              <h3 className="text-sm font-semibold text-white">Repository analyzed successfully. What should I look at next?</h3>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-              <Link to={`/explore/${repoId}/architecture`} className="bg-surface/50 border border-border/50 p-4 rounded hover:border-white/20 hover:bg-surface transition-colors flex flex-col gap-1 group">
-                <span className="text-white font-medium group-hover:text-accent transition-colors flex items-center gap-2"><Box className="w-4 h-4" /> Architecture &rarr;</span>
+              <button onClick={handleUnderstandRepository} className="bg-surface/50 border border-border/50 p-4 rounded hover:border-accent hover:bg-surface transition-colors flex flex-col gap-1 text-left group">
+                 <span className="text-white font-medium group-hover:text-accent transition-colors flex items-center gap-2"><BookOpen className="w-4 h-4 text-accent" /> Understand Repository &rarr;</span>
+                 <span className="text-xs text-muted">Generate an AI overview of the codebase.</span>
+              </button>
+              <Link to={`/explore/${repoId}/architecture`} className="bg-surface/50 border border-border/50 p-4 rounded hover:border-warning hover:bg-surface transition-colors flex flex-col gap-1 group">
+                <span className="text-white font-medium group-hover:text-warning transition-colors flex items-center gap-2"><Box className="w-4 h-4 text-warning" /> Explore Architecture &rarr;</span>
                 <span className="text-xs text-muted">Understand how components fit together.</span>
               </Link>
-              <Link to={`/explore/${repoId}/graph`} className="bg-surface/50 border border-border/50 p-4 rounded hover:border-white/20 hover:bg-surface transition-colors flex flex-col gap-1 group">
-                <span className="text-white font-medium group-hover:text-accent transition-colors flex items-center gap-2"><GitMerge className="w-4 h-4 text-[#cba6f7]" /> Dependencies &rarr;</span>
+              <Link to={`/explore/${repoId}/graph`} className="bg-surface/50 border border-border/50 p-4 rounded hover:border-[#cba6f7] hover:bg-surface transition-colors flex flex-col gap-1 group">
+                <span className="text-white font-medium group-hover:text-[#cba6f7] transition-colors flex items-center gap-2"><GitMerge className="w-4 h-4 text-[#cba6f7]" /> Inspect Dependencies &rarr;</span>
                 <span className="text-xs text-muted">Review {data.dependencies.cycles > 0 ? `${data.dependencies.cycles} circular cycles` : 'dependency connections'}.</span>
               </Link>
-              <Link to={`/explore/${repoId}/health`} className="bg-surface/50 border border-border/50 p-4 rounded hover:border-white/20 hover:bg-surface transition-colors flex flex-col gap-1 group">
-                <span className="text-white font-medium group-hover:text-accent transition-colors flex items-center gap-2"><ShieldAlert className="w-4 h-4 text-danger" /> Health Risks &rarr;</span>
+              <Link to={`/explore/${repoId}/health`} className="bg-surface/50 border border-border/50 p-4 rounded hover:border-danger hover:bg-surface transition-colors flex flex-col gap-1 group">
+                <span className="text-white font-medium group-hover:text-danger transition-colors flex items-center gap-2"><ShieldAlert className="w-4 h-4 text-danger" /> Review Health &rarr;</span>
                 <span className="text-xs text-muted">Inspect {data.engineeringHealth.critical} critical structural issues.</span>
               </Link>
-              <Link to={`/explore/${repoId}/refactoring`} className="bg-surface/50 border border-border/50 p-4 rounded hover:border-white/20 hover:bg-surface transition-colors flex flex-col gap-1 group">
-                <span className="text-white font-medium group-hover:text-accent transition-colors flex items-center gap-2"><Wrench className="w-4 h-4 text-blue-400" /> Refactoring &rarr;</span>
+              <Link to={`/explore/${repoId}/refactoring`} className="bg-surface/50 border border-border/50 p-4 rounded hover:border-blue-400 hover:bg-surface transition-colors flex flex-col gap-1 group">
+                <span className="text-white font-medium group-hover:text-blue-400 transition-colors flex items-center gap-2"><Wrench className="w-4 h-4 text-blue-400" /> Refactoring &rarr;</span>
                 <span className="text-xs text-muted">View highest-priority technical debt.</span>
+              </Link>
+              <Link to={`/explore/${repoId}/source`} className="bg-surface/50 border border-border/50 p-4 rounded hover:border-success hover:bg-surface transition-colors flex flex-col gap-1 group">
+                 <span className="text-white font-medium group-hover:text-success transition-colors flex items-center gap-2"><FileText className="w-4 h-4 text-success" /> Browse Source &rarr;</span>
+                 <span className="text-xs text-muted">Explore the codebase with contextual insights.</span>
+              </Link>
+              <Link to={`/explore/${repoId}/documentation`} className="bg-surface/50 border border-border/50 p-4 rounded hover:border-[#a6e3a1] hover:bg-surface transition-colors flex flex-col gap-1 group">
+                 <span className="text-white font-medium group-hover:text-[#a6e3a1] transition-colors flex items-center gap-2"><BookOpen className="w-4 h-4 text-[#a6e3a1]" /> Read Documentation &rarr;</span>
+                 <span className="text-xs text-muted">Browse automatically generated facts.</span>
               </Link>
             </div>
           </section>
@@ -398,51 +417,8 @@ export default function RepositoryIntelligencePage() {
             )}
 
             {aiData && (
-              <div className="flex flex-col gap-5 text-sm">
-                <div>
-                  <h3 className="text-xs uppercase text-muted tracking-wider mb-2 font-semibold">Summary</h3>
-                  <p className="text-xs text-white/90 leading-relaxed">{aiData.summary}</p>
-                </div>
-
-                {aiData.keyCharacteristics?.length > 0 && (
-                  <div>
-                    <h3 className="text-xs uppercase text-muted tracking-wider mb-2 font-semibold">Key Characteristics</h3>
-                    <ul className="list-disc pl-4 flex flex-col gap-1">
-                      {aiData.keyCharacteristics.map((item, i) => (
-                        <li key={i} className="text-xs text-white/80">{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {aiData.architectureExplanation && (
-                  <div>
-                    <h3 className="text-xs uppercase text-muted tracking-wider mb-2 font-semibold">Architecture</h3>
-                    <p className="text-xs text-white/90 leading-relaxed">{aiData.architectureExplanation}</p>
-                  </div>
-                )}
-
-                {aiData.mainRisks?.length > 0 && (
-                  <div>
-                    <h3 className="text-xs uppercase text-muted tracking-wider mb-2 font-semibold">Main Risks</h3>
-                    <ul className="list-disc pl-4 flex flex-col gap-1">
-                      {aiData.mainRisks.map((item, i) => (
-                        <li key={i} className="text-xs text-warning/90">{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {aiData.recommendedActions?.length > 0 && (
-                  <div>
-                    <h3 className="text-xs uppercase text-muted tracking-wider mb-2 font-semibold">Recommended Actions</h3>
-                    <ul className="list-disc pl-4 flex flex-col gap-1">
-                      {aiData.recommendedActions.map((item, i) => (
-                        <li key={i} className="text-xs text-success/90">{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+              <div className="text-sm">
+                <AiResponse data={aiData} title={null} onNavigate={() => {}} />
               </div>
             )}
           </div>

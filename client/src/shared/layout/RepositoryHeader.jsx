@@ -24,7 +24,7 @@ export default function RepositoryHeader() {
 
   return (
     <header className="h-12 flex items-center px-4 border-b border-border bg-panel shrink-0 gap-4 justify-between">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 min-w-0">
         <Breadcrumbs />
       </div>
 

@@ -7,6 +7,9 @@ const { buildEngineeringRiskModel } = require('./risk.analyzer');
 const { buildRefactoringIntelligence } = require('./refactoring.analyzer');
 const { analyzeChangeImpact } = require('./change.impact');
 const { getRefactoringInsights } = require('../assistant/generators/refactoring.generator');
+const { generateAnswer } = require('../../core/ai/ai.provider');
+const fs = require('fs');
+const path = require('path');
 
 /**
  * Controller for Refactoring Intelligence.
@@ -111,13 +114,72 @@ async function getCandidateInsights(req, res, next) {
     if (err.message === 'Analysis not found') {
        return res.status(404).json({ error: 'Repository or analysis not found' });
     }
-    // Return 502 gracefully if Watsonx fails, so UI can still show deterministic data
-    return res.status(502).json({ 
-       error: 'AI Provider unavailable or failed',
-       summary: "AI provider failed to respond. Deterministic strategies remain available.",
-       recommendations: [],
-       limitations: [err.message]
+    next(err);
+  }
+}
+
+async function autoFixCandidate(req, res, next) {
+  try {
+    const { id, candidateId } = req.params;
+    const record = repositoryStore.get(id);
+    if (!record || !record.analysis) {
+       return res.status(404).json({ error: 'Repository or analysis not found' });
+    }
+
+    const intel = getRefactoringModel(req);
+    const candidate = intel.candidates.find(c => c.id === candidateId);
+    if (!candidate) {
+      return res.status(404).json({ error: 'Candidate not found' });
+    }
+
+    const targetFile = candidate.files[0];
+    if (!targetFile) {
+      return res.status(400).json({ error: 'No files associated with this candidate' });
+    }
+
+    const absolutePath = path.join(record.extractPath, targetFile);
+    let originalCode = '';
+    try {
+      originalCode = fs.readFileSync(absolutePath, 'utf8');
+    } catch (err) {
+      return res.status(404).json({ error: 'File content could not be read' });
+    }
+
+    const prompt = `You are an expert AI refactoring agent.
+I have a file named ${targetFile} that has a refactoring issue.
+Issue Type: ${candidate.type}
+Issue Title: ${candidate.title}
+Issue Context: ${JSON.stringify(candidate.context)}
+
+Your task is to REFACTOR the original code to fix this issue.
+Output ONLY the fully refactored code. Do not output any markdown formatting, backticks, or explanations. Only valid raw source code.
+
+Original Code:
+${originalCode}
+`;
+
+    const result = await generateAnswer(prompt);
+    
+    let refactoredCode = result.trim();
+    if (refactoredCode.startsWith('\`\`\`')) {
+      const lines = refactoredCode.split('\n');
+      lines.shift();
+      if (lines[lines.length - 1].startsWith('\`\`\`')) {
+        lines.pop();
+      }
+      refactoredCode = lines.join('\n');
+    }
+
+    return res.json({
+      candidateId,
+      file: targetFile,
+      originalCode,
+      refactoredCode
     });
+
+  } catch (err) {
+    console.error('[refactoringController] autoFixCandidate failed:', err);
+    next(err);
   }
 }
 
@@ -125,5 +187,6 @@ module.exports = {
   getRefactoring,
   getCandidate,
   getCandidateImpact,
-  getCandidateInsights
+  getCandidateInsights,
+  autoFixCandidate
 };

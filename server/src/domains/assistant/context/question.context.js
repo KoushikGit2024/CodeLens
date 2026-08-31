@@ -23,8 +23,8 @@ const { buildRepositoryIntelligence } = require('../../repository/intelligence.a
  * @param {string} extractPath - Path to repo on disk (for source extraction)
  * @returns {object} { routing, contextData }
  */
-function buildQuestionContext(analysis, question, extractPath) {
-  const routing = routeQuestion(question, analysis);
+function buildQuestionContext(analysis, question, extractPath, activeContext) {
+  const routing = routeQuestion(question, analysis, activeContext);
   const graph = buildDependencyGraph(analysis);
   const architecture = buildArchitectureModel(analysis, graph);
 
@@ -99,7 +99,7 @@ function buildQuestionContext(analysis, question, extractPath) {
   if (routing.requiresAi) {
     // Only fetch raw source code for general or file explanations
     if (routing.intent === INTENTS.FILE_EXPLANATION || routing.intent === INTENTS.GENERAL || routing.intent === INTENTS.ARCHITECTURE || routing.intent === INTENTS.REFACTORING) {
-      const sourceCtx = buildSourceContext(analysis, question, extractPath, { maxFiles: 5, maxSourceChars: 15000 });
+      const sourceCtx = buildSourceContext(analysis, question, extractPath, { maxFiles: 5, maxSourceChars: 15000, activeContext });
       contextData.files = sourceCtx.files;
     }
   }

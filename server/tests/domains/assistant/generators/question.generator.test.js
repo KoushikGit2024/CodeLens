@@ -1,7 +1,7 @@
 const { generateQuestionAnswer } = require('../../../../src/domains/assistant/generators/question.generator');
-const aiProvider = require('../../../../src/core/ai/aiProvider');
+const aiProvider = require('../../../../src/core/ai/ai.service');
 
-jest.mock('../../../../src/core/ai/aiProvider');
+jest.mock('../../../../src/core/ai/ai.service');
 
 describe('Question Generator', () => {
   beforeEach(() => {
@@ -17,28 +17,26 @@ describe('Question Generator', () => {
     expect(ans.summary).toContain('deterministic');
     expect(ans.facts).toContain('Fact A');
     expect(ans.generatedBy).toContain('Deterministic Engine');
-    expect(aiProvider.generateAnswer).not.toHaveBeenCalled();
+    expect(aiProvider.generateStructuredResponse).not.toHaveBeenCalled();
   });
 
   it('calls AI and parses JSON successfully', async () => {
-    aiProvider.isProviderConfigured.mockReturnValue(true);
-    aiProvider.generateAnswer.mockResolvedValue(`\`\`\`json
-{
-  "summary": "AI summary",
-  "explanation": "AI explanation",
-  "facts": ["A"],
-  "inferences": ["B"],
-  "references": []
-}
-\`\`\``);
+    aiProvider.isAIAvailable.mockReturnValue(true);
+    aiProvider.generateStructuredResponse.mockResolvedValue({
+      summary: "It's React.",
+      explanation: null,
+      facts: [],
+      inferences: [],
+      references: [],
+      limitations: []
+    });
 
     const routing = { requiresAi: true };
     const contextData = { facts: [], files: [] };
     
     const ans = await generateQuestionAnswer('test', routing, contextData);
     
-    expect(ans.summary).toBe('AI summary');
-    expect(ans.inferences).toContain('B');
-    expect(ans.generatedBy).toContain('IBM watsonx');
+    expect(ans.summary).toBe("It's React.");
+    expect(ans.generatedBy).toContain('AI CodeLens Engine');
   });
 });

@@ -1,6 +1,7 @@
 'use strict';
 
 const repositoryStore = require('../repository/repository.store');
+const persistence = require('../repository/persistence.store');
 const { buildQuestionContext } = require('./context/question.context');
 const { generateQuestionAnswer } = require('./generators/question.generator');
 
@@ -32,7 +33,8 @@ async function askQuestion(req, res, next) {
     }
 
     // Build the context and route the intent
-    const { routing, contextData } = buildQuestionContext(record.analysis, question, record.extractPath);
+    const activeContext = req.body?.activeContext || null;
+    const { routing, contextData } = buildQuestionContext(record.analysis, question, record.extractPath, activeContext);
 
     // Generate the answer (may hit AI, or answer deterministically)
     const answer = await generateQuestionAnswer(question, routing, contextData);
@@ -70,6 +72,38 @@ async function askQuestion(req, res, next) {
   }
 }
 
+/**
+ * PUT /api/repository/:id/chat/:chatId
+ * Saves a chat history back to the server's repository store.
+ */
+async function saveChatHistory(req, res, next) {
+  try {
+    const record = repositoryStore.get(req.params.id);
+    if (!record) {
+      return res.status(404).json({ error: 'Repository not found' });
+    }
+
+    const chatId = req.params.chatId;
+    const history = req.body?.history;
+
+    if (!chatId || !history || !Array.isArray(history)) {
+      return res.status(400).json({ error: 'Invalid chat history format.' });
+    }
+
+    // Update in-memory
+    if (!record.chats) record.chats = {};
+    record.chats[chatId] = history;
+
+    // Persist to disk
+    persistence.saveChats(record.id, record.chats);
+
+    return res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   askQuestion,
+  saveChatHistory,
 };

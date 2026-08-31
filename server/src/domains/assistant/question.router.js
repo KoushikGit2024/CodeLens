@@ -24,17 +24,17 @@ const INTENTS = {
  * @param {string} question
  * @returns {object} { intent, requiresAi, targetFile }
  */
-function routeQuestion(question, analysis) {
+function routeQuestion(question, analysis, activeContext = null) {
   const q = question.toLowerCase();
 
   const result = {
     intent: INTENTS.GENERAL,
     requiresAi: true,
-    targetFile: null,
+    targetFile: activeContext?.filePath || null,
   };
 
-  // Check if a specific file is mentioned
-  if (analysis) {
+  // Check if a specific file is mentioned in the prompt (only if we don't have an active context)
+  if (!result.targetFile && analysis) {
     const fileMatch = analysis.files.find(f => {
       const basename = f.filePath.split('/').pop().toLowerCase();
       return q.includes(f.filePath.toLowerCase()) || q.includes(basename);

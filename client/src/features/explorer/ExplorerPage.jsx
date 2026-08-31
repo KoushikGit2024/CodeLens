@@ -22,10 +22,14 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
-import { Loader2, File, FileText, Brain, Database, Send, AlertTriangle } from 'lucide-react';
-import { ResizableLayout } from '../../shared/components/ResizableLayout';
+import { ChevronRight, ChevronDown, File, Folder, Code2, Play, Search, Network, Brain, Database, FileText, X, MessageSquare, Send, AlertTriangle, Loader2, RefreshCw } from 'lucide-react';
+import MonacoEditor from '@monaco-editor/react';
 import { repositoryApi } from '../../shared/api';
+import { ResizableLayout } from '../../shared/components/ResizableLayout';
+import { useRepository } from '../../shared/context/RepositoryContext';
 import { FileTree } from './FileTree';
+import AiResponse from '../../shared/components/ai/AiResponse';
+import AiMarkdown from '../../shared/components/ai/AiMarkdown';
 
 // ── Monaco language map ───────────────────────────────────────────────────────
 // Maps file extensions to Monaco language IDs.
@@ -86,12 +90,11 @@ const MONACO_OPTIONS = {
 
 export default function ExplorerPage() {
   const { repoId }        = useParams();
+  const { repo, fileTree, loading: repoLoading, error: repoError } = useRepository();
   const [reanalyzing, setReanalyzing] = useState(false);
   const navigate          = useNavigate();
   const [searchParams]    = useSearchParams();
 
-  const [repo,     setRepo]     = useState(null);
-  const [fileTree, setFileTree] = useState(null);
   const [pageError, setPageError] = useState(null);
 
   // Currently open file
@@ -103,37 +106,12 @@ export default function ExplorerPage() {
   // Monaco editor instance ref — used for revealLine / decorations
   const editorRef = useRef(null);
 
-  // ── Load repo + file tree ──────────────────────────────────────────────────
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const [repoRes, treeRes] = await Promise.all([
-          repositoryApi.get(repoId),
-          repositoryApi.listFiles(repoId),
-        ]);
-        if (!cancelled) {
-          setRepo(repoRes.data);
-          setFileTree(treeRes.data.tree);
-        }
-      } catch (err) {
-        if (!cancelled) setPageError(err?.response?.data?.error || err.message);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, [repoId]);
 
   const handleIncrementalAnalyze = async () => {
     setReanalyzing(true);
     try {
       await repositoryApi.analyzeIncremental(repoId);
-      const [repoRes, treeRes] = await Promise.all([
-        repositoryApi.get(repoId),
-        repositoryApi.listFiles(repoId),
-      ]);
-      setRepo(repoRes.data);
-      setFileTree(treeRes.data.tree);
+      window.location.reload(); // Hard reload to fetch everything again
     } catch (err) {
       console.error(err);
     } finally {
@@ -144,7 +122,7 @@ export default function ExplorerPage() {
 
 
   // ── openFile — central navigation function ─────────────────────────────────
-  const openFile = useCallback(async (filePath, line) => {
+  const openFile = useCallback(async (filePath, line, endLine) => {
     if (!filePath) return;
 
     // Don't re-fetch if already showing this file (unless a line jump is requested)
@@ -167,7 +145,7 @@ export default function ExplorerPage() {
 
     // Reveal line after editor mounts — handled in handleEditorMount
     if (line) {
-      pendingLineRef.current = line;
+      pendingLineRef.current = { line, endLine };
     }
   }, [repoId, selectedPath]);
 
@@ -176,7 +154,14 @@ export default function ExplorerPage() {
     const deepPath = searchParams.get('path');
     const deepLine = searchParams.get('line');
     if (deepPath) {
-      openFile(deepPath, deepLine ? parseInt(deepLine, 10) : undefined);
+      if (deepLine) {
+        const parts = deepLine.split('-');
+        const startLine = parseInt(parts[0], 10);
+        const endLine = parts.length > 1 ? parseInt(parts[1], 10) : undefined;
+        openFile(deepPath, startLine, endLine);
+      } else {
+        openFile(deepPath);
+      }
     }
   }, [searchParams, openFile]);
 
@@ -187,7 +172,12 @@ export default function ExplorerPage() {
   const handleEditorMount = useCallback((editor) => {
     editorRef.current = editor;
     if (pendingLineRef.current) {
-      revealLine(pendingLineRef.current);
+      const { line, endLine } = pendingLineRef.current;
+      if (endLine) {
+        highlightRange(line, endLine);
+      } else {
+        revealLine(line);
+      }
       pendingLineRef.current = null;
     }
   }, []);
@@ -214,7 +204,43 @@ export default function ExplorerPage() {
     });
   }
 
-  // ── Error / loading states ─────────────────────────────────────────────────
+  const getActiveContext = useCallback(() => {
+    if (!selectedPath) return null;
+    const editor = editorRef.current;
+    if (!editor) return { filePath: selectedPath };
+    
+    const selection = editor.getSelection();
+    if (!selection || selection.isEmpty()) {
+       return { filePath: selectedPath };
+    }
+    return {
+      filePath: selectedPath,
+      startLine: selection.startLineNumber,
+      endLine: selection.endLineNumber
+    };
+  }, [selectedPath]);
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  if (repoLoading && !fileTree) {
+    return <div className="p-8 text-white">Loading repository context...</div>;
+  }
+  
+  if (repoError) {
+    return (
+      <div className="p-8 text-red-400 flex flex-col items-start gap-4">
+        <div>Error loading repository: {repoError}</div>
+        <button 
+          onClick={handleIncrementalAnalyze}
+          disabled={reanalyzing}
+          className="px-3 py-1.5 bg-panel border border-border rounded text-sm text-white hover:bg-[#30363d] disabled:opacity-50 flex items-center gap-2"
+        >
+          {reanalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+          {reanalyzing ? 'Retrying...' : 'Retry Analysis'}
+        </button>
+      </div>
+    );
+  }
+
   if (pageError) {
     return (
       <div className="h-screen flex items-center justify-center">
@@ -284,6 +310,7 @@ export default function ExplorerPage() {
             <div className="flex-1 h-full flex flex-col bg-panel">
               <AiPanel
                 repoId={repoId}
+                getActiveContext={getActiveContext}
                 onOpenFile={(filePath, line) => openFile(filePath, line)}
                 onHighlightRange={(filePath, start, end) => {
                   openFile(filePath).then(() => highlightRange(start, end));
@@ -356,7 +383,7 @@ function CodeViewer({ filePath, fileContent, loading, error, onEditorMount }) {
 
 // ── AI Q&A Panel ──────────────────────────────────────────────────────────────
 
-function AiPanel({ repoId, onOpenFile, onHighlightRange }) {
+function AiPanel({ repoId, onOpenFile, onHighlightRange, getActiveContext }) {
   const [messages,  setMessages]  = useState([]);
   const [question,  setQuestion]  = useState('');
   const [loading,   setLoading]   = useState(false);
@@ -376,8 +403,9 @@ function AiPanel({ repoId, onOpenFile, onHighlightRange }) {
     setLoading(true);
 
     try {
+      const activeContext = getActiveContext ? getActiveContext() : null;
       // Use the new Step 8 endpoint
-      const res = await repositoryApi.askQuestion(repoId, q);
+      const res = await repositoryApi.askQuestion(repoId, q, activeContext);
       const ans = res.data.answer;
       
       setMessages(prev => [...prev, {
@@ -455,8 +483,8 @@ function Message({ msg, onOpenFile }) {
   if (msg.role === 'user') {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] bg-accent/10 border border-accent/20 rounded px-2.5 py-1.5 text-xs text-white whitespace-pre-wrap">
-          {msg.content}
+        <div className="max-w-[85%] bg-accent/10 border border-accent/20 rounded px-2.5 py-1.5 text-xs text-white">
+          <AiMarkdown content={msg.content} />
         </div>
       </div>
     );
@@ -474,7 +502,7 @@ function Message({ msg, onOpenFile }) {
   // assistant — render structured response compactly
   return (
     <div className="flex flex-col gap-2 bg-surface/30 border border-border rounded p-2.5">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between border-b border-border/50 pb-2 mb-2">
         <span className="text-[10px] font-medium text-white/80 flex items-center gap-1">
           {msg.isDeterministic ? <Database className="w-3 h-3 text-success" /> : <Brain className="w-3 h-3 text-accent" />}
           {msg.isDeterministic ? 'Deterministic' : 'AI Inference'}
@@ -484,41 +512,16 @@ function Message({ msg, onOpenFile }) {
         )}
       </div>
 
-      <div className="text-xs text-white/90 whitespace-pre-wrap leading-relaxed">
-        {msg.content}
-      </div>
-
-      {msg.facts && msg.facts.length > 0 && (
-        <div className="mt-1">
-          <span className="text-[10px] font-medium text-muted uppercase">Facts</span>
-          <ul className="list-disc list-inside text-[11px] text-white/70 space-y-0.5 mt-0.5">
-            {msg.facts.slice(0, 3).map((f, i) => <li key={i} className="truncate">{f}</li>)}
-            {msg.facts.length > 3 && <li className="italic">+{msg.facts.length - 3} more</li>}
-          </ul>
-        </div>
-      )}
-
-      {msg.references && msg.references.length > 0 && (
-        <div className="flex flex-col gap-0.5 mt-2 pt-2 border-t border-border">
-          <span className="text-[10px] font-medium text-muted uppercase mb-0.5">References</span>
-          {msg.references.map((ref, i) => (
-            <button
-              key={i}
-              onClick={() => onOpenFile(ref.path, ref.startLine)}
-              className="flex items-center gap-1 text-[11px] text-accent/80 hover:text-accent transition-colors text-left group"
-              title={`Open ${ref.path}${ref.startLine ? ` at line ${ref.startLine}` : ''}`}
-            >
-              <File className="w-3 h-3 shrink-0" />
-              <span className="font-mono truncate">
-                {ref.path}{ref.startLine ? `:${ref.startLine}` : ''}
-              </span>
-              {ref.reason && (
-                <span className="text-[9px] text-muted ml-1 truncate group-hover:text-accent/60">({ref.reason})</span>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
+      <AiResponse 
+        data={{
+          summary: msg.summary || msg.content,
+          facts: msg.facts,
+          inferences: msg.inferences,
+          references: msg.references
+        }} 
+        title={null} 
+        onNavigate={onOpenFile} 
+      />
     </div>
   );
 }

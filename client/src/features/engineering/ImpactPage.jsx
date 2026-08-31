@@ -1,23 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { repositoryApi } from '../../shared/api';
+import { useRepository } from '../../shared/context/RepositoryContext';
 
 export default function ImpactPage() {
   const { repoId } = useParams();
+  const { repo, loading: repoLoading, error: repoError } = useRepository();
   const [impact, setImpact] = useState(null);
-  const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [impactRes, statusRes] = await Promise.all([
-          repositoryApi.getChangeImpact(repoId),
-          repositoryApi.get(repoId)
-        ]);
+        const impactRes = await repositoryApi.getChangeImpact(repoId);
         setImpact(impactRes.data);
-        setStatus(statusRes.data);
       } catch (err) {
         setError(err.response?.data?.error || err.message);
       } finally {
@@ -27,8 +24,8 @@ export default function ImpactPage() {
     fetchData();
   }, [repoId]);
 
-  if (loading) return <div className="p-8 text-white">Loading impact analysis...</div>;
-  if (error) return <div className="p-8 text-red-400">Error: {error}</div>;
+  if (loading || repoLoading) return <div className="p-8 text-white">Loading impact analysis...</div>;
+  if (error || repoError) return <div className="p-8 text-red-400">Error: {error || repoError}</div>;
 
   return (
     <div className="flex-1 h-full overflow-y-auto custom-scrollbar bg-surface text-slate-300 p-8 font-sans">
@@ -37,7 +34,7 @@ export default function ImpactPage() {
         <header className="flex justify-between items-end border-b border-slate-700 pb-4">
           <div>
             <h1 className="text-3xl font-bold text-white tracking-tight">Change Impact Analysis</h1>
-            <p className="text-slate-400 mt-1">Repository: {status?.name}</p>
+            <p className="text-slate-400 mt-1">Repository: {repo?.name}</p>
           </div>
         </header>
 

@@ -16,6 +16,15 @@
  *   The active provider is determined by environment variables at startup.
  *   Currently supported:
  *
+ *     Google Gemini (default when GEMINI_API_KEY is set)
+ *       GEMINI_API_KEY   — Gemini API Key
+ *       GEMINI_MODEL     — model ID (optional, defaults to gemini-1.5-flash)
+ *
+ *     OpenAI-Compatible (e.g. Groq, LMStudio, OpenRouter, OpenAI) (default when OPENAI_API_KEY is set)
+ *       OPENAI_API_KEY   — API Key
+ *       OPENAI_API_URL   — Endpoint (optional, defaults to https://api.openai.com/v1/chat/completions)
+ *       OPENAI_MODEL     — model ID (optional, defaults to gpt-3.5-turbo)
+ *
  *     IBM watsonx (default when IBM_API_KEY + IBM_PROJECT_ID are set)
  *       IBM_API_KEY      — IBM Cloud IAM API key
  *       IBM_PROJECT_ID   — watsonx.ai project ID
@@ -124,6 +133,61 @@ async function ibmWatsonxProvider(prompt) {
   return text.trim();
 }
 
+// ── Google Gemini provider ────────────────────────────────────────────────────
+
+async function geminiProvider(prompt) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  const payload = {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: {
+      temperature: 0.1,
+      maxOutputTokens: 8192,
+    }
+  };
+
+  const headers = { 'Content-Type': 'application/json' };
+  const resStr = await httpPost(url, JSON.stringify(payload), headers);
+  const data = JSON.parse(resStr);
+  
+  if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+    return data.candidates[0].content.parts[0].text.trim();
+  }
+  throw new Error(`Unexpected Gemini response: ${resStr.slice(0, 200)}`);
+}
+
+// ── OpenAI-Compatible provider ────────────────────────────────────────────────
+
+async function openAiCompatibleProvider(prompt) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  const url = process.env.OPENAI_API_URL || 'https://api.openai.com/v1/chat/completions';
+  const model = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
+
+  const payload = {
+    model: model,
+    messages: [
+      { role: 'user', content: prompt }
+    ],
+    temperature: 0.1,
+    max_tokens: 4096
+  };
+
+  const headers = { 
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${apiKey}`
+  };
+  
+  const resStr = await httpPost(url, JSON.stringify(payload), headers);
+  const data = JSON.parse(resStr);
+  
+  if (data.choices && data.choices[0]?.message?.content) {
+    return data.choices[0].message.content.trim();
+  }
+  throw new Error(`Unexpected OpenAI-compatible response: ${resStr.slice(0, 200)}`);
+}
+
 // ── Provider registry ─────────────────────────────────────────────────────────
 
 /**
@@ -132,15 +196,39 @@ async function ibmWatsonxProvider(prompt) {
  * @returns {function(string): Promise<string>}
  */
 function getProvider() {
+  if (process.env.GEMINI_API_KEY) {
+    return geminiProvider;
+  }
+  if (process.env.OPENAI_API_KEY) {
+    return openAiCompatibleProvider;
+  }
   if (process.env.IBM_API_KEY && process.env.IBM_PROJECT_ID) {
     return ibmWatsonxProvider;
   }
   throw new ProviderUnavailableError(
-    'No AI provider is configured. Set IBM_API_KEY and IBM_PROJECT_ID in your .env file.'
+    'No AI provider is configured. Set GEMINI_API_KEY, OPENAI_API_KEY, or IBM_API_KEY + IBM_PROJECT_ID in your .env file.'
   );
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
+
+/**
+ * Verify the connection to the configured AI provider.
+ * Makes a tiny test request to ensure the API key and endpoint are valid.
+ * @returns {Promise<boolean>} true if successful, false otherwise
+ */
+async function verifyProviderConnection() {
+  if (!isProviderConfigured()) return false;
+  try {
+    const provider = getProvider();
+    // A very tiny prompt just to get a 200 OK response
+    await provider("Reply with the word 'OK'.");
+    return true;
+  } catch (error) {
+    console.error('[CodeLens] AI connection verification failed:', error.message);
+    return false;
+  }
+}
 
 /**
  * Generate an answer for the given fully-assembled prompt.
@@ -162,7 +250,23 @@ async function generateAnswer(prompt) {
  * @returns {boolean}
  */
 function isProviderConfigured() {
-  return !!(process.env.IBM_API_KEY && process.env.IBM_PROJECT_ID);
+  return !!(
+    process.env.GEMINI_API_KEY ||
+    process.env.OPENAI_API_KEY ||
+    (process.env.IBM_API_KEY && process.env.IBM_PROJECT_ID)
+  );
+}
+
+/**
+ * Returns the name of the active configured provider.
+ *
+ * @returns {string}
+ */
+function getProviderName() {
+  if (process.env.GEMINI_API_KEY) return 'Google Gemini';
+  if (process.env.OPENAI_API_KEY) return 'OpenAI Compatible';
+  if (process.env.IBM_API_KEY && process.env.IBM_PROJECT_ID) return 'IBM watsonx';
+  return 'None';
 }
 
 // ── Minimal HTTPS POST helper ─────────────────────────────────────────────────
@@ -204,4 +308,4 @@ function httpPost(url, body, headers) {
   });
 }
 
-module.exports = { generateAnswer, isProviderConfigured, ProviderUnavailableError };
+module.exports = { generateAnswer, isProviderConfigured, getProviderName, verifyProviderConnection, ProviderUnavailableError };

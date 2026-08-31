@@ -1,6 +1,6 @@
 'use strict';
 
-const { generateStructuredResponse } = require('../../../core/ai/aiProvider');
+const { generateStructuredResponse, isAIAvailable } = require('../../../core/ai/ai.service');
 const { buildCandidateContext } = require('../context/refactoring.context');
 
 const REFACTORING_SCHEMA = {
@@ -66,19 +66,16 @@ Analyze this candidate and provide actionable, structured recommendations.
 
 Output JSON only. Do not use markdown wrappers.`;
 
+  if (!isAIAvailable()) {
+    return {
+      summary: "AI provider is not configured. Refactoring insights are unavailable.",
+      recommendations: [],
+      limitations: ["Offline fallback mode."]
+    };
+  }
+
   try {
-    const rawAiResponse = await generateStructuredResponse(prompt, REFACTORING_SCHEMA);
-    let parsed;
-    try {
-      parsed = JSON.parse(rawAiResponse);
-    } catch (err) {
-      console.warn('[refactoringGenerator] Failed to parse AI JSON:', err.message);
-      return {
-        summary: "AI generated an invalid response.",
-        recommendations: [],
-        limitations: ["Failed to parse AI output."]
-      };
-    }
+    const parsed = await generateStructuredResponse(prompt, REFACTORING_SCHEMA);
 
     // Validate references against the deterministic context to prevent hallucinations
     const allowedFiles = new Set([
@@ -98,7 +95,11 @@ Output JSON only. Do not use markdown wrappers.`;
     return parsed;
   } catch (err) {
     console.error('[refactoringGenerator] AI Provider error:', err.message);
-    throw new Error(`AI Provider failed to generate refactoring insights: ${err.message}`);
+    return {
+      summary: "AI generation failed.",
+      recommendations: [],
+      limitations: [err.message]
+    };
   }
 }
 

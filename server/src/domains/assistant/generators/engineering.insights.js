@@ -1,6 +1,18 @@
 'use strict';
 
-const { generateAnswer, isProviderConfigured, ProviderUnavailableError } = require('../../../core/ai/aiProvider');
+const { generateStructuredResponse, isAIAvailable } = require('../../../core/ai/ai.service');
+
+const INSIGHTS_SCHEMA = {
+  type: 'object',
+  properties: {
+    summary: { type: 'string', description: "High level summary of the codebase's structural health (1-2 sentences)." },
+    priorityRisks: { type: 'array', items: { type: 'string' } },
+    observations: { type: 'array', items: { type: 'string' } },
+    recommendations: { type: 'array', items: { type: 'string' } },
+    limitations: { type: 'string' }
+  },
+  required: ['summary', 'priorityRisks', 'observations', 'recommendations', 'limitations']
+};
 
 /**
  * engineeringInsights.js
@@ -50,25 +62,6 @@ Do NOT invent new metrics or risks. Use the facts provided.
 
 CONTEXT:
 ${JSON.stringify(context, null, 2)}
-
-Respond ONLY with a valid JSON object matching this schema exactly (no markdown formatting, no backticks, just the JSON string):
-
-{
-  "summary": "High level summary of the codebase's structural health (1-2 sentences).",
-  "priorityRisks": [
-    "Most critical risk to address first",
-    "Second most critical risk"
-  ],
-  "observations": [
-    "Insightful observation about coupling or architecture based on the data",
-    "Observation about file size or responsibilities"
-  ],
-  "recommendations": [
-    "Actionable step to improve the score",
-    "Another actionable step"
-  ],
-  "limitations": "Any caveats about what this structural data might be missing."
-}
   `.trim();
 }
 
@@ -81,19 +74,15 @@ Respond ONLY with a valid JSON object matching this schema exactly (no markdown 
  * @returns {Promise<object>}
  */
 async function getEngineeringInsights(riskModel, architecture, graphMeta) {
-  if (!isProviderConfigured()) {
+  if (!isAIAvailable()) {
     return _fallbackResponse();
   }
 
   const prompt = buildInsightsPrompt(riskModel, architecture, graphMeta);
 
   try {
-    const aiResponseStr = await generateAnswer(prompt);
+    const parsed = await generateStructuredResponse(prompt, INSIGHTS_SCHEMA);
     
-    // Clean up potential markdown formatting
-    const cleanStr = aiResponseStr.replace(/^```(?:json)?\n?/i, '').replace(/```$/i, '').trim();
-    const parsed = JSON.parse(cleanStr);
-
     return {
       summary: parsed.summary || "Summary unavailable.",
       priorityRisks: Array.isArray(parsed.priorityRisks) ? parsed.priorityRisks : [],
@@ -102,11 +91,7 @@ async function getEngineeringInsights(riskModel, architecture, graphMeta) {
       limitations: parsed.limitations || "None."
     };
   } catch (err) {
-    if (err instanceof ProviderUnavailableError) {
-      console.warn('[engineeringInsights] AI provider unavailable. Using fallback.');
-    } else {
-      console.warn('[engineeringInsights] Failed to parse AI insights JSON:', err.message);
-    }
+    console.warn('[engineeringInsights] Failed to generate AI insights:', err.message);
     return _fallbackResponse();
   }
 }

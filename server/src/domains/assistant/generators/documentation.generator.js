@@ -7,7 +7,27 @@
  * and validating the response against deterministic facts.
  */
 
-const { generateAnswer, isProviderConfigured, ProviderUnavailableError } = require('../../../core/ai/aiProvider');
+const { generateStructuredResponse, isAIAvailable } = require('../../../core/ai/ai.service');
+
+const OVERVIEW_SCHEMA = {
+  type: 'object',
+  properties: {
+    summary: { type: 'string' },
+    technologies: { type: 'array', items: { type: 'string' } },
+    architectureSummary: { type: 'string' },
+    observations: { type: 'array', items: { type: 'string' } }
+  }
+};
+
+const MODULE_SCHEMA = {
+  type: 'object',
+  properties: {
+    responsibility: { type: 'string' },
+    architectureRole: { type: 'string' },
+    apiNotes: { type: 'string' },
+    inferredDependenciesPurpose: { type: 'string' }
+  }
+};
 const {
   buildOverviewContext,
   buildModuleContext,
@@ -30,26 +50,15 @@ async function generateOverviewDocs(analysis, graph, architectureModel) {
     aiInterpretation: null,
   };
 
-  if (!isProviderConfigured()) {
+  if (!isAIAvailable()) {
     return result; // Fallback to deterministic facts only
   }
 
   const prompt = buildOverviewPrompt(context);
 
   try {
-    const aiResponseStr = await generateAnswer(prompt);
-    let parsed = null;
+    const parsed = await generateStructuredResponse(prompt, OVERVIEW_SCHEMA);
     
-    // Attempt to parse JSON. Sometimes AI adds markdown backticks.
-    try {
-      const cleanStr = aiResponseStr.replace(/^```(?:json)?\n?/i, '').replace(/```$/i, '').trim();
-      parsed = JSON.parse(cleanStr);
-    } catch (parseErr) {
-      console.warn('[documentationGenerator] Failed to parse AI overview JSON:', parseErr.message);
-      // We can fallback to raw if we want, but schema says structured JSON.
-      parsed = { summary: aiResponseStr };
-    }
-
     // Basic structural validation
     result.aiInterpretation = {
       summary: parsed.summary || null,
@@ -58,11 +67,7 @@ async function generateOverviewDocs(analysis, graph, architectureModel) {
       observations: Array.isArray(parsed.observations) ? parsed.observations : [],
     };
   } catch (err) {
-    if (err instanceof ProviderUnavailableError) {
-      console.warn('[documentationGenerator] AI provider unavailable. Using fallback.');
-    } else {
-      console.error('[documentationGenerator] AI generation failed:', err);
-    }
+    console.error('[documentationGenerator] AI generation failed:', err.message);
   }
 
   return result;
@@ -84,24 +89,15 @@ async function generateModuleDocs(analysis, graph, architectureModel, filePath) 
     aiInterpretation: null,
   };
 
-  if (!isProviderConfigured()) {
+  if (!isAIAvailable()) {
     return result;
   }
 
   const prompt = buildModulePrompt(context);
 
   try {
-    const aiResponseStr = await generateAnswer(prompt);
-    let parsed = null;
+    const parsed = await generateStructuredResponse(prompt, MODULE_SCHEMA);
     
-    try {
-      const cleanStr = aiResponseStr.replace(/^```(?:json)?\n?/i, '').replace(/```$/i, '').trim();
-      parsed = JSON.parse(cleanStr);
-    } catch (parseErr) {
-      console.warn('[documentationGenerator] Failed to parse AI module JSON:', parseErr.message);
-      parsed = { responsibility: aiResponseStr };
-    }
-
     result.aiInterpretation = {
       responsibility: parsed.responsibility || null,
       architectureRole: parsed.architectureRole || null,
@@ -109,11 +105,7 @@ async function generateModuleDocs(analysis, graph, architectureModel, filePath) 
       inferredDependenciesPurpose: parsed.inferredDependenciesPurpose || null,
     };
   } catch (err) {
-    if (err instanceof ProviderUnavailableError) {
-      console.warn('[documentationGenerator] AI provider unavailable. Using fallback.');
-    } else {
-      console.error('[documentationGenerator] AI generation failed:', err);
-    }
+    console.error('[documentationGenerator] AI generation failed:', err.message);
   }
 
   return result;

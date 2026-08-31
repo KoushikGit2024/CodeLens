@@ -2,14 +2,17 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   ChevronLeft, AlertTriangle, Layers, GitBranch, 
-  Database, Brain, Activity, File, Loader2, ArrowRight, CheckCircle, LayoutDashboard
+  Database, Brain, Activity, File, Loader2, ArrowRight, CheckCircle, LayoutDashboard, Sparkles
 } from 'lucide-react';
+import { DiffEditor } from '@monaco-editor/react';
 import { ResizableLayout } from '../../shared/components/ResizableLayout';
 import { 
   getRefactoringIntelligence, 
   getRefactoringImpact, 
-  getRefactoringInsights 
+  getRefactoringInsights,
+  autoFixRefactoringCandidate
 } from '../../shared/api';
+import AiResponse from '../../shared/components/ai/AiResponse';
 
 export default function RefactoringPage() {
   const { repoId } = useParams();
@@ -93,8 +96,8 @@ export default function RefactoringPage() {
                     </span>
                     <span className="text-[10px] text-muted font-mono">Score {c.priorityScore}</span>
                   </div>
-                  <h3 className="text-sm font-medium text-white/90 truncate leading-snug">{c.title}</h3>
-                  <p className="text-[11px] text-muted mt-1 truncate">{c.type}</p>
+                  <h3 className="text-sm font-medium text-white/90 truncate leading-snug" title={c.title}>{c.title}</h3>
+                  <p className="text-[11px] text-muted mt-1 truncate" title={c.type}>{c.type}</p>
                 </button>
               ))}
               {(!intel?.candidates || intel.candidates.length === 0) && (
@@ -144,6 +147,15 @@ export default function RefactoringPage() {
 function CandidateDetail({ candidate, repoId }) {
   const [impact, setImpact] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [fixing, setFixing] = useState(false);
+  const [fixResult, setFixResult] = useState(null);
+  const [fixError, setFixError] = useState(null);
+
+  // Clear fix result when candidate changes
+  useEffect(() => {
+    setFixResult(null);
+    setFixError(null);
+  }, [candidate.id]);
 
   useEffect(() => {
     async function loadImpact() {
@@ -171,18 +183,72 @@ function CandidateDetail({ candidate, repoId }) {
           <h1 className="text-2xl font-semibold text-white mb-2">{candidate.title}</h1>
           <p className="text-sm text-white/80 leading-relaxed">{candidate.summary}</p>
         </div>
-        <div className="flex flex-col items-end gap-1 text-right">
-          <span className="text-2xl font-mono font-bold text-white">{candidate.priorityScore}</span>
-          <span className="text-[10px] text-muted uppercase">Priority Score</span>
+        <div className="flex flex-col items-end gap-3 text-right">
+          <div className="flex flex-col items-end gap-1">
+            <span className="text-2xl font-mono font-bold text-white">{candidate.priorityScore}</span>
+            <span className="text-[10px] text-muted uppercase">Priority Score</span>
+          </div>
+          <button 
+            onClick={async () => {
+              setFixing(true);
+              setFixError(null);
+              try {
+                const res = await autoFixRefactoringCandidate(repoId, candidate.id);
+                setFixResult(res);
+              } catch (err) {
+                setFixError(err?.response?.data?.error || err.message);
+              } finally {
+                setFixing(false);
+              }
+            }}
+            disabled={fixing || !!fixResult}
+            className="flex items-center gap-2 px-3 py-1.5 bg-[#8957e5] hover:bg-[#9d6ef7] disabled:opacity-50 text-white rounded text-sm font-medium transition-colors shadow shadow-[#8957e5]/20"
+          >
+            {fixing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            {fixing ? 'Auto-Fixing...' : 'Auto-Fix with AI'}
+          </button>
         </div>
       </div>
 
+      {fixError && (
+        <div className="bg-danger/10 border border-danger/30 text-danger text-sm p-3 rounded flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4" /> {fixError}
+        </div>
+      )}
+
+      {fixResult && (
+        <div className="bg-[#0d1117] border border-border rounded flex flex-col h-[500px] overflow-hidden">
+          <div className="p-3 border-b border-border bg-panel flex items-center justify-between">
+             <span className="text-sm font-medium text-white flex items-center gap-2">
+               <Sparkles className="w-4 h-4 text-[#8957e5]" /> AI Auto-Fix Preview
+             </span>
+             <span className="text-xs font-mono text-muted">{fixResult.file}</span>
+          </div>
+          <div className="flex-1 min-h-0 relative">
+            <DiffEditor
+              original={fixResult.originalCode}
+              modified={fixResult.refactoredCode}
+              language="javascript"
+              theme="vs-dark"
+              options={{
+                readOnly: true,
+                minimap: { enabled: false },
+                renderSideBySide: true,
+                fontSize: 12,
+                scrollBeyondLastLine: false,
+                lineNumbersMinChars: 3
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-panel border border-border rounded p-4">
+        <div className="bg-panel border border-border rounded p-4 min-w-0">
           <h3 className="text-xs font-medium text-muted uppercase tracking-wider mb-3">Affected Files</h3>
           <ul className="space-y-1.5">
             {candidate.files.map(f => (
-              <li key={f} className="text-sm font-mono text-accent truncate">
+              <li key={f} className="text-sm font-mono text-accent truncate" title={f}>
                 <Link to={`/explore/${repoId}/source?path=${encodeURIComponent(f)}`} className="hover:underline">
                   {f}
                 </Link>
@@ -191,7 +257,7 @@ function CandidateDetail({ candidate, repoId }) {
           </ul>
         </div>
         
-        <div className="bg-panel border border-border rounded p-4">
+        <div className="bg-panel border border-border rounded p-4 min-w-0">
           <h3 className="text-xs font-medium text-muted uppercase tracking-wider mb-3 flex items-center gap-2">
             <Layers className="w-3.5 h-3.5" />
             Change Impact Preview
@@ -302,49 +368,23 @@ function AiAdvisor({ candidate, repoId }) {
             {insights.error}
           </div>
         ) : insights ? (
-          <>
-            <div>
-               <h4 className="text-[10px] uppercase font-bold text-muted tracking-wider mb-2">AI Summary</h4>
-               <p className="text-sm text-white/90 leading-relaxed">{insights.summary}</p>
-            </div>
-
-            {insights.recommendations?.map((rec, idx) => (
-              <div key={idx} className="bg-panel border border-border rounded p-3">
-                <h4 className="text-sm font-semibold text-[#cba6f7] mb-2">{rec.strategy}</h4>
-                <p className="text-xs text-white/80 leading-relaxed mb-3">{rec.reasoning}</p>
-                
-                <div className="mb-3">
-                  <h5 className="text-[10px] uppercase font-bold text-muted tracking-wider mb-1">Execution Steps</h5>
-                  <ol className="list-decimal list-inside text-xs text-white/70 space-y-1">
-                    {rec.steps?.map((step, i) => <li key={i}>{step}</li>)}
-                  </ol>
-                </div>
-
-                {rec.references?.length > 0 && (
-                   <div className="pt-2 border-t border-border/50">
-                      <h5 className="text-[10px] uppercase font-bold text-muted tracking-wider mb-1">References</h5>
-                      {rec.references.map((ref, i) => (
-                         <Link key={i} to={`/explore/${repoId}/source?path=${encodeURIComponent(ref.path)}`} className="block text-xs text-[#89b4fa] hover:underline mb-0.5 truncate">
-                           <File className="w-3 h-3 inline mr-1 opacity-70"/>
-                           {ref.path}
-                         </Link>
-                      ))}
-                   </div>
-                )}
-              </div>
-            ))}
-
-            {insights.limitations?.length > 0 && (
-              <div className="bg-yellow-500/5 border border-yellow-500/20 rounded p-3">
-                <h4 className="text-[10px] uppercase font-bold text-yellow-500/70 tracking-wider mb-1 flex items-center gap-1">
-                  <AlertTriangle className="w-3 h-3"/> Limitations
-                </h4>
-                <ul className="list-disc list-inside text-xs text-white/60 space-y-1">
-                  {insights.limitations.map((l, i) => <li key={i}>{l}</li>)}
-                </ul>
-              </div>
-            )}
-          </>
+          <AiResponse 
+            repoId={repoId}
+            chatId={`refactor-${candidate.id}`}
+            data={{
+              summary: insights.summary,
+              recommendations: insights.recommendations?.map(rec => {
+                let md = `**${rec.strategy}**\n${rec.reasoning}`;
+                if (rec.steps?.length > 0) {
+                  md += `\n\n*Execution Steps:*\n` + rec.steps.map(s => `- ${s}`).join('\n');
+                }
+                return md;
+              }) || [],
+              risks: insights.limitations || [],
+              references: insights.recommendations?.flatMap(r => r.references || []) || []
+            }}
+            title={null}
+          />
         ) : null}
       </div>
     </div>

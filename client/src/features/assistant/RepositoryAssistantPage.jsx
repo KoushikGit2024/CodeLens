@@ -2,31 +2,20 @@ import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Loader2, ChevronLeft, MessageSquare, Send, File, Brain, Database, AlertTriangle, Layers, MapPin } from 'lucide-react';
 import { repositoryApi } from '../../shared/api';
+import AiResponse from '../../shared/components/ai/AiResponse';
+import AiMarkdown from '../../shared/components/ai/AiMarkdown';
+import { useRepository } from '../../shared/context/RepositoryContext';
 
 export default function RepositoryAssistantPage() {
   const { repoId } = useParams();
+  const { repo, loading: repoLoading, error: repoError } = useRepository();
   const navigate = useNavigate();
   const bottomRef = useRef(null);
 
-  const [repo, setRepo] = useState(null);
   const [messages, setMessages] = useState([]);
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
-  const [pageError, setPageError] = useState(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const res = await repositoryApi.get(repoId);
-        if (!cancelled) setRepo(res.data);
-      } catch (err) {
-        if (!cancelled) setPageError(err?.response?.data?.error || err.message);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, [repoId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -57,13 +46,17 @@ export default function RepositoryAssistantPage() {
     }
   }
 
-  if (pageError) {
+  if (repoLoading) {
+    return <div className="p-8 text-white">Loading assistant...</div>;
+  }
+
+  if (repoError) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-surface">
         <div className="text-center">
-          <p className="text-danger mb-4 text-sm">{pageError}</p>
-          <button onClick={() => navigate('/')} className="text-sm text-accent hover:underline">
-            ← Back to upload
+          <p className="text-danger mb-4 text-sm">{repoError}</p>
+          <button onClick={() => navigate(-1)} className="text-sm text-accent hover:underline">
+            ← Go back
           </button>
         </div>
       </div>
@@ -155,7 +148,7 @@ function ChatMessage({ msg, repoId }) {
   if (msg.role === 'user') {
     return (
       <div className="self-end max-w-[85%] bg-accent text-white rounded-lg px-4 py-3 text-sm shadow-md">
-        {msg.content}
+        <AiMarkdown content={msg.content} />
       </div>
     );
   }
@@ -185,88 +178,8 @@ function ChatMessage({ msg, repoId }) {
         </span>
       </div>
       
-      <div className="p-5 space-y-5">
-        {/* Summary */}
-        {ans.summary && (
-          <p className="text-sm text-white font-medium leading-relaxed">
-            {ans.summary}
-          </p>
-        )}
-
-        {/* Explanation */}
-        {ans.explanation && (
-          <div className="text-sm text-white/80 leading-relaxed whitespace-pre-wrap">
-            {ans.explanation}
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 pt-3">
-          {/* Facts */}
-          {ans.facts && ans.facts.length > 0 && (
-            <div className="bg-surface rounded border border-border p-3">
-              <h4 className="text-xs font-semibold text-muted uppercase tracking-wider mb-2 flex items-center gap-1">
-                <Database className="w-3 h-3" /> Grounded Facts
-              </h4>
-              <ul className="list-disc list-inside text-xs text-white/80 space-y-1">
-                {ans.facts.map((fact, i) => <li key={i}>{fact}</li>)}
-              </ul>
-            </div>
-          )}
-
-          {/* Inferences */}
-          {ans.inferences && ans.inferences.length > 0 && (
-            <div className="bg-surface rounded border border-border p-3">
-              <h4 className="text-xs font-semibold text-muted uppercase tracking-wider mb-2 flex items-center gap-1">
-                <Brain className="w-3 h-3" /> AI Inferences
-              </h4>
-              <ul className="list-disc list-inside text-xs text-white/80 space-y-1">
-                {ans.inferences.map((inf, i) => <li key={i}>{inf}</li>)}
-              </ul>
-            </div>
-          )}
-        </div>
-
-        {/* References */}
-        {ans.references && ans.references.length > 0 && (
-          <div className="pt-2">
-            <h4 className="text-xs font-semibold text-muted uppercase tracking-wider mb-2 flex items-center gap-1">
-              <MapPin className="w-3 h-3" /> Source References
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {ans.references.map((ref, i) => (
-                <Link
-                  key={i}
-                  to={`/explore/${repoId}?path=${encodeURIComponent(ref.path)}${ref.startLine ? `&line=${ref.startLine}` : ''}`}
-                  className="flex flex-col gap-1 bg-surface border border-border hover:border-accent/40 rounded p-2 transition-colors group"
-                >
-                  <div className="flex items-center gap-1.5 text-xs text-accent group-hover:text-accent/80 font-mono truncate">
-                    <File className="w-3.5 h-3.5 shrink-0" />
-                    <span className="truncate">{ref.path}{ref.startLine ? `:${ref.startLine}` : ''}</span>
-                  </div>
-                  {ref.reason && (
-                    <span className="text-[10px] text-muted pl-5 truncate">{ref.reason}</span>
-                  )}
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Limitations */}
-        {ans.limitations && ans.limitations.length > 0 && (
-          <div className="mt-3 pt-3 border-t border-border">
-            <h4 className="text-xs font-semibold text-warning uppercase tracking-wider mb-1 flex items-center gap-1">
-              <AlertTriangle className="w-3 h-3" /> Limitations
-            </h4>
-            <ul className="list-disc list-inside text-xs text-warning/80 space-y-0.5">
-              {ans.limitations.map((lim, i) => <li key={i}>{lim}</li>)}
-            </ul>
-          </div>
-        )}
-
-        <div className="text-[10px] text-muted text-right mt-2">
-          Generated by: {ans.generatedBy || 'CodeLens'}
-        </div>
+      <div className="p-5">
+        <AiResponse data={ans} title={null} />
       </div>
     </div>
   );

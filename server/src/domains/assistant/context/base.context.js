@@ -80,10 +80,11 @@ const DEFAULTS = {
  * @param {string}  question     — the user's natural-language question
  * @param {string}  extractPath  — absolute path to the extracted repository root
  *                                 (used to read source from disk)
- * @param {object}  [opts]       — override default limits
+ * @param {object}  [opts]       — override default limits (and pass activeContext)
  * @returns {AiContext}
  */
 function buildContext(analysis, question, extractPath, opts = {}) {
+  const activeContext = opts.activeContext || null;
   const cfg = { ...DEFAULTS, ...opts };
 
   // Build graph (needed for dependency expansion)
@@ -91,7 +92,7 @@ function buildContext(analysis, question, extractPath, opts = {}) {
 
   // 1. Score every file
   const terms   = extractQueryTerms(question);
-  const scored  = scoreFiles(analysis, graph, terms);
+  const scored  = scoreFiles(analysis, graph, terms, activeContext);
 
   // 2. Expand with direct dependencies of top-ranked files
   expandWithDeps(scored, graph, cfg.maxFiles);
@@ -117,32 +118,30 @@ function buildContext(analysis, question, extractPath, opts = {}) {
       }))
     : selected;
 
-  // 3. Load source for each candidate
+  // 4. Load source from disk for top files
   let totalChars = 0;
   let truncated  = false;
   const files    = [];
 
   for (const candidate of candidates) {
-    if (totalChars >= cfg.maxSourceChars) {
-      truncated = true;
-      break;
-    }
-
     const fileAnalysis = analysis.files.find(f => f.filePath === candidate.filePath);
     const depInfo      = getFileDependencies(graph, candidate.filePath);
 
-    // Read source snippet
-    const remaining = cfg.maxSourceChars - totalChars;
-    const source    = loadSourceSnippet(
-      extractPath,
-      candidate.filePath,
-      fileAnalysis,
-      terms,
-      cfg.snippetLines,
-      remaining
-    );
-
-    totalChars += source ? source.length : 0;
+    // Identify active context constraints
+    const isContextFile = activeContext && candidate.filePath === activeContext.filePath;
+    const startLine = isContextFile && activeContext.startLine ? Math.max(1, activeContext.startLine - 10) : null;
+    const endLine = isContextFile && activeContext.endLine ? activeContext.endLine + 10 : null;
+    
+    // Read source
+    const candidateItem = { path: candidate.filePath };
+    const charsRead = loadSourceSnippet(candidateItem, extractPath, terms, fileAnalysis, cfg, startLine, endLine);
+    
+    if (totalChars + charsRead > cfg.maxSourceChars && !isContextFile) {
+        candidateItem.source = null;
+        truncated = true;
+    } else {
+        totalChars += charsRead;
+    }
 
     files.push({
       path:         candidate.filePath,
@@ -153,7 +152,7 @@ function buildContext(analysis, question, extractPath, opts = {}) {
         .filter(d => d.filePath)
         .map(d => d.filePath),
       dependents:   depInfo.dependents.map(d => d.filePath),
-      source:       source || null,
+      source:       candidateItem.source || null,
       language:     fileAnalysis.language,
     });
   }
@@ -203,33 +202,33 @@ function extractQueryTerms(question) {
  * @param {object}   analysis
  * @param {object}   graph     — DependencyGraph
  * @param {string[]} terms     — query terms
+ * @param {object}   [activeContext]
  * @returns {Map<string, {score, reason, symbols}>}
  */
-function scoreFiles(analysis, graph, terms) {
+function scoreFiles(analysis, graph, terms, activeContext = null) {
   const scored = new Map();
 
   for (const fileAnalysis of analysis.files) {
     const fp        = fileAnalysis.filePath;
+    let score = 0;
+    const reasons = [];
+
+    // ── Active Context Boost ──────────────────────────────────────────────────
+    if (activeContext && activeContext.filePath === fp) {
+      score += 100;
+      reasons.push('active file');
+    }
+
     const basename  = path.posix.basename(fp);
-    // Remove extension for matching, e.g. 'authController' from 'authController.js'
     const stemRaw   = basename.replace(/\.[^.]+$/, '');
     const stem      = stemRaw.toLowerCase();
     const fpLower   = fp.toLowerCase();
-    // Split stem into word parts using original (pre-lowercase) name for camelCase detection
-    // authController → ['auth', 'Controller'] → ['auth', 'controller']
     const stemParts = stemRaw.split(/(?=[A-Z])|[-_]/).map(p => p.toLowerCase()).filter(p => p.length >= 3);
     const symbols   = extractSymbolNames(fileAnalysis);
     const symLower  = symbols.map(s => s.toLowerCase());
     const imports   = extractImportSources(fileAnalysis);
 
-    let score = 0;
-    const reasons = [];
-
     for (const term of terms) {
-      // +3 path/filename match:
-      //   - stem/path contains the term, OR
-      //   - term contains the stem, OR
-      //   - any stem word-part appears in the term
       const filenameMatch = stem.includes(term)
         || term.includes(stem)
         || fpLower.includes(term)
@@ -239,13 +238,11 @@ function scoreFiles(analysis, graph, terms) {
         reasons.push(`filename matches "${term}"`);
       }
 
-      // +2 symbol name match — direct or partial
       if (symLower.some(s => s.includes(term) || term.includes(s))) {
         score += 2;
         reasons.push(`symbol matches "${term}"`);
       }
 
-      // +1 import source match (e.g. file imports 'express' and question is about express)
       if (imports.some(src => src.toLowerCase().includes(term))) {
         score += 1;
         reasons.push(`imports "${term}"`);
@@ -259,7 +256,6 @@ function scoreFiles(analysis, graph, terms) {
         symbols,
       });
     } else {
-      // Store with score 0 so dep expansion can reference it
       scored.set(fp, { score: 0, reason: '', symbols });
     }
   }
@@ -276,7 +272,6 @@ function scoreFiles(analysis, graph, terms) {
  * @param {number} maxFiles
  */
 function expandWithDeps(scored, graph, maxFiles) {
-  // Collect files that scored > 0
   const seeded = Array.from(scored.entries())
     .filter(([, s]) => s.score > 0)
     .map(([fp]) => fp);
@@ -308,51 +303,63 @@ function expandWithDeps(scored, graph, maxFiles) {
 /**
  * Load a source snippet for a file.
  *
- * Strategy:
- *   1. If any symbol location matches a query term, extract SNIPPET_LINES
- *      around that symbol's start line.
- *   2. Otherwise return the full file content (up to remaining budget).
- *
+ * @param {object}      item
  * @param {string}      extractPath
- * @param {string}      relPath
- * @param {object|null} fileAnalysis
  * @param {string[]}    terms
- * @param {number}      snippetLines
- * @param {number}      budget         — max characters to return
- * @returns {string|null}
+ * @param {object|null} fileAnalysis
+ * @param {object}      cfg
+ * @param {number|null} startLine
+ * @param {number|null} endLine
+ * @returns {number} chars read
  */
-function loadSourceSnippet(extractPath, relPath, fileAnalysis, terms, snippetLines, budget) {
-  if (!extractPath || !relPath) return null;
+function loadSourceSnippet(item, extractPath, terms, fileAnalysis, cfg, startLine = null, endLine = null) {
+  const absPath = path.join(extractPath, item.path);
+  if (!fs.existsSync(absPath)) {
+    item.source = null;
+    return 0;
+  }
 
-  const absPath = path.join(extractPath, relPath);
-  let raw;
   try {
-    raw = fs.readFileSync(absPath, 'utf8');
-  } catch {
-    return null;
-  }
+    const sourceStr = fs.readFileSync(absPath, 'utf8');
+    const lines = sourceStr.split(/\r?\n/);
 
-  if (!raw) return null;
-
-  // Try to find a relevant symbol and extract lines around it
-  if (fileAnalysis && fileAnalysis.symbols && terms.length > 0) {
-    const termsLower = terms.map(t => t.toLowerCase());
-    // Find the first symbol whose name matches a term
-    const match = fileAnalysis.symbols.find(sym =>
-      sym.name && termsLower.some(t => sym.name.toLowerCase().includes(t))
-    );
-
-    if (match && match.location) {
-      const lines  = raw.split('\n');
-      const start  = Math.max(0, match.location.startLine - 1);          // 0-based
-      const end    = Math.min(lines.length, start + snippetLines);
-      const snippet = lines.slice(start, end).join('\n');
-      return snippet.slice(0, budget);
+    // If explicit line range is requested (via active context)
+    if (startLine !== null && endLine !== null) {
+      const idxStart = Math.max(0, startLine - 1);
+      const idxEnd = Math.min(lines.length, endLine);
+      item.source = lines.slice(idxStart, idxEnd).join('\n');
+      return item.source.length;
     }
-  }
 
-  // Fall back to beginning of file
-  return raw.slice(0, budget);
+    // Small file? include whole thing
+    if (lines.length <= cfg.snippetLines * 2) {
+      item.source = sourceStr;
+      return sourceStr.length;
+    }
+
+    // Try to find a relevant symbol and extract lines around it
+    if (fileAnalysis && fileAnalysis.symbols && terms.length > 0) {
+      const termsLower = terms.map(t => t.toLowerCase());
+      const match = fileAnalysis.symbols.find(sym =>
+        sym.name && termsLower.some(t => sym.name.toLowerCase().includes(t))
+      );
+
+      if (match && match.location) {
+        const start = Math.max(0, match.location.startLine - 1);
+        const end = Math.min(lines.length, start + cfg.snippetLines);
+        item.source = lines.slice(start, end).join('\n');
+        return item.source.length;
+      }
+    }
+
+    // Fall back to beginning of file
+    item.source = lines.slice(0, cfg.snippetLines).join('\n');
+    return item.source.length;
+  } catch (err) {
+    console.warn(`[baseContext] Failed to read ${absPath}: ${err.message}`);
+    item.source = null;
+    return 0;
+  }
 }
 
 // ── Symbol helpers ────────────────────────────────────────────────────────────

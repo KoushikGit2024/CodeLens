@@ -16,7 +16,7 @@ export default function AIStatusIndicator() {
           icon: <Sparkles className="w-3.5 h-3.5" />,
           colorClass: 'text-accent border-accent/30 bg-accent/10',
           title: 'AI Enhanced',
-          desc: 'CodeLens is fully operational with IBM watsonx integration.',
+          desc: 'CodeLens is fully operational with an active AI provider.',
           available: [
             'Repository analysis', 'Dependency graph', 'Architecture', 
             'Engineering health', 'Refactoring analysis', 'Code viewer',
@@ -30,7 +30,7 @@ export default function AIStatusIndicator() {
           icon: <CloudOff className="w-3.5 h-3.5" />,
           colorClass: 'text-muted border-border bg-panel',
           title: 'Offline Intelligence',
-          desc: 'CodeLens is currently operating without IBM watsonx.',
+          desc: 'CodeLens is currently operating without an AI provider configured.',
           available: [
              'Repository analysis', 'Dependency graph', 'Architecture', 
             'Engineering health', 'Refactoring analysis', 'Documentation facts', 'Code viewer'
@@ -45,7 +45,7 @@ export default function AIStatusIndicator() {
           icon: <AlertTriangle className="w-3.5 h-3.5" />,
           colorClass: 'text-warning border-warning/30 bg-warning/10',
           title: 'AI Unavailable',
-          desc: 'CodeLens is configured for AI, but IBM watsonx is temporarily failing or unreachable. Falling back to Offline Intelligence.',
+          desc: 'CodeLens is configured for AI, but the provider is temporarily failing or unreachable. Falling back to Offline Intelligence.',
           available: [
              'Repository analysis', 'Dependency graph', 'Architecture', 
             'Engineering health', 'Refactoring analysis', 'Code viewer'

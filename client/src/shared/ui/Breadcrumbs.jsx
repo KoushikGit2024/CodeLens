@@ -34,8 +34,8 @@ export default function Breadcrumbs() {
   const filePath = searchParams.get('path');
 
   return (
-    <div className="flex items-center gap-1.5 text-xs text-muted">
-      <Link to={`/explore/${repoId}`} className="hover:text-white transition-colors flex items-center gap-1">
+    <div className="flex items-center gap-1.5 text-xs text-muted min-w-0">
+      <Link to={`/explore/${repoId}`} className="hover:text-white transition-colors flex items-center gap-1 shrink-0">
         <Home className="w-3.5 h-3.5" />
       </Link>
       

@@ -23,14 +23,14 @@ export class ErrorBoundary extends React.Component {
     if (this.state.hasError) {
       // You can render any custom fallback UI
       return (
-        <div className="flex-1 w-full h-full flex flex-col items-center justify-center bg-surface p-6 text-white min-h-[400px]">
-          <div className="bg-panel border border-danger/30 rounded-lg p-6 max-w-2xl w-full shadow-lg">
+        <div className="flex-1 w-full min-h-screen overflow-y-auto flex flex-col items-center justify-center bg-surface p-6 text-white">
+          <div className="bg-panel border border-danger/30 rounded-lg p-6 max-w-3xl w-full shadow-lg my-auto">
             <div className="flex items-center gap-3 text-danger mb-4">
               <AlertTriangle className="w-8 h-8" />
               <h2 className="text-xl font-semibold">Something went wrong</h2>
             </div>
             
-            <div className="bg-surface/50 border border-border p-4 rounded mb-6 overflow-x-auto">
+            <div className="bg-surface/50 border border-border p-4 rounded mb-6 overflow-auto max-h-[60vh]">
               <p className="text-sm font-mono text-danger/90 mb-2">
                 {this.state.error && this.state.error.toString()}
               </p>
@@ -54,12 +54,22 @@ export class ErrorBoundary extends React.Component {
               </button>
               
               <Link
-                to="/"
-                onClick={() => this.setState({ hasError: false, error: null, errorInfo: null })}
+                to={(() => {
+                  const pathParts = window.location.pathname.split('/');
+                  if (pathParts[1] === 'explore' && pathParts[2]) {
+                    return `/explore/${pathParts[2]}`;
+                  }
+                  return '/';
+                })()}
+                onClick={() => {
+                  this.setState({ hasError: false, error: null, errorInfo: null });
+                  // We do not force reload here to allow client-side routing to recover state,
+                  // unless it fails again, then the boundary will re-catch.
+                }}
                 className="flex items-center gap-2 px-4 py-2 bg-surface border border-border text-white rounded hover:bg-white/5 transition-colors"
               >
                 <Home className="w-4 h-4" />
-                Go to Home
+                {window.location.pathname.startsWith('/explore/') ? 'Back to Overview' : 'Return Home'}
               </Link>
             </div>
           </div>

@@ -65,7 +65,7 @@ function FileTreeNode({ node, depth, selectedPath, onSelectFile }) {
             }
           </span>
           {/* label — truncate with ellipsis */}
-          <span className="truncate min-w-0 font-medium">{node.name}</span>
+          <span className="truncate min-w-0 font-medium" title={node.name}>{node.name}</span>
           {/* child count badge */}
           {hasChildren && (
             <span className="ml-auto shrink-0 text-[9px] text-white/20 group-hover:text-white/40 tabular-nums">

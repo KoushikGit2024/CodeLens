@@ -147,12 +147,47 @@ function resolveImport({ importingFile, specifier, knownFiles, type }) {
       baseCandidates.push(normalisePath(pyPath));
     }
   } else if (isJava) {
-    // Java dotted paths: `com.example.Foo` -> `com/example/Foo`
+    // Java/Kotlin: convert dotted import `com.example.Foo` → `com/example/Foo`
+    // Then find any known file whose path *ends with* that suffix (handles deep src layouts)
     let javaPath = specifier.replace(/\./g, '/');
-    baseCandidates.push(normalisePath(javaPath));
+
+    // Strip wildcard imports: `com.example.*` → `com/example`
+    const isWildcard = javaPath.endsWith('/*');
+    if (isWildcard) javaPath = javaPath.slice(0, -2);
+
+    const ktSuffix   = javaPath + '.kt';
+    const javaSuffix = javaPath + '.java';
+    const ktsSuffix  = javaPath + '.kts';
+
+    for (const knownFile of knownFiles) {
+      if (
+        knownFile.endsWith('/' + ktSuffix)   || knownFile === ktSuffix ||
+        knownFile.endsWith('/' + javaSuffix) || knownFile === javaSuffix ||
+        knownFile.endsWith('/' + ktsSuffix)  || knownFile === ktsSuffix
+      ) {
+        return { specifier, kind: 'internal', resolvedTo: knownFile, reason: null };
+      }
+      // Wildcard: match any file inside the package directory
+      if (isWildcard) {
+        const pkgDir = javaPath + '/';
+        if (
+          (knownFile.endsWith('/' + pkgDir.slice(0, -1)) ||
+           knownFile.includes('/' + pkgDir) ||
+           knownFile.startsWith(pkgDir)) &&
+          (knownFile.endsWith('.kt') || knownFile.endsWith('.java'))
+        ) {
+          // Don't return a single file for wildcards — mark as unresolved to avoid false edges
+          break;
+        }
+      }
+    }
+
+    // Not found internally — it's an external package (Android SDK, stdlib, etc.)
+    return { specifier, kind: 'external', resolvedTo: null, reason: null };
   } else if (isCpp) {
     baseCandidates.push(normalisePath(path.posix.join(importDir, specifier)));
   } else {
+    // JS/TS relative imports (./foo, ../bar, etc.)
     baseCandidates.push(normalisePath(path.posix.join(importDir, specifier)));
   }
 

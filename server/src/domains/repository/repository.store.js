@@ -15,6 +15,7 @@
  *   extractPath:     string         — directory containing extracted files
  *   analysisVersion: number         — monotonic version counter
  *   analysis?:       AnalysisResult — populated after analysis completes
+ *   chats:           Record<string, Array> — all chat histories
  * }
  *
  * Persistence contract:
@@ -33,6 +34,16 @@ const store = new Map();
 // ── Boot: restore repos from disk ────────────────────────────────────────────
 const restored = persistence.loadAll();
 for (const record of restored) {
+  // If the server crashed or was restarted while analyzing, the process is dead.
+  if (record.status === 'analyzing' || record.status === 'pending') {
+    record.status = 'error';
+    record.error = 'Analysis was interrupted by a server restart.';
+    persistence.saveMeta(record);
+  }
+  // Load chats dictionary from disk for this repo
+  const chats = persistence.loadChats(record.id);
+  record.chats = chats || {};
+
   store.set(record.id, record);
 }
 
@@ -53,11 +64,10 @@ module.exports = {
     if (!existing) throw new Error(`Repository ${id} not found in store`);
     const updated = { ...existing, ...patch };
     store.set(id, updated);
-
+    
     // Write analysis separately (large) only when it changes
     if (patch.analysis) {
       persistence.saveAnalysis(id, patch.analysis);
-      // Save meta without analysis to keep meta.json lean
       persistence.saveMeta(updated);
     } else {
       persistence.saveMeta(updated);

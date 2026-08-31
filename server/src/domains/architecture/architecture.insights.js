@@ -6,7 +6,7 @@
  * Generates high-level architectural insights using the configured AI provider.
  */
 
-const { generateAnswer, isProviderConfigured } = require('../../core/ai/aiProvider');
+const { generateAnswer, isAIAvailable } = require('../../core/ai/ai.service');
 
 const ARCHITECTURE_PROMPT_TEMPLATE = `
 You are an expert software architect analyzing a codebase.
@@ -36,7 +36,7 @@ Format your response exactly as follows:
 `;
 
 async function getArchitectureInsights(architectureModel) {
-  if (!isProviderConfigured()) {
+  if (!isAIAvailable()) {
     return {
       status: 'unavailable',
       text: 'AI provider is not configured. Architectural insights are unavailable.'

@@ -11,14 +11,21 @@
     "@monaco-editor/react": "^4.6.0",
     "axios": "^1.7.2",
     "clsx": "^2.1.1",
+    "d3-force": "^3.0.0",
+    "dagre": "^0.8.5",
     "lucide-react": "^0.395.0",
     "mermaid": "^11.17.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^6.23.1",
-    "reactflow": "^11.11.4"
+    "react-syntax-highlighter": "^16.1.1",
+    "reactflow": "^11.11.4",
+    "rehype-sanitize": "^6.0.0",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
+    "@tailwindcss/typography": "^0.5.20",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.38",

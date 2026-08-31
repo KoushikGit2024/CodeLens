@@ -80,12 +80,32 @@ function saveAnalysis(id, analysis) {
 }
 
 /**
- * Persist a full record (meta + analysis if present).
+ * Persist the chats object for a repo.
+ */
+function saveChats(id, chats) {
+  try {
+    const dir = path.join(DATA_DIR, id);
+    ensureDir(dir);
+    fs.writeFileSync(
+      path.join(dir, 'chats.json'),
+      JSON.stringify(chats, null, 2),
+      'utf8'
+    );
+  } catch (err) {
+    console.error('[persistenceStore] Failed to write chats.json:', err.message);
+  }
+}
+
+/**
+ * Persist a full record (meta + analysis if present + chats if present).
  */
 function save(record) {
   saveMeta(record);
   if (record.analysis) {
     saveAnalysis(record.id, record.analysis);
+  }
+  if (record.chats) {
+    saveChats(record.id, record.chats);
   }
 }
 
@@ -135,6 +155,23 @@ function load(id) {
 }
 
 /**
+ * Load chats from disk. Returns empty object if missing.
+ */
+function loadChats(id) {
+  try {
+    const dir = path.join(DATA_DIR, id);
+    const chatsPath = path.join(dir, 'chats.json');
+    if (!fs.existsSync(chatsPath)) return {};
+    
+    const content = fs.readFileSync(chatsPath, 'utf8');
+    return JSON.parse(content);
+  } catch (err) {
+    console.error(`[persistenceStore] Failed to load chats for ${id}:`, err.message);
+    return {};
+  }
+}
+
+/**
  * Load all valid repos from disk.  Returns an array of records.
  * Called once at server startup.
  */
@@ -172,4 +209,4 @@ function remove(id) {
   }
 }
 
-module.exports = { save, saveMeta, saveAnalysis, load, loadAll, remove, getExtractPath, DATA_DIR };
+module.exports = { save, saveMeta, saveAnalysis, saveChats, load, loadChats, loadAll, remove, getExtractPath, DATA_DIR };

@@ -14,7 +14,7 @@ describe('languageDetector', () => {
       ['config.cjs',    'javascript'],
       ['component.jsx', 'javascript'],
       ['app.ts',        'typescript'],
-      ['component.tsx', 'typescript'],
+      ['component.tsx', 'tsx'],
       ['config.mts',    'typescript'],
       ['config.cts',    'typescript'],
     ])('%s → %s', (filename, expected) => {

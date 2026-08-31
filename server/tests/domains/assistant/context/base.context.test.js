@@ -53,6 +53,7 @@ jest.mock('fs', () => {
       const base = absPath.replace(/\\/g, '/').split('/').pop();
       return `// source of ${base}\nfunction example() {}\n`;
     }),
+    existsSync: jest.fn(() => true),
   };
 });
 

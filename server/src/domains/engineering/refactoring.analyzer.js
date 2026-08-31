@@ -1,6 +1,6 @@
 'use strict';
 
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const { SEVERITY } = require('./risk.analyzer');
 const { getStrategiesForRisk } = require('./refactoring.strategies');
 
@@ -104,8 +104,11 @@ function buildRefactoringIntelligence(engineeringRiskModel) {
     const strategies = getStrategiesForRisk(risk);
     const affectedFiles = extractFilesFromRisk(risk);
 
+    const idString = `${risk.title}|${risk.category}|${affectedFiles.join(',')}`;
+    const deterministicId = crypto.createHash('md5').update(idString).digest('hex').substring(0, 12);
+
     const candidate = {
-      id: uuidv4(),
+      id: deterministicId,
       type: risk.category,
       title: risk.title,
       priority: priorityInfo.priority,

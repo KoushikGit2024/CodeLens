@@ -1,42 +1,21 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Loader2, ChevronLeft, BookOpen, Layers, GitBranch, FileText, AlertTriangle, Cpu } from 'lucide-react';
+import { Loader2, BookOpen, Layers, FileText, AlertTriangle, Cpu } from 'lucide-react';
 import { ResizableLayout } from '../../shared/components/ResizableLayout';
 import { repositoryApi } from '../../shared/api';
 import { FileTree } from '../explorer/FileTree';
+import { useRepository } from '../../shared/context/RepositoryContext';
+import AiResponse from '../../shared/components/ai/AiResponse';
 
 export default function DocumentationPage() {
   const { repoId } = useParams();
   const navigate = useNavigate();
+  const { repo, fileTree, loading: repoLoading, error: repoError } = useRepository();
 
-  const [repo, setRepo] = useState(null);
-  const [fileTree, setFileTree] = useState(null);
-  
   const [selectedPath, setSelectedPath] = useState(null); // null = overview
   const [docs, setDocs] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  // Load Repo & Tree
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const [repoRes, treeRes] = await Promise.all([
-          repositoryApi.get(repoId),
-          repositoryApi.listFiles(repoId),
-        ]);
-        if (!cancelled) {
-          setRepo(repoRes.data);
-          setFileTree(treeRes.data.tree);
-        }
-      } catch (err) {
-        if (!cancelled) setError(err?.response?.data?.error || err.message);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, [repoId]);
 
   // Load Documentation
   useEffect(() => {
@@ -65,18 +44,8 @@ export default function DocumentationPage() {
     return () => { cancelled = true; };
   }, [repoId, selectedPath]);
 
-  if (error && !repo) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-danger mb-4 text-sm">{error}</p>
-          <button onClick={() => navigate(-1)} className="text-sm text-accent hover:underline">
-            ← Go back
-          </button>
-        </div>
-      </div>
-    );
-  }
+  if (repoLoading && !fileTree) return <div className="p-8 text-white">Loading documentation...</div>;
+  if (repoError) return <div className="p-8 text-red-400">Error: {repoError}</div>;
 
   return (
     <ResizableLayout
@@ -167,39 +136,20 @@ function OverviewDoc({ docs, repoId }) {
           <Cpu className="w-5 h-5 text-accent" />
           AI Analysis
         </h2>
+        
         {ai ? (
-          <div className="bg-panel border border-border rounded-lg p-5 space-y-5">
-            <div>
-              <h3 className="text-xs text-muted uppercase tracking-wider mb-2">Summary</h3>
-              <p className="text-sm leading-relaxed text-white/90">{ai.summary}</p>
-            </div>
-            
-            {ai.architectureSummary && (
-              <div>
-                <h3 className="text-xs text-muted uppercase tracking-wider mb-2">Architecture</h3>
-                <p className="text-sm leading-relaxed text-white/90">{ai.architectureSummary}</p>
-              </div>
-            )}
-
-            {ai.technologies?.length > 0 && (
-              <div>
-                <h3 className="text-xs text-muted uppercase tracking-wider mb-2">Technologies</h3>
-                <div className="flex flex-wrap gap-2">
-                  {ai.technologies.map((tech, i) => (
-                    <span key={i} className="text-xs bg-surface border border-border px-2 py-1 rounded">{tech}</span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {ai.observations?.length > 0 && (
-              <div>
-                <h3 className="text-xs text-muted uppercase tracking-wider mb-2">Observations</h3>
-                <ul className="list-disc list-inside text-sm text-white/80 space-y-1">
-                  {ai.observations.map((obs, i) => <li key={i}>{obs}</li>)}
-                </ul>
-              </div>
-            )}
+          <div className="bg-panel border border-border rounded-lg p-5">
+            <AiResponse 
+              repoId={repoId}
+              chatId={`docs-overview-${repoId}`}
+              data={{
+                summary: ai.summary,
+                explanation: ai.architectureSummary,
+                facts: ai.technologies?.length ? [`**Technologies:** ${ai.technologies.join(', ')}`] : [],
+                inferences: ai.observations
+              }}
+              title={null} 
+            />
           </div>
         ) : (
           <div className="text-sm text-muted italic bg-surface p-4 rounded border border-border">
@@ -327,32 +277,20 @@ function ModuleDoc({ docs, repoId }) {
           <Cpu className="w-5 h-5 text-accent" />
           Module Intelligence
         </h2>
+        
         {ai ? (
-          <div className="bg-panel border border-border rounded-lg p-5 space-y-5">
-            {ai.responsibility && (
-              <div>
-                <h3 className="text-xs text-muted uppercase tracking-wider mb-2">Responsibility</h3>
-                <p className="text-sm leading-relaxed text-white/90">{ai.responsibility}</p>
-              </div>
-            )}
-            {ai.architectureRole && (
-              <div>
-                <h3 className="text-xs text-muted uppercase tracking-wider mb-2">Architecture Role</h3>
-                <p className="text-sm leading-relaxed text-white/90">{ai.architectureRole}</p>
-              </div>
-            )}
-            {ai.apiNotes && facts.isApiBoundary && (
-              <div>
-                <h3 className="text-xs text-muted uppercase tracking-wider mb-2">API Notes</h3>
-                <p className="text-sm leading-relaxed text-white/90">{ai.apiNotes}</p>
-              </div>
-            )}
-            {ai.inferredDependenciesPurpose && (
-              <div>
-                <h3 className="text-xs text-muted uppercase tracking-wider mb-2">Dependency Context</h3>
-                <p className="text-sm leading-relaxed text-white/90">{ai.inferredDependenciesPurpose}</p>
-              </div>
-            )}
+          <div className="bg-panel border border-border rounded-lg p-5">
+            <AiResponse 
+              repoId={repoId}
+              chatId={`docs-module-${repoId}-${path.replace(/[^a-zA-Z0-9]/g, '-')}`}
+              data={{
+                summary: ai.responsibility,
+                explanation: ai.architectureRole,
+                facts: (ai.apiNotes && facts.isApiBoundary) ? [`**API Notes:**\n${ai.apiNotes}`] : [],
+                inferences: ai.inferredDependenciesPurpose ? [`**Dependency Context:**\n${ai.inferredDependenciesPurpose}`] : []
+              }}
+              title={null} 
+            />
           </div>
         ) : (
           <div className="text-sm text-muted italic bg-surface p-4 rounded border border-border">
@@ -416,7 +354,7 @@ function SourceLink({ path, repoId, compact = false }) {
   
   if (isPackage) {
     return (
-      <div className={`flex items-center gap-2 ${compact ? 'p-1.5' : 'bg-surface border border-border p-3'} rounded`}>
+      <div className={`flex items-center gap-2 ${compact ? 'p-1.5' : 'bg-surface border border-border p-3'} rounded min-w-0`}>
         <Layers className={`shrink-0 text-warning ${compact ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
         <span className="text-xs font-mono text-white truncate" title={path}>{path}</span>
       </div>
@@ -426,7 +364,7 @@ function SourceLink({ path, repoId, compact = false }) {
   return (
     <Link 
       to={`/explore/${repoId}/source?path=${encodeURIComponent(path)}`}
-      className={`group flex items-center gap-2 ${compact ? 'p-1.5 hover:bg-surface' : 'bg-surface border border-border hover:border-accent/40 p-3'} rounded transition-colors`}
+      className={`group flex items-center gap-2 ${compact ? 'p-1.5 hover:bg-surface' : 'bg-surface border border-border hover:border-accent/40 p-3'} rounded transition-colors min-w-0`}
     >
       <FileText className={`shrink-0 text-accent ${compact ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
       <span className="text-xs font-mono text-white truncate group-hover:text-accent transition-colors" title={path}>
@@ -445,7 +383,7 @@ function UnsupportedFileViewer({ path, repoId, reason }) {
     async function load() {
       try {
         const res = await repositoryApi.getFile(repoId, path);
-        setContent(res.data);
+        setContent(typeof res.data === 'string' ? res.data : (res.data?.content || JSON.stringify(res.data, null, 2)));
       } catch (err) {
         setError(err.message || 'Failed to load file content.');
       } finally {
@@ -461,9 +399,9 @@ function UnsupportedFileViewer({ path, repoId, reason }) {
         <AlertTriangle className="w-5 h-5 shrink-0" />
         <p><strong>{reason || "This file type is not parsed for architectural insights."}</strong> Showing raw text content as fallback.</p>
       </div>
-      <div className="bg-panel border border-border rounded-lg overflow-hidden flex flex-col">
-        <div className="bg-surface border-b border-border px-4 py-2 flex items-center justify-between text-xs font-mono text-muted">
-          <span>{path}</span>
+      <div className="bg-panel border border-border rounded-lg overflow-hidden flex flex-col min-w-0">
+        <div className="bg-surface border-b border-border px-4 py-2 flex items-center justify-between text-xs font-mono text-muted min-w-0">
+          <span className="truncate" title={path}>{path}</span>
         </div>
         <div className="p-4 overflow-auto custom-scrollbar" style={{ maxHeight: '60vh' }}>
           {loading ? (

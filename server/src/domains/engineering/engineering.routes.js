@@ -1,4 +1,5 @@
 const { Router } = require('express');
+const { isProviderConfigured, getProviderName } = require('../../core/ai/ai.provider');
 
 const router = Router();
 
@@ -7,8 +8,9 @@ router.get('/', (_req, res) => {
 });
 
 router.get('/ai', (_req, res) => {
-  const configured = !!process.env.WATSONX_API_KEY && !!process.env.WATSONX_PROJECT_ID;
-  res.json({ configured, provider: 'watsonx' });
+  const configured = isProviderConfigured();
+  const provider = getProviderName();
+  res.json({ configured, provider });
 });
 
 module.exports = router;

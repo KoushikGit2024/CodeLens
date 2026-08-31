@@ -1,7 +1,7 @@
 const { generateOverviewDocs, generateModuleDocs } = require('../../../../src/domains/assistant/generators/documentation.generator');
-const aiProvider = require('../../../../src/core/ai/aiProvider');
+const aiProvider = require('../../../../src/core/ai/ai.service');
 
-jest.mock('../../../../src/core/ai/aiProvider');
+jest.mock('../../../../src/core/ai/ai.service');
 
 describe('Documentation Generator', () => {
   const mockAnalysis = {
@@ -28,7 +28,7 @@ describe('Documentation Generator', () => {
   });
 
   it('falls back to deterministic facts when provider is not configured', async () => {
-    aiProvider.isProviderConfigured.mockReturnValue(false);
+    aiProvider.isAIAvailable.mockReturnValue(false);
 
     const docs = await generateOverviewDocs(mockAnalysis, mockGraph, mockArchitecture);
     expect(docs.facts.projectName).toBe('test-repo');
@@ -36,31 +36,26 @@ describe('Documentation Generator', () => {
   });
 
   it('parses structured JSON from AI and maps to aiInterpretation', async () => {
-    aiProvider.isProviderConfigured.mockReturnValue(true);
+    aiProvider.isAIAvailable.mockReturnValue(true);
     
-    // Simulate Watsonx returning markdown wrapped JSON
-    const aiResponse = `\`\`\`json\n{
-      "summary": "A test repo",
-      "technologies": ["React"],
-      "architectureSummary": "MVC",
-      "observations": ["Good"]
-    }\n\`\`\``;
-    aiProvider.generateAnswer.mockResolvedValue(aiResponse);
+    const aiResponse = {
+      summary: "A test repo",
+      technologies: ["React"],
+      architectureSummary: "MVC",
+      observations: ["Good"]
+    };
+    aiProvider.generateStructuredResponse.mockResolvedValue(aiResponse);
 
     const docs = await generateOverviewDocs(mockAnalysis, mockGraph, mockArchitecture);
     expect(docs.aiInterpretation.summary).toBe('A test repo');
     expect(docs.aiInterpretation.technologies).toContain('React');
   });
 
-  it('handles malformed AI JSON gracefully', async () => {
-    aiProvider.isProviderConfigured.mockReturnValue(true);
-    
-    const aiResponse = `This is just a raw string, not JSON.`;
-    aiProvider.generateAnswer.mockResolvedValue(aiResponse);
+  it('handles AI generation failure gracefully', async () => {
+    aiProvider.isAIAvailable.mockReturnValue(true);
+    aiProvider.generateStructuredResponse.mockRejectedValue(new Error('AI Failed'));
 
     const docs = await generateOverviewDocs(mockAnalysis, mockGraph, mockArchitecture);
-    // It should fallback to putting the string in summary
-    expect(docs.aiInterpretation.summary).toBe('This is just a raw string, not JSON.');
-    expect(docs.aiInterpretation.technologies).toEqual([]);
+    expect(docs.aiInterpretation).toBeNull();
   });
 });

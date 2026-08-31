@@ -2,7 +2,8 @@ const multer = require('multer');
 const path = require('path');
 const os = require('os');
 
-const MAX_MB = Number(process.env.MAX_UPLOAD_SIZE_MB) || 100;
+const isProd = process.env.NODE_ENV === 'production';
+const MAX_MB = Number(process.env.MAX_UPLOAD_SIZE_MB) || (isProd ? 100 : 2048);
 const MAX_BYTES = MAX_MB * 1024 * 1024;
 
 const storage = multer.diskStorage({

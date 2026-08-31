@@ -1,6 +1,6 @@
 'use strict';
 
-const { generateStructuredResponse } = require('../../../core/ai/aiProvider');
+const { generateStructuredResponse, isAIAvailable } = require('../../../core/ai/ai.service');
 const { buildIntelligenceContext } = require('../context/repository.intelligence.context');
 
 const INTELLIGENCE_SCHEMA = {
@@ -70,23 +70,20 @@ Instructions:
 
 Output JSON only. Do not use markdown wrappers.`;
 
+  if (!isAIAvailable()) {
+    return {
+      summary: "AI provider is not configured. Intelligence overview is unavailable.",
+      keyCharacteristics: [],
+      architectureExplanation: "",
+      importantComponents: [],
+      mainRisks: [],
+      recommendedActions: [],
+      limitations: ["Offline fallback mode."]
+    };
+  }
+
   try {
-    const rawAiResponse = await generateStructuredResponse(prompt, INTELLIGENCE_SCHEMA);
-    let parsed;
-    try {
-      parsed = JSON.parse(rawAiResponse);
-    } catch (err) {
-      console.warn('[repositoryIntelligenceGenerator] Failed to parse AI JSON:', err.message);
-      return {
-        summary: "AI generated an invalid response.",
-        keyCharacteristics: [],
-        architectureExplanation: "",
-        importantComponents: [],
-        mainRisks: [],
-        recommendedActions: [],
-        limitations: ["Failed to parse AI output."]
-      };
-    }
+    const parsed = await generateStructuredResponse(prompt, INTELLIGENCE_SCHEMA);
 
     // Validate references against deterministic facts
     const allowedFiles = new Set();
@@ -104,7 +101,15 @@ Output JSON only. Do not use markdown wrappers.`;
     return parsed;
   } catch (err) {
     console.error('[repositoryIntelligenceGenerator] AI Provider error:', err.message);
-    throw new Error(`AI Provider failed to generate repository intelligence: ${err.message}`);
+    return {
+      summary: "AI generation failed.",
+      keyCharacteristics: [],
+      architectureExplanation: "",
+      importantComponents: [],
+      mainRisks: [],
+      recommendedActions: [],
+      limitations: [err.message]
+    };
   }
 }
 

@@ -21,7 +21,7 @@ const NAV_GROUPS = [
     title: 'Repository',
     items: [
       { id: 'overview', label: 'Overview', icon: LayoutDashboard, to: '' },
-      { id: 'source', label: 'Source Explorer', icon: FileCode2, to: 'source' },
+      { id: 'source', label: 'Files', icon: FileCode2, to: 'source' },
       { id: 'architecture', label: 'Architecture', icon: Box, to: 'architecture' },
       { id: 'graph', label: 'Dependencies', icon: GitMerge, to: 'graph' },
       { id: 'documentation', label: 'Documentation', icon: BookOpen, to: 'documentation' },
@@ -30,15 +30,15 @@ const NAV_GROUPS = [
   {
     title: 'Engineering',
     items: [
-      { id: 'health', label: 'Health', icon: ShieldAlert, to: 'health' },
+      { id: 'health', label: 'Security & Health', icon: ShieldAlert, to: 'health' },
       { id: 'refactoring', label: 'Refactoring', icon: Wrench, to: 'refactoring' },
-      { id: 'impact', label: 'Change Impact', icon: Activity, to: 'impact' },
+      { id: 'impact', label: 'Impact Analysis', icon: Activity, to: 'impact' },
     ]
   },
   {
     title: 'AI',
     items: [
-      { id: 'assistant', label: 'Repository Assistant', icon: Bot, to: 'assistant' },
+      { id: 'assistant', label: 'AI Assistant', icon: Bot, to: 'assistant' },
     ]
   }
 ];
@@ -88,8 +88,10 @@ export default function RepositorySidebar() {
                   >
                     {({ isActive }) => (
                       <>
-                        <Icon className={clsx(collapsed ? "w-5 h-5" : "w-4 h-4 shrink-0", "transition-colors", isActive ? "text-accent" : "text-muted group-hover:text-white")} />
-                        {!collapsed && <span className="truncate">{item.label}</span>}
+                        <span className={`w-4 h-4 shrink-0 transition-colors ${isActive ? 'text-accent' : 'text-muted group-hover:text-white'}`}>
+                          <Icon className="w-full h-full" />
+                        </span>
+                        {!collapsed && <span className="truncate" title={item.label}>{item.label}</span>}
                       </>
                     )}
                   </NavLink>
@@ -105,7 +107,7 @@ export default function RepositorySidebar() {
           to="/"
           title={collapsed ? "Upload New Repository" : undefined}
           className={({ isActive }) => clsx(
-            "flex items-center rounded text-sm transition-colors group",
+            "flex items-center rounded text-sm transition-colors group min-w-0",
             collapsed ? "justify-center p-2" : "gap-2.5 px-2 py-2 w-full",
             isActive 
               ? "bg-accent/10 text-accent font-medium" 
@@ -115,7 +117,7 @@ export default function RepositorySidebar() {
           {({ isActive }) => (
             <>
               <UploadCloud className={clsx(collapsed ? "w-5 h-5" : "w-4 h-4 shrink-0", "transition-colors", isActive ? "text-accent" : "text-muted group-hover:text-white")} />
-              {!collapsed && <span className="truncate">Upload New Repo</span>}
+              {!collapsed && <span className="truncate" title="Upload New Repo">Upload New Repo</span>}
             </>
           )}
         </NavLink>
@@ -123,13 +125,13 @@ export default function RepositorySidebar() {
         <button 
           onClick={() => setCollapsed(!collapsed)} 
           className={clsx(
-            "flex items-center rounded text-sm transition-colors group",
+            "flex items-center rounded text-sm transition-colors group min-w-0",
             collapsed ? "justify-center p-2 text-muted hover:bg-surface hover:text-white" : "gap-2.5 px-2 py-2 w-full text-muted hover:bg-surface hover:text-white"
           )}
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           <PanelLeftClose className={clsx(collapsed ? "w-5 h-5 rotate-180" : "w-4 h-4 shrink-0", "transition-transform group-hover:text-white text-muted")} />
-          {!collapsed && <span className="truncate">Collapse Sidebar</span>}
+          {!collapsed && <span className="truncate" title="Collapse Sidebar">Collapse Sidebar</span>}
         </button>
       </div>
     </aside>

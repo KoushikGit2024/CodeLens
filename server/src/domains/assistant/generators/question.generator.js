@@ -7,7 +7,29 @@
  * RepositoryAnswer. Handles factual extraction when AI is not needed.
  */
 
-const { generateAnswer, isProviderConfigured, ProviderUnavailableError } = require('../../../core/ai/aiProvider');
+const { generateStructuredResponse, isAIAvailable } = require('../../../core/ai/ai.service');
+
+const QUESTION_SCHEMA = {
+  type: 'object',
+  properties: {
+    summary: { type: 'string', description: 'A direct 1-3 sentence answer to the question.' },
+    explanation: { type: 'string', description: 'A more detailed explanation if necessary.' },
+    facts: { type: 'array', items: { type: 'string' } },
+    inferences: { type: 'array', items: { type: 'string' } },
+    references: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          path: { type: 'string' },
+          reason: { type: 'string' }
+        }
+      }
+    },
+    limitations: { type: 'array', items: { type: 'string' } }
+  },
+  required: ['summary']
+};
 
 /**
  * Generate an answer for a question based on its routing and context.
@@ -32,7 +54,7 @@ async function generateQuestionAnswer(question, routing, contextData) {
   }
 
   // If AI is required but not configured, fallback gracefully
-  if (!isProviderConfigured()) {
+  if (!isAIAvailable()) {
     return {
       summary: "AI provider is not configured. Falling back to deterministic context.",
       explanation: null,
@@ -47,50 +69,30 @@ async function generateQuestionAnswer(question, routing, contextData) {
   const prompt = buildQuestionPrompt(question, contextData);
 
   try {
-    const aiResponseStr = await generateAnswer(prompt);
-    
-    // Parse the response
-    let parsed = null;
-    try {
-      const cleanStr = aiResponseStr.replace(/^```(?:json)?\n?/i, '').replace(/```$/i, '').trim();
-      parsed = JSON.parse(cleanStr);
-    } catch (parseErr) {
-      console.warn('[questionGenerator] Failed to parse AI JSON:', parseErr.message);
-      // Fallback
-      parsed = {
-        summary: aiResponseStr,
-        explanation: null,
-        facts: [],
-        inferences: [],
-        references: [],
-        limitations: ["Failed to parse structured AI output."]
-      };
-    }
+    const parsed = await generateStructuredResponse(prompt, QUESTION_SCHEMA);
 
     // Ensure the response matches our schema
     return {
       summary: parsed.summary || "No summary provided.",
       explanation: parsed.explanation || null,
-      facts: Array.isArray(parsed.facts) ? parsed.facts : contextData.facts, // Merge or use AI's
+      facts: Array.isArray(parsed.facts) && parsed.facts.length ? parsed.facts : contextData.facts, // Merge or use AI's
       inferences: Array.isArray(parsed.inferences) ? parsed.inferences : [],
-      references: Array.isArray(parsed.references) ? parsed.references : extractReferences(aiResponseStr),
+      references: Array.isArray(parsed.references) ? parsed.references : extractReferences(parsed.summary || ''),
       limitations: Array.isArray(parsed.limitations) ? parsed.limitations : [],
-      generatedBy: 'IBM watsonx',
+      generatedBy: 'AI CodeLens Engine',
     };
 
   } catch (err) {
-    if (err instanceof ProviderUnavailableError) {
-      return {
-        summary: "AI provider is unavailable. Falling back to deterministic context.",
-        explanation: null,
-        facts: contextData.facts,
-        inferences: [],
-        references: contextData.files.map(f => ({ path: f.path, reason: f.reason })),
-        limitations: ["AI provider unavailable.", err.message],
-        generatedBy: 'CodeLens Deterministic Engine',
-      };
-    }
-    throw err;
+    console.warn('[questionGenerator] AI generation failed:', err.message);
+    return {
+      summary: "AI provider failed to answer the question. Falling back to deterministic context.",
+      explanation: null,
+      facts: contextData.facts,
+      inferences: [],
+      references: contextData.files.map(f => ({ path: f.path, reason: f.reason })),
+      limitations: ["AI provider failed.", err.message],
+      generatedBy: 'CodeLens Deterministic Engine',
+    };
   }
 }
 

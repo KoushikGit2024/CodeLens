@@ -17,6 +17,24 @@ const { buildArchitectureModel } = require('../architecture/architecture.analyze
 const { generateSystemOverview } = require('../architecture/mermaid.generator');
 const { getArchitectureInsights } = require('../architecture/architecture.insights');
 
+// ── GET /api/repository/list/all ──────────────────────────────────────────────
+async function listRepositories(req, res, next) {
+  try {
+    const repos = repositoryStore.all()
+      .filter(r => r.status === 'ready')
+      .map(r => ({
+        id: r.id,
+        name: r.name,
+        uploadedAt: r.uploadedAt,
+        status: r.status,
+        error: r.error
+      })).sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+    return res.json(repos);
+  } catch (err) {
+    next(err);
+  }
+}
+
 // ── POST /api/repository/upload ───────────────────────────────────────────────
 async function upload(req, res, next) {
   try {
@@ -28,10 +46,13 @@ async function upload(req, res, next) {
     const name        = path.basename(req.file.originalname, '.zip');
     const extractPath = persistence.getExtractPath(id);  // persistent .data/repos/<id>/files/
     
-    // Parse custom ignore patterns if provided
-    let ignorePatterns = [];
+    // Parse custom ignore patterns if provided, and merge with defaults
+    const DEFAULT_IGNORES = ['.git', 'node_modules', 'dist', 'build', 'coverage', '.next', 'out'];
+    let ignorePatterns = [...DEFAULT_IGNORES];
+    
     if (req.body.ignorePatterns) {
-      ignorePatterns = req.body.ignorePatterns.split(',').map(s => s.trim()).filter(Boolean);
+      const customIgnores = req.body.ignorePatterns.split(',').map(s => s.trim()).filter(Boolean);
+      ignorePatterns = [...new Set([...ignorePatterns, ...customIgnores])];
     }
 
     // Store record immediately so the client can poll status
@@ -96,35 +117,6 @@ function listFiles(req, res) {
   return res.json({ id: record.id, name: record.name, tree });
 }
 
-// ── GET /api/repository/:id/analysis ──────────────────────────────────────────
-function getAnalysis(req, res) {
-  const record = repositoryStore.get(req.params.id);
-  if (!record) return res.status(404).json({ error: 'Repository not found' });
-  if (record.status === 'analyzing') return res.status(202).json({ status: 'analyzing' });
-  if (record.status !== 'ready') return res.status(409).json({ error: 'Repository not ready', status: record.status });
-  if (!record.analysis) return res.status(404).json({ error: 'Analysis not available' });
-
-  // Return the analysis without the rootDir (internal path)
-  const { rootDir: _r, ...safeAnalysis } = record.analysis;
-  return res.json(safeAnalysis);
-}
-
-// ── GET /api/repository/:id/analysis/file ─────────────────────────────────────
-// query: ?path=relative/path/to/file
-function getFileAnalysis(req, res) {
-  const record = repositoryStore.get(req.params.id);
-  if (!record) return res.status(404).json({ error: 'Repository not found' });
-  if (record.status !== 'ready') return res.status(409).json({ error: 'Repository not ready', status: record.status });
-  if (!record.analysis) return res.status(404).json({ error: 'Analysis not available' });
-
-  const requestedPath = req.query.path;
-  if (!requestedPath) return res.status(400).json({ error: 'Query parameter "path" is required' });
-
-  const fileAnalysis = record.analysis.files.find(f => f.filePath === requestedPath);
-  if (!fileAnalysis) return res.status(404).json({ error: 'No analysis found for this file' });
-
-  return res.json(fileAnalysis);
-}
 
 // ── GET /api/repository/:id/file?path=… ───────────────────────────────────────
 function getFile(req, res) {
@@ -287,11 +279,10 @@ async function getArchitecture(req, res) {
 
 module.exports = {
   upload,
+  listRepositories,
   getRepository,
   listFiles,
   getFile,
-  getAnalysis,
-  getFileAnalysis,
   getDependencyGraph,
   getFileDependencyInfo,
   getArchitecture,

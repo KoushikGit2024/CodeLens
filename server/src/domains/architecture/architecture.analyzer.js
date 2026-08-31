@@ -174,6 +174,9 @@ function buildArchitectureModel(analysis, graph) {
     }
   }
 
+  const { validateArchitecture } = require('./architecture.rules');
+  const violations = validateArchitecture(components, uniqueRelations);
+
   return {
     components,
     relations: uniqueRelations,
@@ -182,6 +185,7 @@ function buildArchitectureModel(analysis, graph) {
     isolatedFiles: getIsolatedFiles(graph),
     cycles: detectCycles(graph),
     unresolvedDependencies: graph.meta?.unresolvedImports || 0,
+    violations,
     meta: {
       totalComponents: components.length,
       builtAt: new Date().toISOString()
