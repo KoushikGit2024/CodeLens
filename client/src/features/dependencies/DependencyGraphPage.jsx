@@ -318,7 +318,7 @@ function graphToFlow(graph, selectedId, showExternalPackages, layoutType) {
     degreeMap.set(e.source, (degreeMap.get(e.source) || 0) + 1);
     degreeMap.set(e.target, (degreeMap.get(e.target) || 0) + 1);
   }
-  const maxDegree = Math.max(0, ...degreeMap.values());
+  const maxDegree = degreeMap.size === 0 ? 0 : Math.max(...Array.from(degreeMap.values()));
 
   // Directory → color assignment
   const dirs = [...new Set(fileNodes.map(n => getDir(n.filePath)))].sort();
@@ -440,7 +440,13 @@ function graphToFlow(graph, selectedId, showExternalPackages, layoutType) {
 
   if (layoutType === 'clustered') {
     const layouted = getClusteredLayout(rfFileNodes, rfEdges, dirColorMap);
-    return { rfNodes: layouted, rfEdges, dirColorMap };
+    // Position external package nodes in a row below the clustered file nodes
+    // so they don't all pile up at (0,0) and crash ReactFlow
+    const positionedPkgNodes = rfPkgNodes.map((n, i) => ({
+      ...n,
+      position: { x: i * (PKG_W + 20), y: 1200 },
+    }));
+    return { rfNodes: [...layouted, ...positionedPkgNodes], rfEdges, dirColorMap };
   } else if (layoutType === 'force') {
     const allRfNodes = [...rfFileNodes, ...rfPkgNodes];
     return { rfNodes: getForceLayout(allRfNodes, rfEdges), rfEdges, dirColorMap };
