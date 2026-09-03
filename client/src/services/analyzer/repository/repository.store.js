@@ -53,6 +53,10 @@ export function get(id) {
   return store.get(id) || null;
 }
 
+export function getAll() {
+  return Array.from(store.values());
+}
+
 export async function update(id, patch) {
   const existing = store.get(id);
   if (!existing) throw new Error(`Repository ${id} not found in store`);

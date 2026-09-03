@@ -154,3 +154,22 @@ export async function loadAllFiles(repoId) {
   }
   return files;
 }
+
+/**
+ * List all file paths for a given repository (without loading content).
+ * Returns an array of strings (file paths).
+ */
+export async function listFilePaths(repoId) {
+  const db = await getDB();
+  const tx = db.transaction('files', 'readonly');
+  const store = tx.objectStore('files');
+  const paths = [];
+  let cursor = await store.openCursor();
+  while (cursor) {
+    if (cursor.key[0] === repoId) {
+      paths.push(cursor.key[1]);
+    }
+    cursor = await cursor.continue();
+  }
+  return paths;
+}

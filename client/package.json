@@ -16,6 +16,7 @@
     "d3-force": "^3.0.0",
     "dagre": "^0.8.5",
     "idb": "^8.0.3",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.395.0",
     "mermaid": "^11.17.2",
     "path-browserify": "^1.0.1",
@@ -27,6 +28,7 @@
     "reactflow": "^11.11.4",
     "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.1",
+    "uuid": "^14.0.2",
     "web-tree-sitter": "^0.24.7"
   },
   "devDependencies": {
