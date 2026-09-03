@@ -21,7 +21,6 @@ const { getArchitectureInsights } = require('../architecture/architecture.insigh
 async function listRepositories(req, res, next) {
   try {
     const repos = repositoryStore.all()
-      .filter(r => r.status === 'ready')
       .map(r => ({
         id: r.id,
         name: r.name,
@@ -44,6 +43,15 @@ async function upload(req, res, next) {
 
     const id          = uuidv4();
     const name        = path.basename(req.file.originalname, '.zip');
+    
+    // Prevent duplicate uploads by checking if a repo with this name already exists
+    const existingRepo = repositoryStore.all().find(r => r.name === name);
+    if (existingRepo) {
+      return res.status(409).json({ 
+        error: `A repository named "${name}" has already been uploaded. Please delete it first if you want to re-upload.` 
+      });
+    }
+
     const extractPath = persistence.getExtractPath(id);  // persistent .data/repos/<id>/files/
     
     // Parse custom ignore patterns if provided, and merge with defaults
@@ -138,7 +146,15 @@ function getFile(req, res) {
   const stat = fs.statSync(resolved);
   if (stat.isDirectory()) return res.status(400).json({ error: 'Path is a directory, not a file' });
 
-  // Refuse files larger than 2 MB to avoid sending huge payloads
+  // Serve image files directly as binary streams instead of utf-8 strings
+  const ext = path.extname(resolved).toLowerCase();
+  const imageExts = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.ico', '.bmp'];
+  if (imageExts.includes(ext)) {
+    return res.sendFile(resolved);
+  }
+
+  // Refuse text/source files larger than 2 MB to avoid sending huge JSON payloads
+  // and crashing the Monaco editor on the frontend
   const MAX_BYTES = 2 * 1024 * 1024;
   if (stat.size > MAX_BYTES) {
     return res.status(413).json({ error: 'File too large to display (> 2 MB)' });
@@ -265,7 +281,8 @@ async function getArchitecture(req, res) {
     const architectureModel = buildArchitectureModel(record.analysis, graph);
     const mermaid = generateSystemOverview(architectureModel);
     
-    const insights = await getArchitectureInsights(architectureModel);
+    const generateAi = req.query.ai === 'true';
+    const insights = generateAi ? await getArchitectureInsights(architectureModel) : null;
 
     return res.json({
       model: architectureModel,
@@ -274,6 +291,29 @@ async function getArchitecture(req, res) {
     });
   } catch (err) {
     return res.status(500).json({ error: `Architecture analysis failed: ${err.message}` });
+  }
+}
+
+// ── POST /api/repository/batch ────────────────────────────────────────────────
+async function batchManage(req, res) {
+  try {
+    const { ids, action } = req.body;
+    if (!Array.isArray(ids) || !action) {
+      return res.status(400).json({ error: 'Missing ids array or action' });
+    }
+
+    for (const id of ids) {
+      if (action === 'delete') {
+        repositoryStore.remove(id);
+      } else if (action === 'clear_analysis') {
+        repositoryStore.clearAnalysis(id);
+      }
+    }
+
+    res.json({ success: true, count: ids.length, action });
+  } catch (err) {
+    console.error('[repositoryController] Error in batch manage:', err);
+    res.status(500).json({ error: err.message });
   }
 }
 
@@ -286,4 +326,5 @@ module.exports = {
   getDependencyGraph,
   getFileDependencyInfo,
   getArchitecture,
+  batchManage,
 };

@@ -137,7 +137,11 @@ async function analyzeRepository(rootDir, previousAnalysis = null, onProgress = 
   let currentIndex = 0;
   for (const absPath of sourceFiles) {
     currentIndex++;
-    if (onProgress && currentIndex % 10 === 0) {
+    
+    // Yield the event loop to allow concurrent HTTP polling requests to be processed
+    await new Promise(resolve => setImmediate(resolve));
+    
+    if (onProgress) {
       onProgress('analyzing_ast', { total: sourceFiles.length, current: currentIndex });
     }
     const relPath  = path.relative(rootDir, absPath).replace(/\\/g, '/');

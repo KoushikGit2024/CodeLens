@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload, Loader2, AlertCircle, Code, Box, Network, Bot, Clock, FolderOpen } from 'lucide-react';
+import { Upload, Loader2, AlertCircle, Code, Box, Network, Bot, Clock, FolderOpen, Eraser, Trash2, Database, Inbox } from 'lucide-react';
 import { repositoryApi } from '../../shared/api';
 import { Link } from 'react-router-dom';
 import { Logo } from '../../shared/components/Logo';
@@ -14,8 +14,44 @@ export default function UploadPage() {
   const [error, setError] = useState(null);
   const [ignorePatterns, setIgnorePatterns] = useState('');
   const [recentRepos, setRecentRepos] = useState([]);
-  const [loadingRepos, setLoadingRepos] = useState(true);
+  const [hasLoadedRepos, setHasLoadedRepos] = useState(false);
+  const [loadingRepos, setLoadingRepos] = useState(false);
   const [lastRepoId, setLastRepoId] = useState(null);
+  const [selectedRepos, setSelectedRepos] = useState(new Set());
+  const [batchActionRunning, setBatchActionRunning] = useState(false);
+  const [showManager, setShowManager] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const refreshRepos = async () => {
+    setLoadingRepos(true);
+    try {
+      const { data } = await repositoryApi.listAll();
+      setRecentRepos(data);
+      setSelectedRepos(new Set());
+      setHasLoadedRepos(true);
+    } catch (err) {
+      console.error('Failed to load repositories', err);
+    } finally {
+      setLoadingRepos(false);
+    }
+  };
+
+  const handleLoadRepos = async () => {
+    if (!hasLoadedRepos && !loadingRepos) {
+      await refreshRepos();
+    }
+  };
 
   useEffect(() => {
     // Check if there is a last active repository to show the return button
@@ -23,24 +59,48 @@ export default function UploadPage() {
     if (savedRepoId) {
       setLastRepoId(savedRepoId);
     }
+    
+    // Preload repositories so the dropdown is ready instantly
+    handleLoadRepos();
+  }, [navigate]);
 
-    // Only load the recent repositories list if we are not in production
-    if (!import.meta.env.PROD) {
-      async function loadRepos() {
-        try {
-          const { data } = await repositoryApi.listAll();
-          setRecentRepos(data);
-        } catch (err) {
-          console.error('Failed to load repositories', err);
-        } finally {
-          setLoadingRepos(false);
+  const handleToggleSelect = (id) => {
+    setSelectedRepos(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedRepos.size === recentRepos.length) {
+      setSelectedRepos(new Set());
+    } else {
+      setSelectedRepos(new Set(recentRepos.map(r => r.id)));
+    }
+  };
+
+  const handleBatchAction = async (action) => {
+    if (selectedRepos.size === 0) return;
+    setBatchActionRunning(true);
+    try {
+      await repositoryApi.batchManage(Array.from(selectedRepos), action);
+      if (action === 'delete') {
+        // If we deleted the last active repo, clear it
+        if (selectedRepos.has(lastRepoId)) {
+          localStorage.removeItem('lastRepoId');
+          setLastRepoId(null);
         }
       }
-      loadRepos();
-    } else {
-      setLoadingRepos(false);
+      await refreshRepos();
+    } catch (err) {
+      console.error(`Batch ${action} failed:`, err);
+      alert(`Failed to perform batch action: ${err.message}`);
+    } finally {
+      setBatchActionRunning(false);
     }
-  }, [navigate]);
+  };
 
   const handleFile = useCallback((f) => {
     setError(null);
@@ -93,32 +153,6 @@ export default function UploadPage() {
             Upload your codebase to extract architecture, map dependencies, and generate intelligent documentation.
           </p>
         </div>
-        
-        {/* Recent Repositories Dropdown */}
-        {!import.meta.env.PROD && !loadingRepos && recentRepos.length > 0 && (
-          <div className="w-full md:w-72">
-            <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Recent Workspaces</label>
-            <div className="relative">
-              <select
-                className="w-full appearance-none bg-panel border border-border rounded-lg px-4 py-2 text-sm font-medium text-white focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent cursor-pointer shadow-sm hover:bg-surface-light transition-colors"
-                onChange={(e) => {
-                  if (e.target.value) navigate(`/explore/${e.target.value}`);
-                }}
-                defaultValue=""
-              >
-                <option value="" disabled>Select repository...</option>
-                {recentRepos.map(repo => (
-                  <option key={repo.id} value={repo.id}>
-                    {repo.name} ({new Date(repo.uploadedAt).toLocaleDateString()})
-                  </option>
-                ))}
-              </select>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted">
-                <Clock className="w-4 h-4" />
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Main Content Area - Split Layout */}
@@ -258,31 +292,233 @@ export default function UploadPage() {
         </div>
 
         {/* Right Column: Feature Grid */}
-        <div className="w-full lg:w-[45%] flex flex-col justify-center lg:min-h-0 py-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FeatureCard 
-              icon={<Network className="w-5 h-5 text-blue-400" />}
-              title="Dependency Mapping"
-              desc="Visualize cross-file relationships and data flow."
-            />
-            <FeatureCard 
-              icon={<Box className="w-5 h-5 text-green-400" />}
-              title="Architecture Extraction"
-              desc="Automatically extract logical layers and components."
-            />
-            <FeatureCard 
-              icon={<Bot className="w-5 h-5 text-purple-400" />}
-              title="AI Refactoring"
-              desc="Identify bottlenecks and get structural advice."
-            />
-            <FeatureCard 
-              icon={<Code className="w-5 h-5 text-orange-400" />}
-              title="Automated Docs"
-              desc="Generate up-to-date documentation on the fly."
-            />
+        <div className="w-full lg:w-[45%] flex flex-col lg:min-h-0">
+          <div className="bg-panel border border-border rounded-2xl shadow-sm flex-1 flex flex-col lg:overflow-hidden relative">
+            <div 
+              className="flex-1 flex flex-col p-5 md:p-6 justify-center lg:overflow-y-auto [&::-webkit-scrollbar]:hidden"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+              
+              {/* Recent Workspaces Box */}
+          {!import.meta.env.PROD && (
+            <div className="bg-panel border border-border rounded-xl p-5 shadow-sm mb-6 flex flex-col sm:flex-row items-center gap-4">
+              <div className="flex-1 w-full">
+                <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">Recent Workspaces</label>
+                <div className="relative" ref={dropdownRef}>
+                  <div
+                    className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-sm font-medium text-white flex items-center justify-between cursor-pointer shadow-sm hover:bg-surface-light transition-colors"
+                    onClick={() => {
+                      if (!loadingRepos) setIsDropdownOpen(!isDropdownOpen);
+                    }}
+                  >
+                    <span className={loadingRepos ? "text-white/50" : "text-white"}>
+                      {loadingRepos ? 'Loading...' : 'Select repository...'}
+                    </span>
+                    <div className="pointer-events-none text-muted flex items-center gap-2">
+                      {loadingRepos ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : recentRepos.length > 0 ? (
+                        <Database className="w-4 h-4" />
+                      ) : (
+                        <Inbox className="w-4 h-4" />
+                      )}
+                    </div>
+                  </div>
+                  
+                  {isDropdownOpen && !loadingRepos && (
+                    <div className="absolute z-10 top-full left-0 right-0 mt-1.5 bg-panel border border-border rounded-lg shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 max-h-[240px] overflow-y-auto">
+                      {recentRepos.length === 0 ? (
+                        <div className="px-4 py-3 text-sm text-muted text-center">No recent workspaces found</div>
+                      ) : (
+                        recentRepos.map(repo => (
+                          <div 
+                            key={repo.id}
+                            className="px-4 py-2.5 text-sm font-medium text-white hover:bg-surface cursor-pointer transition-colors flex items-center justify-between group"
+                            onClick={() => {
+                              setIsDropdownOpen(false);
+                              navigate(`/explore/${repo.id}`);
+                            }}
+                          >
+                            <span className="truncate group-hover:text-accent transition-colors">{repo.name}</span>
+                            <span className="text-muted font-normal text-xs ml-2 shrink-0">{new Date(repo.uploadedAt).toLocaleDateString()}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="w-full sm:w-auto mt-2 sm:mt-0 self-end">
+                <button
+                  onClick={async () => {
+                    await handleLoadRepos();
+                    setShowManager(true);
+                  }}
+                  disabled={loadingRepos}
+                  className="w-full sm:w-auto px-4 py-2.5 h-[42px] bg-surface hover:bg-surface-light border border-border rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+                  title="Manage Workspaces"
+                >
+                  {loadingRepos ? <Loader2 className="w-4 h-4 text-accent animate-spin" /> : <FolderOpen className="w-4 h-4 text-accent" />}
+                  Manage
+                </button>
+              </div>
+            </div>
+          )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FeatureCard 
+                  icon={<Network className="w-5 h-5 text-blue-400" />}
+                  title="Dependency Mapping"
+                  desc="Visualize cross-file relationships and data flow."
+                />
+                <FeatureCard 
+                  icon={<Box className="w-5 h-5 text-green-400" />}
+                  title="Architecture Extraction"
+                  desc="Automatically extract logical layers and components."
+                />
+                <FeatureCard 
+                  icon={<Bot className="w-5 h-5 text-purple-400" />}
+                  title="AI Refactoring"
+                  desc="Identify bottlenecks and get structural advice."
+                />
+                <FeatureCard 
+                  icon={<Code className="w-5 h-5 text-orange-400" />}
+                  title="Automated Docs"
+                  desc="Generate up-to-date documentation on the fly."
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Workspace Manager Modal */}
+      {showManager && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+          <div className="bg-panel border border-border rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden relative animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-5 md:p-6 border-b border-border/50 flex items-center justify-between shrink-0">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <FolderOpen className="w-5 h-5 text-accent" />
+                Manage Workspaces
+              </h2>
+              
+              <div className="flex items-center gap-3">
+                {selectedRepos.size > 0 && (
+                  <div className="flex items-center gap-2 mr-4 border-r border-border/50 pr-4">
+                    {selectedRepos.has(lastRepoId) && (
+                      <span className="text-[11px] font-medium text-orange-400 mr-2 flex items-center gap-1 hidden md:flex bg-orange-500/10 px-2 py-1 rounded border border-orange-500/20">
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        Modifying active workspace
+                      </span>
+                    )}
+                    <button 
+                      onClick={() => handleBatchAction('clear_analysis')}
+                      disabled={batchActionRunning}
+                      className="px-3 py-1.5 text-xs font-medium bg-surface hover:bg-surface-light border border-border rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50 text-orange-400/90 hover:text-orange-400"
+                      title="Delete analysis data to re-analyze"
+                    >
+                      {batchActionRunning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Eraser className="w-3.5 h-3.5" />}
+                      Clear Analysis
+                    </button>
+                    <button 
+                      onClick={() => handleBatchAction('delete')}
+                      disabled={batchActionRunning}
+                      className="px-3 py-1.5 text-xs font-medium bg-danger/10 hover:bg-danger/20 text-danger border border-danger/20 rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                      title="Permanently delete workspaces"
+                    >
+                      {batchActionRunning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                      Delete
+                    </button>
+                  </div>
+                )}
+                
+                <button 
+                  onClick={() => setShowManager(false)}
+                  className="p-1.5 text-muted hover:text-white bg-surface hover:bg-surface-light rounded-lg transition-colors border border-border"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+              </div>
+            </div>
+            
+            {/* List Header */}
+            <div className="px-5 py-3 border-b border-border/50 bg-surface/50 flex items-center gap-4 text-xs font-semibold text-muted uppercase tracking-wider shrink-0">
+              <input 
+                type="checkbox" 
+                className="rounded border-border bg-surface text-accent focus:ring-accent focus:ring-offset-0 cursor-pointer"
+                checked={recentRepos.length > 0 && selectedRepos.size === recentRepos.length}
+                onChange={handleSelectAll}
+              />
+              <span className="flex-1">Workspace</span>
+              <span className="w-24 text-right">Status</span>
+            </div>
+
+            {/* Scrollable List */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
+              {loadingRepos ? (
+                <div className="flex flex-col items-center justify-center p-12 text-muted">
+                  <Loader2 className="w-10 h-10 mb-4 animate-spin text-accent" />
+                  <p>Loading workspaces...</p>
+                </div>
+              ) : recentRepos.length === 0 ? (
+                <div className="flex flex-col items-center justify-center p-12 text-muted">
+                  <FolderOpen className="w-12 h-12 mb-4 opacity-20" />
+                  <p>No workspaces found.</p>
+                </div>
+              ) : (
+                recentRepos.map(repo => {
+                  const isSelected = selectedRepos.has(repo.id);
+                  const isReady = repo.status === 'ready';
+                  return (
+                    <div 
+                      key={repo.id}
+                      onClick={() => handleToggleSelect(repo.id)}
+                      className={`flex items-center gap-4 p-3 rounded-xl cursor-pointer transition-colors ${isSelected ? 'bg-accent/10 border border-accent/20' : 'hover:bg-surface border border-transparent'}`}
+                    >
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-border bg-surface text-accent focus:ring-accent focus:ring-offset-0 pointer-events-none"
+                        checked={isSelected}
+                        readOnly
+                      />
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-medium text-white truncate">{repo.name}</h3>
+                          {repo.id === lastRepoId && (
+                            <span className="text-[10px] font-medium bg-accent/20 text-accent px-1.5 py-0.5 rounded border border-accent/20 uppercase tracking-wider shrink-0">
+                              Active
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-muted mt-0.5 truncate">
+                          Analyzed {new Date(repo.uploadedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <span className={`text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded border ${isReady ? 'bg-green-500/10 text-green-400 border-green-500/20' : repo.status === 'error' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-orange-500/10 text-orange-400 border-orange-500/20'}`}>
+                          {repo.status}
+                        </span>
+                        
+                        <button
+                          onClick={() => {
+                            setShowManager(false);
+                            navigate(`/explore/${repo.id}`);
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${isReady ? 'bg-accent hover:bg-accent-hover text-white' : 'bg-surface border border-border text-muted hover:text-white'}`}
+                        >
+                          {isReady ? 'Open' : 'View'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="mt-4 text-center shrink-0 w-full border-t border-border/50 pt-4 max-w-7xl mx-auto">
@@ -296,8 +532,8 @@ export default function UploadPage() {
 
 function FeatureCard({ icon, title, desc }) {
   return (
-    <div className="bg-panel border border-border p-5 rounded-xl flex flex-col items-start hover:border-accent/50 transition-colors">
-      <div className="p-2.5 bg-surface border border-border rounded-lg mb-4">
+    <div className="bg-surface border border-border p-5 rounded-xl flex flex-col items-start hover:border-accent/50 transition-colors h-full">
+      <div className="p-2.5 bg-panel border border-border rounded-lg mb-4">
         {icon}
       </div>
       <h3 className="font-semibold text-sm mb-1">{title}</h3>

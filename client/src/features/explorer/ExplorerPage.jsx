@@ -22,7 +22,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
-import { ChevronRight, ChevronDown, File, Folder, Code2, Play, Search, Network, Brain, Database, FileText, X, MessageSquare, Send, AlertTriangle, Loader2, RefreshCw } from 'lucide-react';
+import { ChevronRight, ChevronDown, File, Folder, Code2, Play, Search, Network, Brain, Database, FileText, X, MessageSquare, Send, AlertTriangle, Loader2, RefreshCw, Image as ImageIcon, Copy, Check, FolderTree, Sparkles } from 'lucide-react';
 import MonacoEditor from '@monaco-editor/react';
 import { repositoryApi } from '../../shared/api';
 import { ResizableLayout } from '../../shared/components/ResizableLayout';
@@ -30,6 +30,7 @@ import { useRepository } from '../../shared/context/RepositoryContext';
 import { FileTree } from './FileTree';
 import AiResponse from '../../shared/components/ai/AiResponse';
 import AiMarkdown from '../../shared/components/ai/AiMarkdown';
+import ModuleDocumentation from './ModuleDocumentation';
 
 // ── Monaco language map ───────────────────────────────────────────────────────
 // Maps file extensions to Monaco language IDs.
@@ -93,19 +94,31 @@ export default function ExplorerPage() {
   const { repo, fileTree, loading: repoLoading, error: repoError } = useRepository();
   const [reanalyzing, setReanalyzing] = useState(false);
   const navigate          = useNavigate();
-  const [searchParams]    = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [pageError, setPageError] = useState(null);
 
-  // Currently open file
-  const [selectedPath, setSelectedPath]  = useState(null);
+  // URL is the single source of truth
+  const selectedPath = searchParams.get('path');
+  const viewMode = searchParams.get('view') || 'source';
+
   const [fileContent,  setFileContent]   = useState(null);   // { content, language }
   const [fileLoading,  setFileLoading]   = useState(false);
   const [fileError,    setFileError]     = useState(null);
 
+  const [moduleDocs,   setModuleDocs]    = useState(null);
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+
   // Monaco editor instance ref — used for revealLine / decorations
   const editorRef = useRef(null);
 
+  const handleSetViewMode = (mode) => {
+    setSearchParams(prev => {
+      const p = new URLSearchParams(prev);
+      p.set('view', mode);
+      return p;
+    }, { replace: true });
+  };
 
   const handleIncrementalAnalyze = async () => {
     setReanalyzing(true);
@@ -119,67 +132,102 @@ export default function ExplorerPage() {
     }
   };
 
-
+  const handleGenerateAi = async () => {
+    if (!selectedPath) return;
+    setIsGeneratingAi(true);
+    try {
+      const docsRes = await repositoryApi.getModuleDocumentation(repoId, selectedPath, { generateAi: true });
+      setModuleDocs(docsRes.data);
+    } catch (err) {
+      console.error('Failed to generate AI docs', err);
+    } finally {
+      setIsGeneratingAi(false);
+    }
+  };
 
   // ── openFile — central navigation function ─────────────────────────────────
   const openFile = useCallback(async (filePath, line, endLine) => {
     if (!filePath) return;
 
-    // Don't re-fetch if already showing this file (unless a line jump is requested)
-    if (filePath === selectedPath && !line) return;
+    setSearchParams(prev => {
+      const p = new URLSearchParams(prev);
+      if (p.get('path') !== filePath) {
+        p.delete('line'); // Wipe line if changing files
+      }
+      p.set('path', filePath);
+      if (line) {
+        p.set('line', endLine ? `${line}-${endLine}` : line.toString());
+      }
+      return p;
+    }, { replace: true });
+  }, [setSearchParams]);
 
-    setSelectedPath(filePath);
-    setFileError(null);
-    setFileLoading(true);
-    setFileContent(null);
+  // ── File Fetching Effect ───────────────────────────────────────────────────
+  useEffect(() => {
+    if (!selectedPath) return;
 
-    try {
-      const res = await repositoryApi.getFile(repoId, filePath);
-      const { content, language } = res.data;
-      setFileContent({ content, language: monacoLanguage(filePath, language) });
-    } catch (err) {
-      setFileError(err?.response?.data?.error || err.message || 'Failed to load file');
-    } finally {
-      setFileLoading(false);
-    }
+    let active = true;
 
-    // Reveal line after editor mounts — handled in handleEditorMount
-    if (line) {
-      pendingLineRef.current = { line, endLine };
-    }
+    const fetchFile = async () => {
+      setFileError(null);
+      setFileLoading(true);
+      setFileContent(null);
+
+      try {
+        const [fileRes, docsRes] = await Promise.allSettled([
+          repositoryApi.getFile(repoId, selectedPath),
+          repositoryApi.getModuleDocumentation(repoId, selectedPath)
+        ]);
+
+        if (!active) return;
+
+        if (fileRes.status === 'fulfilled') {
+          const { content, language } = fileRes.value.data;
+          setFileContent({ content, language: monacoLanguage(selectedPath, language) });
+        } else {
+          setFileError(fileRes.reason?.response?.data?.error || fileRes.reason?.message || 'Failed to load file');
+        }
+
+        if (docsRes.status === 'fulfilled') {
+          setModuleDocs(docsRes.value.data);
+        } else {
+          setModuleDocs(null);
+        }
+      } catch (err) {
+        if (!active) return;
+        setFileError('Unexpected error occurred');
+      } finally {
+        if (active) setFileLoading(false);
+      }
+    };
+
+    fetchFile();
+
+    return () => { active = false; };
   }, [repoId, selectedPath]);
 
-  // ── Handle ?path= and ?line= from deep-links (e.g. DependencyGraphPage) ───
+  // ── Line highlighting Effect ───────────────────────────────────────────────
   useEffect(() => {
-    const deepPath = searchParams.get('path');
-    const deepLine = searchParams.get('line');
-    if (deepPath) {
-      if (deepLine) {
-        const parts = deepLine.split('-');
-        const startLine = parseInt(parts[0], 10);
-        const endLine = parts.length > 1 ? parseInt(parts[1], 10) : undefined;
-        openFile(deepPath, startLine, endLine);
-      } else {
-        openFile(deepPath);
-      }
+    const lineParam = searchParams.get('line');
+    if (lineParam && editorRef.current && !fileLoading && fileContent) {
+      const parts = lineParam.split('-');
+      const start = parseInt(parts[0], 10);
+      const end = parts.length > 1 ? parseInt(parts[1], 10) : undefined;
+      
+      // Delay slightly to ensure editor has fully laid out content
+      setTimeout(() => {
+        if (end) {
+          highlightRange(start, end);
+        } else {
+          revealLine(start);
+        }
+      }, 50);
     }
-  }, [searchParams, openFile]);
-
-  // Pending line navigation — set before editor mounts, consumed on mount
-  const pendingLineRef = useRef(null);
+  }, [searchParams.get('line'), fileLoading, fileContent]);
 
   // ── Monaco editor callbacks ────────────────────────────────────────────────
   const handleEditorMount = useCallback((editor) => {
     editorRef.current = editor;
-    if (pendingLineRef.current) {
-      const { line, endLine } = pendingLineRef.current;
-      if (endLine) {
-        highlightRange(line, endLine);
-      } else {
-        revealLine(line);
-      }
-      pendingLineRef.current = null;
-    }
   }, []);
 
   function revealLine(line) {
@@ -265,62 +313,87 @@ export default function ExplorerPage() {
 
   const fileCount = countFiles(fileTree);
 
+  const panels = [
+    {
+      id: 'fileTree',
+      defaultSize: 20,
+      minWidth: 200,
+      collapsible: true,
+      collapseDirection: 'left',
+      title: 'Explorer',
+      icon: <FolderTree />,
+      content: (
+        <div className="flex-1 overflow-y-auto overflow-x-auto p-3 custom-scrollbar bg-panel">
+          <div className="flex items-center justify-between mb-2 px-1">
+            <p className="text-xs text-muted uppercase tracking-wider">Files</p>
+            <button 
+              onClick={handleIncrementalAnalyze}
+              disabled={reanalyzing}
+              className="text-muted hover:text-white transition-colors"
+              title="Refresh File Tree"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${reanalyzing ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+          <FileTree
+            nodes={fileTree}
+            selectedPath={selectedPath}
+            onSelectFile={(p) => openFile(p)}
+          />
+        </div>
+      )
+    },
+    {
+      id: 'codeViewer',
+      defaultSize: viewMode === 'docs' ? 80 : 55,
+      minWidth: 300,
+      collapsible: false,
+      content: (
+        <div className="flex-1 flex flex-col overflow-hidden bg-surface h-full">
+          <CodeViewer
+            repoId={repoId}
+            filePath={selectedPath}
+            fileContent={fileContent}
+            loading={fileLoading}
+            error={fileError}
+            onEditorMount={handleEditorMount}
+            viewMode={viewMode}
+            setViewMode={handleSetViewMode}
+            moduleDocs={moduleDocs}
+            onGenerateAi={handleGenerateAi}
+            isGeneratingAi={isGeneratingAi}
+          />
+        </div>
+      )
+    }
+  ];
+
+  if (viewMode !== 'docs') {
+    panels.push({
+      id: 'aiPanel',
+      defaultSize: 25,
+      minWidth: 250,
+      collapsible: true,
+      collapseDirection: 'right',
+      title: 'Assistant',
+      icon: <Sparkles />,
+      content: (
+        <div className="flex-1 h-full flex flex-col bg-panel">
+          <AiPanel
+            repoId={repoId}
+            getActiveContext={getActiveContext}
+            onOpenFile={(filePath, line) => openFile(filePath, line)}
+            onHighlightRange={(filePath, start, end) => {
+              openFile(filePath).then(() => highlightRange(start, end));
+            }}
+          />
+        </div>
+      )
+    });
+  }
+
   return (
-    <ResizableLayout
-      panels={[
-        {
-          id: 'fileTree',
-          defaultSize: 20,
-          minWidth: 200,
-          collapsible: true,
-          content: (
-            <div className="flex-1 overflow-y-auto overflow-x-auto p-3 custom-scrollbar bg-panel">
-              <p className="text-xs text-muted uppercase tracking-wider mb-2 px-1">Files</p>
-              <FileTree
-                nodes={fileTree}
-                selectedPath={selectedPath}
-                onSelectFile={(p) => openFile(p)}
-              />
-            </div>
-          )
-        },
-        {
-          id: 'codeViewer',
-          defaultSize: 55,
-          minWidth: 300,
-          collapsible: false,
-          content: (
-            <div className="flex-1 flex flex-col overflow-hidden bg-surface h-full">
-              <CodeViewer
-                filePath={selectedPath}
-                fileContent={fileContent}
-                loading={fileLoading}
-                error={fileError}
-                onEditorMount={handleEditorMount}
-              />
-            </div>
-          )
-        },
-        {
-          id: 'aiPanel',
-          defaultSize: 25,
-          minWidth: 250,
-          collapsible: true,
-          content: (
-            <div className="flex-1 h-full flex flex-col bg-panel">
-              <AiPanel
-                repoId={repoId}
-                getActiveContext={getActiveContext}
-                onOpenFile={(filePath, line) => openFile(filePath, line)}
-                onHighlightRange={(filePath, start, end) => {
-                  openFile(filePath).then(() => highlightRange(start, end));
-                }}
-              />
-            </div>
-          )
-        }
-      ]}
-    />
+    <ResizableLayout panels={panels} />
   );
 }
 
@@ -333,7 +406,7 @@ export default function ExplorerPage() {
  *   error   — fetch failed
  *   editor  — Monaco
  */
-function CodeViewer({ filePath, fileContent, loading, error, onEditorMount }) {
+function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMount, viewMode, setViewMode, moduleDocs, onGenerateAi, isGeneratingAi }) {
   if (!filePath) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-muted gap-2">
@@ -343,41 +416,88 @@ function CodeViewer({ filePath, fileContent, loading, error, onEditorMount }) {
     );
   }
 
-  if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center gap-3">
-        <Loader2 className="w-5 h-5 text-accent animate-spin" />
-        <span className="text-muted text-sm">Loading {filePath.split('/').pop()}…</span>
+  const header = (
+    <div className="flex items-center justify-center px-4 py-2 bg-panel border-b border-border shadow-sm shrink-0 z-10">
+      <div className="flex items-center gap-1 bg-surface p-1 rounded-lg border border-border/50">
+        <button 
+          onClick={() => setViewMode('source')} 
+          className={`px-4 py-1.5 text-xs font-medium rounded-md transition-all ${viewMode === 'source' ? 'bg-accent/20 text-accent shadow-sm' : 'text-muted hover:text-white hover:bg-white/5'}`}
+        >
+          Source Code
+        </button>
+        <button 
+          onClick={() => setViewMode('docs')} 
+          className={`px-4 py-1.5 text-xs font-medium rounded-md transition-all ${viewMode === 'docs' ? 'bg-accent/20 text-accent shadow-sm' : 'text-muted hover:text-white hover:bg-white/5'}`}
+        >
+          Documentation
+        </button>
+      </div>
+    </div>
+  );
+
+  let content;
+  if (viewMode === 'docs') {
+    content = (
+      <div className="flex-1 overflow-y-auto bg-surface p-6 custom-scrollbar relative">
+        <ModuleDocumentation docs={moduleDocs} repoId={repoId} onGenerateAi={onGenerateAi} isGeneratingAi={isGeneratingAi} />
       </div>
     );
-  }
-
-  if (error) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-2 text-danger">
-        <AlertTriangle className="w-6 h-6" />
-        <p className="text-sm">{error}</p>
-      </div>
-    );
-  }
-
-  if (!fileContent) return null;
-
-  return (
-    <Editor
-      height="100%"
-      language={fileContent.language || 'plaintext'}
-      value={fileContent.content}
-      theme="vs-dark"
-      options={MONACO_OPTIONS}
-      onMount={onEditorMount}
-      loading={
+  } else {
+    // Source Code Mode
+    if (loading) {
+      content = (
         <div className="flex-1 flex items-center justify-center gap-3">
           <Loader2 className="w-5 h-5 text-accent animate-spin" />
-          <span className="text-muted text-sm">Loading editor…</span>
+          <span className="text-muted text-sm">Loading {filePath.split('/').pop()}…</span>
         </div>
-      }
-    />
+      );
+    } else if (error) {
+      content = (
+        <div className="flex-1 flex flex-col items-center justify-center gap-2 text-danger">
+          <AlertTriangle className="w-6 h-6" />
+          <p className="text-sm">{error}</p>
+        </div>
+      );
+    } else if (/\.(png|jpe?g|gif|svg|webp|ico|bmp)$/i.test(filePath)) {
+      const imageUrl = `/api/repository/${repoId}/file?path=${encodeURIComponent(filePath)}`;
+      content = (
+        <div className="flex-1 flex flex-col p-8 overflow-auto bg-[#0d1117] custom-scrollbar">
+          {/* <div className="flex items-center gap-2 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-400 text-sm mb-6 mx-auto w-full max-w-lg">
+            <ImageIcon className="w-5 h-5 shrink-0" />
+            <p><strong>Image Viewer</strong> Rendering image directly.</p>
+          </div> */}
+          <div className="flex-1 flex items-center justify-center min-h-[40vh]">
+            <img src={imageUrl} alt={filePath} className="max-w-full max-h-[70vh] object-contain rounded drop-shadow-2xl border border-white/10" />
+          </div>
+        </div>
+      );
+    } else if (!fileContent) {
+      content = null;
+    } else {
+      content = (
+        <Editor
+          height="100%"
+          language={fileContent.language || 'plaintext'}
+          value={fileContent.content}
+          theme="vs-dark"
+          options={MONACO_OPTIONS}
+          onMount={onEditorMount}
+          loading={
+            <div className="flex-1 flex items-center justify-center gap-3">
+              <Loader2 className="w-5 h-5 text-accent animate-spin" />
+              <span className="text-muted text-sm">Loading editor…</span>
+            </div>
+          }
+        />
+      );
+    }
+  }
+
+  return (
+    <div className="flex-1 flex flex-col h-full w-full relative">
+      {header}
+      {content}
+    </div>
   );
 }
 
@@ -480,11 +600,32 @@ function AiPanel({ repoId, onOpenFile, onHighlightRange, getActiveContext }) {
 // ── Message ───────────────────────────────────────────────────────────────────
 
 function Message({ msg, onOpenFile }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    let textToCopy = '';
+    if (msg.role === 'user') {
+      textToCopy = msg.content;
+    } else {
+      textToCopy = typeof msg.content === 'string' ? msg.content : msg.summary;
+      if (msg.explanation) textToCopy += `\n\n${msg.explanation}`;
+    }
+    navigator.clipboard.writeText(textToCopy);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   if (msg.role === 'user') {
     return (
-      <div className="flex justify-end">
-        <div className="max-w-[85%] bg-accent/10 border border-accent/20 rounded px-2.5 py-1.5 text-xs text-white">
-          <AiMarkdown content={msg.content} />
+      <div className="flex justify-end group/msg">
+        <div className="flex flex-col gap-1 items-end max-w-[90%]">
+          <div className="bg-accent/10 border border-accent/20 rounded px-2.5 py-1.5 text-xs text-white">
+            <AiMarkdown content={msg.content} />
+          </div>
+          <button onClick={handleCopy} className="opacity-0 group-hover/msg:opacity-100 text-muted hover:text-white transition-opacity text-[10px] flex items-center gap-1" title="Copy Message">
+            {copied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
+            {copied ? 'Copied' : 'Copy'}
+          </button>
         </div>
       </div>
     );
@@ -501,15 +642,17 @@ function Message({ msg, onOpenFile }) {
 
   // assistant — render structured response compactly
   return (
-    <div className="flex flex-col gap-2 bg-surface/30 border border-border rounded p-2.5">
+    <div className="flex flex-col gap-2 bg-surface/30 border border-border rounded p-2.5 group/msg">
       <div className="flex items-center justify-between border-b border-border/50 pb-2 mb-2">
         <span className="text-[10px] font-medium text-white/80 flex items-center gap-1">
           {msg.isDeterministic ? <Database className="w-3 h-3 text-success" /> : <Brain className="w-3 h-3 text-accent" />}
           {msg.isDeterministic ? 'Deterministic' : 'AI Inference'}
         </span>
-        {msg.intent && (
-          <span className="text-[9px] text-muted uppercase tracking-wider">{msg.intent}</span>
-        )}
+        <div className="flex items-center gap-3">
+          {msg.intent && (
+            <span className="text-[9px] text-muted uppercase tracking-wider">{msg.intent}</span>
+          )}
+        </div>
       </div>
 
       <AiResponse 
@@ -522,6 +665,12 @@ function Message({ msg, onOpenFile }) {
         title={null} 
         onNavigate={onOpenFile} 
       />
+      <div className="flex justify-start">
+        <button onClick={handleCopy} className="opacity-0 group-hover/msg:opacity-100 text-muted hover:text-white transition-opacity text-[10px] flex items-center gap-1" title="Copy Response">
+          {copied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
     </div>
   );
 }

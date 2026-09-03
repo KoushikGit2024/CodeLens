@@ -35,17 +35,40 @@ function detectLayer(filePath) {
 }
 
 function detectComponents(analysis, graph) {
+  if (!analysis.files || analysis.files.length === 0) return [];
+
+  // 1. Find common directory prefix to strip out wrapper folders (e.g. 'AlgoVisuals/')
+  let commonPrefixParts = null;
+  for (const file of analysis.files) {
+    const parts = file.filePath.split('/');
+    parts.pop(); // discard filename
+    if (commonPrefixParts === null) {
+      commonPrefixParts = parts;
+    } else {
+      let i = 0;
+      while (i < commonPrefixParts.length && i < parts.length && commonPrefixParts[i] === parts[i]) {
+        i++;
+      }
+      commonPrefixParts = commonPrefixParts.slice(0, i);
+    }
+    if (commonPrefixParts.length === 0) break;
+  }
+
+  const prefixLen = commonPrefixParts ? commonPrefixParts.length : 0;
   const componentsMap = new Map(); // componentName -> { name, files, layer }
 
   for (const file of analysis.files) {
     const parts = file.filePath.split('/');
+    const meaningfulParts = parts.slice(prefixLen);
+    
     let compName = 'root';
     
-    if (parts.length > 1) {
-      if (parts[0] === 'src' && parts.length > 2) {
-        compName = parts[1];
+    if (meaningfulParts.length > 1) {
+      // If the first meaningful part is a common wrapper, go one level deeper
+      if (['src', 'app', 'lib', 'packages'].includes(meaningfulParts[0]) && meaningfulParts.length > 2) {
+        compName = meaningfulParts[1];
       } else {
-        compName = parts[0];
+        compName = meaningfulParts[0];
       }
     }
     

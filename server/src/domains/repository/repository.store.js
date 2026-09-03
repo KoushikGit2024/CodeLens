@@ -40,10 +40,6 @@ for (const record of restored) {
     record.error = 'Analysis was interrupted by a server restart.';
     persistence.saveMeta(record);
   }
-  // Load chats dictionary from disk for this repo
-  const chats = persistence.loadChats(record.id);
-  record.chats = chats || {};
-
   store.set(record.id, record);
 }
 
@@ -82,4 +78,22 @@ module.exports = {
     store.delete(id);
     persistence.remove(id);
   },
+
+  clearAnalysis(id) {
+    const existing = store.get(id);
+    if (!existing) return;
+    
+    // Wipe analysis from memory
+    delete existing.analysis;
+    existing.status = 'unanalyzed';
+    existing.phase = 'uploading';
+    existing.phaseDetails = null;
+    
+    // Update store and write meta to disk
+    store.set(id, existing);
+    persistence.saveMeta(existing);
+    
+    // Wipe analysis from disk
+    persistence.removeAnalysis(id);
+  }
 };

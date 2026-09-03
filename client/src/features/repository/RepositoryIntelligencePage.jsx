@@ -28,7 +28,7 @@ export default function RepositoryIntelligencePage() {
   const { aiState, reportAiError } = useAIState();
 
   const loadIntelligence = async () => {
-    setLoading(true);
+    if (!data) setLoading(true);
     setError(null);
     try {
       const res = await repositoryApi.getIntelligence(repoId);
@@ -42,7 +42,6 @@ export default function RepositoryIntelligencePage() {
       }
     } catch (err) {
       setError(err?.response?.data?.error || err.message);
-    } finally {
       setLoading(false);
     }
   };
@@ -87,14 +86,29 @@ export default function RepositoryIntelligencePage() {
   }
 
   if (error || repoError) {
+    const errorMsg = error || repoError;
+    const isNotReady = errorMsg.toLowerCase().includes('not ready') || errorMsg.toLowerCase().includes('pending');
+
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface">
         <div className="text-center">
           <AlertCircle className="w-6 h-6 text-danger mx-auto mb-3" />
-          <p className="text-danger mb-4 text-sm">{error || repoError}</p>
-          <button onClick={() => navigate(-1)} className="text-sm text-accent hover:underline">
-            ← Go back
-          </button>
+          <p className="text-danger mb-4 text-sm">{errorMsg}</p>
+          {isNotReady ? (
+            <button 
+              onClick={async () => {
+                await repositoryApi.analyze(repoId);
+                window.location.reload();
+              }}
+              className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              Start Analysis
+            </button>
+          ) : (
+            <button onClick={() => navigate(-1)} className="text-sm text-accent hover:underline">
+              ← Go back
+            </button>
+          )}
         </div>
       </div>
     );
@@ -258,13 +272,13 @@ export default function RepositoryIntelligencePage() {
               ) : null}
 
               <div className="flex items-start gap-3 p-3 bg-surface border border-border/50 rounded">
-                <BookOpen className="w-4 h-4 text-[#a6e3a1] shrink-0 mt-0.5" />
+                <FileText className="w-4 h-4 text-[#a6e3a1] shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <h4 className="text-xs font-semibold text-white mb-1">Repository Documentation</h4>
-                  <p className="text-[11px] text-muted leading-relaxed">Structural documentation is automatically available for all components.</p>
+                  <h4 className="text-xs font-semibold text-white mb-1">Codebase Explorer</h4>
+                  <p className="text-[11px] text-muted leading-relaxed">Structural insights are automatically available for all files in the explorer.</p>
                 </div>
-                <Link to={`/explore/${repoId}/documentation`} className="shrink-0 px-3 py-1.5 bg-panel border border-border rounded text-[10px] font-medium text-white hover:border-accent transition-colors">
-                  Read Documentation →
+                <Link to={`/explore/${repoId}/source`} className="shrink-0 px-3 py-1.5 bg-panel border border-border rounded text-[10px] font-medium text-white hover:border-accent transition-colors">
+                  Explore Files →
                 </Link>
               </div>
             </div>
@@ -365,9 +379,9 @@ export default function RepositoryIntelligencePage() {
                  <span className="text-white font-medium group-hover:text-success transition-colors flex items-center gap-2"><FileText className="w-4 h-4 text-success" /> Browse Source &rarr;</span>
                  <span className="text-xs text-muted">Explore the codebase with contextual insights.</span>
               </Link>
-              <Link to={`/explore/${repoId}/documentation`} className="bg-surface/50 border border-border/50 p-4 rounded hover:border-[#a6e3a1] hover:bg-surface transition-colors flex flex-col gap-1 group">
-                 <span className="text-white font-medium group-hover:text-[#a6e3a1] transition-colors flex items-center gap-2"><BookOpen className="w-4 h-4 text-[#a6e3a1]" /> Read Documentation &rarr;</span>
-                 <span className="text-xs text-muted">Browse automatically generated facts.</span>
+              <Link to={`/explore/${repoId}/architecture`} className="bg-surface/50 border border-border/50 p-4 rounded hover:border-[#a6e3a1] hover:bg-surface transition-colors flex flex-col gap-1 group">
+                 <span className="text-white font-medium group-hover:text-[#a6e3a1] transition-colors flex items-center gap-2"><BookOpen className="w-4 h-4 text-[#a6e3a1]" /> View Architecture &rarr;</span>
+                 <span className="text-xs text-muted">Browse high level architecture maps.</span>
               </Link>
             </div>
           </section>

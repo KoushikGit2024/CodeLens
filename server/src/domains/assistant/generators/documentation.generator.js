@@ -43,14 +43,14 @@ const {
  * @param {Object} architectureModel
  * @returns {Promise<Object>} The combined facts and AI interpretation
  */
-async function generateOverviewDocs(analysis, graph, architectureModel) {
+async function generateOverviewDocs(analysis, graph, architectureModel, generateAi = true) {
   const context = buildOverviewContext(analysis, graph, architectureModel);
   const result = {
     facts: context,
     aiInterpretation: null,
   };
 
-  if (!isAIAvailable()) {
+  if (!isAIAvailable() || !generateAi) {
     return result; // Fallback to deterministic facts only
   }
 
@@ -82,14 +82,14 @@ async function generateOverviewDocs(analysis, graph, architectureModel) {
  * @param {string} filePath
  * @returns {Promise<Object>} The combined facts and AI interpretation
  */
-async function generateModuleDocs(analysis, graph, architectureModel, filePath) {
+async function generateModuleDocs(analysis, graph, architectureModel, filePath, generateAi = false) {
   const context = buildModuleContext(analysis, graph, architectureModel, filePath);
   const result = {
     facts: context,
     aiInterpretation: null,
   };
 
-  if (!isAIAvailable()) {
+  if (!generateAi || !isAIAvailable()) {
     return result;
   }
 

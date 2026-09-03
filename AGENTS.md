@@ -34,7 +34,13 @@ The backend is strictly divided between `server/src/analyzers/` (pure determinis
 - Do NOT commit API keys or environment secrets.
 - Always use relative forward-slash paths internally.
 
-## 5. Development Commands
+## 5. State Management & Storage Philosophy
+
+**Rule:** The backend must remain strictly stateless regarding user interactions (like AI chat histories, UI preferences, or session state).
+- The `.data/` folder is exclusively for persisting **repository source code and deterministic analysis/AST structures**. It is designed to be fully reproducible if deleted.
+- When deployed, the backend filesystem may be ephemeral. Therefore, **user-specific data (like AI chats) MUST be stored locally on the client (e.g., using browser `localStorage`)**. Do not pollute the backend `.data/` directory with ephemeral or user-generated UI state.
+
+## 6. Development Commands
 
 From the root directory:
 

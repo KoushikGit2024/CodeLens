@@ -16,6 +16,9 @@ router.post('/upload', uploadMiddleware, repositoryController.upload);
 // GET  /api/repository/list/all            — list all repositories
 router.get('/list/all', repositoryController.listRepositories);
 
+// POST /api/repository/batch               — batch manage (delete/clear analysis)
+router.post('/batch', repositoryController.batchManage);
+
 // GET  /api/repository/:id                 — repository record + status
 router.get('/:id', repositoryController.getRepository);
 
@@ -41,13 +44,9 @@ router.get('/:id/documentation/overview', documentationController.getOverviewDoc
 
 // GET  /api/repository/:id/documentation/file?path=... — AI docs (Module)
 router.get('/:id/documentation/file', documentationController.getModuleDocumentation);
-
-
 // POST /api/repository/:id/question        — AI Repository Intelligence Q&A
 router.post('/:id/question', assistantController.askQuestion);
 
-// PUT /api/repository/:id/chat/:chatId     — Persist chat history
-router.put('/:id/chat/:chatId', assistantController.saveChatHistory);
 
 // GET /api/repository/:id/risks            — Deterministic engineering risks
 router.get('/:id/risks', engineeringHealthController.getRisks);

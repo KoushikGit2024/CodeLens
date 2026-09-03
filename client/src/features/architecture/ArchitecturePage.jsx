@@ -1,12 +1,13 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { RefreshCw, AlertCircle, Loader2, File, Box, Wrench, Layers } from 'lucide-react';
+import { RefreshCw, AlertCircle, Loader2, File, Box, Wrench, Layers, Cpu, Sparkles } from 'lucide-react';
 import { ResizableLayout } from '../../shared/components/ResizableLayout';
 import { repositoryApi } from '../../shared/api';
 import AiResponse from '../../shared/components/ai/AiResponse';
+import ContextBreadcrumbs from '../../shared/components/ContextBreadcrumbs';
 import ReactFlow, { Background, Controls, MiniMap, MarkerType, Handle, Position } from 'reactflow';
 import 'reactflow/dist/style.css';
-import dagre from 'dagre';
+import * as d3Force from 'd3-force';
 
 // ── Layer color map ───────────────────────────────────────────────────────
 
@@ -63,60 +64,162 @@ const ArchNode = ({ data }) => {
 
 const archNodeTypes = { archNode: ArchNode };
 
-// ── Concentric Grid Layout ──────────────────────────────────────────────────
+// ── Hybrid Radial + Golden Flower Layout ────────────────────────────────────
+//
+// Strategy:
+//   1. Identify "core" nodes (components with ≥2 connections, or any internal component).
+//   2. Run a d3-force simulation on core nodes so they spread organically in all directions.
+//   3. For each core node, place its exclusive "leaf" nodes (external deps or single-connection
+//      nodes) in a golden ratio Fibonacci spiral bloom centered on that parent.
 
-function getConcentricGridLayout(nodes) {
-  const LAYER_ORDER = {
-    'Domain': 0,
-    'Service': 1,
-    'API': 2,
-    'Presentation': 3,
-    'Data': 4,
-    'Config': 5,
-    'External': 6,
-    'Unknown': 7
-  };
+function getHybridRadialLayout(nodes, rfEdges) {
+  if (!nodes || nodes.length === 0) return nodes;
 
-  const layers = {};
-  nodes.forEach(node => {
-    let layer = node.data?.layer || (node.data?.isExternal ? 'External' : 'Unknown');
-    if (!layers[layer]) layers[layer] = [];
-    layers[layer].push(node);
+  // ── Physical node dimensions ──────────────────────────────────────────────
+  const CORE_W = 160, CORE_H = 46;
+  const LEAF_W = 120, LEAF_H = 40;
+  const GOLDEN_ANGLE = 2.3999632327;
+
+  // ── Base tuning constants (visually calibrated) ───────────────────────────
+  // These are deliberately small — all actual spacing is MULTIPLIED by node weight,
+  // so heavy (hub) nodes automatically get proportionally more room.
+  const BASE_COLLISION  = 100;  // minimum exclusion radius for any core node (px)
+  const BASE_LINK_DIST  = 260;  // minimum edge length between two core nodes (px)
+  const BASE_CHARGE     = -700; // base repulsion strength
+  const LEAF_INNER      = 95;   // distance from parent center to first leaf (px)
+  const LEAF_SCALE_BASE = 48;   // golden spiral expansion at 1 leaf
+  // Hub bonus: each core→core connection adds this many px to a node's weight
+  const HUB_BONUS_PER_CONN = 35;
+
+  // ── Build full degree map (all edges) ─────────────────────────────────────
+  const degree = new Map();
+  nodes.forEach(n => degree.set(n.id, 0));
+  rfEdges.forEach(e => {
+    degree.set(e.source, (degree.get(e.source) || 0) + 1);
+    degree.set(e.target, (degree.get(e.target) || 0) + 1);
   });
 
-  const sortedLayerKeys = Object.keys(layers).sort((a, b) => {
-    const orderA = LAYER_ORDER[a] !== undefined ? LAYER_ORDER[a] : 99;
-    const orderB = LAYER_ORDER[b] !== undefined ? LAYER_ORDER[b] : 99;
-    return orderA - orderB;
-  });
-
-  // Flatten nodes prioritized by layer so core is at the center
-  let orderedNodes = [];
-  sortedLayerKeys.forEach(key => orderedNodes.push(...layers[key]));
-
-  // Generate dense concentric Fibonacci spiral to avoid edge overlaps
-  const c = 135; // Scaling factor controls density
-
-  orderedNodes.forEach((node, i) => {
-    const w = node.data?.isExternal ? 120 : 160;
-    
-    if (i === 0) {
-      // Put the very first core node exactly in the center
-      node.position = { x: -w / 2, y: -23 };
-    } else {
-      // Golden angle in radians ~ 2.39996
-      const theta = i * 2.3999632327;
-      const radius = c * Math.sqrt(i);
-      
-      const x = radius * Math.cos(theta);
-      const y = radius * Math.sin(theta);
-      
-      // Offset by half node size to center the node
-      node.position = { 
-        x: x - w / 2, 
-        y: y - 23 
-      };
+  // ── Classify leaves vs core ───────────────────────────────────────────────
+  // Leaf = external node with exactly 1 connection (it blooms around its parent)
+  const leafIds = new Set();
+  const leafParent = new Map();
+  nodes.forEach(n => {
+    if (n.data?.isExternal && (degree.get(n.id) || 0) <= 1) {
+      const edge = rfEdges.find(e => e.source === n.id || e.target === n.id);
+      if (edge) {
+        const parentId = edge.source === n.id ? edge.target : edge.source;
+        leafIds.add(n.id);
+        leafParent.set(n.id, parentId);
+      }
     }
+  });
+
+  const coreNodes = nodes.filter(n => !leafIds.has(n.id));
+  const coreEdges = rfEdges.filter(e => !leafIds.has(e.source) && !leafIds.has(e.target));
+
+  // ── Per-node leaf count ───────────────────────────────────────────────────
+  const leafCountMap = new Map();
+  coreNodes.forEach(n => leafCountMap.set(n.id, 0));
+  leafIds.forEach(lid => {
+    const pid = leafParent.get(lid);
+    leafCountMap.set(pid, (leafCountMap.get(pid) || 0) + 1);
+  });
+
+  // ── Per-node core connection count ────────────────────────────────────────
+  const coreConnMap = new Map();
+  coreNodes.forEach(n => coreConnMap.set(n.id, 0));
+  coreEdges.forEach(e => {
+    coreConnMap.set(e.source, (coreConnMap.get(e.source) || 0) + 1);
+    coreConnMap.set(e.target, (coreConnMap.get(e.target) || 0) + 1);
+  });
+
+  // ── nodeWeight: locally-computed "space budget" for each core node ─────────
+  // = outer radius of its leaf bloom + hub bonus for its core connections
+  // This is the key recursive/local calculation: each node declares how much
+  // room it actually needs based on its own neighborhood.
+  function leafBloomOuterRadius(nodeId) {
+    const lc = leafCountMap.get(nodeId) || 0;
+    if (lc === 0) return 0;
+    // Use a LEAF_SCALE that gently grows with leaf count so large fans spread more
+    const leafScale = LEAF_SCALE_BASE + Math.sqrt(lc) * 4;
+    return LEAF_INNER + leafScale * Math.sqrt(lc) + LEAF_W * 0.5;
+  }
+  function nodeWeight(nodeId) {
+    const bloomR = leafBloomOuterRadius(nodeId);
+    const hubBonus = (coreConnMap.get(nodeId) || 0) * HUB_BONUS_PER_CONN;
+    // Clamp minimum to BASE_COLLISION so isolated nodes still have personal space
+    return Math.max(BASE_COLLISION, bloomR + hubBonus);
+  }
+
+  // Per-link distance = sum of both endpoint weights → local, adaptive
+  function linkDist(link) {
+    const sid = typeof link.source === 'object' ? link.source.id : link.source;
+    const tid = typeof link.target === 'object' ? link.target.id : link.target;
+    return Math.max(BASE_LINK_DIST, nodeWeight(sid) + nodeWeight(tid));
+  }
+
+  // Per-node charge: hub nodes push neighbors harder
+  function nodeCharge(simNode) {
+    const lc = leafCountMap.get(simNode.id) || 0;
+    const cc = coreConnMap.get(simNode.id) || 0;
+    // Scale charge with leaf count (bloom size) and core connections
+    return BASE_CHARGE * (1 + lc * 0.25 + cc * 0.15);
+  }
+
+  // Seed radius derived from the average node weight so initial placement
+  // already respects the graph's overall scale — no arbitrary fixed number
+  const avgWeight = coreNodes.reduce((sum, n) => sum + nodeWeight(n.id), 0)
+    / Math.max(coreNodes.length, 1);
+  const seedRadius = Math.max(180, avgWeight * 1.4);
+
+  // ── Step A: d3-force simulation for core nodes ────────────────────────────
+  const simNodes = coreNodes.map((n, i) => {
+    const theta = (i / Math.max(coreNodes.length, 1)) * 2 * Math.PI;
+    return { id: n.id, x: seedRadius * Math.cos(theta), y: seedRadius * Math.sin(theta) };
+  });
+  const simLinks = coreEdges.map(e => ({ source: e.source, target: e.target }));
+
+  const simulation = d3Force.forceSimulation(simNodes)
+    .force('charge',    d3Force.forceManyBody().strength(d => nodeCharge(d)))
+    .force('link',      d3Force.forceLink(simLinks).id(d => d.id).distance(linkDist).strength(0.45))
+    .force('collision', d3Force.forceCollide(d => nodeWeight(d.id) * 0.75).strength(0.9))
+    .force('center',    d3Force.forceCenter(0, 0))
+    .stop();
+
+  // 400 ticks is enough for graphs up to ~50 core nodes to settle cleanly
+  for (let i = 0; i < 400; i++) simulation.tick();
+
+  // Write positions to ReactFlow nodes
+  const posMap = new Map();
+  simNodes.forEach(sn => posMap.set(sn.id, { x: sn.x, y: sn.y }));
+  coreNodes.forEach(n => {
+    const pos = posMap.get(n.id) || { x: 0, y: 0 };
+    n.position = { x: pos.x - CORE_W / 2, y: pos.y - CORE_H / 2 };
+  });
+
+  // ── Step B: Golden ratio flower for leaf nodes ────────────────────────────
+  const leafGroups = new Map();
+  leafIds.forEach(lid => {
+    const pid = leafParent.get(lid);
+    if (!leafGroups.has(pid)) leafGroups.set(pid, []);
+    const leafNode = nodes.find(n => n.id === lid);
+    if (leafNode) leafGroups.get(pid).push(leafNode);
+  });
+
+  leafGroups.forEach((leaves, parentId) => {
+    const parentPos = posMap.get(parentId) || { x: 0, y: 0 };
+    const lc = leaves.length;
+    // Scale the spiral gently with local leaf count: more leaves → looser flower
+    const leafScale = LEAF_SCALE_BASE + Math.sqrt(lc) * 4;
+    leaves.forEach((leaf, i) => {
+      const idx = i + 1;
+      const theta  = idx * GOLDEN_ANGLE;
+      const radius = LEAF_INNER + leafScale * Math.sqrt(idx);
+      leaf.position = {
+        x: parentPos.x + radius * Math.cos(theta) - LEAF_W / 2,
+        y: parentPos.y + radius * Math.sin(theta) - LEAF_H / 2,
+      };
+    });
   });
 
   return nodes;
@@ -199,7 +302,7 @@ function graphToFlow(components, relations, selectedId, violations) {
     };
   });
 
-  return { rfNodes: getConcentricGridLayout(rfNodes), rfEdges };
+  return { rfNodes: getHybridRadialLayout(rfNodes, rfEdges), rfEdges };
 }
 
 export default function ArchitecturePage() {
@@ -210,6 +313,8 @@ export default function ArchitecturePage() {
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
   const [selectedComponent, setSelectedComponent] = useState(null);
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+  const [aiError, setAiError] = useState(null);
 
   const loadArchitecture = async () => {
     setLoading(true);
@@ -221,6 +326,19 @@ export default function ArchitecturePage() {
       setError(err?.response?.data?.error || err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGenerateAi = async () => {
+    setIsGeneratingAi(true);
+    setAiError(null);
+    try {
+      const res = await repositoryApi.getArchitecture(repoId, { generateAi: true });
+      setData(prev => ({ ...prev, insights: res.data.insights }));
+    } catch (err) {
+      setAiError(err?.response?.data?.error || err.message || 'Failed to generate AI insights.');
+    } finally {
+      setIsGeneratingAi(false);
     }
   };
 
@@ -253,14 +371,25 @@ export default function ArchitecturePage() {
   }
 
   if (error) {
+    const isNotReady = error.toLowerCase().includes('not ready') || error.toLowerCase().includes('pending');
     return (
-      <div className="min-h-screen flex items-center justify-center bg-surface">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-6 h-6 text-danger mx-auto mb-3" />
           <p className="text-danger mb-4 text-sm">{error}</p>
-          <button onClick={() => navigate(-1)} className="text-sm text-accent hover:underline">
-            ← Go back
-          </button>
+          {isNotReady ? (
+            <button 
+              onClick={async () => {
+                await repositoryApi.analyze(repoId);
+                window.location.reload();
+              }}
+              className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              Start Analysis
+            </button>
+          ) : (
+            <button onClick={() => navigate(-1)} className="text-sm text-accent hover:underline">← Go back</button>
+          )}
         </div>
       </div>
     );
@@ -274,6 +403,9 @@ export default function ArchitecturePage() {
           defaultSize: 20,
           minWidth: 200,
           collapsible: true,
+          collapseDirection: 'left',
+          title: 'Controls',
+          icon: <Layers />,
           content: (
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-6 custom-scrollbar bg-panel h-full">
               <section>
@@ -374,6 +506,11 @@ export default function ArchitecturePage() {
           collapsible: false,
           content: (
             <main className="flex-1 overflow-auto bg-[#0d1117] relative flex justify-center custom-scrollbar h-full w-full">
+              <ContextBreadcrumbs 
+                domain="Architecture" 
+                activeNode={selectedComponent} 
+                onClear={() => setSelectedComponent(null)} 
+              />
               {rfNodes.length > 0 ? (
                 <ReactFlow
                   nodes={rfNodes}
@@ -433,11 +570,35 @@ export default function ArchitecturePage() {
           defaultSize: 25,
           minWidth: 200,
           collapsible: true,
+          collapseDirection: 'right',
+          title: 'AI Insights',
+          icon: <Sparkles />,
           content: (
             <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4 custom-scrollbar bg-panel h-full">
               <p className="text-xs text-muted uppercase tracking-wider mb-2">AI Architectural Insights</p>
               
-              <AiResponse data={data?.insights} title={null} repoId={repoId} chatId={`architecture-${repoId}`} />
+              {data?.insights ? (
+                <AiResponse data={data.insights} title={null} repoId={repoId} chatId={`architecture-${repoId}`} />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-center p-6 border border-border/50 rounded-lg bg-surface/30">
+                  <Cpu className="w-8 h-8 text-muted mb-4 opacity-50" />
+                  <p className="text-sm text-muted mb-4">AI insights are not generated by default to save resources.</p>
+                  <button 
+                    onClick={handleGenerateAi}
+                    disabled={isGeneratingAi}
+                    className="flex items-center gap-2 px-4 py-2 bg-accent/10 hover:bg-accent/20 text-accent rounded transition-colors text-sm font-medium disabled:opacity-50"
+                  >
+                    {isGeneratingAi ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                    {isGeneratingAi ? 'Analyzing...' : 'Generate AI Insights'}
+                  </button>
+                  {aiError && (
+                    <div className="mt-4 p-3 bg-danger/10 border border-danger/20 rounded text-danger text-xs text-left flex items-start gap-2 w-full">
+                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span className="flex-1">{aiError}</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )
         }

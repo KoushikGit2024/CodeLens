@@ -16,6 +16,37 @@ export default function RepositoryAssistantPage() {
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const chatRepoIdRef = useRef(repoId);
+
+  useEffect(() => {
+    setMessages([]);
+    chatRepoIdRef.current = repoId;
+    async function loadChat() {
+      if (!repoId) return;
+      try {
+        const stored = localStorage.getItem(`codelens_chats_${repoId}_assistant`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setMessages(parsed);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load chat history from localStorage', err);
+      }
+    }
+    loadChat();
+  }, [repoId]);
+
+  useEffect(() => {
+    if (messages.length > 0 && repoId && chatRepoIdRef.current === repoId) {
+      try {
+        localStorage.setItem(`codelens_chats_${repoId}_assistant`, JSON.stringify(messages));
+      } catch (err) {
+        console.error('Failed to save chat history to localStorage', err);
+      }
+    }
+  }, [messages, repoId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -51,13 +82,28 @@ export default function RepositoryAssistantPage() {
   }
 
   if (repoError) {
+    const errorMsg = repoError;
+    const isNotReady = errorMsg.toLowerCase().includes('not ready') || errorMsg.toLowerCase().includes('pending');
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface">
         <div className="text-center">
-          <p className="text-danger mb-4 text-sm">{repoError}</p>
-          <button onClick={() => navigate(-1)} className="text-sm text-accent hover:underline">
-            ← Go back
-          </button>
+          <AlertCircle className="w-6 h-6 text-danger mx-auto mb-3" />
+          <p className="text-danger mb-4 text-sm">{errorMsg}</p>
+          {isNotReady ? (
+            <button 
+              onClick={async () => {
+                await repositoryApi.analyze(repoId);
+                window.location.reload();
+              }}
+              className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              Start Analysis
+            </button>
+          ) : (
+            <button onClick={() => navigate(-1)} className="text-sm text-accent hover:underline">
+              ← Go back
+            </button>
+          )}
         </div>
       </div>
     );

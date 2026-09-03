@@ -3,7 +3,7 @@ import UploadPage from '../features/repository/UploadPage';
 import ExplorerPage from '../features/explorer/ExplorerPage';
 import DependencyGraphPage from '../features/dependencies/DependencyGraphPage';
 import ArchitecturePage from '../features/architecture/ArchitecturePage';
-import DocumentationPage from '../features/documentation/DocumentationPage';
+
 import RepositoryAssistantPage from '../features/assistant/RepositoryAssistantPage';
 import ImpactPage from '../features/engineering/ImpactPage';
 import EngineeringHealthPage from '../features/engineering/EngineeringHealthPage';
@@ -27,7 +27,7 @@ export default function App() {
             <Route path="source" element={<ExplorerPage />} />
             <Route path="graph" element={<DependencyGraphPage />} />
             <Route path="architecture" element={<ArchitecturePage />} />
-            <Route path="documentation" element={<DocumentationPage />} />
+
             <Route path="assistant" element={<RepositoryAssistantPage />} />
             <Route path="impact" element={<ImpactPage />} />
             <Route path="health" element={<EngineeringHealthPage />} />

@@ -104,6 +104,13 @@ function classifySpecifier(specifier, isCpp = false, isJava = false, isPython = 
  * }
  */
 function resolveImport({ importingFile, specifier, knownFiles, type }) {
+  // Strip Vite/Webpack query params and hashes (e.g., "?worker", "?url") for resolution
+  let cleanSpecifier = specifier;
+  const qIndex = cleanSpecifier.indexOf('?');
+  if (qIndex !== -1) cleanSpecifier = cleanSpecifier.substring(0, qIndex);
+  const hIndex = cleanSpecifier.indexOf('#');
+  if (hIndex !== -1) cleanSpecifier = cleanSpecifier.substring(0, hIndex);
+
   const ext = path.posix.extname(importingFile).toLowerCase();
   const isPython = ext === '.py';
   const isJava   = ext === '.java' || ext === '.kt' || ext === '.kts';
@@ -114,7 +121,7 @@ function resolveImport({ importingFile, specifier, knownFiles, type }) {
     return { specifier, kind: 'external', resolvedTo: null, reason: null };
   }
 
-  const kind = classifySpecifier(specifier, isCpp, isJava, isPython);
+  const kind = classifySpecifier(cleanSpecifier, isCpp, isJava, isPython);
 
   if (kind === 'external' && !isPython && !isJava && !isCpp) {
     return { specifier, kind: 'external', resolvedTo: null, reason: null };
@@ -124,7 +131,7 @@ function resolveImport({ importingFile, specifier, knownFiles, type }) {
   const importDir = path.posix.dirname(importingFile);
 
   if (!isPython && !isJava && !isCpp && kind === 'alias') {
-    const stripped = specifier.replace(/^[@~]\//, '');
+    const stripped = specifier.replace(/^[@~]\/?/, '');
     baseCandidates.push(normalisePath(stripped));
     baseCandidates.push(normalisePath(path.posix.join('src', stripped)));
     baseCandidates.push(normalisePath(path.posix.join('lib', stripped)));
@@ -133,7 +140,7 @@ function resolveImport({ importingFile, specifier, knownFiles, type }) {
     // If it's relative like `.foo`, it means sibling. `..foo` means parent.
     // Actually, `from . import foo` gives specifier `.` or `.foo`.
     // Tree-sitter might give `foo.bar`.
-    let pyPath = specifier;
+    let pyPath = cleanSpecifier;
     if (pyPath.startsWith('.')) {
       // Relative import
       pyPath = pyPath.replace(/^\.+/, (match) => {
@@ -149,7 +156,7 @@ function resolveImport({ importingFile, specifier, knownFiles, type }) {
   } else if (isJava) {
     // Java/Kotlin: convert dotted import `com.example.Foo` → `com/example/Foo`
     // Then find any known file whose path *ends with* that suffix (handles deep src layouts)
-    let javaPath = specifier.replace(/\./g, '/');
+    let javaPath = cleanSpecifier.replace(/\./g, '/');
 
     // Strip wildcard imports: `com.example.*` → `com/example`
     const isWildcard = javaPath.endsWith('/*');
@@ -185,10 +192,10 @@ function resolveImport({ importingFile, specifier, knownFiles, type }) {
     // Not found internally — it's an external package (Android SDK, stdlib, etc.)
     return { specifier, kind: 'external', resolvedTo: null, reason: null };
   } else if (isCpp) {
-    baseCandidates.push(normalisePath(path.posix.join(importDir, specifier)));
+    baseCandidates.push(normalisePath(path.posix.join(importDir, cleanSpecifier)));
   } else {
     // JS/TS relative imports (./foo, ../bar, etc.)
-    baseCandidates.push(normalisePath(path.posix.join(importDir, specifier)));
+    baseCandidates.push(normalisePath(path.posix.join(importDir, cleanSpecifier)));
   }
 
   // Step 3 & 4 — probing candidates
@@ -234,6 +241,11 @@ function resolveImport({ importingFile, specifier, knownFiles, type }) {
   }
 
   // Step 5 — unresolved
+  // If an alias starting with '@' couldn't be resolved internally, it's likely a scoped npm package (e.g., @mui/material)
+  if (kind === 'alias' && specifier.startsWith('@')) {
+    return { specifier, kind: 'external', resolvedTo: null, reason: null };
+  }
+
   return {
     specifier,
     kind: 'unresolved',

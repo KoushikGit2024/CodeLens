@@ -48,6 +48,11 @@ export const repositoryApi = {
     return cachedGet(`/repository/${id}`);
   },
 
+  /** Batch manage repositories (delete or clear analysis) */
+  batchManage(ids, action) {
+    return api.post('/repository/batch', { ids, action });
+  },
+
   /** Get file tree */
   listFiles(id) {
     return cachedGet(`/repository/${id}/files`);
@@ -69,27 +74,34 @@ export const repositoryApi = {
   },
 
   /** Get repository architecture */
-  getArchitecture(id) {
-    return cachedGet(`/repository/${id}/architecture`);
+  getArchitecture(id, options = {}) {
+    const params = {};
+    if (options.generateAi) params.ai = 'true';
+    return cachedGet(`/repository/${id}/architecture`, { params });
   },
 
   // Documentation
-  getOverviewDocumentation: (id) =>
-    cachedGet(`/repository/${id}/documentation/overview`),
-  getModuleDocumentation: (id, path) =>
-    cachedGet(`/repository/${id}/documentation/file`, { params: { path } }),
+  getOverviewDocumentation: (id, options = {}) => {
+    const params = {};
+    if (options.generateAi) params.ai = 'true';
+    return cachedGet(`/repository/${id}/documentation/overview`, { params });
+  },
+  getModuleDocumentation: (id, path, options = {}) => {
+    const params = { path };
+    if (options.generateAi) params.ai = 'true';
+    return cachedGet(`/repository/${id}/documentation/file`, { params });
+  },
 
   // AI Repository Intelligence (Step 8)
   askQuestion: (id, question, activeContext) => {
     return api.post(`/repository/${id}/question`, { question, activeContext });
   },
 
-  /** Save chat history to the repository */
-  saveChatHistory(id, chatId, history) {
-    return api.put(`/repository/${id}/chat/${chatId}`, { history });
-  },
 
   // CI / Incremental Analysis
+  analyze: (id) => {
+    return api.post(`/repository/${id}/analyze`, { mode: 'full' });
+  },
   analyzeIncremental: (id) => {
     return api.post(`/repository/${id}/analyze`, { mode: 'incremental' });
   },

@@ -7,7 +7,6 @@ const ROUTE_LABELS = {
   'source': 'Source Explorer',
   'architecture': 'Architecture',
   'graph': 'Dependencies',
-  'documentation': 'Documentation',
   'health': 'Engineering Health',
   'refactoring': 'Refactoring',
   'impact': 'Change Impact',

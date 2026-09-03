@@ -13,10 +13,10 @@ async function getIntelligence(req, res, next) {
   try {
     const record = repositoryStore.get(req.params.id);
     
-    if (record && record.status === 'analyzing') {
+    if (record && (record.status === 'analyzing' || record.status === 'pending')) {
       return res.status(202).json({ 
-        status: 'analyzing', 
-        phase: record.phase,
+        status: record.status, 
+        phase: record.phase || 'pending',
         phaseDetails: record.phaseDetails
       });
     }
@@ -24,6 +24,13 @@ async function getIntelligence(req, res, next) {
     if (!record) {
       return res.status(404).json({ error: 'Repository not found' });
     }
+    if (record.status === 'error') {
+       return res.status(500).json({ 
+          error: record.error || 'Repository analysis failed due to an internal error',
+          status: 'error' 
+       });
+    }
+
     if (record.status !== 'ready' || !record.analysis) {
        return res.status(503).json({ 
           error: 'Analysis not ready',

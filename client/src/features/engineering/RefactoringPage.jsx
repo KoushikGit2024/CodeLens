@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   ChevronLeft, AlertTriangle, Layers, GitBranch, 
-  Database, Brain, Activity, File, Loader2, ArrowRight, CheckCircle, LayoutDashboard, Sparkles
+  Database, Brain, Activity, File, Loader2, ArrowRight, CheckCircle, LayoutDashboard, Sparkles, Wrench
 } from 'lucide-react';
 import { DiffEditor } from '@monaco-editor/react';
 import { ResizableLayout } from '../../shared/components/ResizableLayout';
@@ -72,6 +72,9 @@ export default function RefactoringPage() {
           defaultSize: 20,
           minWidth: 200,
           collapsible: true,
+          collapseDirection: 'left',
+          title: 'Candidates',
+          icon: <Wrench />,
           content: (
             <aside className="flex-1 overflow-y-auto p-3 flex flex-col gap-2 custom-scrollbar bg-panel h-full">
               <p className="text-xs text-muted uppercase tracking-wider mb-2 px-1">Candidates by Priority</p>
@@ -96,8 +99,8 @@ export default function RefactoringPage() {
                     </span>
                     <span className="text-[10px] text-muted font-mono">Score {c.priorityScore}</span>
                   </div>
-                  <h3 className="text-sm font-medium text-white/90 truncate leading-snug" title={c.title}>{c.title}</h3>
-                  <p className="text-[11px] text-muted mt-1 truncate" title={c.type}>{c.type}</p>
+                  <h3 className="text-sm font-medium text-white/90 break-words leading-snug" title={c.title}>{c.title}</h3>
+                  <p className="text-[11px] text-muted mt-1 break-words" title={c.type}>{c.type}</p>
                 </button>
               ))}
               {(!intel?.candidates || intel.candidates.length === 0) && (
@@ -129,6 +132,9 @@ export default function RefactoringPage() {
           defaultSize: 30,
           minWidth: 250,
           collapsible: true,
+          collapseDirection: 'right',
+          title: 'Advisor',
+          icon: <Sparkles />,
           content: (
             <aside className="flex-1 overflow-y-auto custom-scrollbar flex flex-col bg-panel h-full">
               {selectedCandidate && (
@@ -332,23 +338,26 @@ function CandidateDetail({ candidate, repoId }) {
 
 function AiAdvisor({ candidate, repoId }) {
   const [insights, setInsights] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      setInsights(null);
-      try {
-        const data = await getRefactoringInsights(repoId, candidate.id);
-        setInsights(data);
-      } catch (err) {
-        setInsights({ error: err?.response?.data?.error || err.message });
-      } finally {
-        setLoading(false);
-      }
+  const loadInsights = async () => {
+    setLoading(true);
+    setInsights(null);
+    try {
+      const data = await getRefactoringInsights(repoId, candidate.id);
+      setInsights(data);
+    } catch (err) {
+      setInsights({ error: err?.response?.data?.error || err.message });
+    } finally {
+      setLoading(false);
     }
-    load();
-  }, [repoId, candidate.id]);
+  };
+
+  // Reset insights when candidate changes
+  useEffect(() => {
+    setInsights(null);
+    setLoading(false);
+  }, [candidate.id]);
 
   return (
     <div className="flex flex-col h-full bg-[#1e1e2e]/40">
@@ -358,6 +367,18 @@ function AiAdvisor({ candidate, repoId }) {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        {!insights && !loading && (
+          <div className="flex flex-col items-center justify-center h-40 gap-3 text-center">
+            <p className="text-sm text-muted">Generate a customized AI refactoring strategy for this candidate.</p>
+            <button 
+              onClick={loadInsights}
+              className="px-4 py-2 bg-accent/20 text-accent hover:bg-accent/30 rounded transition-colors"
+            >
+              Generate AI Strategy
+            </button>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex flex-col items-center justify-center h-40 gap-3 text-muted">
             <Loader2 className="w-6 h-6 text-[#cba6f7] animate-spin" />

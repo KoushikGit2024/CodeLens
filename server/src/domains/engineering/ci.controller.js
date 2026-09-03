@@ -32,7 +32,12 @@ async function analyze(req, res, next) {
     repositoryStore.update(record.id, { status: 'analyzing' });
 
     // Perform analysis
-    const newAnalysis = await analyzeRepository(record.extractPath, previousAnalysis);
+    const newAnalysis = await analyzeRepository(
+      record.extractPath, 
+      previousAnalysis,
+      (phase, details) => repositoryStore.update(record.id, { phase, phaseDetails: details }),
+      { ignorePatterns: record.ignorePatterns || [] }
+    );
 
     if (newAnalysis.status === 'error') {
       repositoryStore.update(record.id, { status: 'error', error: newAnalysis.error });

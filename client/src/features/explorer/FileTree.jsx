@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronRight, Folder, FolderOpen, FileCode } from 'lucide-react';
 
 // Maps file extensions to a colour class for the file icon
@@ -37,7 +37,14 @@ function FileTreeNode({ node, depth, selectedPath, onSelectFile }) {
   // Auto-collapse only at depth > 1 so top-level folders start open
   const [open, setOpen] = useState(depth < 1);
   const isSelected = node.path === selectedPath;
+  const isAncestor = selectedPath?.startsWith(node.path + '/');
   const indentPx = depth * 14;
+
+  useEffect(() => {
+    if (isAncestor) {
+      setOpen(true);
+    }
+  }, [isAncestor]);
 
   if (node.type === 'directory') {
     const hasChildren = node.children?.length > 0;
@@ -46,7 +53,7 @@ function FileTreeNode({ node, depth, selectedPath, onSelectFile }) {
         <button
           onClick={() => setOpen((o) => !o)}
           style={{ paddingLeft: `${indentPx + 4}px` }}
-          className="w-full text-left flex items-center gap-1.5 py-[3px] pr-2 rounded text-xs group text-white/60 hover:text-white hover:bg-white/5 transition-colors"
+          className="min-w-max text-left flex items-center gap-1.5 py-[3px] pr-2 rounded text-xs group text-white/60 hover:text-white hover:bg-white/5 transition-colors"
           title={node.name}
         >
           {/* chevron */}
@@ -64,8 +71,8 @@ function FileTreeNode({ node, depth, selectedPath, onSelectFile }) {
               : <Folder className="w-3.5 h-3.5 text-yellow-400/60" />
             }
           </span>
-          {/* label — truncate with ellipsis */}
-          <span className="truncate min-w-0 font-medium" title={node.name}>{node.name}</span>
+          {/* label — no truncation, allow scroll */}
+          <span className="whitespace-nowrap min-w-0 font-medium" title={node.name}>{node.name}</span>
           {/* child count badge */}
           {hasChildren && (
             <span className="ml-auto shrink-0 text-[9px] text-white/20 group-hover:text-white/40 tabular-nums">
@@ -102,7 +109,7 @@ function FileTreeNode({ node, depth, selectedPath, onSelectFile }) {
       <button
         onClick={() => onSelectFile(node.path)}
         style={{ paddingLeft: `${indentPx + 4}px` }}
-        className={`w-full text-left flex items-center gap-1.5 py-[3px] pr-2 rounded text-xs transition-colors group ${
+        className={`min-w-max text-left flex items-center gap-1.5 py-[3px] pr-2 rounded text-xs transition-colors group ${
           isSelected
             ? 'text-white bg-accent/15 border-l-2 border-accent'
             : 'text-white/60 hover:text-white hover:bg-white/5 border-l-2 border-transparent'
@@ -116,8 +123,8 @@ function FileTreeNode({ node, depth, selectedPath, onSelectFile }) {
           className="w-3.5 h-3.5 shrink-0"
           style={{ color: isSelected ? iconColor : iconColor + 'aa' }}
         />
-        {/* filename — truncate with ellipsis, tooltip shows full path */}
-        <span className={`truncate min-w-0 font-mono text-[11px] ${
+        {/* filename — no truncation, allow scroll */}
+        <span className={`whitespace-nowrap min-w-0 font-mono text-[11px] ${
           isSelected ? 'text-white font-medium' : 'group-hover:text-white'
         }`}>
           {node.name}

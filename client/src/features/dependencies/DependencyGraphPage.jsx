@@ -30,9 +30,10 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
-import { ChevronLeft, Loader2, AlertCircle, Database, Package, File, RefreshCw, X, ExternalLink, GitBranch, Layers, Zap, LayoutGrid } from 'lucide-react';
+import { ChevronLeft, Loader2, AlertCircle, Database, Package, File, RefreshCw, X, ExternalLink, GitBranch, Layers, Zap, LayoutGrid, Filter, Info } from 'lucide-react';
 import { repositoryApi } from '../../shared/api';
 import { ResizableLayout } from '../../shared/components/ResizableLayout';
+import ContextBreadcrumbs from '../../shared/components/ContextBreadcrumbs';
 import dagre from 'dagre';
 import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide } from 'd3-force';
 
@@ -492,6 +493,15 @@ export default function DependencyGraphPage() {
 
   useEffect(() => { loadGraph(); }, [loadGraph]);
 
+  // Poll if analyzing
+  useEffect(() => {
+    let timer;
+    if (graph?.status === 'analyzing') {
+      timer = setTimeout(() => loadGraph(), 2000);
+    }
+    return () => clearTimeout(timer);
+  }, [graph, loadGraph]);
+
   // Rebuild when graph/settings change
   useEffect(() => {
     if (!graph) return;
@@ -630,7 +640,7 @@ export default function DependencyGraphPage() {
 
   // Stats
   const stats = useMemo(() => {
-    if (!graph) return null;
+    if (!graph || graph.status === 'analyzing' || !graph.meta) return null;
     return {
       files:      graph.meta.totalFiles,
       packages:   graph.meta.totalPackages,
@@ -641,7 +651,7 @@ export default function DependencyGraphPage() {
     };
   }, [graph]);
 
-  if (loading) {
+  if (loading && !graph) {
     return (
       <div className="min-h-screen flex items-center justify-center gap-3">
         <Loader2 className="w-5 h-5 text-accent animate-spin" />
@@ -651,13 +661,35 @@ export default function DependencyGraphPage() {
   }
 
   if (error) {
+    const isNotReady = error.toLowerCase().includes('not ready') || error.toLowerCase().includes('pending');
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-6 h-6 text-danger mx-auto mb-3" />
           <p className="text-danger mb-4 text-sm">{error}</p>
-          <button onClick={() => navigate(-1)} className="text-sm text-accent hover:underline">← Go back</button>
+          {isNotReady ? (
+            <button 
+              onClick={async () => {
+                await repositoryApi.analyze(repoId);
+                window.location.reload();
+              }}
+              className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              Start Analysis
+            </button>
+          ) : (
+            <button onClick={() => navigate(-1)} className="text-sm text-accent hover:underline">← Go back</button>
+          )}
         </div>
+      </div>
+    );
+  }
+
+  if (graph?.status === 'analyzing') {
+    return (
+      <div className="min-h-screen flex items-center justify-center gap-3">
+        <Loader2 className="w-5 h-5 text-accent animate-spin" />
+        <span className="text-muted text-sm">Analysis in progress. Please wait…</span>
       </div>
     );
   }
@@ -670,6 +702,9 @@ export default function DependencyGraphPage() {
           defaultSize: 14,
           minWidth: 170,
           collapsible: true,
+          collapseDirection: 'left',
+          title: 'Filters',
+          icon: <Filter />,
           content: (
             <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-4 custom-scrollbar bg-panel h-full text-xs">
 
@@ -786,6 +821,11 @@ export default function DependencyGraphPage() {
           collapsible: false,
           content: (
             <div className="relative bg-[#0d1117] flex flex-col h-full w-full">
+              <ContextBreadcrumbs 
+                domain="Dependency Graph" 
+                activeNode={selected} 
+                onClear={() => setSelected(null)} 
+              />
               {nodes.length === 0 ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
                   <Database className="w-12 h-12 text-muted" />
@@ -826,18 +866,7 @@ export default function DependencyGraphPage() {
                     maskColor="rgba(13,17,23,0.85)"
                     style={{ background: '#161b22', border: '1px solid #30363d' }}
                   />
-
-                  {/* Focus-mode hint */}
-                  {selected && (
-                    <Panel position="top-center">
-                      <div className="flex items-center gap-2 bg-panel border border-border rounded-full px-3 py-1.5 text-xs text-muted shadow-lg">
-                        <span>Focus mode — showing connections for <span className="text-white">{selected.replace('file:', '').split('/').pop()}</span></span>
-                        <button onClick={onPaneClick} className="text-muted hover:text-white ml-1">
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </Panel>
-                  )}
+                  
                 </ReactFlow>
               )}
             </div>
@@ -848,6 +877,9 @@ export default function DependencyGraphPage() {
           defaultSize: 26,
           minWidth: 200,
           collapsible: true,
+          collapseDirection: 'right',
+          title: 'Details',
+          icon: <Info />,
           content: (
             <div className="flex-1 overflow-y-auto p-3 custom-scrollbar bg-panel h-full text-xs">
               {!selected && (
@@ -896,7 +928,7 @@ function FileDetailPanel({ info, repoId }) {
     <div className="flex flex-col gap-3">
       <div>
         <p className="text-muted uppercase tracking-wider mb-1">File</p>
-        <p className="text-white font-mono break-all mb-2 text-[11px]">{info.filePath}</p>
+        <p className="text-white font-mono whitespace-nowrap overflow-x-auto custom-scrollbar pb-1 mb-1 text-[11px]">{info.filePath}</p>
         <Link
           to={`/explore/${repoId}/source?path=${encodeURIComponent(info.filePath)}`}
           className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-accent/10 border border-accent/40 rounded text-accent hover:bg-accent/20 transition-colors"

@@ -30,10 +30,12 @@ async function getOverviewDocumentation(req, res, next) {
       return res.json(cache.overview);
     }
 
+    const generateAi = req.query.ai === 'true';
+
     const graph = buildDependencyGraph(record.analysis);
     const architectureModel = buildArchitectureModel(record.analysis, graph);
 
-    const docs = await generateOverviewDocs(record.analysis, graph, architectureModel);
+    const docs = await generateOverviewDocs(record.analysis, graph, architectureModel, generateAi);
     cache.overview = docs; // save to cache
 
     return res.json(docs);
@@ -64,18 +66,28 @@ async function getModuleDocumentation(req, res, next) {
       });
     }
 
+    const generateAi = req.query.ai === 'true';
+
     const cache = getRepoCache(req.params.id);
     if (cache.modules[requestedPath]) {
-      return res.json(cache.modules[requestedPath]);
+      // If we already have the AI interpretation, or we don't need it, return cache
+      if (cache.modules[requestedPath].aiInterpretation || !generateAi) {
+        return res.json(cache.modules[requestedPath]);
+      }
     }
 
     const graph = buildDependencyGraph(record.analysis);
     const architectureModel = buildArchitectureModel(record.analysis, graph);
 
-    const docs = await generateModuleDocs(record.analysis, graph, architectureModel, requestedPath);
-    cache.modules[requestedPath] = docs; // save to cache
+    const docs = await generateModuleDocs(record.analysis, graph, architectureModel, requestedPath, generateAi);
+    
+    if (!cache.modules[requestedPath]) {
+       cache.modules[requestedPath] = docs;
+    } else if (generateAi && docs.aiInterpretation) {
+       cache.modules[requestedPath].aiInterpretation = docs.aiInterpretation;
+    }
 
-    return res.json(docs);
+    return res.json(cache.modules[requestedPath]);
   } catch (err) {
     next(err);
   }

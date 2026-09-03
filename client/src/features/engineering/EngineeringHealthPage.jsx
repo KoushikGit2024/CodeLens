@@ -24,17 +24,6 @@ const EngineeringHealthPage = () => {
       setLoading(true);
       const riskData = await getEngineeringRisks(repoId);
       setModel(riskData);
-      
-      // Fetch insights in parallel but don't block the main UI on it
-      setLoadingInsights(true);
-      getEngineeringInsights(repoId)
-        .then(setInsights)
-        .catch(err => {
-          console.error("Failed to load insights", err);
-          // Fails silently, deterministic UI still works
-        })
-        .finally(() => setLoadingInsights(false));
-
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     } finally {
@@ -132,9 +121,27 @@ const EngineeringHealthPage = () => {
         </div>
       )}
 
+      {!insights && !loadingInsights && (
+        <div className="mb-8 rounded-lg border border-blue-500/30 bg-blue-500/5 p-6 flex flex-col items-center justify-center gap-3">
+          <p className="text-gray-400">Generate an AI interpretation of your engineering health metrics.</p>
+          <button 
+            onClick={() => {
+              setLoadingInsights(true);
+              getEngineeringInsights(repoId)
+                .then(setInsights)
+                .catch(err => console.error(err))
+                .finally(() => setLoadingInsights(false));
+            }}
+            className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded hover:bg-blue-500/30 transition-colors"
+          >
+            Generate AI Interpretation
+          </button>
+        </div>
+      )}
+
       {loadingInsights && !insights && (
-        <div className="mb-8 flex items-center gap-3 text-blue-400 text-sm">
-          <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+        <div className="mb-8 flex flex-col items-center gap-3 text-blue-400 text-sm p-6 border border-blue-500/10 rounded-lg">
+          <Loader2 className="h-6 w-6 animate-spin" />
           Generating AI interpretations...
         </div>
       )}

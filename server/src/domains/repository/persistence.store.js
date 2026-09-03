@@ -80,32 +80,12 @@ function saveAnalysis(id, analysis) {
 }
 
 /**
- * Persist the chats object for a repo.
- */
-function saveChats(id, chats) {
-  try {
-    const dir = path.join(DATA_DIR, id);
-    ensureDir(dir);
-    fs.writeFileSync(
-      path.join(dir, 'chats.json'),
-      JSON.stringify(chats, null, 2),
-      'utf8'
-    );
-  } catch (err) {
-    console.error('[persistenceStore] Failed to write chats.json:', err.message);
-  }
-}
-
-/**
- * Persist a full record (meta + analysis if present + chats if present).
+ * Persist a full record (meta + analysis if present).
  */
 function save(record) {
   saveMeta(record);
   if (record.analysis) {
     saveAnalysis(record.id, record.analysis);
-  }
-  if (record.chats) {
-    saveChats(record.id, record.chats);
   }
 }
 
@@ -154,25 +134,9 @@ function load(id) {
   }
 }
 
-/**
- * Load chats from disk. Returns empty object if missing.
- */
-function loadChats(id) {
-  try {
-    const dir = path.join(DATA_DIR, id);
-    const chatsPath = path.join(dir, 'chats.json');
-    if (!fs.existsSync(chatsPath)) return {};
-    
-    const content = fs.readFileSync(chatsPath, 'utf8');
-    return JSON.parse(content);
-  } catch (err) {
-    console.error(`[persistenceStore] Failed to load chats for ${id}:`, err.message);
-    return {};
-  }
-}
 
 /**
- * Load all valid repos from disk.  Returns an array of records.
+ * Load all valid repos from disk. Returns an array of records.
  * Called once at server startup.
  */
 function loadAll() {
@@ -195,13 +159,13 @@ function loadAll() {
   }
 }
 
-/**
- * Delete a repo's data directory from disk.
- */
 function remove(id) {
   try {
     const dir = path.join(DATA_DIR, id);
-    if (fs.existsSync(dir)) {
+    const pChats = path.join(dir, 'chats.json');
+  if (fs.existsSync(pChats)) fs.unlinkSync(pChats);
+
+  if (fs.existsSync(dir)) {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   } catch (err) {
@@ -209,4 +173,18 @@ function remove(id) {
   }
 }
 
-module.exports = { save, saveMeta, saveAnalysis, saveChats, load, loadChats, loadAll, remove, getExtractPath, DATA_DIR };
+/**
+ * Delete only the analysis data for a repo, allowing re-analysis.
+ */
+function removeAnalysis(id) {
+  try {
+    const p = path.join(DATA_DIR, id, 'analysis.json');
+    if (fs.existsSync(p)) {
+      fs.unlinkSync(p);
+    }
+  } catch (err) {
+    console.error(`[persistenceStore] Failed to remove analysis for repo ${id}:`, err.message);
+  }
+}
+
+module.exports = { save, saveMeta, saveAnalysis, load, loadAll, remove, removeAnalysis, getExtractPath, DATA_DIR };

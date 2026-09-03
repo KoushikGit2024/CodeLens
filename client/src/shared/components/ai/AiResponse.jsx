@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import AiMarkdown from './AiMarkdown';
 import AiReference from './AiReference';
-import { AlertCircle, FileText, Settings, ShieldAlert, Sparkles, Lightbulb, ListChecks, Send, Loader2, User } from 'lucide-react';
+import { AlertCircle, FileText, Settings, ShieldAlert, Sparkles, Lightbulb, ListChecks, Send, Loader2, User, Copy, Check } from 'lucide-react';
 import { repositoryApi } from '../../api';
 import { useRepository } from '../../context/RepositoryContext';
 
@@ -16,6 +16,78 @@ import { useRepository } from '../../context/RepositoryContext';
  * - risks / mainRisks / limitations
  * - references (array of strings or objects)
  */
+// ── CopyableListItem ──────────────────────────────────────────────────────────
+function CopyableListItem({ content, className }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  
+  return (
+    <li className={`${className} group/item relative pr-6`}>
+      <AiMarkdown content={content} />
+      <button 
+        onClick={handleCopy}
+        className="absolute top-0 right-0 opacity-0 group-hover/item:opacity-100 transition-opacity text-muted hover:text-white"
+        title="Copy item"
+      >
+        {copied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
+      </button>
+    </li>
+  );
+}
+
+// ── CopyableChatMessage ───────────────────────────────────────────────────────
+function CopyableChatMessage({ msg }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className={`flex gap-3 group/chat ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+      {msg.role === 'assistant' && (
+        <div className="w-6 h-6 rounded bg-accent/20 border border-accent/30 flex items-center justify-center shrink-0 mt-1">
+          <Sparkles className="w-3.5 h-3.5 text-accent" />
+        </div>
+      )}
+      
+      <div className="flex flex-col gap-1 max-w-[85%] w-full">
+        <div className={`text-sm px-4 py-2.5 rounded-lg w-full ${
+          msg.role === 'user' 
+            ? 'bg-panel border border-border text-white' 
+            : 'bg-transparent text-white/90'
+        }`}>
+          {msg.role === 'user' ? (
+            msg.content
+          ) : (
+            <AiMarkdown content={msg.content} />
+          )}
+        </div>
+
+        <button 
+          onClick={handleCopy} 
+          className={`opacity-0 group-hover/chat:opacity-100 text-muted hover:text-white transition-opacity shrink-0 flex items-center gap-1 text-[10px] ${msg.role === 'user' ? 'self-end' : 'self-start'}`} 
+          title="Copy Message"
+        >
+          {copied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+
+      {msg.role === 'user' && (
+        <div className="w-6 h-6 rounded bg-panel border border-border flex items-center justify-center shrink-0 mt-1">
+          <User className="w-3.5 h-3.5 text-muted" />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AiResponse({ data, title = "AI Intelligence", onNavigate, repoId, chatId }) {
   const { repo } = useRepository();
   const [chatHistory, setChatHistory] = useState(() => {
@@ -118,7 +190,9 @@ export default function AiResponse({ data, title = "AI Intelligence", onNavigate
   const recommendations = data.recommendations || data.recommendedActions || data.strategies || [];
   const risks = data.risks || data.mainRisks || data.limitations || [];
   const references = data.references || [];
-
+  useEffect(()=>{
+    console.log(chatHistory);
+  },[chatHistory]);
   return (
     <div className="flex flex-col gap-6">
       {/* ── Summary / Main Content ────────────────────────────────────────── */}
@@ -154,9 +228,7 @@ export default function AiResponse({ data, title = "AI Intelligence", onNavigate
           </h4>
           <ul className="list-disc pl-4 flex flex-col gap-1.5">
             {facts.map((fact, i) => (
-              <li key={i} className="text-xs text-white/80 leading-relaxed">
-                <AiMarkdown content={fact} />
-              </li>
+              <CopyableListItem key={i} content={fact} className="text-xs text-white/80 leading-relaxed" />
             ))}
           </ul>
         </section>
@@ -171,9 +243,7 @@ export default function AiResponse({ data, title = "AI Intelligence", onNavigate
           </h4>
           <ul className="list-disc pl-4 flex flex-col gap-1.5">
             {inferences.map((inf, i) => (
-              <li key={i} className="text-xs text-white/80 leading-relaxed">
-                <AiMarkdown content={inf} />
-              </li>
+              <CopyableListItem key={i} content={inf} className="text-xs text-white/80 leading-relaxed" />
             ))}
           </ul>
         </section>
@@ -188,9 +258,7 @@ export default function AiResponse({ data, title = "AI Intelligence", onNavigate
           </h4>
           <ul className="list-disc pl-4 flex flex-col gap-1.5">
             {risks.map((risk, i) => (
-              <li key={i} className="text-xs text-danger/90 leading-relaxed">
-                <AiMarkdown content={risk} />
-              </li>
+              <CopyableListItem key={i} content={risk} className="text-xs text-danger/90 leading-relaxed" />
             ))}
           </ul>
         </section>
@@ -205,9 +273,7 @@ export default function AiResponse({ data, title = "AI Intelligence", onNavigate
           </h4>
           <ul className="list-disc pl-4 flex flex-col gap-1.5">
             {recommendations.map((rec, i) => (
-              <li key={i} className="text-xs text-success/90 leading-relaxed">
-                <AiMarkdown content={rec} />
-              </li>
+              <CopyableListItem key={i} content={rec} className="text-xs text-success/90 leading-relaxed" />
             ))}
           </ul>
         </section>
@@ -236,29 +302,7 @@ export default function AiResponse({ data, title = "AI Intelligence", onNavigate
           {chatHistory.length > 0 && (
             <div className="flex flex-col gap-4 mb-2">
               {chatHistory.map((msg, idx) => (
-                <div key={idx} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  {msg.role === 'assistant' && (
-                    <div className="w-6 h-6 rounded bg-accent/20 border border-accent/30 flex items-center justify-center shrink-0 mt-1">
-                      <Sparkles className="w-3.5 h-3.5 text-accent" />
-                    </div>
-                  )}
-                  <div className={`text-sm px-4 py-2.5 rounded-lg max-w-[85%] ${
-                    msg.role === 'user' 
-                      ? 'bg-panel border border-border text-white' 
-                      : 'bg-transparent text-white/90'
-                  }`}>
-                    {msg.role === 'user' ? (
-                      msg.content
-                    ) : (
-                      <AiMarkdown content={msg.content} />
-                    )}
-                  </div>
-                  {msg.role === 'user' && (
-                    <div className="w-6 h-6 rounded bg-panel border border-border flex items-center justify-center shrink-0 mt-1">
-                      <User className="w-3.5 h-3.5 text-muted" />
-                    </div>
-                  )}
-                </div>
+                <CopyableChatMessage key={idx} msg={msg} />
               ))}
               <div ref={chatEndRef} />
             </div>
