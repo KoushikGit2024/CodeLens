@@ -165,10 +165,24 @@ export const repositoryApi = {
   async getFile(id, filePath) {
     const content = await persistenceStore.loadFile(id, filePath);
     if (content === null) throw new Error('File not found');
-    
-    // Depending on usage, sometimes the backend served raw strings, sometimes binary.
-    // For now we return raw content wrapped in data.
-    return { data: content };
+
+    // Derive language from file extension so the Monaco editor gets the right
+    // syntax highlighter. This mirrors what the server-side getFile endpoint
+    // returned as the `language` field that ExplorerPage destructures.
+    const ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase();
+    const EXT_TO_LANG = {
+      '.js': 'javascript', '.mjs': 'javascript', '.cjs': 'javascript', '.jsx': 'javascript',
+      '.ts': 'typescript', '.tsx': 'typescript', '.mts': 'typescript', '.cts': 'typescript',
+      '.py': 'python', '.java': 'java',
+      '.cpp': 'cpp', '.cc': 'cpp', '.cxx': 'cpp', '.h': 'cpp', '.hpp': 'cpp',
+      '.json': 'json', '.md': 'markdown', '.css': 'css',
+      '.html': 'html', '.htm': 'html', '.xml': 'xml',
+      '.yaml': 'yaml', '.yml': 'yaml', '.sh': 'shell', '.env': 'ini',
+    };
+    const language = EXT_TO_LANG[ext] || 'plaintext';
+
+    // ExplorerPage destructures { content, language } from fileRes.value.data
+    return { data: { content, language } };
   },
 
   /** Get full dependency graph */
