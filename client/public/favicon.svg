@@ -1,0 +1,70 @@
+<svg viewBox="-4 -4 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g transform="translate(4 4)">
+    <!-- Outer C / analytical arc -->
+    <path
+      d="M43 7
+         C34 2.5 23.5 2.8 15.1 7.7
+         C5.8 13.1 0 23.1 0 32
+         C0 40.9 5.8 50.9 15.1 56.3
+         C23.5 61.2 34 61.5 43 57"
+      stroke="#6366f1"
+      stroke-width="5"
+      stroke-linecap="round"
+    />
+
+    <!-- Lens -->
+    <circle
+      cx="29"
+      cy="32"
+      r="17"
+      stroke="#e2e8f0"
+      stroke-width="3.5"
+    />
+
+    <!-- Lens handle -->
+    <path
+      d="M42 45L53 56"
+      stroke="#e2e8f0"
+      stroke-width="4"
+      stroke-linecap="round"
+    />
+
+    <!-- Code brackets -->
+    <path
+      d="M22 25L17 32L22 39"
+      stroke="#6366f1"
+      stroke-width="2.5"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <path
+      d="M36 25L41 32L36 39"
+      stroke="#6366f1"
+      stroke-width="2.5"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+
+    <!-- Code slash -->
+    <path
+      d="M32 23L27 41"
+      stroke="#60a5fa"
+      stroke-width="2.5"
+      stroke-linecap="round"
+    />
+    
+    <!-- Subtle Analysis lines inside lens -->
+    <path
+      d="M21 44H37"
+      stroke="#475569"
+      stroke-width="1.5"
+      stroke-linecap="round"
+    />
+    <path
+      d="M21 48H32"
+      stroke="#475569"
+      stroke-width="1.5"
+      stroke-linecap="round"
+    />
+  </g>
+</svg>

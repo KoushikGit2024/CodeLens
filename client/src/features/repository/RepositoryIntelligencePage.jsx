@@ -9,12 +9,14 @@ import {
 import AIStatusIndicator from '../assistant/AIStatusIndicator';
 import { useAIState } from '../../shared/context/AIContext';
 import { useRepository } from '../../shared/context/RepositoryContext';
+import { useToast } from '../../shared/context/ToastContext';
 import AnalysisProgress from './AnalysisProgress';
 
 export default function RepositoryIntelligencePage() {
   const { repoId } = useParams();
   const { repo, loading: repoLoading, error: repoError } = useRepository();
   const navigate = useNavigate();
+  const { addToast } = useToast();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -27,18 +29,25 @@ export default function RepositoryIntelligencePage() {
   const [aiData, setAiData] = useState(null);
   const { aiState, reportAiError } = useAIState();
 
-  const loadIntelligence = async () => {
-    if (!data) setLoading(true);
+  const loadIntelligence = async (wasAnalyzing = false) => {
     setError(null);
+    setLoading(true);
     try {
       const res = await repositoryApi.getIntelligence(repoId);
       if (res.status === 202) {
         setCurrentPhase(res.data.phase || 'scanning_files');
         setPhaseDetails(res.data.phaseDetails || null);
-        setTimeout(loadIntelligence, 1000);
+        setTimeout(() => loadIntelligence(true), 1000);
       } else {
         setData(res.data);
-        setLoading(false);
+        if (wasAnalyzing) {
+          setCurrentPhase('ready');
+          setTimeout(() => {
+            setLoading(false);
+          }, 1500);
+        } else {
+          setLoading(false);
+        }
       }
     } catch (err) {
       setError(err?.response?.data?.error || err.message);
@@ -50,37 +59,47 @@ export default function RepositoryIntelligencePage() {
     loadIntelligence();
   }, [repoId]);
 
+  // Reload data seamlessly when the background analysis finishes and becomes ready
+  useEffect(() => {
+    if (repo?.status === 'ready') {
+      loadIntelligence();
+    }
+  }, [repo?.status]);
+
   const handleUnderstandRepository = async () => {
     setAiLoading(true);
     setAiError(null);
     try {
-      const res = await repositoryApi.askQuestion(repoId, "Give me an overview of this repository.");
-      // The answer is expected to be a JSON string since it was generated via generateStructuredResponse
-      // However, wait, the askEndpoint returns { answer, references }
-      let parsed;
-      if (typeof res.data.answer === 'object' && res.data.answer !== null) {
-        parsed = res.data.answer;
-      } else {
-        try {
-          parsed = JSON.parse(res.data.answer);
-        } catch (e) {
-          // Fallback if not valid JSON
-          parsed = { summary: res.data.answer };
-        }
-      }
-      setAiData(parsed);
+      const res = await repositoryApi.getIntelligence(repoId, { generateAi: true });
+      setAiData(res.data.insights);
+      addToast({ title: 'AI Synthesis Complete', description: 'Repository intelligence has been successfully generated.', type: 'success' });
     } catch (err) {
-      setAiError(err?.response?.data?.error || err.message);
+      setAiError(err?.response?.data?.error || err.message || 'Failed to generate AI intelligence.');
+      addToast({ title: 'AI Generation Failed', description: err.message, type: 'error' });
       reportAiError();
     } finally {
       setAiLoading(false);
     }
   };
 
-  if (loading || repoLoading) {
+  if (repo?.status === 'analyzing') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface text-white">
-        <AnalysisProgress currentPhase={currentPhase} phaseDetails={phaseDetails} />
+        <AnalysisProgress 
+          currentPhase={repo?.phase || currentPhase} 
+          phaseDetails={repo?.phaseDetails || phaseDetails} 
+        />
+      </div>
+    );
+  }
+
+  const isInitialLoad = loading && !data;
+
+  if (repoLoading || (isInitialLoad && !error)) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-surface text-white">
+        <Loader2 className="w-8 h-8 text-accent animate-spin mb-4" />
+        <span className="text-sm text-muted">Loading intelligence dashboard...</span>
       </div>
     );
   }
@@ -98,7 +117,8 @@ export default function RepositoryIntelligencePage() {
             <button 
               onClick={async () => {
                 await repositoryApi.analyze(repoId);
-                window.location.reload();
+                await refetchRepo();
+                loadIntelligence(true); // Restart polling with analyzing=true
               }}
               className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors"
             >

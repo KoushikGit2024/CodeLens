@@ -43,6 +43,34 @@ export function RepositoryProvider({ children }) {
     fetchRepo();
   }, [fetchRepo]);
 
+  // Polling mechanism for when the repo is actively analyzing
+  useEffect(() => {
+    let interval;
+    if (repo && repo.status === 'analyzing') {
+      interval = setInterval(async () => {
+        try {
+          const repoRes = await repositoryApi.get(repoId);
+          setRepo(repoRes.data);
+          
+          if (repoRes.data.status === 'ready') {
+            clearInterval(interval);
+            try {
+              const treeRes = await repositoryApi.listFiles(repoId);
+              setFileTree(treeRes.data.tree);
+            } catch (treeErr) {
+              console.warn("Failed to fetch file tree", treeErr);
+            }
+          }
+        } catch (err) {
+          console.warn("Polling error", err);
+        }
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [repo?.status, repoId]);
+
   const value = {
     repoId,
     repo,

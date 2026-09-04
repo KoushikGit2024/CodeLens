@@ -23,3 +23,4 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
+vi.mock("../src/shared/context/ToastContext.jsx", () => ({ useToast: () => ({ addToast: vi.fn() }) }));

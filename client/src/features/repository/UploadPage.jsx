@@ -12,6 +12,7 @@ export default function UploadPage() {
   const [progress, setProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
+  const [isSuccess, setIsSuccess] = useState(false);
   const [ignorePatterns, setIgnorePatterns] = useState('');
   const [recentRepos, setRecentRepos] = useState([]);
   const [hasLoadedRepos, setHasLoadedRepos] = useState(false);
@@ -54,32 +55,13 @@ export default function UploadPage() {
   };
 
   useEffect(() => {
-    // Check if there is a last active repository to show the return button
     const savedRepoId = localStorage.getItem('lastRepoId');
     if (savedRepoId) {
       setLastRepoId(savedRepoId);
     }
     
-    // Preload repositories so the dropdown is ready instantly
     handleLoadRepos();
   }, [navigate]);
-
-  const handleToggleSelect = (id) => {
-    setSelectedRepos(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const handleSelectAll = () => {
-    if (selectedRepos.size === recentRepos.length) {
-      setSelectedRepos(new Set());
-    } else {
-      setSelectedRepos(new Set(recentRepos.map(r => r.id)));
-    }
-  };
 
   const handleBatchAction = async (action) => {
     if (selectedRepos.size === 0) return;
@@ -87,7 +69,6 @@ export default function UploadPage() {
     try {
       await repositoryApi.batchManage(Array.from(selectedRepos), action);
       if (action === 'delete') {
-        // If we deleted the last active repo, clear it
         if (selectedRepos.has(lastRepoId)) {
           localStorage.removeItem('lastRepoId');
           setLastRepoId(null);
@@ -99,6 +80,26 @@ export default function UploadPage() {
       alert(`Failed to perform batch action: ${err.message}`);
     } finally {
       setBatchActionRunning(false);
+    }
+  };
+
+  const handleToggleSelect = (repoId) => {
+    setSelectedRepos(prev => {
+      const next = new Set(prev);
+      if (next.has(repoId)) {
+        next.delete(repoId);
+      } else {
+        next.add(repoId);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedRepos(new Set(recentRepos.map(r => r.id)));
+    } else {
+      setSelectedRepos(new Set());
     }
   };
 
@@ -128,24 +129,28 @@ export default function UploadPage() {
     setUploading(true);
     setError(null);
     setProgress(0);
+    setIsSuccess(false);
     try {
       const { data } = await repositoryApi.upload(file, { ignorePatterns }, (evt) => {
         if (evt.total) setProgress(Math.round((evt.loaded / evt.total) * 100));
       });
+      setIsSuccess(true);
+      setProgress(100);
+      await new Promise(resolve => setTimeout(resolve, 1500));
       navigate(`/explore/${data.id}`);
     } catch (err) {
       setError(err?.response?.data?.error || err.message || 'Upload failed');
     } finally {
       setUploading(false);
+      setIsSuccess(false);
     }
   };
 
   return (
     <div 
-      className="min-h-screen lg:h-screen bg-surface flex flex-col pt-8 pb-4 px-4 md:px-8 font-sans text-white lg:overflow-hidden"
+      className={`min-h-screen lg:h-screen bg-surface flex flex-col pt-8 pb-4 px-4 md:px-8 font-sans text-white lg:overflow-hidden transition-opacity ${uploading ? 'pointer-events-none' : ''}`}
     >
       
-      {/* Header Section */}
       <div className="w-full max-w-7xl mx-auto mb-6 flex flex-col md:flex-row items-center justify-between gap-4 border-b border-border/50 pb-4 shrink-0">
         <div className="flex flex-col items-center md:items-start text-center md:text-left">
           <Logo className="w-12 h-12 mb-2" textClass="text-2xl font-bold tracking-tight text-white" showText={true} />
@@ -155,10 +160,8 @@ export default function UploadPage() {
         </div>
       </div>
 
-      {/* Main Content Area - Split Layout */}
       <div className="w-full max-w-7xl mx-auto flex-1 flex flex-col lg:flex-row gap-8 min-h-0">
         
-        {/* Left Column: Upload Section */}
         <div className="w-full lg:w-[55%] flex flex-col lg:min-h-0">
           <div className="bg-panel border border-border rounded-2xl shadow-sm flex-1 flex flex-col lg:overflow-hidden relative">
             <div 
@@ -202,11 +205,10 @@ export default function UploadPage() {
               />
             </div>
 
-            {/* Selected File Details */}
             {file && !uploading && (
               <div className="mt-3 p-3 bg-surface border border-border rounded-lg flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3 overflow-hidden">
-                  <FileArchiveIcon />
+                  <FileArchiveIcon className="w-4 h-4 text-muted" />
                   <span className="text-sm font-medium truncate" title={file.name}>{file.name}</span>
                 </div>
                 <span className="text-xs text-muted font-mono bg-panel px-2 py-1 rounded border border-border/50 shrink-0">
@@ -215,19 +217,24 @@ export default function UploadPage() {
               </div>
             )}
 
-            {/* Upload Progress */}
-            {uploading && (
-              <div className="mt-3 p-4 bg-surface border border-border rounded-lg shrink-0">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 text-accent animate-spin" />
-                    <span className="text-sm font-medium">Extracting & Analyzing...</span>
-                  </div>
-                  <span className="text-sm font-mono text-muted">{progress}%</span>
+            {(uploading || isSuccess) && (
+              <div className="w-full mt-4 p-4 rounded-xl border border-border/50 bg-[#161b22] flex flex-col gap-3 shadow-xl">
+                <div className="flex justify-between items-center text-white">
+                  <span className="text-sm font-medium flex items-center gap-2">
+                    {isSuccess ? (
+                      <span className="text-success flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                        Extraction Complete!
+                      </span>
+                    ) : (
+                      'Extracting & Analyzing...'
+                    )}
+                  </span>
+                  {!isSuccess && <span className="text-sm font-mono text-muted">{progress}%</span>}
                 </div>
-                <div className="h-1.5 bg-panel rounded-full overflow-hidden border border-border/50">
-                  <div
-                    className="h-full bg-accent transition-all duration-300 ease-out"
+                <div className="w-full bg-panel h-2 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full transition-all duration-300 ease-out ${isSuccess ? 'bg-success' : 'bg-accent'}`}
                     style={{ width: `${progress}%` }}
                   />
                 </div>
@@ -244,12 +251,11 @@ export default function UploadPage() {
 
             {/* Ignore Patterns Input */}
             <div className="mt-4 pt-4 border-t border-border/50 shrink-0">
-              <label className="block text-xs font-medium mb-1.5">
-                Ignore Patterns <span className="text-muted font-normal">(Optional)</span>
-              </label>
+              <label className="block text-sm font-medium text-white mb-1">Additional Ignore Patterns</label>
+              <p className="text-xs text-muted mb-2">Standard directories like .git, node_modules, and dist are ignored automatically. Add any extra comma-separated folders to skip.</p>
               <input
                 type="text"
-                placeholder="e.g. tests, docs, assets"
+                placeholder="e.g. tests, assets, docs"
                 value={ignorePatterns}
                 onChange={(e) => setIgnorePatterns(e.target.value)}
                 disabled={uploading}

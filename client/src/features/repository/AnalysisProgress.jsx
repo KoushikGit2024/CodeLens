@@ -6,7 +6,9 @@ const PHASES = [
   { id: 'extracting', label: 'Extracting files' },
   { id: 'scanning_files', label: 'Detecting languages' },
   { id: 'analyzing_ast', label: 'Parsing source files' },
-  { id: 'finalizing_analysis', label: 'Building dependency graph' },
+  { id: 'finalizing_analysis', label: 'Processing file relations' },
+  { id: 'building_graph', label: 'Building dependency graph' },
+  { id: 'building_architecture', label: 'Building architecture model' },
   { id: 'ready', label: 'Finalizing repository intelligence' }
 ];
 

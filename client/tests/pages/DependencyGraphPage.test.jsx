@@ -3,16 +3,21 @@ import { describe, it, expect, vi } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
 import DependencyGraphPage from '../../src/features/dependencies/DependencyGraphPage';
 import { RepositoryProvider } from '../../src/shared/context/RepositoryContext';
+import { AIProvider } from '../../src/shared/context/AIContext';
 
 vi.mock('../../src/shared/api', () => ({
-  repositoryApi: {}
+  repositoryApi: {
+    getDependencyGraph: vi.fn().mockResolvedValue({ data: { nodes: [], edges: [] } })
+  }
 }));
 
 const renderWithProviders = (component) => {
   return render(
     <BrowserRouter>
       <RepositoryProvider>
-        {component}
+        <AIProvider>
+          {component}
+        </AIProvider>
       </RepositoryProvider>
     </BrowserRouter>
   );
@@ -21,6 +26,7 @@ const renderWithProviders = (component) => {
 describe('DependencyGraphPage', () => {
   it('renders without crashing', () => {
     renderWithProviders(<DependencyGraphPage />);
-    expect(screen.getByText(/Dependencies/i)).toBeInTheDocument();
+    expect(screen.getByText(/Building dependency graph/i)).toBeInTheDocument();
   });
 });
+

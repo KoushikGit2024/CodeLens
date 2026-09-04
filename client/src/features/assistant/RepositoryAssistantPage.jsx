@@ -93,7 +93,7 @@ export default function RepositoryAssistantPage() {
             <button 
               onClick={async () => {
                 await repositoryApi.analyze(repoId);
-                window.location.reload();
+                navigate(`/explore/${repoId}`);
               }}
               className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors"
             >

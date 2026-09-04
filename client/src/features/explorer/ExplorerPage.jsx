@@ -31,6 +31,7 @@ import { FileTree } from './FileTree';
 import AiResponse from '../../shared/components/ai/AiResponse';
 import AiMarkdown from '../../shared/components/ai/AiMarkdown';
 import ModuleDocumentation from './ModuleDocumentation';
+import AnalysisProgress from '../repository/AnalysisProgress';
 
 // ── Monaco language map ───────────────────────────────────────────────────────
 // Maps file extensions to Monaco language IDs.
@@ -91,7 +92,7 @@ const MONACO_OPTIONS = {
 
 export default function ExplorerPage() {
   const { repoId }        = useParams();
-  const { repo, fileTree, loading: repoLoading, error: repoError } = useRepository();
+  const { repo, fileTree, loading: repoLoading, error: repoError, refetchRepo } = useRepository();
   const [reanalyzing, setReanalyzing] = useState(false);
   const navigate          = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -124,7 +125,7 @@ export default function ExplorerPage() {
     setReanalyzing(true);
     try {
       await repositoryApi.analyzeIncremental(repoId);
-      window.location.reload(); // Hard reload to fetch everything again
+      refetchRepo(); // Soft reload to fetch everything again
     } catch (err) {
       console.error(err);
     } finally {
@@ -270,13 +271,27 @@ export default function ExplorerPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   if (repoLoading && !fileTree) {
-    return <div className="p-8 text-white">Loading repository context...</div>;
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-surface text-white">
+        <Loader2 className="w-8 h-8 text-accent animate-spin mb-4" />
+        <span className="text-sm text-muted">Loading repository...</span>
+      </div>
+    );
   }
-  
-  if (repoError) {
+
+  // If repo is reanalyzing after being ready, we can also show progress over the UI
+  if (repo?.status === 'analyzing') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-surface text-white">
+        <AnalysisProgress currentPhase={repo.phase} phaseDetails={repo.phaseDetails} />
+      </div>
+    );
+  }
+  if (repoError || repo?.status === 'error') {
+    const displayError = repoError || repo?.error || 'Unknown analysis error';
     return (
       <div className="p-8 text-red-400 flex flex-col items-start gap-4">
-        <div>Error loading repository: {repoError}</div>
+        <div>Error loading repository: {displayError}</div>
         <button 
           onClick={handleIncrementalAnalyze}
           disabled={reanalyzing}

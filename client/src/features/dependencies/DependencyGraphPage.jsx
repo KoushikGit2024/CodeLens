@@ -115,6 +115,18 @@ const CustomNode = ({ data }) => {
         )}
       </div>
       <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} isConnectable={false} />
+      {data.isCycling && (
+        <div 
+          style={{ position: 'absolute', top: -3, right: -3, width: 10, height: 10, borderRadius: '50%', background: '#ff7b72', boxShadow: '0 0 0 2px #161b22' }} 
+          title="Involved in Cycle" 
+        />
+      )}
+      {!data.isCycling && data.isIsolated && (
+        <div 
+          style={{ position: 'absolute', top: -3, right: -3, width: 10, height: 10, borderRadius: '50%', background: '#8b949e', boxShadow: '0 0 0 2px #161b22' }} 
+          title="Isolated File" 
+        />
+      )}
     </div>
   );
 };
@@ -361,6 +373,8 @@ function graphToFlow(graph, selectedId, showExternalPackages, layoutType) {
         degree,
         isFaded,
         isFocused: n.id === selectedId,
+        isCycling: graph.cycles?.some(cycle => cycle.includes(n.id)) || false,
+        isIsolated: graph.isolatedFiles?.includes(n.id) || false,
       },
       style: { width: NODE_W, height: NODE_H },
       position: { x: 0, y: 0 },
@@ -677,7 +691,7 @@ export default function DependencyGraphPage() {
             <button 
               onClick={async () => {
                 await repositoryApi.analyze(repoId);
-                window.location.reload();
+                navigate(`/explore/${repoId}`);
               }}
               className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors"
             >
@@ -791,32 +805,10 @@ export default function DependencyGraphPage() {
                 </div>
                 <p className="text-muted mt-1" style={{ fontSize: 10 }}>Node color = total connections (in + out)</p>
               </section>
-
-              {/* Cycles */}
-              {graph?.cycles?.length > 0 && (
-                <section className="border-t border-border pt-3">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <p className="text-warning uppercase tracking-wider" style={{ fontSize: 10 }}>⚠ Cycles ({graph.cycles.length})</p>
-                    <Link to={`/explore/${repoId}/refactoring`} className="text-warning underline hover:text-white" style={{ fontSize: 10 }}>Fix</Link>
-                  </div>
-                  {graph.cycles.slice(0, 5).map((cycle, i) => (
-                    <p key={i} className="text-muted mb-0.5 truncate" title={cycle.join(' → ')} style={{ fontSize: 10 }}>
-                      {cycle.map(f => f.split('/').pop()).join(' → ')}
-                    </p>
-                  ))}
-                  {graph.cycles.length > 5 && <p className="text-muted" style={{ fontSize: 10 }}>+{graph.cycles.length - 5} more…</p>}
-                </section>
-              )}
-
-              {/* Isolated */}
-              {graph?.isolatedFiles?.length > 0 && (
-                <section className="border-t border-border pt-3">
-                  <p className="text-muted uppercase tracking-wider mb-1.5" style={{ fontSize: 10 }}>Isolated files ({graph.isolatedFiles.length})</p>
-                  {graph.isolatedFiles.slice(0, 8).map(f => (
-                    <p key={f} className="text-muted truncate mb-0.5" title={f} style={{ fontSize: 10 }}>{f.split('/').pop()}</p>
-                  ))}
-                </section>
-              )}
+              {/* Settings */}
+              <section className="border-t border-border pt-3">
+                <p className="text-muted mt-1" style={{ fontSize: 10 }}>Node color = total connections (in + out)</p>
+              </section>
             </div>
           )
         },
@@ -904,7 +896,7 @@ export default function DependencyGraphPage() {
               )}
 
               {selected && !infoLoading && fileInfo && (
-                <FileDetailPanel info={fileInfo} repoId={repoId} />
+                <FileDetailPanel info={fileInfo} repoId={repoId} graph={graph} />
               )}
 
               {selected && !infoLoading && !fileInfo && (
@@ -929,7 +921,10 @@ function StatRow({ label, value, warn = false }) {
   );
 }
 
-function FileDetailPanel({ info, repoId }) {
+function FileDetailPanel({ info, repoId, graph }) {
+  const nodeCycles = graph?.cycles?.filter(c => c.includes(info.id)) || [];
+  const isIsolated = graph?.isolatedFiles?.includes(info.id);
+
   return (
     <div className="flex flex-col gap-3">
       <div>
@@ -949,7 +944,30 @@ function FileDetailPanel({ info, repoId }) {
         <Chip label={`${info.dependentCount} users`} color="success" />
       </div>
 
-      {info.dependencies.length > 0 && (
+      {isIsolated && (
+        <div className="bg-surface/50 border border-border/50 p-2 rounded flex items-center gap-2">
+          <Info className="w-3.5 h-3.5 text-muted" />
+          <span className="text-xs text-muted">This file is isolated (no connections)</span>
+        </div>
+      )}
+
+      {nodeCycles.length > 0 && (
+        <div className="bg-warning/10 border border-warning/30 p-2 rounded flex flex-col gap-1.5 mt-1">
+          <div className="flex items-center gap-1.5">
+            <AlertCircle className="w-3.5 h-3.5 text-warning" />
+            <span className="text-xs font-medium text-warning">Involved in {nodeCycles.length} cycle{nodeCycles.length > 1 ? 's' : ''}</span>
+          </div>
+          <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto custom-scrollbar pr-1">
+            {nodeCycles.map((cycle, i) => (
+              <div key={i} className="text-[10px] text-muted leading-tight border-l-2 border-warning/30 pl-2">
+                {cycle.map(f => f.split('/').pop()).join(' → ')}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {info.dependencies?.length > 0 && (
         <section>
           <p className="text-muted uppercase tracking-wider mb-1.5">Imports ({info.dependencyCount})</p>
           {info.dependencies.map((dep, i) => <DepEntry key={i} dep={dep} repoId={repoId} />)}

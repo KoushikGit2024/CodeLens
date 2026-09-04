@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { ChevronLeft, Loader2, AlertCircle, RefreshCw, ShieldAlert, CheckCircle, LayoutDashboard, FileText } from 'lucide-react';
 import AIStatusIndicator from '../assistant/AIStatusIndicator';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { getEngineeringRisks, getEngineeringInsights } from '../../shared/api';
+import { repositoryApi } from '../../shared/api';
 import AiResponse from '../../shared/components/ai/AiResponse';
+import { useToast } from '../../shared/context/ToastContext';
 
 const EngineeringHealthPage = () => {
   const { repoId } = useParams();
   const navigate = useNavigate();
+  const { addToast } = useToast();
   
   const [loading, setLoading] = useState(true);
   const [model, setModel] = useState(null);
@@ -22,8 +24,8 @@ const EngineeringHealthPage = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const riskData = await getEngineeringRisks(repoId);
-      setModel(riskData);
+      const riskData = await repositoryApi.getRisks(repoId);
+      setModel(riskData.data);
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     } finally {
@@ -125,12 +127,18 @@ const EngineeringHealthPage = () => {
         <div className="mb-8 rounded-lg border border-blue-500/30 bg-blue-500/5 p-6 flex flex-col items-center justify-center gap-3">
           <p className="text-gray-400">Generate an AI interpretation of your engineering health metrics.</p>
           <button 
-            onClick={() => {
+            onClick={async () => {
               setLoadingInsights(true);
-              getEngineeringInsights(repoId)
-                .then(setInsights)
-                .catch(err => console.error(err))
-                .finally(() => setLoadingInsights(false));
+              try {
+                const res = await repositoryApi.getRisks(repoId, { generateAi: true });
+                setInsights(res.data.insights);
+                addToast({ title: 'Interpretation Generated', description: 'AI interpretation of engineering health is ready.', type: 'success' });
+              } catch (err) {
+                console.error(err);
+                addToast({ title: 'Generation Failed', description: err.message || 'Failed to generate AI interpretation.', type: 'error' });
+              } finally {
+                setLoadingInsights(false);
+              }
             }}
             className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded hover:bg-blue-500/30 transition-colors"
           >
