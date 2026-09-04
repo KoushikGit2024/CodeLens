@@ -1,39 +1,87 @@
 # System Architecture Overview
 
-CodeLens is a modern, decoupled web application that follows a "Deterministic First, AI Second" philosophy. The architecture consists of three main components: a React/Vite client, an Express/Node.js server, and the IBM watsonx AI service.
+CodeLens is a modern web application that follows a **"Client-Dominant Analysis, Server-Only AI"** philosophy. The browser is the primary intelligence engine and data store. The server is strictly an AI proxy and stores zero information.
 
 ## High-Level Architecture
 
 ```mermaid
 graph TD
-    Client[Client Browser (React/Vite)]
-    Server[Node.js / Express Server]
-    AST[AST Analyzers (web-tree-sitter)]
-    Graph[Dependency & Architecture Graph]
-    AI[IBM watsonx AI]
-    LocalFileSystem[(Local Repository Store)]
+    subgraph Browser["Browser (Client)"]
+        UI[React/Vite UI]
+        Worker[analyzer.worker.js (Web Worker)]
+        IDB[(IndexedDB Cache)]
+        CTX[AI Context Builder]
 
-    Client <-->|REST API| Server
-    Server -->|Upload & Extract| LocalFileSystem
-    Server -->|Read Source| AST
-    AST -->|Generate Symbols| Graph
-    Graph -->|Generate Context| Server
-    Server <-->|Prompt & Context| AI
+        UI -->|Trigger analysis| Worker
+        Worker -->|Tree-sitter WASM parse| Worker
+        Worker -->|"Symbols, Graph, Complexity, Clones, Dead Code"| IDB
+        IDB -->|Load cached results| UI
+        UI -->|Build context from local data| CTX
+    end
+
+    subgraph Server["Server (Node.js / Express)"]
+        AIProxy[IBM watsonx Proxy]
+    end
+
+    CTX -->|Pre-built context prompt| AIProxy
+    AIProxy <-->|Watsonx API| AI[IBM watsonx AI]
+    AIProxy -->|AI response| UI
 ```
 
-## The "Deterministic First" Principle
+## The Single Rule
 
-CodeLens strictly enforces a layered architecture to ensure that AI hallucination is minimized and performance is maximized:
+> **If it is static analysis → it runs on the client.**
+> **If it requires AI → it goes to the server.**
 
-1. **Deterministic Analysis Layer**: CodeLens parses raw source code into an Abstract Syntax Tree (AST) using Tree-sitter. It extracts canonical symbols, dependencies, cycles, components, and refactoring candidates using pure determinism.
-2. **Context Assembly Layer**: The deterministic facts are compiled into a bounded JSON context schema.
-3. **AI Interpretation Layer**: The AI is ONLY provided with the bounded context, never the raw source code. It is tasked with synthesizing, summarizing, and explaining the facts.
+## What the Server Does (and only this)
 
-By separating these layers, CodeLens ensures that metrics like cyclomatic complexity, circular dependencies, and file sizes are always 100% accurate, while the AI is used for what it does best: natural language synthesis.
+The server is intentionally minimal and strictly stateless. It has exactly one job:
+
+1. **AI Proxy**: Receive a fully pre-built context prompt from the client and forward it to the IBM watsonx API. Return the AI response verbatim.
+
+The server does **NOT**:
+- Parse ASTs
+- Build dependency graphs
+- Compute complexity scores
+- Detect clones
+- Produce risk models or architecture models
+- Perform reachability analysis
+- Store files, ZIPs, or analysis state of any kind
+
+## What the Client Does (everything else)
+
+The client browser is the full analysis engine:
+
+1. **File Handling**: Processes ZIP uploads entirely in-memory using `JSZip` to extract source code locally.
+2. **AST Parsing (Web Worker)**: Runs `web-tree-sitter` (WASM) inside a dedicated `analyzer.worker.js` Web Worker to parse source files without blocking the UI thread.
+3. **Symbol Extraction**: Extracts functions, classes, imports, exports, and their locations from the AST.
+4. **Graph Construction**: Builds the dependency graph (nodes + edges) and architecture model entirely in-memory from the extracted symbols.
+5. **Quality Analysis**: Computes cyclomatic complexity, detects structural code clones across files, and runs reachability analysis for dead code detection.
+6. **IndexedDB Persistence**: Stores all analysis results in browser IndexedDB so repeat visits skip re-parsing entirely.
+7. **AI Context Building**: Assembles the deterministic facts (graph metrics, hotspots, clones, dead code) into a structured context payload.
+8. **AI Prompt Dispatch**: Sends only the pre-built context prompt to the server's AI proxy endpoint.
+
+## Data Flow
+
+```
+User uploads ZIP
+       ↓
+Client reads ZIP in-browser (JSZip) → extracts files in-memory
+       ↓
+analyzer.worker.js (Tree-sitter WASM) parses files
+       ↓
+Client builds: Symbol Table → Dependency Graph → Architecture Model → Risk Model
+       ↓
+Results persisted to IndexedDB
+       ↓
+Client builds AI context from local models
+       ↓
+Server receives context prompt → forwards to watsonx → returns response
+```
 
 ## Core Services
 
-- **[Client](../frontend/overview.md)**: A rich, interactive React application using Monaco Editor for code viewing and Mermaid.js / React Flow for visualizations.
-- **[Server](../architecture/backend-architecture.md)**: An Express backend that orchestrates the entire intelligence pipeline.
-- **[Analyzers](../analyzers/)**: The suite of AST parsers and graph analyzers that generate the deterministic repository model.
+- **[Client Analysis Worker](../frontend/overview.md)**: `analyzer.worker.js` — the Tree-sitter WASM parser and core analysis pipeline running in a Web Worker.
+- **[Client Services](../frontend/overview.md)**: `client/src/services/analyzer/` — graph builders, complexity calculators, clone detectors, reachability analyzers.
+- **[Server](../architecture/backend-architecture.md)**: A minimal Express server — AI proxy only, storing zero data.
 - **[AI Pipeline](../ai/overview.md)**: The integration with IBM watsonx for repository Q&A and automated documentation.

@@ -15,3 +15,4 @@ This directory contains records of significant architectural decisions made duri
 - [ADR-009: Refactoring Intelligence](ADR-009-refactoring-intelligence.md)
 - [ADR-010: Unified Repository Intelligence](ADR-010-unified-repository-intelligence.md)
 - [ADR-011: End-to-End Product Integration](ADR-011-end-to-end-product-integration.md)
+- [ADR-012: Hybrid Client/Server Analysis Architecture](ADR-012-hybrid-client-server-analysis.md)

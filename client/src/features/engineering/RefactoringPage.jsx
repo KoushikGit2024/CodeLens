@@ -8,6 +8,7 @@ import { DiffEditor } from '@monaco-editor/react';
 import { ResizableLayout } from '../../shared/components/ResizableLayout';
 import { repositoryApi } from '../../shared/api';
 import AiResponse from '../../shared/components/ai/AiResponse';
+import PageHeader from '../../shared/components/PageHeader';
 
 export default function RefactoringPage() {
   const { repoId } = useParams();
@@ -57,10 +58,22 @@ export default function RefactoringPage() {
     );
   }
 
+  const formatCategory = (category) => {
+    switch (category) {
+      case 'QUALITY': return 'Code Quality Issue';
+      case 'ARCHITECTURE': return 'Architecture Layer Violation';
+      case 'DEPENDENCY': return 'Dependency Graph Flaw';
+      case 'COUPLING': return 'High Module Coupling';
+      case 'SIZE': return 'Oversized Component';
+      default: return category;
+    }
+  };
+
   const selectedCandidate = intel?.candidates?.find(c => c.id === selectedCandidateId);
 
   return (
-    <ResizableLayout
+    <div className="flex flex-col h-full bg-surface">
+      <ResizableLayout
       panels={[
         {
           id: 'candidates',
@@ -95,7 +108,7 @@ export default function RefactoringPage() {
                     <span className="text-[10px] text-muted font-mono">Score {c.priorityScore}</span>
                   </div>
                   <h3 className="text-sm font-medium text-white/90 break-words leading-snug" title={c.title}>{c.title}</h3>
-                  <p className="text-[11px] text-muted mt-1 break-words" title={c.type}>{c.type}</p>
+                  <p className="text-[11px] text-muted mt-1 break-words" title={c.type}>{formatCategory(c.type)}</p>
                 </button>
               ))}
               {(!intel?.candidates || intel.candidates.length === 0) && (
@@ -113,12 +126,21 @@ export default function RefactoringPage() {
           minWidth: 300,
           collapsible: false,
           content: (
-            <main className="flex-1 overflow-y-auto p-6 custom-scrollbar flex flex-col bg-surface/50 h-full">
-              {selectedCandidate ? (
-                <CandidateDetail candidate={selectedCandidate} repoId={repoId} />
-              ) : (
-                <div className="flex-1 flex items-center justify-center text-muted">Select a candidate to view details</div>
-              )}
+            <main className="flex-1 overflow-y-auto custom-scrollbar flex flex-col bg-surface/50 h-full">
+              <div className="px-6 pt-6 shrink-0">
+                <PageHeader 
+                  title="Refactoring Intelligence" 
+                  description="Automatically prioritize technical debt into actionable candidates. Select a candidate to see its blast radius and request an AI rewrite."
+                  icon={Wrench}
+                />
+              </div>
+              <div className="flex-1 p-6 pt-2">
+                {selectedCandidate ? (
+                  <CandidateDetail candidate={selectedCandidate} repoId={repoId} />
+                ) : (
+                  <div className="flex-1 h-full flex items-center justify-center text-muted">Select a candidate to view details</div>
+                )}
+              </div>
             </main>
           )
         },
@@ -140,6 +162,7 @@ export default function RefactoringPage() {
         }
       ]}
     />
+    </div>
   );
 }
 

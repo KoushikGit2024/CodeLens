@@ -2,6 +2,8 @@
 
 const { v4: uuidv4 } = require('uuid');
 const { getFileDependencies } = require('../dependencies/dependency.analyzer');
+const { analyzeReachability } = require('./reachability.analyzer');
+const { detectClones } = require('./clone.analyzer');
 
 /**
  * engineeringRiskAnalyzer.js
@@ -14,7 +16,10 @@ const RISK_CATEGORIES = {
   SIZE: 'SIZE',
   COUPLING: 'COUPLING',
   DEPENDENCY: 'DEPENDENCY',
-  ARCHITECTURE: 'ARCHITECTURE'
+  ARCHITECTURE: 'ARCHITECTURE',
+  COMPLEXITY: 'COMPLEXITY',
+  DUPLICATION: 'DUPLICATION',
+  REACHABILITY: 'REACHABILITY'
 };
 
 const SEVERITY = {
@@ -28,7 +33,9 @@ const THRESHOLDS = {
   FILE_LINES_WARNING: 300,
   EXPORTS_WARNING: 15,
   FAN_IN_WARNING: 10,
-  FAN_OUT_WARNING: 15
+  FAN_OUT_WARNING: 15,
+  COMPLEXITY_HIGH: 20,
+  COMPLEXITY_WARNING: 10
 };
 
 const SEVERITY_PENALTY = {
@@ -237,6 +244,86 @@ function determineHotspots(risks) {
   return sortedFiles;
 }
 
+function analyzeCodeQualityRisks(analysis, graph) {
+  const risks = [];
+  const allFunctions = [];
+
+  for (const file of analysis.files) {
+    if (!file.symbols) continue;
+    
+    let fileComplexity = 0;
+    let fileFunctions = 0;
+
+    for (const sym of file.symbols) {
+      if (sym.kind === 'function' || sym.kind === 'method' || sym.kind === 'arrow') {
+        allFunctions.push(sym);
+        
+        if (sym.complexity) {
+          fileComplexity += sym.complexity;
+          fileFunctions++;
+          
+          if (sym.complexity > THRESHOLDS.COMPLEXITY_HIGH) {
+            risks.push(createRisk(
+              RISK_CATEGORIES.COMPLEXITY,
+              SEVERITY.HIGH,
+              'Highly Complex Function',
+              `Function "${sym.name}" has cyclomatic complexity of ${sym.complexity}. Consider refactoring.`,
+              file.filePath,
+              { functionName: sym.name, complexity: sym.complexity }
+            ));
+          } else if (sym.complexity > THRESHOLDS.COMPLEXITY_WARNING) {
+            risks.push(createRisk(
+              RISK_CATEGORIES.COMPLEXITY,
+              SEVERITY.WARNING,
+              'Complex Function',
+              `Function "${sym.name}" has complexity ${sym.complexity}.`,
+              file.filePath,
+              { functionName: sym.name, complexity: sym.complexity }
+            ));
+          }
+        }
+      }
+    }
+    
+    // Average complexity per file
+    const avgComplexity = fileFunctions > 0 ? (fileComplexity / fileFunctions).toFixed(1) : 0;
+    file.metrics = file.metrics || {};
+    file.metrics.totalFunctions = fileFunctions;
+    file.metrics.averageComplexity = avgComplexity;
+  }
+
+  // Clones
+  const clones = detectClones(allFunctions);
+  for (const clone of clones) {
+    if (clone.count > 2) { // 3 or more identical functions
+      const filesInvolved = Array.from(new Set(clone.instances.map(i => i.location?.startLine ? 'Same file' : 'Other file'))).join(', '); // simplistic for now
+      risks.push(createRisk(
+        RISK_CATEGORIES.DUPLICATION,
+        SEVERITY.HIGH,
+        'Significant Code Duplication',
+        `Found ${clone.count} identical functions across the codebase.`,
+        null,
+        { count: clone.count, hash: clone.hash }
+      ));
+    }
+  }
+
+  // Reachability
+  const reachability = analyzeReachability(graph);
+  for (const deadFile of reachability.unreachableFiles) {
+    risks.push(createRisk(
+      RISK_CATEGORIES.REACHABILITY,
+      SEVERITY.WARNING,
+      'Dead / Unused File',
+      `File is not reachable from any known entry point in the graph.`,
+      deadFile,
+      {}
+    ));
+  }
+
+  return { risks, reachability, clones };
+}
+
 /**
  * Build the engineering risk model.
  *
@@ -246,11 +333,14 @@ function determineHotspots(risks) {
  * @returns {object} EngineeringRiskModel
  */
 function buildEngineeringRiskModel(analysis, graph, architecture) {
+  const quality = analyzeCodeQualityRisks(analysis, graph);
+
   const risks = [
     ...analyzeSizeRisks(analysis),
     ...analyzeCouplingRisks(analysis, graph),
     ...analyzeDependencyRisks(architecture),
-    ...analyzeArchitectureRisks(architecture)
+    ...analyzeArchitectureRisks(architecture),
+    ...quality.risks
   ];
 
   const { score, riskLevel } = calculateScoreAndLevel(risks);
@@ -270,6 +360,8 @@ function buildEngineeringRiskModel(analysis, graph, architecture) {
     metrics,
     hotspots,
     risks,
+    deadCode: quality.reachability.unreachableFiles,
+    clones: quality.clones,
     recommendations: [] // Stub for AI/deterministic recommendations
   };
 }

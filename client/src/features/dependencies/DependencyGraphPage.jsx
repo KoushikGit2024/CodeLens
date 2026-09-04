@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import ReactFlow, {
   Background,
   Controls,
@@ -481,6 +481,7 @@ const LAYOUT_OPTIONS = [
 export default function DependencyGraphPage() {
   const { repoId } = useParams();
   const navigate   = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [graph,    setGraph]    = useState(null);
   const [loading,  setLoading]  = useState(true);
@@ -489,7 +490,15 @@ export default function DependencyGraphPage() {
   const [fileInfo, setFileInfo] = useState(null);
   const [infoLoading, setInfoLoading] = useState(false);
   const [showExternalPackages, setShowExternalPackages] = useState(false);
-  const [layoutType, setLayoutType] = useState('clustered');
+  
+  const layoutType = searchParams.get('layout') || 'clustered';
+  const setLayoutType = (type) => {
+    setSearchParams(prev => {
+      prev.set('layout', type);
+      return prev;
+    });
+  };
+
   const [dirColorMap, setDirColorMap] = useState(new Map());
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -925,24 +934,63 @@ function FileDetailPanel({ info, repoId, graph }) {
   const nodeCycles = graph?.cycles?.filter(c => c.includes(info.id)) || [];
   const isIsolated = graph?.isolatedFiles?.includes(info.id);
 
+  const getSeverityColor = (severity) => {
+    switch (severity) {
+      case 'critical': return 'text-danger border-danger/30 bg-danger/10';
+      case 'high': return 'text-warning border-warning/30 bg-warning/10';
+      case 'warning': return 'text-amber-400 border-amber-400/30 bg-amber-400/10';
+      default: return 'text-success border-success/30 bg-success/10';
+    }
+  };
+
   return (
     <div className="flex flex-col gap-3">
       <div>
         <p className="text-muted uppercase tracking-wider mb-1">File</p>
         <p className="text-white font-mono whitespace-nowrap overflow-x-auto custom-scrollbar pb-1 mb-1 text-[11px]">{info.filePath}</p>
-        <Link
-          to={`/explore/${repoId}/source?path=${encodeURIComponent(info.filePath)}`}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-accent/10 border border-accent/40 rounded text-accent hover:bg-accent/20 transition-colors"
-        >
-          <ExternalLink className="w-3 h-3" />
-          View in Explorer
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            to={`/explore/${repoId}/source?path=${encodeURIComponent(info.filePath)}`}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-accent/10 border border-accent/40 rounded text-accent hover:bg-accent/20 transition-colors"
+          >
+            <ExternalLink className="w-3 h-3" />
+            View Source
+          </Link>
+          {info.health && info.health.severity !== 'healthy' && (
+            <Link
+              to={`/explore/${repoId}/health?file=${encodeURIComponent(info.filePath)}`}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-surface/50 border border-border/50 rounded text-muted hover:text-white transition-colors"
+              title="View specific risks for this file"
+            >
+              <AlertCircle className="w-3 h-3" />
+              View Risks
+            </Link>
+          )}
+        </div>
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-2">
         <Chip label={`${info.dependencyCount} deps`} color="accent" />
         <Chip label={`${info.dependentCount} users`} color="success" />
+        {info.health && (
+          <span className={`border rounded px-1.5 py-0.5 text-[10px] font-medium capitalize flex items-center gap-1 ${getSeverityColor(info.health.severity)}`}>
+            {info.health.severity !== 'healthy' ? <AlertCircle className="w-3 h-3" /> : <GitBranch className="w-3 h-3" />}
+            {info.health.severity}
+          </span>
+        )}
       </div>
+
+      {info.health?.hotspot && (
+        <div className="bg-danger/10 border border-danger/30 p-2 rounded flex items-start gap-2">
+          <AlertCircle className="w-3.5 h-3.5 text-danger shrink-0 mt-0.5" />
+          <div className="flex flex-col">
+            <span className="text-xs font-medium text-danger">Engineering Hotspot</span>
+            <span className="text-[10px] text-danger/80 leading-tight mt-0.5">
+              This file requires immediate attention (Score: {info.health.hotspot.score})
+            </span>
+          </div>
+        </div>
+      )}
 
       {isIsolated && (
         <div className="bg-surface/50 border border-border/50 p-2 rounded flex items-center gap-2">

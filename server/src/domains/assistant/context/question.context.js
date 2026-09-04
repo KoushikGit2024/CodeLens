@@ -92,6 +92,24 @@ function buildQuestionContext(analysis, question, extractPath, activeContext) {
     topCandidates.forEach((c, idx) => {
       contextData.facts.push(`[Priority ${idx+1}] ${c.title} (Score: ${c.priorityScore}). Files involved: ${c.files.join(', ')}`);
     });
+
+    if (riskModel.deadCode && riskModel.deadCode.length > 0) {
+      contextData.facts.push(`Dead/Unused Files: ${riskModel.deadCode.join(', ')}`);
+    }
+
+    if (riskModel.clones && riskModel.clones.length > 0) {
+      const topClones = riskModel.clones.slice(0, 3);
+      contextData.facts.push(`Significant Clones Detected: ${riskModel.clones.length} duplicate groups.`);
+      topClones.forEach((clone, idx) => {
+         const locations = clone.instances.map(i => i.location?.startLine ? 'line ' + i.location.startLine : 'unknown').join(', ');
+         contextData.facts.push(`Clone Group ${idx+1}: Copied ${clone.count} times. (Locations: ${locations})`);
+      });
+    }
+
+    const highlyComplex = riskModel.risks.filter(r => r.category === 'COMPLEXITY' && r.severity === 'high');
+    if (highlyComplex.length > 0) {
+      contextData.facts.push(`Highly Complex Functions: ${highlyComplex.map(r => r.evidence?.functionName).join(', ')}`);
+    }
   }
 
   // 2. Gather source code selectively

@@ -32,7 +32,9 @@
 import { locationFromNode, createFunction, createArrow, createClass, createMethod, createImport, createExport, SymbolKind, createInterface, createStruct, createNamespace, createPackage, createConstructor, createVariable } from '../symbols';
 
 
-import { BaseParser } from './base.parser';
+import { BaseParser } from './base.parser.js';
+import { calculateComplexity } from '../../advanced/complexity.analyzer.js';
+import { generateStructuralHash } from '../../advanced/clone.analyzer.js';
 
 
 
@@ -161,12 +163,16 @@ class JavaScriptParser extends BaseParser {
     const isAsync   = nodeHasChild(node, 'async');
     const isGen     = node.type === 'generator_function_declaration';
     const params    = this._extractParams(node, source);
+    const complexity= calculateComplexity(node);
+    const hash      = generateStructuralHash(node);
 
     symbols.push(createFunction({
       name,
       async: isAsync,
       generator: isGen,
       params,
+      complexity,
+      hash,
       location: locationFromNode(node),
     }));
   }
@@ -194,11 +200,15 @@ class JavaScriptParser extends BaseParser {
       const name    = nodeText(nameNode, source);
       const isAsync = nodeHasChild(valueNode, 'async');
       const params  = this._extractParams(valueNode, source);
+      const complexity = calculateComplexity(valueNode);
+      const hash       = generateStructuralHash(valueNode);
 
       symbols.push(createArrow({
         name,
         async: isAsync,
         params,
+        complexity,
+        hash,
         location: locationFromNode(child),
       }));
     }
@@ -251,6 +261,8 @@ class JavaScriptParser extends BaseParser {
     const isAsync   = nodeHasChild(node, 'async');
     const isGen     = nodeHasChild(node, '*');
     const params    = this._extractParams(node, source);
+    const complexity= calculateComplexity(node);
+    const hash      = generateStructuralHash(node);
 
     symbols.push(createMethod({
       name,
@@ -259,6 +271,8 @@ class JavaScriptParser extends BaseParser {
       async: isAsync,
       generator: isGen,
       params,
+      complexity,
+      hash,
       location: locationFromNode(node),
     }));
   }

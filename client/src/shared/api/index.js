@@ -230,6 +230,18 @@ export const repositoryApi = {
       });
       
     const externalPackages = [...new Set(dependencies.filter(d => d.package).map(d => d.package))];
+
+    // Compute Health metrics for this specific file
+    const architecture = buildArchitectureModel(record.analysis, graph);
+    const engineeringHealth = buildEngineeringRiskModel(record.analysis, graph, architecture);
+    
+    const fileRisks = engineeringHealth.risks.filter(r => r.file === filePath);
+    const hotspot = engineeringHealth.hotspots.find(h => h.file === filePath);
+    
+    let severity = 'healthy';
+    if (fileRisks.some(r => r.severity === 'critical')) severity = 'critical';
+    else if (fileRisks.some(r => r.severity === 'high')) severity = 'high';
+    else if (fileRisks.some(r => r.severity === 'warning')) severity = 'warning';
       
     return { 
       data: { 
@@ -238,7 +250,12 @@ export const repositoryApi = {
         dependents, 
         externalPackages,
         dependencyCount: dependencies.filter(d => !d.package).length,
-        dependentCount: dependents.length
+        dependentCount: dependents.length,
+        health: {
+          severity,
+          risks: fileRisks,
+          hotspot: hotspot || null
+        }
       } 
     };
   },
@@ -248,6 +265,22 @@ export const repositoryApi = {
     const record = await repositoryStore.get(id);
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
     const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
+    
+    const health = buildEngineeringRiskModel(record.analysis, record.analysis.graph, architecture);
+
+    architecture.components.forEach(comp => {
+      const compRisks = health.risks.filter(r => comp.files.includes(r.file) || (r.category === 'ARCHITECTURE' && r.evidence?.component === comp.name));
+      
+      let severity = 'healthy';
+      if (compRisks.some(r => r.severity === 'critical')) severity = 'critical';
+      else if (compRisks.some(r => r.severity === 'high')) severity = 'high';
+      else if (compRisks.some(r => r.severity === 'warning')) severity = 'warning';
+
+      comp.health = {
+        severity,
+        risks: compRisks
+      };
+    });
     
     if (options.generateAi) {
       // Stub: in reality we would POST the computed context to Watsonx
@@ -285,12 +318,24 @@ export const repositoryApi = {
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
     const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
     const risks = buildEngineeringRiskModel(record.analysis, record.analysis.graph, architecture);
-    const refactoring = buildRefactoringIntelligence(risks);
+    const refactoring = buildRefactoringIntelligence(risks, record.analysis, record.analysis.graph);
     return { data: refactoring };
   },
 
   async getRefactoringImpact(repoId, candidateId) {
-    return { data: { files: [], complexity: 'Low', effort: 'Unknown' } };
+    const record = await repositoryStore.get(repoId);
+    if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
+    
+    const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
+    const risks = buildEngineeringRiskModel(record.analysis, record.analysis.graph, architecture);
+    const refactoring = buildRefactoringIntelligence(risks, record.analysis, record.analysis.graph);
+    
+    const candidate = refactoring.candidates.find(c => c.id === candidateId);
+    if (!candidate) throw new Error('Candidate not found');
+    
+    const files = candidate.files || [];
+    const impact = analyzeChangeImpact(record.analysis, record.analysis.graph, files);
+    return { data: impact };
   },
 
   async getRefactoringInsights(repoId, candidateId) {
@@ -298,7 +343,54 @@ export const repositoryApi = {
   },
 
   async autoFixRefactoringCandidate(repoId, candidateId) {
-    throw new Error('Auto-fix is currently disabled in offline mode.');
+    const record = await repositoryStore.get(repoId);
+    if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
+    
+    // Re-build refactoring intelligence to find the candidate
+    const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
+    const risks = buildEngineeringRiskModel(record.analysis, record.analysis.graph, architecture);
+    const refactoring = buildRefactoringIntelligence(risks, record.analysis, record.analysis.graph);
+    
+    const candidate = refactoring.candidates.find(c => c.id === candidateId);
+    if (!candidate) throw new Error('Candidate not found');
+    if (!candidate.files || candidate.files.length === 0) throw new Error('No files associated with this candidate');
+    
+    const targetFile = candidate.files[0];
+    const originalCode = await persistenceStore.loadFile(repoId, targetFile);
+    if (!originalCode) throw new Error(`Could not load source file ${targetFile}`);
+    
+    const strategiesText = candidate.suggestedStrategies?.map(s => `- ${s.action}: ${s.description}`).join('\n') || 'Improve code quality and structure.';
+    
+    const prompt = `You are an expert AI software architect. Please refactor the following file to resolve the issue: "${candidate.title}".
+Category: ${candidate.type}
+Description: ${candidate.summary}
+
+Recommended Strategies:
+${strategiesText}
+
+Please provide ONLY the fully refactored source code inside a markdown code block (e.g. \`\`\`javascript ... \`\`\`). Do not include explanations outside the code block.
+
+File: ${targetFile}
+Original Code:
+\`\`\`
+${originalCode}
+\`\`\`
+`;
+
+    const res = await api.post(`/ai/chat`, { prompt });
+    const responseText = res.data?.response || res.data || '';
+    
+    // Extract code from markdown block
+    let refactoredCode = responseText;
+    const codeBlockMatch = responseText.match(/```[a-z]*\n([\s\S]*?)\n```/);
+    if (codeBlockMatch) {
+      refactoredCode = codeBlockMatch[1];
+    } else {
+      // fallback just in case Watsonx didn't use backticks
+      refactoredCode = responseText;
+    }
+
+    return { data: { originalCode, refactoredCode, file: targetFile } };
   },
 
   // ── AI Prompt Endpoints ──────────────────────────────────────────────────────

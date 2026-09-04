@@ -2,6 +2,8 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { getFileDependencies } from '../dependencies/dependency.analyzer.js';
+import { detectClones } from './clone.analyzer.js';
+import { analyzeReachability } from './reachability.analyzer.js';
 
 /**
  * engineeringRiskAnalyzer.js
@@ -14,7 +16,8 @@ const RISK_CATEGORIES = {
   SIZE: 'SIZE',
   COUPLING: 'COUPLING',
   DEPENDENCY: 'DEPENDENCY',
-  ARCHITECTURE: 'ARCHITECTURE'
+  ARCHITECTURE: 'ARCHITECTURE',
+  QUALITY: 'QUALITY'
 };
 
 const SEVERITY = {
@@ -28,7 +31,9 @@ const THRESHOLDS = {
   FILE_LINES_WARNING: 300,
   EXPORTS_WARNING: 15,
   FAN_IN_WARNING: 10,
-  FAN_OUT_WARNING: 15
+  FAN_OUT_WARNING: 15,
+  COMPLEXITY_HIGH: 15,
+  COMPLEXITY_WARNING: 10
 };
 
 const SEVERITY_PENALTY = {
@@ -203,6 +208,76 @@ function analyzeArchitectureRisks(architecture) {
   return risks;
 }
 
+function analyzeCodeQualityRisks(analysis, graph) {
+  const risks = [];
+  const allFunctions = [];
+  
+  // 1. Gather all functions for clone detection + high complexity
+  for (const file of analysis.files) {
+    if (file.hasErrors || file.error) continue;
+    
+    for (const sym of file.symbols) {
+      if (['function', 'method', 'arrow'].includes(sym.kind)) {
+        allFunctions.push({ ...sym, filePath: file.filePath });
+        
+        // Complexity Risk
+        if (sym.complexity > THRESHOLDS.COMPLEXITY_HIGH) {
+          risks.push(createRisk(
+            RISK_CATEGORIES.QUALITY,
+            SEVERITY.HIGH,
+            'High Cyclomatic Complexity',
+            `${sym.kind} '${sym.name}' has a high complexity score of ${sym.complexity}. Consider refactoring.`,
+            file.filePath,
+            { name: sym.name, complexity: sym.complexity, location: sym.location }
+          ));
+        } else if (sym.complexity > THRESHOLDS.COMPLEXITY_WARNING) {
+          risks.push(createRisk(
+            RISK_CATEGORIES.QUALITY,
+            SEVERITY.WARNING,
+            'Elevated Complexity',
+            `${sym.kind} '${sym.name}' has a complexity score of ${sym.complexity}.`,
+            file.filePath,
+            { name: sym.name, complexity: sym.complexity, location: sym.location }
+          ));
+        }
+      }
+    }
+  }
+
+  // 2. Clone Detection
+  const clones = detectClones(allFunctions);
+  for (const clone of clones) {
+    const filePaths = clone.instances.map(i => i.filePath);
+    risks.push(createRisk(
+      RISK_CATEGORIES.QUALITY,
+      SEVERITY.WARNING,
+      'Structural Code Clone',
+      `Found ${clone.count} instances of structurally identical code.`,
+      filePaths[0],
+      { count: clone.count, instances: clone.instances }
+    ));
+  }
+
+  // 3. Dead Code / Reachability
+  const reachability = analyzeReachability(graph);
+  for (const deadFile of reachability.unreachableFiles) {
+    // skip external packages
+    if (deadFile.startsWith('pkg:')) continue;
+    
+    const rawPath = deadFile.replace(/^file:/, '');
+    risks.push(createRisk(
+      RISK_CATEGORIES.QUALITY,
+      SEVERITY.WARNING,
+      'Dead / Unreachable File',
+      'This file is never imported by any other file in the repository.',
+      rawPath,
+      {}
+    ));
+  }
+
+  return risks;
+}
+
 function calculateScoreAndLevel(risks) {
   let score = 100;
   
@@ -250,7 +325,8 @@ function buildEngineeringRiskModel(analysis, graph, architecture) {
     ...analyzeSizeRisks(analysis),
     ...analyzeCouplingRisks(analysis, graph),
     ...analyzeDependencyRisks(architecture),
-    ...analyzeArchitectureRisks(architecture)
+    ...analyzeArchitectureRisks(architecture),
+    ...analyzeCodeQualityRisks(analysis, graph)
   ];
 
   const { score, riskLevel } = calculateScoreAndLevel(risks);

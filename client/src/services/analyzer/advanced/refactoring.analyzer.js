@@ -2,6 +2,7 @@
 
 import { SEVERITY } from './risk.analyzer.js';
 import { getStrategiesForRisk } from './refactoring.strategies.js';
+import { analyzeChangeImpact } from './change.impact.js';
 
 /**
  * refactoringAnalyzer.js
@@ -92,7 +93,7 @@ function extractFilesFromRisk(risk) {
  * @param {object} engineeringRiskModel - output of buildEngineeringRiskModel
  * @returns {object} RefactoringIntelligenceModel
  */
-function buildRefactoringIntelligence(engineeringRiskModel) {
+function buildRefactoringIntelligence(engineeringRiskModel, analysis, graph) {
   const candidates = [];
 
   for (const risk of engineeringRiskModel.risks) {
@@ -128,10 +129,22 @@ function buildRefactoringIntelligence(engineeringRiskModel) {
       
       suggestedStrategies: strategies,
       
-      // These will be populated on-demand via the impact endpoint or populated loosely here
-      estimatedScope: {
-        fileCount: affectedFiles.length
-      }
+      estimatedScope: (() => {
+        let direct = affectedFiles.length;
+        let downstream = 0;
+        if (analysis && graph && affectedFiles.length > 0) {
+          try {
+            const impact = analyzeChangeImpact(analysis, graph, affectedFiles);
+            downstream = impact.transitivelyAffectedFiles.length;
+          } catch (e) {
+            console.error("Failed to calculate impact for refactoring candidate", e);
+          }
+        }
+        return {
+          fileCount: direct,
+          downstreamImpact: downstream
+        };
+      })()
     };
 
     candidates.push(candidate);

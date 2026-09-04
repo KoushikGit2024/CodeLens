@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, NavLink, useParams } from 'react-router-dom';
+import { Link, NavLink, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   FileCode2, 
@@ -49,7 +49,18 @@ const NAV_GROUPS = [
 
 export default function RepositorySidebar() {
   const { repoId } = useParams();
-  const [collapsed, setCollapsed] = useState(false);
+  const { search } = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  const collapsed = searchParams.get('sidebar') === 'closed';
+  const setCollapsed = (isClosed) => {
+    setSearchParams(prev => {
+      if (isClosed) prev.set('sidebar', 'closed');
+      else prev.delete('sidebar');
+      return prev;
+    }, { replace: true });
+  };
+
   const [collapsedGroups, setCollapsedGroups] = useState({});
 
   const toggleGroup = (groupId) => {
@@ -63,7 +74,7 @@ export default function RepositorySidebar() {
       <div className={clsx("h-12 flex items-center shrink-0 border-b border-border transition-all", collapsed ? "justify-center px-0" : "justify-between px-4")}>
         {!collapsed ? (
           <>
-            <Link to="/" className="flex items-center hover:opacity-80 transition-opacity">
+            <Link to={`/${search}`} className="flex items-center hover:opacity-80 transition-opacity">
               <Logo className="w-5 h-5" textClass="text-[16px]" showText={true} />
             </Link>
             <button 
@@ -75,7 +86,7 @@ export default function RepositorySidebar() {
             </button>
           </>
         ) : (
-          <Link to="/" className="flex items-center hover:opacity-80 transition-opacity">
+          <Link to={`/${search}`} className="flex items-center hover:opacity-80 transition-opacity">
             <Logo className="w-6 h-6" showText={false} />
           </Link>
         )}
@@ -120,7 +131,7 @@ export default function RepositorySidebar() {
                   return (
                     <NavLink
                       key={item.id}
-                      to={`/explore/${repoId}/${item.to}`}
+                      to={`/explore/${repoId}/${item.to}${search}`}
                       end={item.to === ''}
                       title={collapsed ? item.label : undefined}
                       className={({ isActive }) => clsx(

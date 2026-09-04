@@ -89,8 +89,8 @@ function locationFromNode(node) {
  *   { kind:'function', name:'greet', async:false, generator:false,
  *     params:['name'], location:{ startLine:3, startColumn:0, endLine:5, endColumn:1 } }
  */
-function createFunction({ name, async: isAsync = false, generator = false, params = [], location }) {
-  return { kind: SymbolKind.FUNCTION, name, async: isAsync, generator, params, location };
+function createFunction({ name, async: isAsync = false, generator = false, params = [], complexity = 1, hash = null, location }) {
+  return { kind: SymbolKind.FUNCTION, name, async: isAsync, generator, params, complexity, hash, location };
 }
 
 /**
@@ -110,8 +110,8 @@ function createFunction({ name, async: isAsync = false, generator = false, param
  * @param {object} opts
  * @returns {ArrowSymbol}
  */
-function createArrow({ name, async: isAsync = false, params = [], location }) {
-  return { kind: SymbolKind.ARROW, name, async: isAsync, params, location };
+function createArrow({ name, async: isAsync = false, params = [], complexity = 1, hash = null, location }) {
+  return { kind: SymbolKind.ARROW, name, async: isAsync, params, complexity, hash, location };
 }
 
 /**
@@ -150,9 +150,9 @@ function createClass({ name, superClass = null, location }) {
  * @returns {MethodSymbol}
  */
 function createMethod({ name, className, static: isStatic = false, async: isAsync = false,
-                        generator = false, visibility = 'public', params = [], location, decorators = [] }) {
+                        generator = false, visibility = 'public', params = [], complexity = 1, hash = null, location, decorators = [] }) {
   return { kind: SymbolKind.METHOD, name, className, static: isStatic,
-           async: isAsync, generator, visibility, params, location, decorators };
+           async: isAsync, generator, visibility, params, complexity, hash, location, decorators };
 }
 
 /**

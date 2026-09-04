@@ -1,4 +1,4 @@
-import { RefreshCw, Loader2 } from 'lucide-react';
+import { RefreshCw, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Breadcrumbs from '../ui/Breadcrumbs';
@@ -28,6 +28,23 @@ export default function RepositoryHeader() {
   return (
     <header className="h-12 flex items-center px-4 border-b border-border bg-panel shrink-0 gap-4 justify-between">
       <div className="flex items-center gap-4 min-w-0">
+        <div className="flex items-center gap-1">
+          <button 
+            onClick={() => navigate(-1)}
+            className="p-1.5 text-muted hover:text-white hover:bg-surface rounded transition-colors"
+            title="Go back"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button 
+            onClick={() => navigate(1)}
+            className="p-1.5 text-muted hover:text-white hover:bg-surface rounded transition-colors"
+            title="Go forward"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="h-4 w-px bg-border hidden sm:block"></div>
         <Breadcrumbs />
       </div>
 

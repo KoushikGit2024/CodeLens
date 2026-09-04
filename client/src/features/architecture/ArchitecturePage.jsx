@@ -448,6 +448,16 @@ export default function ArchitecturePage() {
                       {(() => {
                         const compData = data?.model?.components?.find(c => c.name === selectedComponent);
                         if (!compData) return null;
+                        
+                        const getSeverityColor = (severity) => {
+                          switch (severity) {
+                            case 'critical': return 'text-danger border-danger/30 bg-danger/10';
+                            case 'high': return 'text-warning border-warning/30 bg-warning/10';
+                            case 'warning': return 'text-amber-400 border-amber-400/30 bg-amber-400/10';
+                            default: return 'text-success border-success/30 bg-success/10';
+                          }
+                        };
+
                         return (
                           <div className="flex flex-col gap-1.5 mt-3">
                             <div className="flex justify-between items-center">
@@ -458,6 +468,21 @@ export default function ArchitecturePage() {
                               <span className="text-xs text-muted">Files</span>
                               <span className="text-xs text-white/80 font-mono">{compData.files?.length || 0}</span>
                             </div>
+                            
+                            {compData.health && (
+                              <div className="flex justify-between items-start mt-2 pt-2 border-t border-border/50">
+                                <span className="text-xs text-muted">Health</span>
+                                <div className="flex flex-col items-end gap-1">
+                                  <span className={`border rounded px-1.5 py-0.5 text-[10px] font-medium capitalize flex items-center gap-1 ${getSeverityColor(compData.health.severity)}`}>
+                                    {compData.health.severity !== 'healthy' ? <AlertCircle className="w-3 h-3" /> : <GitBranch className="w-3 h-3" />}
+                                    {compData.health.severity}
+                                  </span>
+                                  {compData.health.risks.length > 0 && (
+                                    <span className="text-[10px] text-muted">{compData.health.risks.length} Risk(s)</span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         );
                       })()}
