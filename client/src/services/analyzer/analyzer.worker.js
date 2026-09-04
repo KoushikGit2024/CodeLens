@@ -1,7 +1,11 @@
 import { analyzeRepository } from './repository/repository.analyzer.js';
 import { buildDependencyGraph } from './dependencies/dependency.analyzer.js';
+import { buildArchitectureModel } from './advanced/architecture.analyzer.js';
 import * as repositoryStore from './repository/repository.store.js';
 import * as persistenceStore from './repository/persistence.store.js';
+
+// Small yield so the polling loop can observe each phase even on fast repos
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function executeAnalysisPipeline(repoId, options = {}, postMessage = () => {}) {
   // 1. Mark repo as analyzing
@@ -13,9 +17,11 @@ export async function executeAnalysisPipeline(repoId, options = {}, postMessage 
   
   await repositoryStore.update(repoId, { status: 'analyzing', phase: 'scanning_files' });
 
-  const onProgress = (phase, details) => {
-    repositoryStore.update(repoId, { phase, phaseDetails: details });
+  const onProgress = async (phase, details) => {
+    await repositoryStore.update(repoId, { phase, phaseDetails: details });
     postMessage({ type: 'PROGRESS', repoId, phase, details });
+    // Yield briefly so the UI polling can observe this phase
+    await sleep(400);
   };
 
   // 2. Run AST Analysis
@@ -27,13 +33,19 @@ export async function executeAnalysisPipeline(repoId, options = {}, postMessage 
   }
 
   // 3. Run Dependency Graph Engine
-  onProgress('building_graph');
+  await onProgress('building_graph');
   const graph = buildDependencyGraph(analysis);
-  
-  // Store graph back onto the analysis object
   analysis.graph = graph;
 
-  // 4. Finalize
+  // 4. Run Architecture Analysis
+  await onProgress('building_architecture');
+  const architecture = buildArchitectureModel(analysis, graph);
+  analysis.architecture = architecture;
+
+  // 5. Show finalizing step briefly before marking ready
+  await onProgress('ready');
+
+  // 6. Finalize
   await repositoryStore.update(repoId, { 
     status: 'ready', 
     phase: 'ready', 

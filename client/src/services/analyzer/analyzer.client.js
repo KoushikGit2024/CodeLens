@@ -33,6 +33,19 @@ export function initWorker() {
       }
     }
   };
+
+  worker.onerror = (error) => {
+    console.error('[analyzer.client] Worker script error:', error);
+    // Reject all pending promises
+    for (const [repoId, resolvers] of pendingResolvers.entries()) {
+      resolvers.reject(new Error('Worker script crashed or failed to load. Check console for details.'));
+    }
+    pendingResolvers.clear();
+  };
+
+  worker.onmessageerror = (error) => {
+    console.error('[analyzer.client] Worker message serialization error:', error);
+  };
 }
 
 /**

@@ -11,33 +11,36 @@ import RefactoringPage from '../features/engineering/RefactoringPage';
 import RepositoryIntelligencePage from '../features/repository/RepositoryIntelligencePage';
 import HelpPage from '../features/help/HelpPage';
 import { AIProvider } from '../shared/context/AIContext';
+import { ToastProvider } from '../shared/context/ToastContext';
 import RepositoryShell from '../shared/layout/RepositoryShell';
 import { ErrorBoundary } from '../shared/components/ErrorBoundary';
 
 export default function App() {
   return (
     <ErrorBoundary>
-      <AIProvider>
-        <Routes>
-          <Route path="/" element={<UploadPage />} />
-          
-          {/* The Canonical Repository Routes */}
-          <Route path="/explore/:repoId" element={<RepositoryShell />}>
-            <Route index element={<RepositoryIntelligencePage />} />
-            <Route path="source" element={<ExplorerPage />} />
-            <Route path="graph" element={<DependencyGraphPage />} />
-            <Route path="architecture" element={<ArchitecturePage />} />
+      <ToastProvider>
+        <AIProvider>
+          <Routes>
+            <Route path="/" element={<UploadPage />} />
+            
+            {/* The Canonical Repository Routes */}
+            <Route path="/explore/:repoId" element={<RepositoryShell />}>
+              <Route index element={<RepositoryIntelligencePage />} />
+              <Route path="source" element={<ExplorerPage />} />
+              <Route path="graph" element={<DependencyGraphPage />} />
+              <Route path="architecture" element={<ArchitecturePage />} />
 
-            <Route path="assistant" element={<RepositoryAssistantPage />} />
-            <Route path="impact" element={<ImpactPage />} />
-            <Route path="health" element={<EngineeringHealthPage />} />
-            <Route path="refactoring" element={<RefactoringPage />} />
-          </Route>
+              <Route path="assistant" element={<RepositoryAssistantPage />} />
+              <Route path="impact" element={<ImpactPage />} />
+              <Route path="health" element={<EngineeringHealthPage />} />
+              <Route path="refactoring" element={<RefactoringPage />} />
+            </Route>
 
-          <Route path="/help" element={<HelpPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </AIProvider>
+            <Route path="/help" element={<HelpPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </AIProvider>
+      </ToastProvider>
     </ErrorBoundary>
   );
 }

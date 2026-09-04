@@ -1,19 +1,38 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'CodeLensDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Bumped for 'analysis' store separation
 
 /**
  * Initialize IndexedDB.
  */
 async function getDB() {
   return openDB(DB_NAME, DB_VERSION, {
-    upgrade(db) {
+    async upgrade(db, oldVersion, newVersion, transaction) {
       if (!db.objectStoreNames.contains('repos')) {
         db.createObjectStore('repos', { keyPath: 'id' });
       }
       if (!db.objectStoreNames.contains('files')) {
         db.createObjectStore('files', { keyPath: ['repoId', 'filePath'] });
+      }
+      if (!db.objectStoreNames.contains('analysis')) {
+        db.createObjectStore('analysis', { keyPath: 'id' });
+      }
+      
+      // Migration from version 1 to 2: Split analysis out of 'repos' store
+      if (oldVersion < 2 && db.objectStoreNames.contains('repos')) {
+        const repoStore = transaction.objectStore('repos');
+        const analysisStore = transaction.objectStore('analysis');
+        let cursor = await repoStore.openCursor();
+        while (cursor) {
+          const record = cursor.value;
+          if (record.analysis) {
+            await analysisStore.put({ id: record.id, analysis: record.analysis });
+            delete record.analysis;
+            await cursor.update(record);
+          }
+          cursor = await cursor.continue();
+        }
       }
     },
   });
@@ -30,6 +49,8 @@ export async function saveMeta(record) {
     name: record.name,
     uploadedAt: record.uploadedAt,
     status: record.status,
+    phase: record.phase,
+    phaseDetails: record.phaseDetails,
     error: record.error,
     analysisVersion: record.analysisVersion,
   };
@@ -47,10 +68,9 @@ export async function saveMeta(record) {
 export async function saveAnalysis(record) {
   if (!record.analysis) return;
   const db = await getDB();
-  const tx = db.transaction('repos', 'readwrite');
-  const store = tx.objectStore('repos');
-  const existing = await store.get(record.id) || { id: record.id };
-  await store.put({ ...existing, analysis: record.analysis });
+  const tx = db.transaction('analysis', 'readwrite');
+  const store = tx.objectStore('analysis');
+  await store.put({ id: record.id, analysis: record.analysis });
   await tx.done;
 }
 
@@ -67,7 +87,14 @@ export async function save(record) {
  */
 export async function load(id) {
   const db = await getDB();
-  return await db.get('repos', id);
+  const meta = await db.get('repos', id);
+  if (!meta) return null;
+  
+  const analysisDoc = await db.get('analysis', id);
+  if (analysisDoc && analysisDoc.analysis) {
+    meta.analysis = analysisDoc.analysis;
+  }
+  return meta;
 }
 
 /**
@@ -89,6 +116,11 @@ export async function remove(id) {
   await txRepos.objectStore('repos').delete(id);
   await txRepos.done;
   
+  // Remove analysis
+  const txAnalysis = db.transaction('analysis', 'readwrite');
+  await txAnalysis.objectStore('analysis').delete(id);
+  await txAnalysis.done;
+  
   // Remove associated files
   const txFiles = db.transaction('files', 'readwrite');
   const store = txFiles.objectStore('files');
@@ -107,13 +139,9 @@ export async function remove(id) {
  */
 export async function removeAnalysis(id) {
   const db = await getDB();
-  const tx = db.transaction('repos', 'readwrite');
-  const store = tx.objectStore('repos');
-  const existing = await store.get(id);
-  if (existing) {
-    delete existing.analysis;
-    await store.put(existing);
-  }
+  const tx = db.transaction('analysis', 'readwrite');
+  const store = tx.objectStore('analysis');
+  await store.delete(id);
   await tx.done;
 }
 

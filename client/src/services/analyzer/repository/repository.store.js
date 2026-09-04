@@ -29,35 +29,65 @@ import * as persistence from './persistence.store.js';
 // ── In-memory map ─────────────────────────────────────────────────────────────
 const store = new Map();
 
+let initialized = false;
+let initPromise = null;
+
+async function ensureInitialized() {
+  if (initialized) return;
+  if (!initPromise) {
+    initPromise = (async () => {
+      const restored = await persistence.loadAll();
+      for (const record of restored) {
+        if (record.status === 'analyzing' || record.status === 'pending') {
+          record.status = 'error';
+          record.error = 'Analysis was interrupted by a page reload.';
+          await persistence.saveMeta(record);
+        }
+        store.set(record.id, record);
+      }
+      initialized = true;
+    })();
+  }
+  return initPromise;
+}
+
 // ── Boot: restore repos from disk ────────────────────────────────────────────
 export async function initializeStore() {
-  const restored = await persistence.loadAll();
-  for (const record of restored) {
-    if (record.status === 'analyzing' || record.status === 'pending') {
-      record.status = 'error';
-      record.error = 'Analysis was interrupted by a page reload.';
-      await persistence.saveMeta(record);
-    }
-    store.set(record.id, record);
-  }
+  return ensureInitialized();
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export async function set(id, record) {
+  await ensureInitialized();
   store.set(id, record);
   await persistence.save(record);
 }
 
-export function get(id) {
+export async function get(id) {
+  await ensureInitialized();
+  
+  // ALWAYS read from IndexedDB to ensure we aren't reading stale UI-thread memory
+  // that missed background worker updates.
+  const dbRecord = await persistence.load(id);
+  if (dbRecord) {
+    store.set(id, dbRecord); // Update local cache
+    return dbRecord;
+  }
   return store.get(id) || null;
 }
 
-export function getAll() {
-  return Array.from(store.values());
+export async function getAll() {
+  await ensureInitialized();
+  const dbRecords = await persistence.loadAll();
+  for (const record of dbRecords) {
+    store.set(record.id, record);
+  }
+  return dbRecords;
 }
 
 export async function update(id, patch) {
+  await ensureInitialized();
   const existing = store.get(id);
   if (!existing) throw new Error(`Repository ${id} not found in store`);
   const updated = { ...existing, ...patch };
@@ -69,16 +99,19 @@ export async function update(id, patch) {
   await persistence.saveMeta(updated);
 }
 
-export function all() {
+export async function all() {
+  await ensureInitialized();
   return Array.from(store.values());
 }
 
 export async function remove(id) {
+  await ensureInitialized();
   store.delete(id);
   await persistence.remove(id);
 }
 
 export async function clearAnalysis(id) {
+  await ensureInitialized();
   const existing = store.get(id);
   if (!existing) return;
   

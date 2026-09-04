@@ -6,12 +6,7 @@ import {
 } from 'lucide-react';
 import { DiffEditor } from '@monaco-editor/react';
 import { ResizableLayout } from '../../shared/components/ResizableLayout';
-import { 
-  getRefactoringIntelligence, 
-  getRefactoringImpact, 
-  getRefactoringInsights,
-  autoFixRefactoringCandidate
-} from '../../shared/api';
+import { repositoryApi } from '../../shared/api';
 import AiResponse from '../../shared/components/ai/AiResponse';
 
 export default function RefactoringPage() {
@@ -27,8 +22,8 @@ export default function RefactoringPage() {
   useEffect(() => {
     async function load() {
       try {
-        const data = await getRefactoringIntelligence(repoId);
-        setIntel(data);
+        const data = await repositoryApi.getRefactoringIntelligence(repoId);
+        setIntel(data.data);
         if (data.candidates && data.candidates.length > 0) {
           setSelectedCandidateId(data.candidates[0].id);
         }
@@ -167,8 +162,8 @@ function CandidateDetail({ candidate, repoId }) {
     async function loadImpact() {
       setLoading(true);
       try {
-        const data = await getRefactoringImpact(repoId, candidate.id);
-        setImpact(data);
+        const data = await repositoryApi.getRefactoringImpact(repoId, candidate.id);
+        setImpact(data.data);
       } catch (err) {
         console.error(err);
       } finally {
@@ -199,8 +194,8 @@ function CandidateDetail({ candidate, repoId }) {
               setFixing(true);
               setFixError(null);
               try {
-                const res = await autoFixRefactoringCandidate(repoId, candidate.id);
-                setFixResult(res);
+                const res = await repositoryApi.autoFixRefactoringCandidate(repoId, candidate.id);
+                setFixResult(res.data);
               } catch (err) {
                 setFixError(err?.response?.data?.error || err.message);
               } finally {
@@ -344,8 +339,8 @@ function AiAdvisor({ candidate, repoId }) {
     setLoading(true);
     setInsights(null);
     try {
-      const data = await getRefactoringInsights(repoId, candidate.id);
-      setInsights(data);
+        const data = await repositoryApi.getRefactoringInsights(repoId, candidate.id);
+        setInsights(data.data);
     } catch (err) {
       setInsights({ error: err?.response?.data?.error || err.message });
     } finally {

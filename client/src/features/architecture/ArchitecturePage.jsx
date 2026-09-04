@@ -5,6 +5,7 @@ import { ResizableLayout } from '../../shared/components/ResizableLayout';
 import { repositoryApi } from '../../shared/api';
 import AiResponse from '../../shared/components/ai/AiResponse';
 import ContextBreadcrumbs from '../../shared/components/ContextBreadcrumbs';
+import { useToast } from '../../shared/context/ToastContext';
 import ReactFlow, { Background, Controls, MiniMap, MarkerType, Handle, Position } from 'reactflow';
 import 'reactflow/dist/style.css';
 import * as d3Force from 'd3-force';
@@ -58,6 +59,12 @@ const ArchNode = ({ data }) => {
         )}
       </div>
       <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} isConnectable={false} />
+      {isViolating && (
+        <div 
+          style={{ position: 'absolute', top: -3, right: -3, width: 10, height: 10, borderRadius: '50%', background: '#ff7b72', boxShadow: '0 0 0 2px #0d1117' }} 
+          title="Rule Violation" 
+        />
+      )}
     </div>
   );
 };
@@ -308,6 +315,7 @@ function graphToFlow(components, relations, selectedId, violations) {
 export default function ArchitecturePage() {
   const { repoId } = useParams();
   const navigate = useNavigate();
+  const { addToast } = useToast();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -335,8 +343,10 @@ export default function ArchitecturePage() {
     try {
       const res = await repositoryApi.getArchitecture(repoId, { generateAi: true });
       setData(prev => ({ ...prev, insights: res.data.insights }));
+      addToast({ title: 'Insights Generated', description: 'Architecture insights have been successfully generated.', type: 'success' });
     } catch (err) {
       setAiError(err?.response?.data?.error || err.message || 'Failed to generate AI insights.');
+      addToast({ title: 'Generation Failed', description: err.message || 'Failed to generate AI insights.', type: 'error' });
     } finally {
       setIsGeneratingAi(false);
     }
@@ -381,7 +391,7 @@ export default function ArchitecturePage() {
             <button 
               onClick={async () => {
                 await repositoryApi.analyze(repoId);
-                window.location.reload();
+                navigate(`/explore/${repoId}`);
               }}
               className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors"
             >
@@ -420,21 +430,70 @@ export default function ArchitecturePage() {
                    </div>
                  </div>
 
-                {data?.model?.violations?.length > 0 && (
-                  <section className="mb-4">
-                    <p className="text-xs text-danger uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                      <AlertCircle className="w-3.5 h-3.5" /> Rule Violations ({data.model.violations.length})
-                    </p>
-                    <div className="flex flex-col gap-2">
-                      {data.model.violations.map((v, i) => (
-                        <div key={i} className="bg-danger/10 border border-danger/30 p-2 rounded flex flex-col gap-1 cursor-pointer hover:bg-danger/20 transition-colors" onClick={() => setSelectedComponent(v.sourceComponent)}>
-                          <span className="text-[11px] font-semibold text-danger">{v.name}</span>
-                          <span className="text-[10px] text-white/80">{v.sourceComponent} → {v.targetComponent}</span>
-                          <span className="text-[10px] text-muted italic line-clamp-2" title={v.description}>{v.description}</span>
-                        </div>
-                      ))}
+                {!selectedComponent ? (
+                  <div className="text-center p-4 border border-dashed border-border/50 rounded-lg">
+                    <Box className="w-8 h-8 text-muted mx-auto mb-2 opacity-50" />
+                    <p className="text-xs text-muted">Click a component in the graph to view its details and specific violations.</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    {/* Component Info */}
+                    <div className="bg-surface/50 p-3 rounded border border-border/50">
+                      <p className="text-xs text-muted uppercase tracking-wider mb-2">Component Details</p>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Box className="w-4 h-4 text-accent" />
+                        <span className="text-sm font-semibold text-white truncate" title={selectedComponent}>{selectedComponent}</span>
+                      </div>
+                      
+                      {(() => {
+                        const compData = data?.model?.components?.find(c => c.name === selectedComponent);
+                        if (!compData) return null;
+                        return (
+                          <div className="flex flex-col gap-1.5 mt-3">
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-muted">Layer</span>
+                              <span className="text-xs font-mono" style={{ color: layerColor(compData.layer, false).border }}>{compData.layer}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-muted">Files</span>
+                              <span className="text-xs text-white/80 font-mono">{compData.files?.length || 0}</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
-                  </section>
+
+                    {/* Node Specific Violations */}
+                    {(() => {
+                      const nodeViolations = (data?.model?.violations || []).filter(
+                        v => v.sourceComponent === selectedComponent || v.targetComponent === selectedComponent
+                      );
+                      
+                      if (nodeViolations.length === 0) {
+                        return (
+                          <div className="bg-success/10 border border-success/30 p-3 rounded flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4 text-success" />
+                            <span className="text-xs text-success">No architecture violations</span>
+                          </div>
+                        );
+                      }
+                      
+                      return (
+                        <div className="flex flex-col gap-2">
+                          <p className="text-xs text-danger uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                            <AlertCircle className="w-3.5 h-3.5" /> Violations ({nodeViolations.length})
+                          </p>
+                          {nodeViolations.map((v, i) => (
+                            <div key={i} className="bg-danger/10 border border-danger/30 p-2 rounded flex flex-col gap-1">
+                              <span className="text-[11px] font-semibold text-danger">{v.name}</span>
+                              <span className="text-[10px] text-white/80">{v.sourceComponent} → {v.targetComponent}</span>
+                              <span className="text-[10px] text-muted italic line-clamp-2" title={v.description}>{v.description}</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
                 )}
                 <p className="text-xs text-muted uppercase tracking-wider mb-3">Entry Points</p>
                 {data?.model?.entryPoints?.length > 0 ? (

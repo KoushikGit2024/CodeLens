@@ -5,7 +5,16 @@ import * as repositoryStore from '../../services/analyzer/repository/repository.
 import * as persistenceStore from '../../services/analyzer/repository/persistence.store.js';
 import { startAnalysis } from '../../services/analyzer/analyzer.client.js';
 
-// We can still keep an api instance for any true backend calls (like health checks)
+import { buildArchitectureModel } from '../../services/analyzer/advanced/architecture.analyzer.js';
+import { buildRepositoryIntelligence } from '../../services/analyzer/advanced/intelligence.analyzer.js';
+import { buildEngineeringRiskModel } from '../../services/analyzer/advanced/risk.analyzer.js';
+import { buildRefactoringIntelligence } from '../../services/analyzer/advanced/refactoring.analyzer.js';
+import { analyzeChangeImpact } from '../../services/analyzer/advanced/change.impact.js';
+import { buildQuestionContext } from '../../services/analyzer/advanced/question.context.js';
+import { buildPrompt } from '../../services/analyzer/advanced/base.context.js';
+import { buildOverviewContext, buildModuleContext, buildOverviewPrompt, buildModulePrompt } from '../../services/analyzer/advanced/documentation.context.js';
+
+// We can still keep an api instance for any true backend calls (like health checks or LLM proxied calls)
 const api = axios.create({
   baseURL: '/api',
   timeout: 60_000,
@@ -184,52 +193,178 @@ export const repositoryApi = {
     // Emulate getFileDependencies logic
     const dependencies = graph.edges
       .filter(e => e.source === nodeId)
-      .map(e => ({ id: e.target, type: e.type }));
+      .map(e => {
+        const isPkg = e.target.startsWith('pkg:');
+        return {
+          id: e.target,
+          type: e.type,
+          filePath: !isPkg ? e.target.replace('file:', '') : undefined,
+          package: isPkg ? e.target.replace('pkg:', '') : undefined
+        };
+      });
       
     const dependents = graph.edges
       .filter(e => e.target === nodeId)
-      .map(e => ({ id: e.source, type: e.type }));
+      .map(e => {
+        const isPkg = e.source.startsWith('pkg:');
+        return {
+          id: e.source,
+          type: e.type,
+          filePath: !isPkg ? e.source.replace('file:', '') : undefined,
+          package: isPkg ? e.source.replace('pkg:', '') : undefined
+        };
+      });
       
-    return { data: { filePath, dependencies, dependents, dependencyCount: dependencies.length } };
+    const externalPackages = [...new Set(dependencies.filter(d => d.package).map(d => d.package))];
+      
+    return { 
+      data: { 
+        filePath, 
+        dependencies: dependencies.filter(d => !d.package), 
+        dependents, 
+        externalPackages,
+        dependencyCount: dependencies.filter(d => !d.package).length,
+        dependentCount: dependents.length
+      } 
+    };
   },
 
-  // ── AI and CI Endpoints (still hitting backend for now if they require Watsonx) ──
-  getArchitecture(id, options = {}) {
-    const params = {};
-    if (options.generateAi) params.ai = 'true';
-    return api.get(`/repository/${id}/architecture`, { params });
+  // ── Offline Advanced Intelligence Endpoints ──────────────────────────────────
+  async getArchitecture(id, options = {}) {
+    const record = await repositoryStore.get(id);
+    if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
+    const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
+    
+    if (options.generateAi) {
+      // Stub: in reality we would POST the computed context to Watsonx
+      // For now, we will return the deterministic model
+      return { data: { model: architecture } };
+    }
+    return { data: { model: architecture } };
   },
-  getOverviewDocumentation: (id, options = {}) => {
-    const params = {};
-    if (options.generateAi) params.ai = 'true';
-    return api.get(`/repository/${id}/documentation/overview`, { params });
+
+  async getIntelligence(repoId) {
+    const record = await repositoryStore.get(repoId);
+    if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
+    const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
+    const intelligence = buildRepositoryIntelligence(record.analysis, record.analysis.graph, architecture);
+    return { data: intelligence };
   },
-  getModuleDocumentation: (id, path, options = {}) => {
-    const params = { path };
-    if (options.generateAi) params.ai = 'true';
-    return api.get(`/repository/${id}/documentation/file`, { params });
+
+  async getRisks(repoId) {
+    const record = await repositoryStore.get(repoId);
+    if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
+    const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
+    const risks = buildEngineeringRiskModel(record.analysis, record.analysis.graph, architecture);
+    return { data: risks };
   },
-  askQuestion: (id, question, activeContext) => {
-    return api.post(`/repository/${id}/question`, { question, activeContext });
+
+  async getChangeImpact(repoId, files) {
+    const record = await repositoryStore.get(repoId);
+    if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
+    const impact = analyzeChangeImpact(record.analysis, record.analysis.graph, files || []);
+    return { data: impact };
   },
-  analyze: (id) => {
-    return api.post(`/repository/${id}/analyze`, { mode: 'full' });
+
+  async getRefactoringIntelligence(repoId) {
+    const record = await repositoryStore.get(repoId);
+    if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
+    const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
+    const risks = buildEngineeringRiskModel(record.analysis, record.analysis.graph, architecture);
+    const refactoring = buildRefactoringIntelligence(risks);
+    return { data: refactoring };
   },
-  analyzeIncremental: (id) => {
-    return api.post(`/repository/${id}/analyze`, { mode: 'incremental' });
+
+  async getRefactoringImpact(repoId, candidateId) {
+    return { data: { files: [], complexity: 'Low', effort: 'Unknown' } };
   },
-  getChangeImpact: (repoId) => api.get(`/repository/${repoId}/impact`),
+
+  async getRefactoringInsights(repoId, candidateId) {
+    return { data: { insights: "AI refactoring insights not yet ported to offline-first." } };
+  },
+
+  async autoFixRefactoringCandidate(repoId, candidateId) {
+    throw new Error('Auto-fix is currently disabled in offline mode.');
+  },
+
+  // ── AI Prompt Endpoints ──────────────────────────────────────────────────────
+  async askQuestion(id, question, activeContext) {
+    const record = await repositoryStore.get(id);
+    if (!record || !record.analysis || !record.analysis.graph) throw new Error('Analysis not available');
+
+    // Build the giant prompt string offline!
+    const { routing, contextData } = await buildQuestionContext(record.analysis, question, id, activeContext);
+    
+    // Convert to a raw prompt
+    const promptContext = {
+       question,
+       repository: contextData.meta,
+       files: contextData.files,
+       truncated: false
+    };
+    const rawPrompt = buildPrompt(promptContext);
+    
+    // Append facts manually for now
+    const fullPrompt = contextData.facts.length > 0 
+      ? `Facts:\n${contextData.facts.join('\n')}\n\n${rawPrompt}` 
+      : rawPrompt;
+
+    // Send the compiled prompt to the generic backend AI endpoint
+    return api.post(`/ai/chat`, { prompt: fullPrompt });
+  },
+
+  async getOverviewDocumentation(id, options = {}) {
+    const record = await repositoryStore.get(id);
+    if (!record || !record.analysis || !record.analysis.graph) throw new Error('Analysis not available');
+
+    const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
+    const context = buildOverviewContext(record.analysis, record.analysis.graph, architecture);
+
+    if (options.generateAi) {
+      const prompt = buildOverviewPrompt(context);
+      const aiResponse = await api.post(`/ai/chat`, { prompt, jsonMode: true });
+      return { data: { facts: context, aiGenerated: aiResponse.data.response } };
+    }
+    
+    return { data: { facts: context } };
+  },
+  
+  async getModuleDocumentation(id, path, options = {}) {
+    const record = await repositoryStore.get(id);
+    if (!record || !record.analysis || !record.analysis.graph) throw new Error('Analysis not available');
+
+    const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
+    const context = buildModuleContext(record.analysis, record.analysis.graph, architecture, path);
+
+    if (options.generateAi) {
+      const prompt = buildModulePrompt(context);
+      const aiResponse = await api.post(`/ai/chat`, { prompt, jsonMode: true });
+      return { data: { facts: context, aiGenerated: aiResponse.data.response } };
+    }
+    
+    return { data: { facts: context } };
+  },
+
+  // ── CI / Trigger Endpoints ───────────────────────────────────────────────────
+  analyze: async (id) => {
+    await repositoryStore.update(id, { status: 'analyzing', phase: 'extracting', error: null });
+    startAnalysis(id, {}).catch(err => console.error('Background analysis failed:', err));
+    return { data: { success: true } };
+  },
+  analyzeIncremental: async (id) => {
+    await repositoryStore.update(id, { status: 'analyzing', phase: 'extracting', error: null });
+    startAnalysis(id, {}).catch(err => console.error('Background analysis failed:', err));
+    return { data: { success: true } };
+  },
   getCiReport: (repoId) => api.get(`/repository/${repoId}/ci-report`),
-  getIntelligence: (repoId) => api.get(`/repository/${repoId}/intelligence`),
-  getRisks: (repoId) => api.get(`/repository/${repoId}/risks`)
 };
 
 export const getAiHealth = () => api.get('/health/ai').then(res => res.data);
-export const getEngineeringRisks = (id) => api.get(`/repository/${id}/risks`).then(res => res.data);
+export const getEngineeringRisks = (id) => repositoryApi.getRisks(id).then(res => res.data);
 export const getEngineeringInsights = (id) => api.get(`/repository/${id}/risks/insights`).then(res => res.data);
-export const getRefactoringIntelligence = (id) => api.get(`/repository/${id}/refactoring`).then(res => res.data);
-export const getRefactoringCandidate = (id, candidateId) => api.get(`/repository/${id}/refactoring/${candidateId}`).then(res => res.data);
-export const getRefactoringImpact = (id, candidateId) => api.get(`/repository/${id}/refactoring/${candidateId}/impact`).then(res => res.data);
+export const getRefactoringIntelligence = (id) => repositoryApi.getRefactoringIntelligence(id).then(res => res.data);
+export const getRefactoringCandidate = (id, candidateId) => repositoryApi.getRefactoringIntelligence(id).then(res => res.data.candidates.find(c => c.id === candidateId));
+export const getRefactoringImpact = (id, candidateId) => repositoryApi.getChangeImpact(id).then(res => res.data); // Mocked
 export const getRefactoringInsights = (id, candidateId) => api.get(`/repository/${id}/refactoring/${candidateId}/insights`).then(res => res.data);
 export const autoFixRefactoringCandidate = (id, candidateId) => api.post(`/repository/${id}/refactoring/${candidateId}/auto-fix`).then(res => res.data);
 

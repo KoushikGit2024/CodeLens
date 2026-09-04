@@ -1,20 +1,23 @@
 import { RefreshCw, Loader2 } from 'lucide-react';
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import Breadcrumbs from '../ui/Breadcrumbs';
 import AIStatusIndicator from '../../features/assistant/AIStatusIndicator';
 import { repositoryApi } from '../api';
+import { useRepository } from '../context/RepositoryContext';
 
 export default function RepositoryHeader() {
   const { repoId } = useParams();
+  const navigate = useNavigate();
+  const { refetchRepo } = useRepository();
   const [reanalyzing, setReanalyzing] = useState(false);
 
   const handleReanalyze = async () => {
     setReanalyzing(true);
     try {
       await repositoryApi.analyze(repoId);
-      // Wait a moment then refresh the page to reload all intelligence data
-      setTimeout(() => window.location.reload(), 1000);
+      await refetchRepo();
+      navigate(`/explore/${repoId}`);
     } catch (err) {
       console.error('Failed to re-analyze', err);
     } finally {
