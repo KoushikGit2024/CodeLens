@@ -48,7 +48,9 @@ function analyzeReachability(graph) {
     return { unreachableFiles: [], entryPoints: [] };
   }
 
-  const nodeIds = Object.keys(graph.nodes);
+  const nodeIds = Array.isArray(graph.nodes) 
+    ? graph.nodes.map(n => n.id) 
+    : Object.keys(graph.nodes);
   
   // 1. Identify Entry Points
   const entryPoints = nodeIds.filter(id => {

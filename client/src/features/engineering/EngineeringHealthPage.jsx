@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, Loader2, AlertCircle, RefreshCw, ShieldAlert, CheckCircle, LayoutDashboard, FileText, Copy, Ghost, ChevronDown, ChevronUp, Code } from 'lucide-react';
+import { ChevronLeft, Loader2, AlertCircle, RefreshCw, ShieldAlert, CheckCircle, LayoutDashboard, FileText, Copy, Ghost, ChevronDown, ChevronUp, Code, ArrowRight } from 'lucide-react';
 import AIStatusIndicator from '../assistant/AIStatusIndicator';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { repositoryApi } from '../../shared/api';
@@ -7,166 +7,49 @@ import AiResponse from '../../shared/components/ai/AiResponse';
 import PageHeader from '../../shared/components/PageHeader';
 import { useToast } from '../../shared/context/ToastContext';
 
-const RiskAccordionItem = ({ risk, repoId, navigate }) => {
-  const [expanded, setExpanded] = useState(false);
-  const [sourceCode, setSourceCode] = useState(null);
-  const [loadingCode, setLoadingCode] = useState(false);
-
-  const handleExpand = async () => {
-    const isExpanding = !expanded;
-    setExpanded(isExpanding);
-    
-    if (isExpanding && risk.file && !sourceCode) {
-      setLoadingCode(true);
-      try {
-        const res = await repositoryApi.getFile(repoId, risk.file);
-        let content = res.data.content;
-        
-        // If we have line numbers, we can slice it
-        const loc = risk.details?.location;
-        if (loc && loc.startLine) {
-          const lines = content.split('\n');
-          const start = Math.max(0, loc.startLine - 5);
-          const end = Math.min(lines.length, (loc.endLine || loc.startLine) + 5);
-          content = lines.slice(start, end).map((l, i) => {
-            const lineNum = start + i + 1;
-            const isTarget = lineNum >= loc.startLine && lineNum <= (loc.endLine || loc.startLine);
-            return `${isTarget ? '>' : ' '} ${String(lineNum).padStart(3, ' ')} | ${l}`;
-          }).join('\n');
-        } else {
-          // just show the first 30 lines if no loc
-          content = content.split('\n').slice(0, 30).join('\n') + '\n... (truncated)';
-        }
-        
-        setSourceCode(content);
-      } catch (err) {
-        setSourceCode("// Source code could not be loaded.");
-      } finally {
-        setLoadingCode(false);
-      }
-    }
-  };
-
+const RiskCard = ({ risk, repoId, navigate }) => {
   const getSeverityBadge = (severity) => {
     const map = {
       critical: 'bg-red-500/20 text-red-500 border border-red-500/30',
       high: 'bg-orange-500/20 text-orange-500 border border-orange-500/30',
       warning: 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/30'
     };
-    return `px-2 py-0.5 rounded text-xs uppercase font-medium ${map[severity] || ''}`;
+    return `px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-widest ${map[severity] || ''}`;
   };
 
   return (
-    <div className={`rounded border ${expanded ? 'border-accent/50 bg-panel shadow-md' : 'border-border bg-panel'} overflow-hidden transition-all duration-200`}>
-      {/* Header */}
-      <button 
-        onClick={handleExpand}
-        className="w-full flex items-start justify-between p-5 text-left hover:bg-surface/50 transition-colors"
-      >
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <span className={getSeverityBadge(risk.severity)}>{risk.severity}</span>
-            <span className="text-xs font-semibold uppercase tracking-widest text-muted">{risk.category}</span>
-          </div>
-          <h3 className="mt-2 text-lg font-medium text-white">{risk.title}</h3>
-          {!expanded && <p className="mt-1 text-sm text-muted line-clamp-1">{risk.description}</p>}
+    <div className="rounded-xl border border-border bg-[#0d1117] flex flex-col overflow-hidden hover:border-accent/40 transition-colors shadow-lg h-72">
+      <div className="p-5 flex-1 flex flex-col bg-gradient-to-b from-surface/50 to-transparent">
+        <div className="flex items-start justify-between mb-3">
+          <span className={getSeverityBadge(risk.severity)}>{risk.severity}</span>
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">{risk.category}</span>
         </div>
-        <div className="ml-4 mt-2 text-muted">
-          {expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-        </div>
-      </button>
-
-      {/* Expanded Content */}
-      {expanded && (
-        <div className="p-5 border-t border-border/50 bg-surface/30">
-          <p className="mb-4 text-gray-300">{risk.description}</p>
-          
-          {/* File location */}
-          {risk.file && (
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-white flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-accent" />
-                  Target File
-                </span>
-                <Link
-                  to={`/explore/${repoId}/source?path=${encodeURIComponent(risk.file)}`}
-                  className="text-xs text-accent hover:underline flex items-center gap-1"
-                >
-                  <Code className="w-3 h-3" />
-                  View Full Source
-                </Link>
-              </div>
-              <div className="font-mono text-sm text-muted bg-surface px-3 py-2 rounded border border-border">
-                {risk.file} {risk.details?.location?.startLine ? `(Line ${risk.details.location.startLine})` : ''}
-              </div>
+        <h3 className="text-base font-semibold text-white mb-2 line-clamp-2" title={risk.title}>{risk.title}</h3>
+        <p className="text-xs text-muted line-clamp-3 leading-relaxed flex-1">{risk.description}</p>
+        
+        {risk.file && (
+          <div className="mt-4 pt-4 border-t border-border/50">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-medium text-white/70 uppercase tracking-widest">Target File</span>
             </div>
-          )}
-
-          {/* Details / Evidence */}
-          {risk.details && Object.keys(risk.details).length > 0 && (
-            <div className="mb-4">
-              <h4 className="text-sm font-medium text-white mb-2">Technical Details</h4>
-              <div className="bg-surface rounded p-3 text-sm text-muted">
-                {Object.entries(risk.details).map(([k, v]) => (
-                  k !== 'location' && k !== 'instances' && (
-                    <div key={k} className="flex mb-1">
-                      <span className="w-1/3 font-medium text-gray-400 capitalize">{k.replace(/([A-Z])/g, ' $1').trim()}</span>
-                      <span className="w-2/3 text-gray-300">{String(v)}</span>
-                    </div>
-                  )
-                ))}
-                {risk.details.instances && (
-                  <div className="mt-2">
-                    <span className="font-medium text-gray-400 block mb-1">Clone Instances:</span>
-                    <ul className="list-disc list-inside">
-                      {risk.details.instances.map((inst, i) => (
-                        <li key={i} className="text-gray-300">
-                          {inst.filePath} {inst.location?.startLine ? `(Line ${inst.location.startLine})` : ''}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Source Code Snippet */}
-          {risk.file && (
-            <div className="mt-4">
-              <h4 className="text-sm font-medium text-white mb-2">Code Snippet</h4>
-              <div className="relative rounded border border-border overflow-hidden bg-[#1e1e1e]">
-                {loadingCode ? (
-                  <div className="flex items-center justify-center p-8 text-muted">
-                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                    Fetching source code...
-                  </div>
-                ) : sourceCode ? (
-                  <pre className="p-4 text-xs font-mono text-gray-300 overflow-x-auto whitespace-pre">
-                    <code>{sourceCode}</code>
-                  </pre>
-                ) : (
-                  <div className="p-4 text-xs text-muted">No snippet available.</div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Refactoring Strategy Action */}
-          <div className="mt-6 flex justify-end">
-            <button 
-              onClick={() => navigate(`/explore/${repoId}/refactoring`)}
-              className="px-4 py-2 text-sm font-medium bg-accent/20 text-accent rounded hover:bg-accent/30 transition-colors flex items-center"
+            <Link
+              to={`/explore/${repoId}/source?path=${encodeURIComponent(risk.file)}`}
+              className="text-xs font-mono text-accent bg-accent/10 px-2 py-1.5 rounded truncate block hover:underline"
+              title={risk.file}
             >
-              Generate Refactoring Strategy
-              <svg className="ml-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </button>
+              {risk.file.split('/').pop()}
+            </Link>
           </div>
-        </div>
-      )}
+        )}
+      </div>
+      <div className="bg-panel border-t border-border px-4 py-3 shrink-0 flex justify-end">
+        <button 
+          onClick={() => navigate(`/explore/${repoId}/refactoring`)}
+          className="text-xs font-medium text-white/80 hover:text-white flex items-center gap-1 transition-colors"
+        >
+          Send to Triage <ArrowRight className="w-3 h-3" />
+        </button>
+      </div>
     </div>
   );
 };
@@ -393,9 +276,9 @@ const EngineeringHealthPage = () => {
           {fileFilter ? 'No engineering risks found for this specific file.' : 'No engineering risks identified. The codebase appears structurally healthy.'}
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredRisks.map((risk) => (
-            <RiskAccordionItem key={risk.id} risk={risk} repoId={repoId} navigate={navigate} />
+            <RiskCard key={risk.id} risk={risk} repoId={repoId} navigate={navigate} />
           ))}
         </div>
       )}

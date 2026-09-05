@@ -10,6 +10,58 @@ import { repositoryApi } from '../../shared/api';
 import AiResponse from '../../shared/components/ai/AiResponse';
 import PageHeader from '../../shared/components/PageHeader';
 
+const formatCategory = (category) => {
+  if (!category) return 'General';
+  return category.replace(/([A-Z])/g, ' $1').trim().replace(/^./, str => str.toUpperCase());
+};
+
+const IssueGroup = ({ issueTitle, issueData, priorityLevel, selectedCandidateId, setSelectedCandidateId, bgColors, selectedBg }) => {
+  const [isOpen, setIsOpen] = useState(true);
+  
+  return (
+    <div className="flex flex-col gap-1.5 ml-2 border-l-2 border-border/50 pl-3">
+      <div 
+        className="text-[11px] text-muted/80 font-semibold mb-1 truncate cursor-pointer hover:text-white transition-colors flex items-center gap-1" 
+        title={issueTitle}
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span>{isOpen ? '▾' : '▸'}</span>
+        <span>{issueTitle} <span className="font-normal opacity-70">({issueData.items.length})</span></span>
+      </div>
+      
+      {isOpen && issueData.items.sort((a,b) => b.priorityScore - a.priorityScore).map(c => (
+        <button
+          key={c.id}
+          onClick={() => setSelectedCandidateId(c.id)}
+          className={`text-left p-3 rounded-lg border transition-all ${
+            selectedCandidateId === c.id 
+              ? selectedBg[priorityLevel]
+              : bgColors[priorityLevel]
+          }`}
+        >
+          <div className="flex items-start justify-between mb-2">
+            <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-surface border border-border/50">Score {c.priorityScore}</span>
+            <p className="text-[9px] uppercase tracking-wider text-muted truncate" title={c.type}>{formatCategory(c.type)}</p>
+          </div>
+          
+          {c.files && c.files.length > 0 && (
+            <h3 className="text-sm font-medium text-white/90 truncate mb-1 font-mono" title={c.files[0]}>
+              {c.files[0].split('/').pop()}
+              {c.files.length > 1 ? ` (+${c.files.length - 1})` : ''}
+            </h3>
+          )}
+          
+          {c.description && (
+            <p className="text-[11px] text-muted/80 line-clamp-2 leading-relaxed" title={c.description}>
+              {c.description}
+            </p>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+};
+
 export default function RefactoringPage() {
   const { repoId } = useParams();
   const navigate = useNavigate();
@@ -84,38 +136,68 @@ export default function RefactoringPage() {
           title: 'Candidates',
           icon: <Wrench />,
           content: (
-            <aside className="flex-1 overflow-y-auto p-3 flex flex-col gap-2 custom-scrollbar bg-panel h-full">
-              <p className="text-xs text-muted uppercase tracking-wider mb-2 px-1">Candidates by Priority</p>
+            <aside className="flex-1 overflow-y-auto p-3 flex flex-col gap-4 custom-scrollbar bg-[#0d1117] h-full border-r border-border">
               
-              {intel?.candidates?.map(c => (
-                <button
-                  key={c.id}
-                  onClick={() => setSelectedCandidateId(c.id)}
-                  className={`text-left p-3 rounded border transition-colors ${
-                    selectedCandidateId === c.id 
-                      ? 'bg-accent/10 border-accent/40' 
-                      : 'bg-surface/30 border-border hover:border-white/20'
-                  }`}
-                >
-                  <div className="flex items-start justify-between mb-1">
-                    <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                      c.priority === 'critical' ? 'bg-danger/20 text-danger' :
-                      c.priority === 'high' ? 'bg-orange-500/20 text-orange-400' :
-                      'bg-yellow-500/20 text-yellow-400'
-                    }`}>
-                      {c.priority}
-                    </span>
-                    <span className="text-[10px] text-muted font-mono">Score {c.priorityScore}</span>
-                  </div>
-                  <h3 className="text-sm font-medium text-white/90 break-words leading-snug" title={c.title}>{c.title}</h3>
-                  <p className="text-[11px] text-muted mt-1 break-words" title={c.type}>{formatCategory(c.type)}</p>
-                </button>
-              ))}
-              {(!intel?.candidates || intel.candidates.length === 0) && (
+              {(!intel?.candidates || intel.candidates.length === 0) ? (
                 <div className="flex flex-col items-center justify-center p-6 mt-10 text-center gap-3">
                   <CheckCircle className="w-8 h-8 text-success opacity-80" />
-                  <p className="text-sm text-muted">No high-priority refactoring candidates found.</p>
+                  <p className="text-sm text-muted">Inbox zero! No refactoring candidates found.</p>
                 </div>
+              ) : (
+                <>
+                  {['critical', 'high', 'warning'].map(priorityLevel => {
+                    const group = intel.candidates.filter(c => c.priority === priorityLevel);
+                    if (group.length === 0) return null;
+                    
+                    const titles = {
+                      'critical': 'Critical Action Required',
+                      'high': 'High Priority Triage',
+                      'warning': 'Suggested Improvements'
+                    };
+                    const bgColors = {
+                      'critical': 'bg-danger/5 border-danger/20 hover:border-danger/40',
+                      'high': 'bg-orange-500/5 border-orange-500/20 hover:border-orange-500/40',
+                      'warning': 'bg-blue-500/5 border-blue-500/20 hover:border-blue-500/40'
+                    };
+                    const selectedBg = {
+                      'critical': 'bg-danger/20 border-danger/60 shadow-[0_0_10px_rgba(248,113,113,0.15)]',
+                      'high': 'bg-orange-500/20 border-orange-500/60 shadow-[0_0_10px_rgba(251,146,60,0.15)]',
+                      'warning': 'bg-blue-500/20 border-blue-500/60 shadow-[0_0_10px_rgba(59,130,246,0.15)]'
+                    };
+                    
+                    // Group candidates by title
+                    const issuesMap = {};
+                    group.forEach(c => {
+                      if (!issuesMap[c.title]) issuesMap[c.title] = { maxScore: 0, items: [] };
+                      issuesMap[c.title].items.push(c);
+                      issuesMap[c.title].maxScore = Math.max(issuesMap[c.title].maxScore, c.priorityScore);
+                    });
+                    
+                    const sortedIssues = Object.entries(issuesMap).sort((a, b) => b[1].maxScore - a[1].maxScore);
+                    
+                    return (
+                      <div key={priorityLevel} className="flex flex-col gap-3 mb-4">
+                        <div className="flex items-center gap-2 px-1">
+                          <p className="text-xs text-white/90 uppercase tracking-wider font-bold">{titles[priorityLevel]}</p>
+                          <span className="text-[10px] bg-surface border border-border px-1.5 rounded text-muted">{group.length}</span>
+                        </div>
+                        
+                        {sortedIssues.map(([issueTitle, issueData]) => (
+                          <IssueGroup 
+                            key={issueTitle}
+                            issueTitle={issueTitle}
+                            issueData={issueData}
+                            priorityLevel={priorityLevel}
+                            selectedCandidateId={selectedCandidateId}
+                            setSelectedCandidateId={setSelectedCandidateId}
+                            bgColors={bgColors}
+                            selectedBg={selectedBg}
+                          />
+                        ))}
+                      </div>
+                    );
+                  })}
+                </>
               )}
             </aside>
           )
@@ -241,14 +323,22 @@ function CandidateDetail({ candidate, repoId }) {
       )}
 
       {fixResult && (
-        <div className="bg-[#0d1117] border border-border rounded flex flex-col h-[500px] overflow-hidden">
-          <div className="p-3 border-b border-border bg-panel flex items-center justify-between">
-             <span className="text-sm font-medium text-white flex items-center gap-2">
-               <Sparkles className="w-4 h-4 text-[#8957e5]" /> AI Auto-Fix Preview
-             </span>
-             <span className="text-xs font-mono text-muted">{fixResult.file}</span>
+        <div className="bg-[#0d1117] border-2 border-success/30 rounded-lg flex flex-col h-[550px] overflow-hidden shadow-2xl shadow-success/10 mt-6">
+          <div className="p-4 border-b border-border bg-surface flex items-center justify-between">
+             <div className="flex items-center gap-3">
+               <div className="p-1.5 bg-success/20 rounded-md">
+                 <GitBranch className="w-5 h-5 text-success" />
+               </div>
+               <div>
+                 <h3 className="text-sm font-semibold text-white">Suggested Pull Request</h3>
+                 <span className="text-xs font-mono text-muted">{fixResult.file}</span>
+               </div>
+             </div>
+             <button className="bg-success hover:bg-success/80 text-white px-4 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2">
+               <CheckCircle className="w-4 h-4" /> Approve & Merge
+             </button>
           </div>
-          <div className="flex-1 min-h-0 relative">
+          <div className="flex-1 min-h-0 relative bg-[#0d1117]">
             <DiffEditor
               original={fixResult.originalCode}
               modified={fixResult.refactoredCode}
@@ -271,13 +361,25 @@ function CandidateDetail({ candidate, repoId }) {
         <div className="bg-panel border border-border rounded p-4 min-w-0">
           <h3 className="text-xs font-medium text-muted uppercase tracking-wider mb-3">Affected Files</h3>
           <ul className="space-y-1.5">
-            {candidate.files.map(f => (
-              <li key={f} className="text-sm font-mono text-accent truncate" title={f}>
-                <Link to={`/explore/${repoId}/source?path=${encodeURIComponent(f)}`} className="hover:underline">
-                  {f}
-                </Link>
-              </li>
-            ))}
+            {candidate.files.map(f => {
+              const range = candidate.fileRanges && candidate.fileRanges[f];
+              let url = `/explore/${repoId}/source?path=${encodeURIComponent(f)}`;
+              if (range && range.startLine && range.endLine) {
+                url += `&line=${range.startLine}-${range.endLine}`;
+              }
+              return (
+                <li key={f} className="text-sm font-mono text-accent truncate" title={f}>
+                  <Link to={url} className="hover:underline">
+                    {f}
+                    {range && range.startLine && (
+                      <span className="text-muted/60 text-xs ml-2">
+                        L{range.startLine}-{range.endLine}
+                      </span>
+                    )}
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         </div>
         

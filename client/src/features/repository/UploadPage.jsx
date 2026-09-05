@@ -65,6 +65,15 @@ export default function UploadPage() {
 
   const handleBatchAction = async (action) => {
     if (selectedRepos.size === 0) return;
+    
+    if (action === 'delete') {
+      const confirmed = window.confirm(`Are you sure you want to permanently delete ${selectedRepos.size} workspace(s)? This action cannot be undone.`);
+      if (!confirmed) return;
+    } else if (action === 'clear_analysis') {
+      const confirmed = window.confirm(`Are you sure you want to clear the analysis data for ${selectedRepos.size} workspace(s)? You will need to re-analyze them.`);
+      if (!confirmed) return;
+    }
+
     setBatchActionRunning(true);
     try {
       await repositoryApi.batchManage(Array.from(selectedRepos), action);
@@ -412,7 +421,7 @@ export default function UploadPage() {
                 {selectedRepos.size > 0 && (
                   <div className="flex items-center gap-2 mr-4 border-r border-border/50 pr-4">
                     {selectedRepos.has(lastRepoId) && (
-                      <span className="text-[11px] font-medium text-orange-400 mr-2 flex items-center gap-1 hidden md:flex bg-orange-500/10 px-2 py-1 rounded border border-orange-500/20">
+                      <span className="text-[11px] font-medium text-orange-400 mr-2 hidden items-center gap-1 md:flex bg-orange-500/10 px-2 py-1 rounded border border-orange-500/20">
                         <AlertCircle className="w-3.5 h-3.5" />
                         Modifying active workspace
                       </span>
@@ -498,7 +507,7 @@ export default function UploadPage() {
                           )}
                         </div>
                         <p className="text-[11px] text-muted mt-0.5 truncate">
-                          Analyzed {new Date(repo.uploadedAt).toLocaleDateString()}
+                          {isReady ? 'Analyzed' : repo.status === 'error' ? 'Analysis failed' : repo.status === 'analyzing' ? 'Analyzing' : 'Uploaded'} on {new Date(repo.uploadedAt).toLocaleDateString()}
                         </p>
                       </div>
 
@@ -508,13 +517,16 @@ export default function UploadPage() {
                         </span>
                         
                         <button
-                          onClick={() => {
+                          onClick={async () => {
+                            if (!isReady) {
+                              await repositoryApi.reanalyze(repo.id);
+                            }
                             setShowManager(false);
                             navigate(`/explore/${repo.id}`);
                           }}
                           className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${isReady ? 'bg-accent hover:bg-accent-hover text-white' : 'bg-surface border border-border text-muted hover:text-white'}`}
                         >
-                          {isReady ? 'Open' : 'View'}
+                          {isReady ? 'Open' : 'Re-Analyze'}
                         </button>
                       </div>
                     </div>

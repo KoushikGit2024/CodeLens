@@ -98,6 +98,7 @@ export default function ExplorerPage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [pageError, setPageError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // URL is the single source of truth
   const selectedPath = searchParams.get('path');
@@ -338,8 +339,8 @@ export default function ExplorerPage() {
       title: 'Explorer',
       icon: <FolderTree />,
       content: (
-        <div className="flex-1 overflow-y-auto overflow-x-auto p-3 custom-scrollbar bg-panel">
-          <div className="flex items-center justify-between mb-2 px-1">
+        <div className="flex-1 overflow-y-auto overflow-x-auto p-3 custom-scrollbar bg-panel flex flex-col">
+          <div className="flex items-center justify-between mb-2 px-1 shrink-0">
             <p className="text-xs text-muted uppercase tracking-wider">Files</p>
             <button 
               onClick={handleIncrementalAnalyze}
@@ -350,11 +351,23 @@ export default function ExplorerPage() {
               <RefreshCw className={`w-3.5 h-3.5 ${reanalyzing ? 'animate-spin' : ''}`} />
             </button>
           </div>
-          <FileTree
-            nodes={fileTree}
-            selectedPath={selectedPath}
-            onSelectFile={(p) => openFile(p)}
-          />
+          <div className="px-1 mb-3 shrink-0">
+            <input 
+              type="text"
+              placeholder="Search files..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-surface border border-border rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-accent"
+            />
+          </div>
+          <div className="flex-1 overflow-y-auto min-h-0">
+            <FileTree
+              nodes={fileTree}
+              selectedPath={selectedPath}
+              onSelectFile={(p) => openFile(p)}
+              searchTerm={searchTerm}
+            />
+          </div>
         </div>
       )
     },
@@ -473,21 +486,25 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
           <p className="text-sm">{error}</p>
         </div>
       );
-    } else if (/\.(png|jpe?g|gif|svg|webp|ico|bmp)$/i.test(filePath)) {
-      const imageUrl = `/api/repository/${repoId}/file?path=${encodeURIComponent(filePath)}`;
+    } else if (!fileContent) {
+      content = null;
+    } else if (/\.(png|jpe?g|gif|webp|ico|bmp)$/i.test(filePath)) {
       content = (
-        <div className="flex-1 flex flex-col p-8 overflow-auto bg-[#0d1117] custom-scrollbar">
-          {/* <div className="flex items-center gap-2 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-400 text-sm mb-6 mx-auto w-full max-w-lg">
-            <ImageIcon className="w-5 h-5 shrink-0" />
-            <p><strong>Image Viewer</strong> Rendering image directly.</p>
-          </div> */}
+        <div className="flex-1 flex flex-col p-8 overflow-auto bg-[#0d1117] custom-scrollbar relative">
           <div className="flex-1 flex items-center justify-center min-h-[40vh]">
-            <img src={imageUrl} alt={filePath} className="max-w-full max-h-[70vh] object-contain rounded drop-shadow-2xl border border-white/10" />
+            <img src={fileContent.content} alt={filePath} className="max-w-full max-h-[70vh] object-contain rounded drop-shadow-2xl border border-white/10" />
           </div>
         </div>
       );
-    } else if (!fileContent) {
-      content = null;
+    } else if (/\.svg$/i.test(filePath)) {
+      const svgUrl = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(fileContent.content)))}`;
+      content = (
+        <div className="flex-1 flex flex-col p-8 overflow-auto bg-[#0d1117] custom-scrollbar">
+          <div className="flex-1 flex items-center justify-center min-h-[40vh]">
+            <img src={svgUrl} alt={filePath} className="max-w-full max-h-[70vh] object-contain rounded drop-shadow-2xl border border-white/10" />
+          </div>
+        </div>
+      );
     } else {
       content = (
         <Editor

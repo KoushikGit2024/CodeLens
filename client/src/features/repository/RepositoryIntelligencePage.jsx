@@ -367,41 +367,77 @@ export default function RepositoryIntelligencePage() {
              </section>
           </div>
 
-          {/* ── Guided Workflow ────────────────────────────────────────── */}
-          <section className="bg-panel border border-border p-5 rounded mt-4 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1 h-full bg-success"></div>
-            <div className="flex items-center gap-2 mb-4">
-              <CheckCircle className="w-5 h-5 text-success" />
-              <h3 className="text-sm font-semibold text-white">Repository analyzed successfully. What should I look at next?</h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-              <button onClick={handleUnderstandRepository} className="bg-surface/50 border border-border/50 p-4 rounded hover:border-accent hover:bg-surface transition-colors flex flex-col gap-1 text-left group">
-                 <span className="text-white font-medium group-hover:text-accent transition-colors flex items-center gap-2"><BookOpen className="w-4 h-4 text-accent" /> Understand Repository &rarr;</span>
-                 <span className="text-xs text-muted">Generate an AI overview of the codebase.</span>
+          {/* ── Quick Explore Actions ────────────────────────────────────────── */}
+          <section className="mt-8">
+            <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-accent"></span>
+              Next Steps & Exploration
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              <button 
+                onClick={handleUnderstandRepository} 
+                className="bg-surface/30 border border-border/50 p-4 rounded hover:border-accent hover:bg-surface transition-all flex flex-col gap-2 text-left group"
+              >
+                 <div className="flex items-center gap-2 text-white font-medium group-hover:text-accent transition-colors">
+                   <BookOpen className="w-4 h-4 text-accent" /> 
+                   Understand Codebase
+                 </div>
+                 <span className="text-xs text-muted">Generate an AI overview of the entire repository structure.</span>
               </button>
-              <Link to={`/explore/${repoId}/architecture`} className="bg-surface/50 border border-border/50 p-4 rounded hover:border-warning hover:bg-surface transition-colors flex flex-col gap-1 group">
-                <span className="text-white font-medium group-hover:text-warning transition-colors flex items-center gap-2"><Box className="w-4 h-4 text-warning" /> Explore Architecture &rarr;</span>
-                <span className="text-xs text-muted">Understand how components fit together.</span>
+              
+              <Link 
+                to={`/explore/${repoId}/architecture`} 
+                className="bg-surface/30 border border-border/50 p-4 rounded hover:border-warning hover:bg-surface transition-all flex flex-col gap-2 group"
+              >
+                <div className="flex items-center gap-2 text-white font-medium group-hover:text-warning transition-colors">
+                  <Box className="w-4 h-4 text-warning" /> 
+                  Architecture Map
+                </div>
+                <span className="text-xs text-muted">Visualize how components and domains fit together.</span>
               </Link>
-              <Link to={`/explore/${repoId}/graph`} className="bg-surface/50 border border-border/50 p-4 rounded hover:border-[#cba6f7] hover:bg-surface transition-colors flex flex-col gap-1 group">
-                <span className="text-white font-medium group-hover:text-[#cba6f7] transition-colors flex items-center gap-2"><GitMerge className="w-4 h-4 text-[#cba6f7]" /> Inspect Dependencies &rarr;</span>
-                <span className="text-xs text-muted">Review {data.dependencies.cycles > 0 ? `${data.dependencies.cycles} circular cycles` : 'dependency connections'}.</span>
+              
+              <Link 
+                to={`/explore/${repoId}/graph`} 
+                className="bg-surface/30 border border-border/50 p-4 rounded hover:border-[#cba6f7] hover:bg-surface transition-all flex flex-col gap-2 group"
+              >
+                <div className="flex items-center gap-2 text-white font-medium group-hover:text-[#cba6f7] transition-colors">
+                  <GitMerge className="w-4 h-4 text-[#cba6f7]" /> 
+                  Dependency Graph
+                </div>
+                <span className="text-xs text-muted">Review {data.dependencies.cycles > 0 ? <span className="text-danger font-medium">{data.dependencies.cycles} circular cycles</span> : 'dependency connections'}.</span>
               </Link>
-              <Link to={`/explore/${repoId}/health`} className="bg-surface/50 border border-border/50 p-4 rounded hover:border-danger hover:bg-surface transition-colors flex flex-col gap-1 group">
-                <span className="text-white font-medium group-hover:text-danger transition-colors flex items-center gap-2"><ShieldAlert className="w-4 h-4 text-danger" /> Review Health &rarr;</span>
+              
+              <Link 
+                to={`/explore/${repoId}/health`} 
+                className="bg-surface/30 border border-border/50 p-4 rounded hover:border-danger hover:bg-surface transition-all flex flex-col gap-2 group"
+              >
+                <div className="flex items-center gap-2 text-white font-medium group-hover:text-danger transition-colors">
+                  <ShieldAlert className="w-4 h-4 text-danger" /> 
+                  Engineering Health
+                </div>
                 <span className="text-xs text-muted">Inspect {data.engineeringHealth.critical} critical structural issues.</span>
               </Link>
-              <Link to={`/explore/${repoId}/refactoring`} className="bg-surface/50 border border-border/50 p-4 rounded hover:border-blue-400 hover:bg-surface transition-colors flex flex-col gap-1 group">
-                <span className="text-white font-medium group-hover:text-blue-400 transition-colors flex items-center gap-2"><Wrench className="w-4 h-4 text-blue-400" /> Refactoring &rarr;</span>
-                <span className="text-xs text-muted">View highest-priority technical debt.</span>
+              
+              <Link 
+                to={`/explore/${repoId}/refactoring`} 
+                className="bg-surface/30 border border-border/50 p-4 rounded hover:border-blue-400 hover:bg-surface transition-all flex flex-col gap-2 group"
+              >
+                <div className="flex items-center gap-2 text-white font-medium group-hover:text-blue-400 transition-colors">
+                  <Wrench className="w-4 h-4 text-blue-400" /> 
+                  Technical Debt
+                </div>
+                <span className="text-xs text-muted">View highest-priority refactoring candidates.</span>
               </Link>
-              <Link to={`/explore/${repoId}/source`} className="bg-surface/50 border border-border/50 p-4 rounded hover:border-success hover:bg-surface transition-colors flex flex-col gap-1 group">
-                 <span className="text-white font-medium group-hover:text-success transition-colors flex items-center gap-2"><FileText className="w-4 h-4 text-success" /> Browse Source &rarr;</span>
-                 <span className="text-xs text-muted">Explore the codebase with contextual insights.</span>
-              </Link>
-              <Link to={`/explore/${repoId}/architecture`} className="bg-surface/50 border border-border/50 p-4 rounded hover:border-[#a6e3a1] hover:bg-surface transition-colors flex flex-col gap-1 group">
-                 <span className="text-white font-medium group-hover:text-[#a6e3a1] transition-colors flex items-center gap-2"><BookOpen className="w-4 h-4 text-[#a6e3a1]" /> View Architecture &rarr;</span>
-                 <span className="text-xs text-muted">Browse high level architecture maps.</span>
+              
+              <Link 
+                to={`/explore/${repoId}/source`} 
+                className="bg-surface/30 border border-border/50 p-4 rounded hover:border-success hover:bg-surface transition-all flex flex-col gap-2 group"
+              >
+                 <div className="flex items-center gap-2 text-white font-medium group-hover:text-success transition-colors">
+                   <FileText className="w-4 h-4 text-success" /> 
+                   Browse Source
+                 </div>
+                 <span className="text-xs text-muted">Explore the codebase files with contextual insights.</span>
               </Link>
             </div>
           </section>

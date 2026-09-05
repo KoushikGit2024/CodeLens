@@ -72,8 +72,10 @@ function calculatePriority(risk) {
   };
 }
 
-function extractFilesFromRisk(risk) {
+function extractFilesAndRangesFromRisk(risk) {
   const files = new Set();
+  const fileRanges = {};
+
   if (risk.file) files.add(risk.file);
   
   if (risk.evidence) {
@@ -83,8 +85,37 @@ function extractFilesFromRisk(risk) {
     if (risk.evidence.sourceComp && risk.evidenceFile) {
        files.add(risk.evidenceFile);
     }
+    
+    // Extract location for High Complexity
+    if (risk.evidence.location && risk.file) {
+      fileRanges[risk.file] = {
+        startLine: risk.evidence.location.startLine,
+        endLine: risk.evidence.location.endLine
+      };
+    }
+    
+    // Extract locations for Structural Clones
+    if (risk.evidence.instances) {
+      risk.evidence.instances.forEach(instance => {
+        files.add(instance.filePath);
+        if (instance.location) {
+          fileRanges[instance.filePath] = {
+            startLine: instance.location.startLine,
+            endLine: instance.location.endLine
+          };
+        }
+      });
+    }
+    
+    // Default to whole file for size risks if no specific location is provided
+    if (risk.evidence.lineCount && risk.file && !fileRanges[risk.file]) {
+      fileRanges[risk.file] = {
+        startLine: 1,
+        endLine: risk.evidence.lineCount
+      };
+    }
   }
-  return Array.from(files);
+  return { files: Array.from(files), fileRanges };
 }
 
 /**
@@ -102,7 +133,7 @@ function buildRefactoringIntelligence(engineeringRiskModel, analysis, graph) {
 
     const priorityInfo = calculatePriority(risk);
     const strategies = getStrategiesForRisk(risk);
-    const affectedFiles = extractFilesFromRisk(risk);
+    const { files: affectedFiles, fileRanges } = extractFilesAndRangesFromRisk(risk);
 
     const idString = `${risk.title}|${risk.category}|${affectedFiles.join(',')}`;
     
@@ -125,6 +156,7 @@ function buildRefactoringIntelligence(engineeringRiskModel, analysis, graph) {
       
       summary: risk.description,
       files: affectedFiles,
+      fileRanges: fileRanges,
       evidence: risk.evidence,
       
       suggestedStrategies: strategies,

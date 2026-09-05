@@ -96,18 +96,28 @@ export const repositoryApi = {
       const files = Object.keys(zip.files).filter(name => !zip.files[name].dir);
       
       const ignorePatterns = options.ignorePatterns 
-        ? options.ignorePatterns.split(',').map(s => s.trim())
+        ? options.ignorePatterns.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
         : [];
       
       let processedCount = 0;
       for (const filePath of files) {
-        // Simple ignore check
+        // Default directories to ignore (exact match of a path segment)
+        const defaultIgnores = ['.git', 'node_modules', 'dist', 'build', 'coverage', '.next', 'out'];
+        const pathSegments = filePath.split('/');
         const shouldIgnore = ignorePatterns.some(p => filePath.includes(p)) || 
-                             filePath.includes('node_modules') || 
-                             filePath.includes('.git');
+                             defaultIgnores.some(ignoreDir => pathSegments.includes(ignoreDir));
         
         if (!shouldIgnore) {
-          const content = await zip.files[filePath].async('string');
+          const extMatch = filePath.match(/\.(png|jpe?g|gif|webp|ico|bmp)$/i);
+          let content;
+          if (extMatch) {
+            const ext = extMatch[1].toLowerCase();
+            const mimeType = ext === 'jpg' ? 'jpeg' : ext;
+            const base64 = await zip.files[filePath].async('base64');
+            content = `data:image/${mimeType};base64,${base64}`;
+          } else {
+            content = await zip.files[filePath].async('string');
+          }
           await persistenceStore.saveFile(repoId, filePath, content);
         }
         processedCount++;
@@ -140,11 +150,30 @@ export const repositoryApi = {
     return { data: record };
   },
 
+  /** Re-run analysis on an existing repository */
+  async reanalyze(id, options = {}) {
+    const record = await repositoryStore.get(id);
+    if (!record) throw new Error('Repository not found');
+    
+    await repositoryStore.clearAnalysis(id);
+    await repositoryStore.update(id, { status: 'analyzing', phase: 'uploading' });
+    
+    startAnalysis(id, options).catch(err => {
+      console.error('Background analysis failed:', err);
+    });
+    
+    return { data: { id, status: 'analyzing' } };
+  },
+
   /** Batch manage repositories (delete or clear analysis) */
   async batchManage(ids, action) {
     if (action === 'delete') {
       for (const id of ids) {
         await repositoryStore.remove(id);
+      }
+    } else if (action === 'clear_analysis') {
+      for (const id of ids) {
+        await repositoryStore.clearAnalysis(id);
       }
     }
     return { data: { success: true } };
@@ -462,16 +491,16 @@ ${originalCode}
     startAnalysis(id, {}).catch(err => console.error('Background analysis failed:', err));
     return { data: { success: true } };
   },
-  getCiReport: (repoId) => api.get(`/repository/${repoId}/ci-report`),
+  getCiReport: (repoId) => Promise.resolve({ data: { status: 'CI reporting requires integration.' } }),
 };
 
-export const getAiHealth = () => api.get('/health/ai').then(res => res.data);
+export const getAiHealth = () => api.get('/ai/health').then(res => res.data);
 export const getEngineeringRisks = (id) => repositoryApi.getRisks(id).then(res => res.data);
-export const getEngineeringInsights = (id) => api.get(`/repository/${id}/risks/insights`).then(res => res.data);
+export const getEngineeringInsights = (id) => Promise.resolve({ insights: "Insights generation requires WatsonX." });
 export const getRefactoringIntelligence = (id) => repositoryApi.getRefactoringIntelligence(id).then(res => res.data);
 export const getRefactoringCandidate = (id, candidateId) => repositoryApi.getRefactoringIntelligence(id).then(res => res.data.candidates.find(c => c.id === candidateId));
-export const getRefactoringImpact = (id, candidateId) => repositoryApi.getChangeImpact(id).then(res => res.data); // Mocked
-export const getRefactoringInsights = (id, candidateId) => api.get(`/repository/${id}/refactoring/${candidateId}/insights`).then(res => res.data);
-export const autoFixRefactoringCandidate = (id, candidateId) => api.post(`/repository/${id}/refactoring/${candidateId}/auto-fix`).then(res => res.data);
+export const getRefactoringImpact = (id, candidateId) => repositoryApi.getChangeImpact(id).then(res => res.data);
+export const getRefactoringInsights = (id, candidateId) => repositoryApi.getRefactoringInsights(id, candidateId).then(res => res.data);
+export const autoFixRefactoringCandidate = (id, candidateId) => repositoryApi.autoFixRefactoringCandidate(id, candidateId).then(res => res.data);
 
 export default api;
