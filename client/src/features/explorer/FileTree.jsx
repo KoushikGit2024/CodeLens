@@ -24,7 +24,7 @@ function defaultHighlightMatch(text, query) {
     <>
       {parts.map((part, i) => 
         part.toLowerCase() === query.toLowerCase() 
-          ? <span key={i} className="bg-accent/40 text-white font-semibold rounded-sm px-0.5">{part}</span> 
+          ? <span key={i} className="bg-accent/40 text-text font-semibold rounded-sm px-0.5">{part}</span> 
           : part
       )}
     </>
@@ -102,11 +102,11 @@ function FileTreeNode({
         <button
           onClick={() => setOpen((o) => !o)}
           style={{ paddingLeft: `${indentPx + 4}px` }}
-          className="w-full text-left flex items-center gap-1.5 py-[3px] pr-2 rounded text-xs group text-white/60 hover:text-white hover:bg-white/5 transition-colors"
+          className="w-full text-left flex items-center gap-1.5 py-[3px] pr-2 rounded text-xs group text-text/60 hover:text-text hover:bg-white/5 transition-colors"
           title={node.name}
         >
           {/* chevron */}
-          <span className="shrink-0 w-3 h-3 flex items-center justify-center text-white/30 group-hover:text-white/60">
+          <span className="shrink-0 w-3 h-3 flex items-center justify-center text-text/30 group-hover:text-text/60">
             <ChevronRight
               className={`w-3 h-3 transition-transform duration-150 ${
                 open && hasChildren ? 'rotate-90' : ''
@@ -126,7 +126,7 @@ function FileTreeNode({
           </span>
           {/* child count badge */}
           {hasChildren && (
-            <span className="ml-auto shrink-0 text-[9px] text-white/20 group-hover:text-white/40 tabular-nums">
+            <span className="ml-auto shrink-0 text-[9px] text-text/20 group-hover:text-text/40 tabular-nums">
               {node.children.filter(c => c.type === 'file').length > 0
                 ? node.children.filter(c => c.type === 'file').length
                 : ''}
@@ -165,8 +165,8 @@ function FileTreeNode({
     mode === 'navigate' ? 'cursor-pointer' : 'cursor-default'
   } ${
     isSelected
-      ? 'text-white bg-accent/15 border-l-2 border-accent'
-      : 'text-white/60 hover:text-white hover:bg-white/5 border-l-2 border-transparent'
+      ? 'text-text bg-accent/15 border-l-2 border-accent'
+      : 'text-text/60 hover:text-text hover:bg-white/5 border-l-2 border-transparent'
   }`;
 
   const nodeContent = (
@@ -188,7 +188,7 @@ function FileTreeNode({
       />
       
       <span className={`whitespace-nowrap min-w-0 font-mono text-[11px] truncate ${
-        isSelected || isChecked ? 'text-white font-medium' : 'group-hover:text-white'
+        isSelected || isChecked ? 'text-text font-medium' : 'group-hover:text-text'
       }`}>
         {highlightMatch(node.name, searchTerm)}
       </span>

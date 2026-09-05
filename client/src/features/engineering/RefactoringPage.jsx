@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
-  ChevronLeft, AlertTriangle, Layers, GitBranch, 
-  Database, Brain, Activity, File, Loader2, ArrowRight, CheckCircle, LayoutDashboard, Sparkles, Wrench
+  AlertTriangle, Layers, GitBranch, 
+  Database, Brain, Loader2, CheckCircle, Sparkles, Wrench,
+  ChevronDown, ChevronRight, File
 } from 'lucide-react';
 import { DiffEditor } from '@monaco-editor/react';
 import { ResizableLayout } from '../../shared/components/ResizableLayout';
@@ -10,58 +11,171 @@ import { repositoryApi } from '../../shared/api';
 import AiResponse from '../../shared/components/ai/AiResponse';
 import PageHeader from '../../shared/components/PageHeader';
 
+// Palette constants — all in sync with CSS variables
+const PRIORITY_META = {
+  critical: {
+    label: 'Critical',
+    dot: '#e05252',
+    border: 'border-[#e05252]/30',
+    bg: 'hover:bg-[#e05252]/5',
+    selectedBorder: 'border-[#e05252]/50',
+    selectedBg: 'bg-[#e05252]/8',
+    text: 'text-[#e05252]',
+  },
+  high: {
+    label: 'High Priority',
+    dot: '#d4923a',
+    border: 'border-[#d4923a]/30',
+    bg: 'hover:bg-[#d4923a]/5',
+    selectedBorder: 'border-[#d4923a]/50',
+    selectedBg: 'bg-[#d4923a]/8',
+    text: 'text-[#d4923a]',
+  },
+  warning: {
+    label: 'Suggestions',
+    dot: '#4D7EFF',
+    border: 'border-[#4D7EFF]/20',
+    bg: 'hover:bg-[#4D7EFF]/5',
+    selectedBorder: 'border-[#4D7EFF]/40',
+    selectedBg: 'bg-[#4D7EFF]/8',
+    text: 'text-accent',
+  },
+};
+
 const formatCategory = (category) => {
   if (!category) return 'General';
   return category.replace(/([A-Z])/g, ' $1').trim().replace(/^./, str => str.toUpperCase());
 };
 
-const IssueGroup = ({ issueTitle, issueData, priorityLevel, selectedCandidateId, setSelectedCandidateId, bgColors, selectedBg }) => {
-  const [isOpen, setIsOpen] = useState(true);
-  
+// ── Candidate Card ────────────────────────────────────────────────────────────
+const CandidateCard = ({ candidate, isSelected, onSelect, priorityLevel }) => {
+  const meta = PRIORITY_META[priorityLevel] || PRIORITY_META.warning;
   return (
-    <div className="flex flex-col gap-1.5 ml-2 border-l-2 border-border/50 pl-3">
-      <div 
-        className="text-[11px] text-muted/80 font-semibold mb-1 truncate cursor-pointer hover:text-white transition-colors flex items-center gap-1" 
-        title={issueTitle}
-        onClick={() => setIsOpen(!isOpen)}
-      >
-        <span>{isOpen ? '▾' : '▸'}</span>
-        <span>{issueTitle} <span className="font-normal opacity-70">({issueData.items.length})</span></span>
+    <button
+      onClick={() => onSelect(candidate.id)}
+      className={`w-full text-left px-3 py-2.5 rounded border transition-all duration-150
+        ${isSelected
+          ? `${meta.selectedBg} ${meta.selectedBorder} border`
+          : `border-transparent ${meta.bg}`
+        }
+      `}
+    >
+      <div className="flex items-center justify-between mb-1.5">
+        <span className=" text-[10px] font-semibold text-muted tracking-wide">
+          Score {candidate.priorityScore}
+        </span>
+        <span className="text-[9px] uppercase tracking-widest text-muted/60">
+          {formatCategory(candidate.type)}
+        </span>
       </div>
-      
-      {isOpen && issueData.items.sort((a,b) => b.priorityScore - a.priorityScore).map(c => (
-        <button
-          key={c.id}
-          onClick={() => setSelectedCandidateId(c.id)}
-          className={`text-left p-3 rounded-lg border transition-all ${
-            selectedCandidateId === c.id 
-              ? selectedBg[priorityLevel]
-              : bgColors[priorityLevel]
-          }`}
-        >
-          <div className="flex items-start justify-between mb-2">
-            <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-surface border border-border/50">Score {c.priorityScore}</span>
-            <p className="text-[9px] uppercase tracking-wider text-muted truncate" title={c.type}>{formatCategory(c.type)}</p>
-          </div>
-          
-          {c.files && c.files.length > 0 && (
-            <h3 className="text-sm font-medium text-white/90 truncate mb-1 font-mono" title={c.files[0]}>
-              {c.files[0].split('/').pop()}
-              {c.files.length > 1 ? ` (+${c.files.length - 1})` : ''}
-            </h3>
-          )}
-          
-          {c.description && (
-            <p className="text-[11px] text-muted/80 line-clamp-2 leading-relaxed" title={c.description}>
-              {c.description}
-            </p>
-          )}
-        </button>
-      ))}
+      {candidate.files?.length > 0 && (
+        <div className="flex items-center gap-1.5 mb-1">
+          <File className="w-3 h-3 shrink-0 text-muted/50" />
+          <span className="text-[12px] font-medium text-[#CBD5E8] truncate" title={candidate.files[0]}>
+            {candidate.files[0].split('/').pop()}
+            {candidate.files.length > 1 && (
+              <span className="text-muted ml-1 font-normal">+{candidate.files.length - 1}</span>
+            )}
+          </span>
+        </div>
+      )}
+      {candidate.description && (
+        <p className="text-[11px] text-muted leading-relaxed line-clamp-2">
+          {candidate.description}
+        </p>
+      )}
+    </button>
+  );
+};
+
+// ── Issue Group ───────────────────────────────────────────────────────────────
+const IssueGroup = ({ issueTitle, issueData, priorityLevel, selectedCandidateId, setSelectedCandidateId }) => {
+  const [isOpen, setIsOpen] = useState(true);
+  const sorted = [...issueData.items].sort((a, b) => b.priorityScore - a.priorityScore);
+
+  return (
+    <div className="flex flex-col">
+      <button
+        className="flex items-center gap-1.5 py-1 px-1 text-left text-[11px] text-muted hover:text-[#CBD5E8] transition-colors"
+        onClick={() => setIsOpen(o => !o)}
+        title={issueTitle}
+      >
+        {isOpen
+          ? <ChevronDown className="w-3 h-3 shrink-0" />
+          : <ChevronRight className="w-3 h-3 shrink-0" />
+        }
+        <span className="truncate font-medium">{issueTitle}</span>
+        <span className="ml-auto text-[10px] shrink-0 text-muted/50">({sorted.length})</span>
+      </button>
+
+      {isOpen && (
+        <div className="flex flex-col gap-0.5 ml-4 mt-0.5">
+          {sorted.map(c => (
+            <CandidateCard
+              key={c.id}
+              candidate={c}
+              isSelected={selectedCandidateId === c.id}
+              onSelect={setSelectedCandidateId}
+              priorityLevel={priorityLevel}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };
 
+// ── Priority Section ──────────────────────────────────────────────────────────
+const PrioritySection = ({ priorityLevel, group, selectedCandidateId, setSelectedCandidateId }) => {
+  const [isOpen, setIsOpen] = useState(true);
+  const meta = PRIORITY_META[priorityLevel] || PRIORITY_META.warning;
+
+  const issuesMap = {};
+  group.forEach(c => {
+    if (!issuesMap[c.title]) issuesMap[c.title] = { maxScore: 0, items: [] };
+    issuesMap[c.title].items.push(c);
+    issuesMap[c.title].maxScore = Math.max(issuesMap[c.title].maxScore, c.priorityScore);
+  });
+  const sortedIssues = Object.entries(issuesMap).sort((a, b) => b[1].maxScore - a[1].maxScore);
+
+  return (
+    <div className="flex flex-col">
+      <button
+        onClick={() => setIsOpen(o => !o)}
+        className="flex items-center gap-2 px-1 py-2 text-left group"
+      >
+        <span
+          className="w-1.5 h-1.5 rounded-full shrink-0"
+          style={{ background: meta.dot }}
+        />
+        <span className={`text-[11px] font-semibold uppercase tracking-wider ${meta.text}`}>
+          {meta.label}
+        </span>
+        <span className="ml-1 text-[10px] text-muted/60">({group.length})</span>
+        <span className="ml-auto text-muted/40 group-hover:text-muted transition-colors">
+          {isOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+        </span>
+      </button>
+
+      {isOpen && (
+        <div className="flex flex-col gap-1 mb-2">
+          {sortedIssues.map(([issueTitle, issueData]) => (
+            <IssueGroup
+              key={issueTitle}
+              issueTitle={issueTitle}
+              issueData={issueData}
+              priorityLevel={priorityLevel}
+              selectedCandidateId={selectedCandidateId}
+              setSelectedCandidateId={setSelectedCandidateId}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 export default function RefactoringPage() {
   const { repoId } = useParams();
   const navigate = useNavigate();
@@ -69,7 +183,6 @@ export default function RefactoringPage() {
   const [intel, setIntel] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
   const [selectedCandidateId, setSelectedCandidateId] = useState(null);
 
   useEffect(() => {
@@ -77,8 +190,8 @@ export default function RefactoringPage() {
       try {
         const data = await repositoryApi.getRefactoringIntelligence(repoId);
         setIntel(data.data);
-        if (data.candidates && data.candidates.length > 0) {
-          setSelectedCandidateId(data.candidates[0].id);
+        if (data.data?.candidates?.length > 0) {
+          setSelectedCandidateId(data.data.candidates[0].id);
         }
       } catch (err) {
         setError(err?.response?.data?.error || err.message);
@@ -91,7 +204,7 @@ export default function RefactoringPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center gap-3 bg-surface text-white">
+      <div className="min-h-screen flex items-center justify-center gap-3 bg-surface">
         <Loader2 className="w-5 h-5 text-accent animate-spin" />
         <span className="text-muted text-sm">Analyzing Refactoring Candidates...</span>
       </div>
@@ -100,7 +213,7 @@ export default function RefactoringPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-2 bg-surface text-white">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-2 bg-surface">
         <AlertTriangle className="w-6 h-6 text-danger" />
         <p className="text-sm text-danger">{error}</p>
         <button onClick={() => navigate(`/explore/${repoId}`)} className="text-xs text-accent hover:underline mt-4">
@@ -110,145 +223,97 @@ export default function RefactoringPage() {
     );
   }
 
-  const formatCategory = (category) => {
-    switch (category) {
-      case 'QUALITY': return 'Code Quality Issue';
-      case 'ARCHITECTURE': return 'Architecture Layer Violation';
-      case 'DEPENDENCY': return 'Dependency Graph Flaw';
-      case 'COUPLING': return 'High Module Coupling';
-      case 'SIZE': return 'Oversized Component';
-      default: return category;
-    }
-  };
-
   const selectedCandidate = intel?.candidates?.find(c => c.id === selectedCandidateId);
 
   return (
     <div className="flex flex-col h-full bg-surface">
       <ResizableLayout
-      panels={[
-        {
-          id: 'candidates',
-          defaultSize: 20,
-          minWidth: 200,
-          collapsible: true,
-          collapseDirection: 'left',
-          title: 'Candidates',
-          icon: <Wrench />,
-          content: (
-            <aside className="flex-1 overflow-y-auto p-3 flex flex-col gap-4 custom-scrollbar bg-[#0d1117] h-full border-r border-border">
-              
-              {(!intel?.candidates || intel.candidates.length === 0) ? (
-                <div className="flex flex-col items-center justify-center p-6 mt-10 text-center gap-3">
-                  <CheckCircle className="w-8 h-8 text-success opacity-80" />
-                  <p className="text-sm text-muted">Inbox zero! No refactoring candidates found.</p>
-                </div>
-              ) : (
-                <>
-                  {['critical', 'high', 'warning'].map(priorityLevel => {
-                    const group = intel.candidates.filter(c => c.priority === priorityLevel);
-                    if (group.length === 0) return null;
-                    
-                    const titles = {
-                      'critical': 'Critical Action Required',
-                      'high': 'High Priority Triage',
-                      'warning': 'Suggested Improvements'
-                    };
-                    const bgColors = {
-                      'critical': 'bg-danger/5 border-danger/20 hover:border-danger/40',
-                      'high': 'bg-orange-500/5 border-orange-500/20 hover:border-orange-500/40',
-                      'warning': 'bg-blue-500/5 border-blue-500/20 hover:border-blue-500/40'
-                    };
-                    const selectedBg = {
-                      'critical': 'bg-danger/20 border-danger/60 shadow-[0_0_10px_rgba(248,113,113,0.15)]',
-                      'high': 'bg-orange-500/20 border-orange-500/60 shadow-[0_0_10px_rgba(251,146,60,0.15)]',
-                      'warning': 'bg-blue-500/20 border-blue-500/60 shadow-[0_0_10px_rgba(59,130,246,0.15)]'
-                    };
-                    
-                    // Group candidates by title
-                    const issuesMap = {};
-                    group.forEach(c => {
-                      if (!issuesMap[c.title]) issuesMap[c.title] = { maxScore: 0, items: [] };
-                      issuesMap[c.title].items.push(c);
-                      issuesMap[c.title].maxScore = Math.max(issuesMap[c.title].maxScore, c.priorityScore);
-                    });
-                    
-                    const sortedIssues = Object.entries(issuesMap).sort((a, b) => b[1].maxScore - a[1].maxScore);
-                    
-                    return (
-                      <div key={priorityLevel} className="flex flex-col gap-3 mb-4">
-                        <div className="flex items-center gap-2 px-1">
-                          <p className="text-xs text-white/90 uppercase tracking-wider font-bold">{titles[priorityLevel]}</p>
-                          <span className="text-[10px] bg-surface border border-border px-1.5 rounded text-muted">{group.length}</span>
-                        </div>
-                        
-                        {sortedIssues.map(([issueTitle, issueData]) => (
-                          <IssueGroup 
-                            key={issueTitle}
-                            issueTitle={issueTitle}
-                            issueData={issueData}
-                            priorityLevel={priorityLevel}
+        panels={[
+          {
+            id: 'candidates',
+            defaultSize: 22,
+            minWidth: 220,
+            collapsible: true,
+            collapseDirection: 'left',
+            title: 'Candidates',
+            icon: <Wrench />,
+            content: (
+              <aside className="flex-1 overflow-y-auto p-3 flex flex-col custom-scrollbar bg-panel h-full">
+                {(!intel?.candidates || intel.candidates.length === 0) ? (
+                  <div className="flex flex-col items-center justify-center p-6 mt-10 text-center gap-3">
+                    <CheckCircle className="w-8 h-8 text-success/30 opacity-80" />
+                    <p className="text-sm text-muted">No refactoring candidates found.</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col divide-y divide-border/30">
+                    {['critical', 'high', 'warning'].map(level => {
+                      const group = intel.candidates.filter(c => c.priority === level);
+                      if (group.length === 0) return null;
+                      return (
+                        <div key={level} className="py-2">
+                          <PrioritySection
+                            priorityLevel={level}
+                            group={group}
                             selectedCandidateId={selectedCandidateId}
                             setSelectedCandidateId={setSelectedCandidateId}
-                            bgColors={bgColors}
-                            selectedBg={selectedBg}
                           />
-                        ))}
-                      </div>
-                    );
-                  })}
-                </>
-              )}
-            </aside>
-          )
-        },
-        {
-          id: 'details',
-          defaultSize: 50,
-          minWidth: 300,
-          collapsible: false,
-          content: (
-            <main className="flex-1 overflow-y-auto custom-scrollbar flex flex-col bg-surface/50 h-full">
-              <div className="px-6 pt-6 shrink-0">
-                <PageHeader 
-                  title="Refactoring Intelligence" 
-                  description="Automatically prioritize technical debt into actionable candidates. Select a candidate to see its blast radius and request an AI rewrite."
-                  icon={Wrench}
-                />
-              </div>
-              <div className="flex-1 p-6 pt-2">
-                {selectedCandidate ? (
-                  <CandidateDetail candidate={selectedCandidate} repoId={repoId} />
-                ) : (
-                  <div className="flex-1 h-full flex items-center justify-center text-muted">Select a candidate to view details</div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
-              </div>
-            </main>
-          )
-        },
-        {
-          id: 'advisor',
-          defaultSize: 30,
-          minWidth: 250,
-          collapsible: true,
-          collapseDirection: 'right',
-          title: 'Advisor',
-          icon: <Sparkles />,
-          content: (
-            <aside className="flex-1 overflow-y-auto custom-scrollbar flex flex-col bg-panel h-full">
-              {selectedCandidate && (
-                 <AiAdvisor candidate={selectedCandidate} repoId={repoId} />
-              )}
-            </aside>
-          )
-        }
-      ]}
-    />
+              </aside>
+            )
+          },
+          {
+            id: 'details',
+            defaultSize: 48,
+            minWidth: 300,
+            collapsible: false,
+            content: (
+              <main className="flex-1 overflow-y-auto custom-scrollbar flex flex-col bg-surface h-full">
+                <div className="px-6 pt-6 shrink-0">
+                  <PageHeader 
+                    title="Refactoring Intelligence" 
+                    description="Automatically prioritize technical debt into actionable candidates. Select a candidate to see its blast radius and request an AI rewrite."
+                    icon={Wrench}
+                  />
+                </div>
+                <div className="flex-1 p-6 pt-3">
+                  {selectedCandidate ? (
+                    <CandidateDetail candidate={selectedCandidate} repoId={repoId} />
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-muted text-sm">
+                      Select a candidate from the sidebar to view details
+                    </div>
+                  )}
+                </div>
+              </main>
+            )
+          },
+          {
+            id: 'advisor',
+            defaultSize: 30,
+            minWidth: 250,
+            collapsible: true,
+            collapseDirection: 'right',
+            title: 'AI Advisor',
+            icon: <Sparkles />,
+            content: (
+              <aside className="flex-1 overflow-y-auto custom-scrollbar flex flex-col bg-panel h-full">
+                {selectedCandidate && (
+                  <AiAdvisor candidate={selectedCandidate} repoId={repoId} />
+                )}
+              </aside>
+            )
+          }
+        ]}
+      />
     </div>
   );
 }
 
-// ── Center Panel ─────────────────────────────────────────────────────────────
+// ── Center Panel ──────────────────────────────────────────────────────────────
 
 function CandidateDetail({ candidate, repoId }) {
   const [impact, setImpact] = useState(null);
@@ -257,7 +322,6 @@ function CandidateDetail({ candidate, repoId }) {
   const [fixResult, setFixResult] = useState(null);
   const [fixError, setFixError] = useState(null);
 
-  // Clear fix result when candidate changes
   useEffect(() => {
     setFixResult(null);
     setFixError(null);
@@ -278,23 +342,32 @@ function CandidateDetail({ candidate, repoId }) {
     loadImpact();
   }, [repoId, candidate.id]);
 
+  const priorityMeta = PRIORITY_META[candidate.priority] || PRIORITY_META.warning;
+
   return (
-    <div className="max-w-4xl mx-auto w-full flex flex-col gap-6 pb-12">
-      <div className="flex items-start justify-between border-b border-border pb-4">
-        <div>
+    <div className="max-w-4xl mx-auto w-full flex flex-col gap-5 pb-12">
+      {/* Header */}
+      <div className="flex items-start justify-between pb-4 border-b border-border">
+        <div className="flex-1 min-w-0 pr-4">
           <div className="flex items-center gap-2 mb-2">
-            <Database className="w-4 h-4 text-success" />
-            <span className="text-xs font-medium text-success uppercase tracking-wider">Deterministic Findings</span>
+            <Database className="w-3.5 h-3.5 text-success shrink-0" />
+            <span className="text-[11px] font-medium text-success uppercase tracking-wider">Deterministic Finding</span>
+            <span
+              className={`ml-1 text-[10px] px-1.5 py-0.5 rounded border font-semibold uppercase tracking-wide ${priorityMeta.text}`}
+              style={{ borderColor: `${priorityMeta.dot}40`, background: `${priorityMeta.dot}10` }}
+            >
+              {priorityMeta.label}
+            </span>
           </div>
-          <h1 className="text-2xl font-semibold text-white mb-2">{candidate.title}</h1>
-          <p className="text-sm text-white/80 leading-relaxed">{candidate.summary}</p>
+          <h1 className="text-xl font-semibold text-[#CBD5E8] mb-1.5">{candidate.title}</h1>
+          <p className="text-sm text-muted leading-relaxed">{candidate.summary}</p>
         </div>
-        <div className="flex flex-col items-end gap-3 text-right">
-          <div className="flex flex-col items-end gap-1">
-            <span className="text-2xl font-mono font-bold text-white">{candidate.priorityScore}</span>
-            <span className="text-[10px] text-muted uppercase">Priority Score</span>
+        <div className="flex flex-col items-end gap-3 shrink-0">
+          <div className="text-right">
+            <div className="text-2xl  font-bold text-[#CBD5E8]">{candidate.priorityScore}</div>
+            <div className="text-[10px] text-muted uppercase tracking-wide">Priority Score</div>
           </div>
-          <button 
+          <button
             onClick={async () => {
               setFixing(true);
               setFixError(null);
@@ -308,7 +381,7 @@ function CandidateDetail({ candidate, repoId }) {
               }
             }}
             disabled={fixing || !!fixResult}
-            className="flex items-center gap-2 px-3 py-1.5 bg-[#8957e5] hover:bg-[#9d6ef7] disabled:opacity-50 text-white rounded text-sm font-medium transition-colors shadow shadow-[#8957e5]/20"
+            className="flex items-center gap-2 px-3 py-1.5 bg-accent hover:bg-accent/80 disabled:opacity-40 text-[#CBD5E8] rounded text-sm font-medium transition-colors"
           >
             {fixing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
             {fixing ? 'Auto-Fixing...' : 'Auto-Fix with AI'}
@@ -317,28 +390,26 @@ function CandidateDetail({ candidate, repoId }) {
       </div>
 
       {fixError && (
-        <div className="bg-danger/10 border border-danger/30 text-danger text-sm p-3 rounded flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4" /> {fixError}
+        <div className="bg-danger/8 border border-danger/25 text-danger text-sm p-3 rounded flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" /> {fixError}
         </div>
       )}
 
       {fixResult && (
-        <div className="bg-[#0d1117] border-2 border-success/30 rounded-lg flex flex-col h-[550px] overflow-hidden shadow-2xl shadow-success/10 mt-6">
-          <div className="p-4 border-b border-border bg-surface flex items-center justify-between">
-             <div className="flex items-center gap-3">
-               <div className="p-1.5 bg-success/20 rounded-md">
-                 <GitBranch className="w-5 h-5 text-success" />
-               </div>
-               <div>
-                 <h3 className="text-sm font-semibold text-white">Suggested Pull Request</h3>
-                 <span className="text-xs font-mono text-muted">{fixResult.file}</span>
-               </div>
-             </div>
-             <button className="bg-success hover:bg-success/80 text-white px-4 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2">
-               <CheckCircle className="w-4 h-4" /> Approve & Merge
-             </button>
+        <div className="border border-success/20 rounded-lg flex flex-col h-[550px] overflow-hidden">
+          <div className="px-4 py-3 border-b border-border bg-panel flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <GitBranch className="w-4 h-4 text-success" />
+              <div>
+                <div className="text-sm font-medium text-[#CBD5E8]">Suggested Pull Request</div>
+                <div className="text-xs  text-muted">{fixResult.file}</div>
+              </div>
+            </div>
+            <button className="bg-success/15 hover:bg-success/25 border border-success/30 text-success px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-2">
+              <CheckCircle className="w-4 h-4" /> Approve & Merge
+            </button>
           </div>
-          <div className="flex-1 min-h-0 relative bg-[#0d1117]">
+          <div className="flex-1 min-h-0 relative bg-surface">
             <DiffEditor
               original={fixResult.originalCode}
               modified={fixResult.refactoredCode}
@@ -357,24 +428,22 @@ function CandidateDetail({ candidate, repoId }) {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-panel border border-border rounded p-4 min-w-0">
-          <h3 className="text-xs font-medium text-muted uppercase tracking-wider mb-3">Affected Files</h3>
+      {/* Info Grid */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="border border-border rounded p-4 min-w-0">
+          <h3 className="text-[11px] font-medium text-muted uppercase tracking-wider mb-3">Affected Files</h3>
           <ul className="space-y-1.5">
             {candidate.files.map(f => {
               const range = candidate.fileRanges && candidate.fileRanges[f];
               let url = `/explore/${repoId}/source?path=${encodeURIComponent(f)}`;
-              if (range && range.startLine && range.endLine) {
-                url += `&line=${range.startLine}-${range.endLine}`;
-              }
+              if (range?.startLine && range?.endLine) url += `&line=${range.startLine}-${range.endLine}`;
               return (
-                <li key={f} className="text-sm font-mono text-accent truncate" title={f}>
-                  <Link to={url} className="hover:underline">
+                <li key={f} className="flex items-center gap-1.5 min-w-0">
+                  <File className="w-3 h-3 shrink-0 text-muted/50" />
+                  <Link to={url} className="text-xs  text-accent hover:underline truncate" title={f}>
                     {f}
-                    {range && range.startLine && (
-                      <span className="text-muted/60 text-xs ml-2">
-                        L{range.startLine}-{range.endLine}
-                      </span>
+                    {range?.startLine && (
+                      <span className="text-muted/50 ml-1.5">L{range.startLine}–{range.endLine}</span>
                     )}
                   </Link>
                 </li>
@@ -382,32 +451,35 @@ function CandidateDetail({ candidate, repoId }) {
             })}
           </ul>
         </div>
-        
-        <div className="bg-panel border border-border rounded p-4 min-w-0">
-          <h3 className="text-xs font-medium text-muted uppercase tracking-wider mb-3 flex items-center gap-2">
-            <Layers className="w-3.5 h-3.5" />
-            Change Impact Preview
+
+        <div className="border border-border rounded p-4 min-w-0">
+          <h3 className="text-[11px] font-medium text-muted uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <Layers className="w-3.5 h-3.5" /> Change Impact
           </h3>
           {loading ? (
-            <div className="text-xs text-muted flex items-center gap-2"><Loader2 className="w-3 h-3 animate-spin"/> Calculating...</div>
+            <div className="text-xs text-muted flex items-center gap-2">
+              <Loader2 className="w-3 h-3 animate-spin" /> Calculating...
+            </div>
           ) : impact ? (
-            <div className="space-y-3">
-              <div>
-                <div className="text-xs text-muted mb-1">Direct Dependents</div>
-                <div className="text-sm font-medium text-white">{impact?.directlyAffectedFiles?.length || 0} files</div>
+            <div className="space-y-2.5">
+              <div className="flex justify-between items-baseline">
+                <span className="text-xs text-muted">Direct</span>
+                <span className="text-sm  font-medium text-[#CBD5E8]">{impact?.directlyAffectedFiles?.length || 0} files</span>
               </div>
-              <div>
-                <div className="text-xs text-muted mb-1">Transitive Dependents</div>
-                <div className="text-sm font-medium text-white">{impact?.transitivelyAffectedFiles?.length || 0} files</div>
+              <div className="flex justify-between items-baseline">
+                <span className="text-xs text-muted">Transitive</span>
+                <span className="text-sm  font-medium text-[#CBD5E8]">{impact?.transitivelyAffectedFiles?.length || 0} files</span>
               </div>
-              <div>
-                <div className="text-xs text-muted mb-1">Affected Components</div>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {impact?.affectedComponents?.length > 0 ? impact.affectedComponents.map(c => (
-                     <span key={c} className="text-[10px] px-1.5 py-0.5 bg-surface rounded border border-border">{c}</span>
-                  )) : <span className="text-[10px] text-muted">None</span>}
+              {impact?.affectedComponents?.length > 0 && (
+                <div>
+                  <span className="text-xs text-muted block mb-1.5">Components</span>
+                  <div className="flex flex-wrap gap-1">
+                    {impact.affectedComponents.map(c => (
+                      <span key={c} className="text-[10px] px-1.5 py-0.5 bg-surface rounded border border-border text-muted">{c}</span>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           ) : (
             <div className="text-xs text-danger">Failed to load impact</div>
@@ -415,46 +487,55 @@ function CandidateDetail({ candidate, repoId }) {
         </div>
       </div>
 
-      <div className="bg-panel border border-border rounded p-4">
-        <h3 className="text-xs font-medium text-muted uppercase tracking-wider mb-4">Deterministic Strategies</h3>
-        {candidate.suggestedStrategies?.length > 0 ? (
-          <div className="space-y-6">
+      {/* Strategies */}
+      {candidate.suggestedStrategies?.length > 0 && (
+        <div className="border border-border rounded p-4">
+          <h3 className="text-[11px] font-medium text-muted uppercase tracking-wider mb-4">Deterministic Strategies</h3>
+          <div className="space-y-5">
             {candidate.suggestedStrategies.map((strat, idx) => (
-              <div key={idx} className="border-l-2 border-accent/40 pl-4">
-                <h4 className="text-sm font-semibold text-white mb-1">{strat.action}</h4>
-                <p className="text-sm text-white/70 mb-3">{strat.description}</p>
-                
+              <div key={idx} className="border-l-2 border-border pl-4">
+                <h4 className="text-sm font-semibold text-[#CBD5E8] mb-1">{strat.action}</h4>
+                <p className="text-sm text-muted mb-3 leading-relaxed">{strat.description}</p>
                 <div className="grid grid-cols-2 gap-4 text-xs">
                   <div>
-                    <span className="text-success font-medium mb-1 block">Expected Benefits</span>
-                    <ul className="list-disc list-inside text-white/60 space-y-0.5">
-                      {strat.expectedBenefits?.map((b, i) => <li key={i}>{b}</li>)}
+                    <span className="text-success font-medium mb-1.5 block">Expected Benefits</span>
+                    <ul className="space-y-0.5 text-muted">
+                      {strat.expectedBenefits?.map((b, i) => (
+                        <li key={i} className="flex items-start gap-1.5">
+                          <span className="mt-1 w-1 h-1 rounded-full bg-success/60 shrink-0" />
+                          {b}
+                        </li>
+                      ))}
                     </ul>
                   </div>
                   <div>
-                    <span className="text-orange-400 font-medium mb-1 block">Risks</span>
-                    <ul className="list-disc list-inside text-white/60 space-y-0.5">
-                      {strat.risks?.map((r, i) => <li key={i}>{r}</li>)}
+                    <span className="text-warning font-medium mb-1.5 block">Risks</span>
+                    <ul className="space-y-0.5 text-muted">
+                      {strat.risks?.map((r, i) => (
+                        <li key={i} className="flex items-start gap-1.5">
+                          <span className="mt-1 w-1 h-1 rounded-full bg-warning/60 shrink-0" />
+                          {r}
+                        </li>
+                      ))}
                     </ul>
                   </div>
                 </div>
               </div>
             ))}
           </div>
-        ) : (
-          <p className="text-sm text-muted">No deterministic strategies available for this category.</p>
-        )}
-      </div>
+        </div>
+      )}
 
-      <div className="text-xs text-muted flex gap-4 border-t border-border pt-4">
-         <span>Severity: <span className="uppercase text-white/70">{candidate.severity}</span></span>
-         <span>Confidence: <span className="uppercase text-white/70">{candidate.confidence}</span></span>
+      {/* Footer meta */}
+      <div className="flex items-center gap-6 text-xs text-muted pt-2 border-t border-border">
+        <span>Severity: <span className="text-[#CBD5E8] uppercase">{candidate.severity}</span></span>
+        <span>Confidence: <span className="text-[#CBD5E8] uppercase">{candidate.confidence}</span></span>
       </div>
     </div>
   );
 }
 
-// ── Right Panel ──────────────────────────────────────────────────────────────
+// ── Right Panel ───────────────────────────────────────────────────────────────
 
 function AiAdvisor({ candidate, repoId }) {
   const [insights, setInsights] = useState(null);
@@ -464,8 +545,8 @@ function AiAdvisor({ candidate, repoId }) {
     setLoading(true);
     setInsights(null);
     try {
-        const data = await repositoryApi.getRefactoringInsights(repoId, candidate.id);
-        setInsights(data.data);
+      const data = await repositoryApi.getRefactoringInsights(repoId, candidate.id);
+      setInsights(data.data);
     } catch (err) {
       setInsights({ error: err?.response?.data?.error || err.message });
     } finally {
@@ -473,43 +554,46 @@ function AiAdvisor({ candidate, repoId }) {
     }
   };
 
-  // Reset insights when candidate changes
   useEffect(() => {
     setInsights(null);
     setLoading(false);
   }, [candidate.id]);
 
   return (
-    <div className="flex flex-col h-full bg-[#1e1e2e]/40">
-      <div className="p-4 border-b border-border bg-panel flex items-center gap-2 shrink-0">
-        <Brain className="w-4 h-4 text-[#cba6f7]" />
-        <span className="text-sm font-medium text-[#cba6f7]">AI Refactoring Advisor</span>
+    <div className="flex flex-col h-full bg-panel">
+      <div className="h-10 flex items-center px-4 border-b border-border shrink-0 gap-2">
+        <Brain className="w-3.5 h-3.5 text-muted" />
+        <span className="text-xs text-muted uppercase tracking-wider">AI Refactoring Advisor</span>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {!insights && !loading && (
           <div className="flex flex-col items-center justify-center h-40 gap-3 text-center">
             <p className="text-sm text-muted">Generate a customized AI refactoring strategy for this candidate.</p>
-            <button 
+            <button
               onClick={loadInsights}
-              className="px-4 py-2 bg-accent/20 text-accent hover:bg-accent/30 rounded transition-colors"
+              className="px-4 py-2 border border-accent/30 text-accent hover:bg-accent/8 rounded transition-colors text-sm"
             >
               Generate AI Strategy
             </button>
           </div>
         )}
 
-        {loading ? (
+        {loading && (
           <div className="flex flex-col items-center justify-center h-40 gap-3 text-muted">
-            <Loader2 className="w-6 h-6 text-[#cba6f7] animate-spin" />
+            <Loader2 className="w-5 h-5 text-accent animate-spin" />
             <span className="text-xs">Analyzing candidate...</span>
           </div>
-        ) : insights?.error ? (
-          <div className="text-xs text-danger p-3 bg-danger/10 border border-danger/20 rounded">
+        )}
+
+        {!loading && insights?.error && (
+          <div className="text-xs text-danger p-3 bg-danger/8 border border-danger/20 rounded">
             {insights.error}
           </div>
-        ) : insights ? (
-          <AiResponse 
+        )}
+
+        {!loading && insights && !insights.error && (
+          <AiResponse
             repoId={repoId}
             chatId={`refactor-${candidate.id}`}
             data={{
@@ -526,7 +610,7 @@ function AiAdvisor({ candidate, repoId }) {
             }}
             title={null}
           />
-        ) : null}
+        )}
       </div>
     </div>
   );

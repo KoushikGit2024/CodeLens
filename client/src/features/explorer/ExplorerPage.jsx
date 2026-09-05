@@ -113,6 +113,7 @@ export default function ExplorerPage() {
 
   // Monaco editor instance ref — used for revealLine / decorations
   const editorRef = useRef(null);
+  const [isEditorMounted, setIsEditorMounted] = useState(false);
 
   const handleSetViewMode = (mode) => {
     setSearchParams(prev => {
@@ -211,7 +212,7 @@ export default function ExplorerPage() {
   // ── Line highlighting Effect ───────────────────────────────────────────────
   useEffect(() => {
     const lineParam = searchParams.get('line');
-    if (lineParam && editorRef.current && !fileLoading && fileContent) {
+    if (lineParam && isEditorMounted && !fileLoading && fileContent) {
       const parts = lineParam.split('-');
       const start = parseInt(parts[0], 10);
       const end = parts.length > 1 ? parseInt(parts[1], 10) : undefined;
@@ -225,11 +226,12 @@ export default function ExplorerPage() {
         }
       }, 50);
     }
-  }, [searchParams.get('line'), fileLoading, fileContent]);
+  }, [searchParams.get('line'), fileLoading, fileContent, isEditorMounted]);
 
   // ── Monaco editor callbacks ────────────────────────────────────────────────
   const handleEditorMount = useCallback((editor) => {
     editorRef.current = editor;
+    setIsEditorMounted(true);
   }, []);
 
   function revealLine(line) {
@@ -445,21 +447,19 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
   }
 
   const header = (
-    <div className="flex items-center justify-center px-4 py-2 bg-panel border-b border-border shadow-sm shrink-0 z-10">
-      <div className="flex items-center gap-1 bg-surface p-1 rounded-lg border border-border/50">
-        <button 
-          onClick={() => setViewMode('source')} 
-          className={`px-4 py-1.5 text-xs font-medium rounded-md transition-all ${viewMode === 'source' ? 'bg-accent/20 text-accent shadow-sm' : 'text-muted hover:text-white hover:bg-white/5'}`}
-        >
-          Source Code
-        </button>
-        <button 
-          onClick={() => setViewMode('docs')} 
-          className={`px-4 py-1.5 text-xs font-medium rounded-md transition-all ${viewMode === 'docs' ? 'bg-accent/20 text-accent shadow-sm' : 'text-muted hover:text-white hover:bg-white/5'}`}
-        >
-          Documentation
-        </button>
-      </div>
+    <div className="flex items-center justify-center px-4 pt-2 bg-panel border-b border-border shadow-sm shrink-0 z-10 gap-6">
+      <button 
+        onClick={() => setViewMode('source')} 
+        className={`px-4 py-2 text-xs font-medium border-b-2 transition-all ${viewMode === 'source' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-white hover:border-border'}`}
+      >
+        Source Code
+      </button>
+      <button 
+        onClick={() => setViewMode('docs')} 
+        className={`px-4 py-2 text-xs font-medium border-b-2 transition-all ${viewMode === 'docs' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-white hover:border-border'}`}
+      >
+        Documentation
+      </button>
     </div>
   );
 
@@ -649,9 +649,9 @@ function Message({ msg, onOpenFile }) {
 
   if (msg.role === 'user') {
     return (
-      <div className="flex justify-end group/msg">
+      <div className="flex justify-end group/msg mb-2">
         <div className="flex flex-col gap-1 items-end max-w-[90%]">
-          <div className="bg-accent/10 border border-accent/20 rounded px-2.5 py-1.5 text-xs text-white">
+          <div className="px-3 py-2 text-xs text-white bg-surface border border-border rounded shadow-sm">
             <AiMarkdown content={msg.content} />
           </div>
           <button onClick={handleCopy} className="opacity-0 group-hover/msg:opacity-100 text-muted hover:text-white transition-opacity text-[10px] flex items-center gap-1" title="Copy Message">
@@ -674,8 +674,8 @@ function Message({ msg, onOpenFile }) {
 
   // assistant — render structured response compactly
   return (
-    <div className="flex flex-col gap-2 bg-surface/30 border border-border rounded p-2.5 group/msg">
-      <div className="flex items-center justify-between border-b border-border/50 pb-2 mb-2">
+    <div className="flex flex-col gap-2 border-l-2 border-accent pl-3 py-1 mb-2 group/msg">
+      <div className="flex items-center justify-between pb-1">
         <span className="text-[10px] font-medium text-white/80 flex items-center gap-1">
           {msg.isDeterministic ? <Database className="w-3 h-3 text-success" /> : <Brain className="w-3 h-3 text-accent" />}
           {msg.isDeterministic ? 'Deterministic' : 'AI Inference'}

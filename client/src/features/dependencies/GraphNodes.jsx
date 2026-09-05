@@ -13,22 +13,21 @@ export const CustomNode = ({ data }) => {
         opacity: data.isFaded ? 0.10 : 1,
         width: w,
         border: data.isFocused
-          ? `2px solid ${data.heatColor || '#58a6ff'}`
-          : `1px solid ${(data.heatColor || '#30363d')}${data.isFaded ? '18' : '55'}`,
-        background: data.isFocused ? 'rgba(26, 39, 64, 0.9)' : 'rgba(22, 27, 34, 0.7)',
-        boxShadow: data.isFocused ? `0 0 10px ${data.heatColor || '#58a6ff'}33` : 'none',
+          ? `2px solid ${data.heatColor || '#4D7EFF'}`
+          : `1px solid ${(data.heatColor || '#1D2130')}${data.isFaded ? '18' : '55'}`,
+        background: data.isFocused ? 'rgba(17, 23, 38, 0.95)' : 'rgba(17, 19, 24, 0.85)',
+        boxShadow: 'none',
       }}
     >
       <Handle type="target" position={Position.Top} style={{ opacity: 0 }} isConnectable={false} />
       <div className="flex items-center gap-1.5 px-2 py-1.5" style={{ overflow: 'hidden' }}>
         {isFile
-          ? <File className="w-3 h-3 shrink-0" style={{ color: data.heatColor || '#58a6ff', minWidth: 12 }} />
+          ? <File className="w-3 h-3 shrink-0" style={{ color: data.heatColor || '#4D7EFF', minWidth: 12 }} />
           : <Package className="w-3 h-3 shrink-0 text-amber-400" style={{ minWidth: 12 }} />
         }
         <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
           <div
-            className="text-white font-semibold leading-tight"
-            style={{ fontSize: 10, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}
+            style={{ fontSize: 10, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', color: '#CBD5E8', fontWeight: 600, lineHeight: '1.25' }}
             title={data.label}
           >
             {data.label}
@@ -36,7 +35,7 @@ export const CustomNode = ({ data }) => {
           {isFile && data.shortDir && (
             <div
               className="leading-tight"
-              style={{ fontSize: 9, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', color: data.dirColor || '#8b949e' }}
+              style={{ fontSize: 9, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', color: data.dirColor || '#6B7A99' }}
               title={data.dir}
             >
               {data.shortDir}
@@ -48,8 +47,8 @@ export const CustomNode = ({ data }) => {
             style={{
               fontSize: 9, fontWeight: 700, borderRadius: 99,
               padding: '0 4px', flexShrink: 0, lineHeight: '14px',
-              background: `${data.heatColor || '#58a6ff'}22`,
-              color: data.heatColor || '#58a6ff',
+              background: `${data.heatColor || '#4D7EFF'}22`,
+              color: data.heatColor || '#4D7EFF',
             }}
           >
             {data.degree}
@@ -59,13 +58,13 @@ export const CustomNode = ({ data }) => {
       <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} isConnectable={false} />
       {data.isCycling && (
         <div 
-          style={{ position: 'absolute', top: -3, right: -3, width: 10, height: 10, borderRadius: '50%', background: '#ff7b72', boxShadow: '0 0 0 2px #161b22' }} 
+          style={{ position: 'absolute', top: -3, right: -3, width: 10, height: 10, borderRadius: '50%', background: '#e05252', boxShadow: '0 0 0 2px #0C0E14' }} 
           title="Involved in Cycle" 
         />
       )}
       {!data.isCycling && data.isIsolated && (
         <div 
-          style={{ position: 'absolute', top: -3, right: -3, width: 10, height: 10, borderRadius: '50%', background: '#8b949e', boxShadow: '0 0 0 2px #161b22' }} 
+          style={{ position: 'absolute', top: -3, right: -3, width: 10, height: 10, borderRadius: '50%', background: '#6B7A99', boxShadow: '0 0 0 2px #0C0E14' }} 
           title="Isolated File" 
         />
       )}

@@ -31,14 +31,14 @@ export default function RepositoryHeader() {
         <div className="flex items-center gap-1">
           <button 
             onClick={() => navigate(-1)}
-            className="p-1.5 text-muted hover:text-white hover:bg-surface rounded transition-colors"
+            className="p-1.5 text-muted hover:text-[#CBD5E8] hover:bg-surface rounded transition-colors"
             title="Go back"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
           <button 
             onClick={() => navigate(1)}
-            className="p-1.5 text-muted hover:text-white hover:bg-surface rounded transition-colors"
+            className="p-1.5 text-muted hover:text-[#CBD5E8] hover:bg-surface rounded transition-colors"
             title="Go forward"
           >
             <ChevronRight className="w-4 h-4" />
@@ -52,7 +52,7 @@ export default function RepositoryHeader() {
         <button
           onClick={handleReanalyze}
           disabled={reanalyzing}
-          className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-white transition-colors border border-blue-400/40 hover:border-white/40 rounded px-2 py-1 disabled:opacity-50"
+          className="flex items-center gap-1.5 text-xs text-accent hover:text-[#CBD5E8] transition-colors border border-accent/30 hover:border-muted/50 rounded px-2 py-1 disabled:opacity-50"
           title="Re-analyze Repository"
         >
           {reanalyzing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}

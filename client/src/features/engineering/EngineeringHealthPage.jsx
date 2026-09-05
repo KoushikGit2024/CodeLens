@@ -24,13 +24,13 @@ const RiskCard = ({ risk, repoId, navigate }) => {
           <span className={getSeverityBadge(risk.severity)}>{risk.severity}</span>
           <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">{risk.category}</span>
         </div>
-        <h3 className="text-base font-semibold text-white mb-2 line-clamp-2" title={risk.title}>{risk.title}</h3>
+        <h3 className="text-base font-semibold text-text mb-2 line-clamp-2" title={risk.title}>{risk.title}</h3>
         <p className="text-xs text-muted line-clamp-3 leading-relaxed flex-1">{risk.description}</p>
         
         {risk.file && (
-          <div className="mt-4 pt-4 border-t border-border/50">
+          <div className="mt-4 pt-4 border-t border-white/5">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-medium text-white/70 uppercase tracking-widest">Target File</span>
+              <span className="text-[10px] font-medium text-text/70 uppercase tracking-widest">Target File</span>
             </div>
             <Link
               to={`/explore/${repoId}/source?path=${encodeURIComponent(risk.file)}`}
@@ -45,7 +45,7 @@ const RiskCard = ({ risk, repoId, navigate }) => {
       <div className="bg-panel border-t border-border px-4 py-3 shrink-0 flex justify-end">
         <button 
           onClick={() => navigate(`/explore/${repoId}/refactoring`)}
-          className="text-xs font-medium text-white/80 hover:text-white flex items-center gap-1 transition-colors"
+          className="text-xs font-medium text-text/80 hover:text-text flex items-center gap-1 transition-colors"
         >
           Send to Triage <ArrowRight className="w-3 h-3" />
         </button>
@@ -124,7 +124,7 @@ const EngineeringHealthPage = () => {
   const filteredRisks = model.risks.filter(r => !fileFilter || r.file === fileFilter);
 
   return (
-    <div className="flex h-full flex-col overflow-auto bg-surface text-white">
+    <div className="flex h-full flex-col overflow-auto bg-surface text-text">
       <div className="px-6 pt-6 shrink-0">
         <PageHeader 
           title="Engineering Health Dashboard" 
@@ -136,7 +136,7 @@ const EngineeringHealthPage = () => {
       <div className="p-8 pt-2">
         <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white">Engineering Health</h1>
+          <h1 className="text-3xl font-bold text-text">Engineering Health</h1>
           <p className="mt-2 text-muted">{model.summary}</p>
         </div>
         <div className="text-right">
@@ -173,7 +173,7 @@ const EngineeringHealthPage = () => {
             <div className="rounded border border-border bg-panel p-5">
               <div className="flex items-center gap-2 text-warning mb-2">
                 <Ghost className="w-5 h-5" />
-                <h3 className="font-semibold text-white">Dead / Unused Files ({model.deadCode.length})</h3>
+                <h3 className="font-semibold text-text">Dead / Unused Files ({model.deadCode.length})</h3>
               </div>
               <p className="text-sm text-muted mb-3">These files are never imported or called from any entry point.</p>
               <div className="max-h-40 overflow-y-auto space-y-1">
@@ -188,13 +188,13 @@ const EngineeringHealthPage = () => {
             <div className="rounded border border-border bg-panel p-5">
               <div className="flex items-center gap-2 text-danger mb-2">
                 <Copy className="w-5 h-5" />
-                <h3 className="font-semibold text-white">Structural Code Clones ({model.clones.length})</h3>
+                <h3 className="font-semibold text-text">Structural Code Clones ({model.clones.length})</h3>
               </div>
               <p className="text-sm text-muted mb-3">These function groups have identical logical structures across the codebase.</p>
               <div className="max-h-40 overflow-y-auto space-y-3">
                 {model.clones.slice(0, 5).map((c, i) => (
                   <div key={i} className="text-sm bg-surface p-2 rounded">
-                    <div className="text-white font-medium mb-1">Clone Group {i + 1} (Copied {c.count} times)</div>
+                    <div className="text-text font-medium mb-1">Clone Group {i + 1} (Copied {c.count} times)</div>
                     {c.instances.map((inst, idx) => (
                       <div key={idx} className="text-xs font-mono text-muted truncate">
                         • {inst.name || 'anonymous'} {inst.location?.startLine ? `(Line ${inst.location.startLine})` : ''}
@@ -256,13 +256,13 @@ const EngineeringHealthPage = () => {
       )}
 
       <div className="mb-4 flex items-center justify-between border-b border-border pb-2">
-        <h2 className="text-xl font-semibold text-white">Identified Risks</h2>
+        <h2 className="text-xl font-semibold text-text">Identified Risks</h2>
         {fileFilter && (
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted">Showing risks for: <code className="text-white">{fileFilter}</code></span>
+            <span className="text-sm text-muted">Showing risks for: <code className="text-text">{fileFilter}</code></span>
             <button 
               onClick={() => navigate(`/explore/${repoId}/health`)}
-              className="text-xs px-2 py-1 bg-surface border border-border rounded text-muted hover:text-white transition-colors flex items-center gap-1"
+              className="text-xs px-2 py-1 bg-surface border border-border rounded text-muted hover:text-text transition-colors flex items-center gap-1"
             >
               <RefreshCw className="w-3 h-3" />
               Clear Filter

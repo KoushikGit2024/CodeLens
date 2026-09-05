@@ -389,7 +389,7 @@ export default function DependencyGraphPage() {
           minWidth: 300,
           collapsible: false,
           content: (
-            <div className="relative bg-[#0d1117] flex flex-col h-full w-full">
+            <div className="relative bg-surface shadow-inner flex flex-col h-full w-full">
               <ContextBreadcrumbs 
                 domain="Dependency Graph" 
                 activeNode={selected} 
@@ -425,15 +425,15 @@ export default function DependencyGraphPage() {
                   proOptions={{ hideAttribution: true }}
                   defaultEdgeOptions={{ zIndex: 1 }}
                 >
-                  <Background color="#21262d" gap={20} size={1} variant="dots" />
+                  <Background color="#1D2130" gap={20} size={1} variant="dots" />
                   <Controls className="bg-panel border-border" />
                   <MiniMap
                     nodeColor={n => {
                       if (n.type === 'group') return '#ffffff08';
-                      return n.data?.heatColor || '#1f6feb';
+                      return n.data?.heatColor || '#4D7EFF';
                     }}
-                    maskColor="rgba(13,17,23,0.85)"
-                    style={{ background: '#161b22', border: '1px solid #30363d' }}
+                    maskColor="rgba(12,14,20,0.85)"
+                    style={{ background: '#111318', border: '1px solid #1D2130' }}
                   />
                 </ReactFlow>
               )}

@@ -49,7 +49,7 @@ const ArchNode = ({ data }) => {
     >
       <Handle type="target" position={Position.Top} style={{ opacity: 0 }} isConnectable={false} />
       <div style={{ padding: '6px 10px', display: 'flex', flexDirection: 'column', gap: 1 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={data.label}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#CBD5E8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={data.label}>
           {data.label}
         </div>
         {!data.isExternal && data.layer && (
@@ -61,7 +61,7 @@ const ArchNode = ({ data }) => {
       <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} isConnectable={false} />
       {isViolating && (
         <div 
-          style={{ position: 'absolute', top: -3, right: -3, width: 10, height: 10, borderRadius: '50%', background: '#ff7b72', boxShadow: '0 0 0 2px #0d1117' }} 
+          style={{ position: 'absolute', top: -3, right: -3, width: 10, height: 10, borderRadius: '50%', background: '#e05252', boxShadow: '0 0 0 2px #0C0E14' }} 
           title="Rule Violation" 
         />
       )}
@@ -292,19 +292,19 @@ function graphToFlow(components, relations, selectedId, violations) {
       type: 'straight', // Straight edges look best for radial hubs
       animated: isViolating || isFocused,
       style: { 
-        stroke: isViolating ? '#ff7b72' : isFocused ? '#58a6ff' : '#30363dbb', 
+        stroke: isViolating ? '#e05252' : isFocused ? '#4D7EFF' : '#1D2130cc', 
         strokeWidth: isViolating || isFocused ? 2 : 1,
         opacity: isFaded ? 0.15 : 1
       },
       markerEnd: { 
         type: MarkerType.ArrowClosed, 
-        color: isViolating ? '#ff7b72' : isFocused ? '#58a6ff' : '#30363dbb', 
+        color: isViolating ? '#e05252' : isFocused ? '#4D7EFF' : '#1D2130cc', 
         width: isFocused || isViolating ? 12 : 10, 
         height: isFocused || isViolating ? 12 : 10 
       },
       label: r.type || undefined,
-      labelStyle: { fill: '#8b949e', fontSize: 8, fontFamily: 'monospace' },
-      labelBgStyle: { fill: '#0d1117', fillOpacity: 0.8 },
+      labelStyle: { fill: '#6B7A99', fontSize: 8, fontFamily: 'monospace' },
+      labelBgStyle: { fill: '#0C0E14', fillOpacity: 0.8 },
       zIndex: isFocused || isViolating ? 1 : 0,
     };
   });
@@ -373,7 +373,7 @@ export default function ArchitecturePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center gap-3 bg-surface text-white">
+      <div className="min-h-screen flex items-center justify-center gap-3 bg-surface text-text">
         <Loader2 className="w-5 h-5 text-accent animate-spin" />
         <span className="text-muted text-sm">Analyzing architecture...</span>
       </div>
@@ -393,7 +393,7 @@ export default function ArchitecturePage() {
                 await repositoryApi.analyze(repoId);
                 navigate(`/explore/${repoId}`);
               }}
-              className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors"
+              className="px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-lg text-sm font-medium transition-colors"
             >
               Start Analysis
             </button>
@@ -419,7 +419,7 @@ export default function ArchitecturePage() {
           content: (
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-6 custom-scrollbar bg-panel h-full">
               <section>
-                 <div className="bg-surface/50 p-3 rounded border border-border/50 flex flex-col gap-2 mb-4">
+                 <div className="flex flex-col gap-2 mb-4 pb-4 border-b border-white/5">
                    <div className="flex items-center justify-between">
                      <span className="text-xs text-muted flex items-center gap-1.5"><AlertCircle className="w-3.5 h-3.5"/> Security & Health</span>
                      <Link to={`/explore/${repoId}/health`} className="text-[10px] text-accent hover:underline">View Health</Link>
@@ -431,18 +431,18 @@ export default function ArchitecturePage() {
                  </div>
 
                 {!selectedComponent ? (
-                  <div className="text-center p-4 border border-dashed border-border/50 rounded-lg">
+                  <div className="text-center p-4 border border-dashed border-white/5 rounded-lg">
                     <Box className="w-8 h-8 text-muted mx-auto mb-2 opacity-50" />
                     <p className="text-xs text-muted">Click a component in the graph to view its details and specific violations.</p>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-4">
                     {/* Component Info */}
-                    <div className="bg-surface/50 p-3 rounded border border-border/50">
+                    <div className="pb-3 border-b border-white/5">
                       <p className="text-xs text-muted uppercase tracking-wider mb-2">Component Details</p>
                       <div className="flex items-center gap-2 mb-2">
                         <Box className="w-4 h-4 text-accent" />
-                        <span className="text-sm font-semibold text-white truncate" title={selectedComponent}>{selectedComponent}</span>
+                        <span className="text-sm font-semibold text-text truncate" title={selectedComponent}>{selectedComponent}</span>
                       </div>
                       
                       {(() => {
@@ -466,11 +466,11 @@ export default function ArchitecturePage() {
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-xs text-muted">Files</span>
-                              <span className="text-xs text-white/80 font-mono">{compData.files?.length || 0}</span>
+                              <span className="text-xs text-text/80 font-mono">{compData.files?.length || 0}</span>
                             </div>
                             
                             {compData.health && (
-                              <div className="flex justify-between items-start mt-2 pt-2 border-t border-border/50">
+                              <div className="flex justify-between items-start mt-2 pt-2 border-t border-white/5">
                                 <span className="text-xs text-muted">Health</span>
                                 <div className="flex flex-col items-end gap-1">
                                   <span className={`border rounded px-1.5 py-0.5 text-[10px] font-medium capitalize flex items-center gap-1 ${getSeverityColor(compData.health.severity)}`}>
@@ -496,7 +496,7 @@ export default function ArchitecturePage() {
                       
                       if (nodeViolations.length === 0) {
                         return (
-                          <div className="bg-success/10 border border-success/30 p-3 rounded flex items-center gap-2">
+                          <div className="bg-success/10 border border-success/30 p-3 rounded flex items-center gap-2 mb-2">
                             <AlertCircle className="w-4 h-4 text-success" />
                             <span className="text-xs text-success">No architecture violations</span>
                           </div>
@@ -511,7 +511,7 @@ export default function ArchitecturePage() {
                           {nodeViolations.map((v, i) => (
                             <div key={i} className="bg-danger/10 border border-danger/30 p-2 rounded flex flex-col gap-1">
                               <span className="text-[11px] font-semibold text-danger">{v.name}</span>
-                              <span className="text-[10px] text-white/80">{v.sourceComponent} → {v.targetComponent}</span>
+                              <span className="text-[10px] text-text/80">{v.sourceComponent} → {v.targetComponent}</span>
                               <span className="text-[10px] text-muted italic line-clamp-2" title={v.description}>{v.description}</span>
                             </div>
                           ))}
@@ -526,7 +526,7 @@ export default function ArchitecturePage() {
                     {data.model.entryPoints.map((ep, i) => (
                       <div key={i} className="flex items-center gap-2 group min-w-0">
                         <File className="w-4 h-4 text-accent shrink-0" />
-                        <span className="text-xs font-mono truncate flex-1 text-white" title={ep}>{ep}</span>
+                        <span className="text-xs font-mono truncate flex-1 text-text" title={ep}>{ep}</span>
                         <Link 
                           to={`/explore/${repoId}/source?path=${encodeURIComponent(ep)}`}
                           className="opacity-0 group-hover:opacity-100 text-xs text-accent hover:underline"
@@ -554,11 +554,11 @@ export default function ArchitecturePage() {
                             <Box className="w-4 h-4 text-warning" />
                             {comp.name}
                           </span>
-                          <span className="text-[10px] uppercase text-muted bg-surface px-1.5 py-0.5 rounded border border-border/50">
+                          <span className="text-[10px] uppercase text-muted bg-surface px-1.5 py-0.5 rounded border border-white/5">
                             {comp.layer}
                           </span>
                         </div>
-                        <div className="pl-6 border-l-2 border-border/30 ml-1.5 flex flex-col gap-1">
+                        <div className="pl-6 border-l-2 border-white/5 ml-1.5 flex flex-col gap-1">
                           {comp.files.map((file, j) => (
                             <div key={j} className="flex items-center justify-between group min-w-0">
                               <span className="text-[11px] text-muted font-mono truncate" title={file}>
@@ -589,7 +589,7 @@ export default function ArchitecturePage() {
           minWidth: 300,
           collapsible: false,
           content: (
-            <main className="flex-1 overflow-auto bg-[#0d1117] relative flex justify-center custom-scrollbar h-full w-full">
+            <main className="flex-1 overflow-auto bg-surface shadow-inner relative flex justify-center custom-scrollbar h-full w-full">
               <ContextBreadcrumbs 
                 domain="Architecture" 
                 activeNode={selectedComponent} 
@@ -612,7 +612,7 @@ export default function ArchitecturePage() {
                   proOptions={{ hideAttribution: true }}
                   className="bg-transparent"
                 >
-                  <Background color="#21262d" gap={20} size={1} variant="dots" />
+                  <Background color="#1D2130" gap={20} size={1} variant="dots" />
                   <Controls position="bottom-right" className="bg-panel border-border" />
                   <MiniMap
                     position="top-right"
@@ -620,23 +620,23 @@ export default function ArchitecturePage() {
                       const c = layerColor(n.data?.layer, n.data?.isExternal);
                       return c.bg;
                     }}
-                    maskColor="rgba(13,17,23,0.75)"
-                    className="bg-[#0d1117] border border-border"
+                    maskColor="rgba(12,14,20,0.75)"
+                    className="bg-panel border border-border"
                   />
 
                   {/* Layer legend */}
                   <div
                     style={{
                       position: 'absolute', bottom: 12, left: 12, zIndex: 10,
-                      background: '#161b22ee', border: '1px solid #30363d',
+                      background: 'rgba(17,19,24,0.93)', border: '1px solid #1D2130',
                       borderRadius: 8, padding: '8px 12px',
                     }}
                   >
-                    <div style={{ fontSize: 9, color: '#8b949e', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Layers</div>
+                    <div style={{ fontSize: 9, color: '#6B7A99', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Layers</div>
                     {Object.entries(LAYER_COLORS).filter(([k]) => k !== 'External').map(([layer, { bg, border }]) => (
                       <div key={layer} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
                         <span style={{ width: 8, height: 8, borderRadius: 2, background: bg, border: `1px solid ${border}`, display: 'inline-block', flexShrink: 0 }} />
-                        <span style={{ fontSize: 10, color: '#c9d1d9' }}>{layer}</span>
+                        <span style={{ fontSize: 10, color: '#CBD5E8' }}>{layer}</span>
                       </div>
                     ))}
                   </div>

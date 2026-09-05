@@ -147,15 +147,15 @@ export function ResizableLayout({ panels, className = "h-full w-full" }) {
             {index < panels.length - 1 && (
               <div
                 onPointerDown={(e) => handlePointerDown(e, index)}
-                className={`relative w-2 flex flex-col items-center justify-center z-40 shrink-0
+                className={`relative w-3 -ml-[1.5px] -mr-[1.5px] flex flex-col items-center justify-center z-40 shrink-0
                   ${(collapsed[index] || collapsed[index + 1]) ? 'cursor-default' : 'cursor-col-resize group'}
                 `}
               >
                 {/* Resizer visible line */}
-                <div className={`absolute inset-y-0 left-[3px] w-[1px] transition-all
+                <div className={`absolute inset-y-0 left-1/2 -translate-x-1/2 transition-all
                   ${(collapsed[index] || collapsed[index + 1]) 
-                    ? 'bg-border' 
-                    : 'bg-border group-hover:bg-accent group-active:bg-accent'}
+                    ? 'bg-border w-[1px]' 
+                    : 'bg-border w-[1px] group-hover:bg-accent group-hover:w-[2px] group-active:bg-accent group-active:w-[2px]'}
                 `} />
 
                 {/* Collapse Buttons on Resizer */}

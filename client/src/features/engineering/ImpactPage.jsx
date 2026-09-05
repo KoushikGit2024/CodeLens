@@ -139,7 +139,7 @@ const ImpactNode = ({ data }) => {
         background: bg,
         backdropFilter: 'blur(6px)',
         padding: '10px',
-        color: '#fff',
+        color: '#CBD5E8',
         fontFamily: 'monospace',
         fontSize: '11px',
         boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
@@ -323,7 +323,7 @@ export default function ImpactPage() {
                       <p className="text-sm">Select files from the sidebar and click "Analyze Impact".</p>
                     </div>
                   ) : (
-                    <div className="flex-1 w-full h-full bg-[#0d1117] rounded border border-border shadow-inner relative overflow-hidden">
+                    <div className="flex-1 w-full h-full bg-surface border border-border shadow-inner relative overflow-hidden">
                       <ReactFlow
                         onInit={setRfInstance}
                         nodes={nodes}
@@ -337,7 +337,7 @@ export default function ImpactPage() {
                         nodesDraggable={true} 
                         proOptions={{ hideAttribution: true }}
                       >
-                        <Controls className="bg-surface border-border !fill-black" showInteractive={false} />
+                        <Controls showInteractive={false} />
                       </ReactFlow>
                       <div className="absolute top-4 right-4 bg-panel/90 border border-border rounded p-3 text-xs flex flex-col gap-2 backdrop-blur-sm shadow-xl">
                         <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#da3633]"></div> Changed Files</div>
