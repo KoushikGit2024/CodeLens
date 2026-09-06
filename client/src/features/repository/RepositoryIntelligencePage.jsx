@@ -26,8 +26,26 @@ export default function RepositoryIntelligencePage() {
   
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState(null);
-  const [aiData, setAiData] = useState(null);
+  const [aiData, setAiDataState] = useState(null);
   const { aiState, reportAiError } = useAIState();
+
+  // Persist aiData to localStorage so it survives page refreshes
+  const setAiData = (data) => {
+    setAiDataState(data);
+    if (data) {
+      try { localStorage.setItem(`ai_synthesis_${repoId}`, JSON.stringify(data)); } catch (_) {}
+    }
+  };
+
+  // Restore last AI synthesis on mount
+  useEffect(() => {
+    if (!repoId) return;
+    try {
+      const cached = localStorage.getItem(`ai_synthesis_${repoId}`);
+      if (cached) setAiDataState(JSON.parse(cached));
+    } catch (_) {}
+  }, [repoId]);
+
 
   const loadIntelligence = async (wasAnalyzing = false) => {
     setError(null);
@@ -39,7 +57,7 @@ export default function RepositoryIntelligencePage() {
         setPhaseDetails(res.data.phaseDetails || null);
         setTimeout(() => loadIntelligence(true), 1000);
       } else {
-        setData(res.data);
+        setData(res.data.intelligence || res.data);
         if (wasAnalyzing) {
           setCurrentPhase('ready');
           setTimeout(() => {
@@ -455,15 +473,15 @@ export default function RepositoryIntelligencePage() {
             </p>
             <button
               onClick={handleUnderstandRepository}
-              disabled={aiLoading}
-              className="bg-accent text-text text-xs py-2 px-4 rounded hover:bg-accent/90 disabled:opacity-50 transition-colors flex justify-center items-center gap-2"
+              disabled={aiLoading || aiState === 'offline' || aiState === 'unavailable' || aiState === 'error'}
+              className="bg-accent text-text text-xs py-2 px-4 rounded hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex justify-center items-center gap-2"
             >
               {aiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
               {aiLoading ? 'Synthesizing...' : 'Understand Repository'}
             </button>
-            {aiState === 'offline' || aiState === 'unavailable' ? (
-               <p className="text-[10px] text-warning text-center mt-1">
-                 AI summaries are currently unavailable.
+            {(aiState === 'offline' || aiState === 'unavailable') ? (
+               <p className="text-[10px] text-muted text-center mt-1">
+                 No AI provider configured — running in deterministic mode.
                </p>
             ) : null}
           </div>
@@ -488,7 +506,7 @@ export default function RepositoryIntelligencePage() {
 
             {aiData && (
               <div className="text-sm">
-                <AiResponse data={aiData} title={null} onNavigate={() => {}} />
+                <AiResponse data={aiData} title={null} onNavigate={() => {}} repoId={repoId} chatId="repo-intelligence" />
               </div>
             )}
           </div>

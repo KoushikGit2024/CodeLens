@@ -1,12 +1,12 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'CodeLensDB';
-const DB_VERSION = 2; // Bumped for 'analysis' store separation
+const DB_VERSION = 3; // Bumped for 'chatSessions' store
 
 /**
  * Initialize IndexedDB.
  */
-async function getDB() {
+export async function getDB() {
   return openDB(DB_NAME, DB_VERSION, {
     async upgrade(db, oldVersion, newVersion, transaction) {
       if (!db.objectStoreNames.contains('repos')) {
@@ -17,6 +17,9 @@ async function getDB() {
       }
       if (!db.objectStoreNames.contains('analysis')) {
         db.createObjectStore('analysis', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('chatSessions')) {
+        db.createObjectStore('chatSessions', { keyPath: ['repoId', 'feature'] });
       }
       
       // Migration from version 1 to 2: Split analysis out of 'repos' store

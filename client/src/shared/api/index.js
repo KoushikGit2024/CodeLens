@@ -319,12 +319,73 @@ export const repositoryApi = {
     return { data: { model: architecture } };
   },
 
-  async getIntelligence(repoId) {
+  async getIntelligence(repoId, options = {}) {
     const record = await repositoryStore.get(repoId);
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
     const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
     const intelligence = buildRepositoryIntelligence(record.analysis, record.analysis.graph, architecture);
-    return { data: intelligence };
+
+    if (options.generateAi) {
+      const langs = Object.entries(intelligence.repository.languages || {})
+        .sort((a, b) => b[1] - a[1]).slice(0, 5)
+        .map(([l, n]) => `${l} (${n} files)`).join(', ');
+
+      const hotspotList = (intelligence.hotspots || []).slice(0, 5)
+        .map(h => `  - ${h.file} (hotspot score: ${h.score})`).join('\n');
+
+      const topCandidates = (intelligence.refactoring.topCandidates || [])
+        .map(c => `  - ${c.title} [${c.priority}]`).join('\n');
+
+      const prompt = `You are CodeLens, a senior software architect and code intelligence assistant.
+Analyze the following deterministic repository metrics and produce a clear, concise, high-level overview.
+Be direct and actionable. Focus on what matters most to a developer who has just opened this codebase.
+
+REPOSITORY: ${intelligence.repository.name}
+FILES: ${intelligence.repository.fileCount} source files
+LANGUAGES: ${langs}
+
+ARCHITECTURE:
+- ${intelligence.architecture.components} detected components
+- Layers: ${(intelligence.architecture.layers || []).join(', ') || 'N/A'}
+
+DEPENDENCY GRAPH:
+- ${intelligence.dependencies.nodes} nodes, ${intelligence.dependencies.edges} edges
+- Circular dependencies: ${intelligence.dependencies.cycles}
+
+ENGINEERING HEALTH:
+- Overall score: ${intelligence.engineeringHealth.score}/100
+- Critical issues: ${intelligence.engineeringHealth.critical}
+- High-severity issues: ${intelligence.engineeringHealth.high}
+- Warnings: ${intelligence.engineeringHealth.warnings}
+
+REFACTORING:
+- ${intelligence.refactoring.candidateCount} candidate(s) identified (${intelligence.refactoring.critical} critical, ${intelligence.refactoring.high} high)
+- Top candidates:
+${topCandidates || '  None'}
+
+TOP HOTSPOT FILES:
+${hotspotList || '  None identified'}
+
+Provide a 3-5 paragraph technical summary covering: overall codebase health, main architectural observations, key risks to address, and recommended immediate actions.`;
+
+      const aiResponse = await api.post('/ai/chat', { prompt });
+      const insights = {
+        summary: aiResponse.data.response,
+        facts: [
+          `${intelligence.repository.fileCount} files analyzed across ${intelligence.architecture.components} architectural component(s)`,
+          `${intelligence.dependencies.nodes} nodes, ${intelligence.dependencies.edges} edges in the dependency graph`,
+          intelligence.dependencies.cycles > 0
+            ? `${intelligence.dependencies.cycles} circular dependency cycle(s) detected — requires attention`
+            : 'No circular dependencies detected',
+          `Engineering health score: ${intelligence.engineeringHealth.score}/100 (${intelligence.engineeringHealth.critical} critical, ${intelligence.engineeringHealth.high} high issues)`,
+          `${intelligence.refactoring.candidateCount} refactoring candidate(s) identified`,
+        ],
+        references: (intelligence.hotspots || []).slice(0, 5).map(h => h.file)
+      };
+      return { data: { intelligence, insights } };
+    }
+
+    return { data: { intelligence } };
   },
 
   async getRisks(repoId) {

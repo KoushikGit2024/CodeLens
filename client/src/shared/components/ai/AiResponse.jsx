@@ -2,20 +2,51 @@ import React, { useState, useEffect, useRef } from 'react';
 import AiMarkdown from './AiMarkdown';
 import AiReference from './AiReference';
 import { AlertCircle, FileText, Settings, ShieldAlert, Sparkles, Lightbulb, ListChecks, Send, Loader2, User, Copy, Check } from 'lucide-react';
-import { repositoryApi } from '../../api';
-import { useRepository } from '../../context/RepositoryContext';
+import { useAI } from '../../context/AIContext';
 
-/**
- * A canonical component to present AI responses consistently across CodeLens.
- * It expects a structured object that might contain:
- * - status (e.g. 'unavailable', 'error')
- * - summary / explanation / answer
- * - facts (deterministic facts)
- * - inferences / keyCharacteristics / observations / insights
- * - recommendations / recommendedActions / strategies
- * - risks / mainRisks / limitations
- * - references (array of strings or objects)
- */
+// ── TypewriterMarkdown (New Animation Component) ──────────────────────────────
+function TypewriterMarkdown({ content, animate = true, speed = 15, className = "" }) {
+  const [displayed, setDisplayed] = useState(animate ? '' : content);
+  const [isTyping, setIsTyping] = useState(animate);
+
+  useEffect(() => {
+    // If animation is disabled or there is no content, just render it instantly
+    if (!animate || !content) {
+      setDisplayed(content);
+      setIsTyping(false);
+      return;
+    }
+
+    let currentLength = 0;
+    setIsTyping(true);
+    
+    // Adaptive chunk size: prevents massive responses from taking 2 minutes to type out,
+    // while keeping short responses looking like a natural keystroke speed.
+    const chunkSize = Math.max(1, Math.floor(content.length / 150)); 
+
+    const interval = setInterval(() => {
+      currentLength += chunkSize;
+      
+      if (currentLength >= content.length) {
+        setDisplayed(content);
+        setIsTyping(false);
+        clearInterval(interval);
+      } else {
+        // Appends a solid block character cursor while actively typing
+        setDisplayed(content.slice(0, currentLength) + ' ▌');
+      }
+    }, speed);
+
+    return () => clearInterval(interval);
+  }, [content, animate, speed]);
+
+  return (
+    <div className={`${className} ${isTyping ? 'opacity-90' : 'opacity-100 transition-opacity duration-500'}`}>
+      <AiMarkdown content={displayed} />
+    </div>
+  );
+}
+
 // ── CopyableListItem ──────────────────────────────────────────────────────────
 function CopyableListItem({ content, className }) {
   const [copied, setCopied] = useState(false);
@@ -65,7 +96,8 @@ function CopyableChatMessage({ msg }) {
           {msg.role === 'user' ? (
             msg.content
           ) : (
-            <AiMarkdown content={msg.content} />
+            // Apply the typewriter animation to the assistant's chat responses
+            <TypewriterMarkdown content={msg.content} animate={true} />
           )}
         </div>
 
@@ -89,62 +121,20 @@ function CopyableChatMessage({ msg }) {
 }
 
 export default function AiResponse({ data, title = "AI Intelligence", onNavigate, repoId, chatId }) {
-  const { repo } = useRepository();
-  const [chatHistory, setChatHistory] = useState(() => {
-    // In production, fallback to localStorage since the backend has no persistent disk
-    if (import.meta.env.PROD) {
-      const cached = localStorage.getItem(`chat_${repoId}_${chatId}`);
-      return cached ? JSON.parse(cached) : [];
-    }
-    // In development, use the backend-provided persistent chat history
-    return (repo?.chats && repo.chats[chatId]) || [];
+  const { messages: chatHistory, isLoading: isAsking, error: chatError, sendMessage, retryLast, lastFailedPrompt } = useAI({ 
+    repoId, 
+    feature: chatId, 
+    contextData: data 
   });
   const [input, setInput] = useState('');
-  const [isAsking, setIsAsking] = useState(false);
-  const [chatError, setChatError] = useState(null);
   const chatEndRef = useRef(null);
 
-  const handleAskQuestion = async (e) => {
+  const handleAskQuestion = (e) => {
     e.preventDefault();
-    if (!input.trim() || !repoId) return;
-
-    const userMessage = { role: 'user', content: input.trim() };
-    setChatHistory(prev => [...prev, userMessage]);
+    if (!input.trim() || isAsking) return;
+    sendMessage(input);
     setInput('');
-    setIsAsking(true);
-    setChatError(null);
-
-    // Scroll to bottom
     setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-
-    try {
-      const activeContext = {
-        baseData: data,
-        history: chatHistory
-      };
-      const res = await repositoryApi.askQuestion(repoId, userMessage.content, activeContext);
-      
-      const newHistory = [...chatHistory, userMessage, { role: 'assistant', content: res.data.answer }];
-      setChatHistory(newHistory);
-      
-      if (import.meta.env.PROD) {
-        // Persist to local storage in production
-        localStorage.setItem(`chat_${repoId}_${chatId}`, JSON.stringify(newHistory));
-      } else {
-        // Persist to backend disk silently in development
-        repositoryApi.saveChatHistory(repoId, chatId, newHistory).catch(e => {
-          console.error('Failed to sync chat history to server', e);
-        });
-      }
-
-    } catch (err) {
-      setChatError(err.response?.data?.error || err.message || 'Failed to get a response.');
-      // Remove the user message if it failed entirely, or leave it and show error? 
-      // It's usually better to leave the message and show an error below it.
-    } finally {
-      setIsAsking(false);
-      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-    }
   };
 
   if (!data) return null;
@@ -189,10 +179,9 @@ export default function AiResponse({ data, title = "AI Intelligence", onNavigate
   const inferences = data.inferences || data.keyCharacteristics || data.observations || [];
   const recommendations = data.recommendations || data.recommendedActions || data.strategies || [];
   const risks = data.risks || data.mainRisks || data.limitations || [];
-  const references = data.references || [];
-  useEffect(()=>{
-    console.log(chatHistory);
-  },[chatHistory]);
+
+  const references = (data.references || []).filter(Boolean);
+  
   return (
     <div className="flex flex-col gap-6">
       {/* ── Summary / Main Content ────────────────────────────────────────── */}
@@ -204,7 +193,8 @@ export default function AiResponse({ data, title = "AI Intelligence", onNavigate
               {title}
             </h3>
           )}
-          <AiMarkdown content={summary} className="text-white/90" />
+          {/* Replaced AiMarkdown with TypewriterMarkdown */}
+          <TypewriterMarkdown content={summary} className="text-white/90" animate={true} speed={15} />
         </section>
       )}
 
@@ -221,7 +211,7 @@ export default function AiResponse({ data, title = "AI Intelligence", onNavigate
 
       {/* ── Deterministic Facts ───────────────────────────────────────────── */}
       {facts && facts.length > 0 && (
-        <section className="bg-panel/50 border border-border/50 rounded-lg p-4">
+        <section className="bg-panel/50 border border-border/50 rounded-lg p-4 transition-all duration-700 delay-300 animate-in fade-in slide-in-from-bottom-2">
           <h4 className="text-[10px] uppercase text-muted tracking-wider mb-3 font-bold flex items-center gap-1.5">
             <ListChecks className="w-3.5 h-3.5 text-success" />
             Deterministic Facts
@@ -236,7 +226,7 @@ export default function AiResponse({ data, title = "AI Intelligence", onNavigate
 
       {/* ── AI Inferences ─────────────────────────────────────────────────── */}
       {inferences && inferences.length > 0 && (
-        <section>
+        <section className="transition-all duration-700 delay-500 animate-in fade-in slide-in-from-bottom-2">
           <h4 className="text-[10px] uppercase text-muted tracking-wider mb-2 font-bold flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-[#cba6f7]" />
             AI Inferences
@@ -251,7 +241,7 @@ export default function AiResponse({ data, title = "AI Intelligence", onNavigate
 
       {/* ── Risks & Limitations ───────────────────────────────────────────── */}
       {risks && risks.length > 0 && (
-        <section className="bg-danger/5 border border-danger/10 rounded-lg p-4">
+        <section className="bg-danger/5 border border-danger/10 rounded-lg p-4 transition-all duration-700 delay-700 animate-in fade-in slide-in-from-bottom-2">
           <h4 className="text-[10px] uppercase text-danger/80 tracking-wider mb-2 font-bold flex items-center gap-1.5">
             <ShieldAlert className="w-3.5 h-3.5" />
             Risks & Limitations
@@ -266,7 +256,7 @@ export default function AiResponse({ data, title = "AI Intelligence", onNavigate
 
       {/* ── Recommendations ───────────────────────────────────────────────── */}
       {recommendations && recommendations.length > 0 && (
-        <section className="bg-success/5 border border-success/10 rounded-lg p-4">
+        <section className="bg-success/5 border border-success/10 rounded-lg p-4 transition-all duration-700 delay-1000 animate-in fade-in slide-in-from-bottom-2">
           <h4 className="text-[10px] uppercase text-success/80 tracking-wider mb-2 font-bold flex items-center gap-1.5">
             <Lightbulb className="w-3.5 h-3.5" />
             Recommendations
@@ -284,7 +274,7 @@ export default function AiResponse({ data, title = "AI Intelligence", onNavigate
         <section className="border-t border-border pt-4">
           <h4 className="text-[10px] uppercase text-muted tracking-wider mb-3 font-bold flex items-center gap-1.5">
             <FileText className="w-3.5 h-3.5" />
-            Source References
+            Source References{console.log(references)}
           </h4>
           <div className="flex flex-wrap gap-2">
             {references.map((ref, i) => (
@@ -308,11 +298,26 @@ export default function AiResponse({ data, title = "AI Intelligence", onNavigate
             </div>
           )}
 
-          {/* Error Message */}
+          {/* Error Message with Retry */}
           {chatError && (
-            <div className="flex items-center gap-2 text-danger text-xs bg-danger/10 p-2 rounded border border-danger/20">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              {chatError}
+            <div className="flex flex-col gap-2 bg-danger/10 border border-danger/20 rounded-lg p-3">
+              <div className="flex items-start gap-2 text-danger text-xs">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span className="flex-1 leading-relaxed">{chatError}</span>
+              </div>
+              {lastFailedPrompt && (
+                <div className="flex items-center justify-between border-t border-danger/10 pt-2 mt-1">
+                  <span className="text-[10px] text-danger/60 italic truncate max-w-[70%]">"{lastFailedPrompt}"</span>
+                  <button
+                    onClick={retryLast}
+                    disabled={isAsking}
+                    className="flex items-center gap-1.5 text-[10px] font-semibold text-danger hover:text-white bg-danger/20 hover:bg-danger/40 border border-danger/30 rounded px-2.5 py-1 transition-colors disabled:opacity-50"
+                  >
+                    {isAsking ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                    {isAsking ? 'Retrying...' : 'Retry'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

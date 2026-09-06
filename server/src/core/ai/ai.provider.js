@@ -188,85 +188,105 @@ async function openAiCompatibleProvider(prompt) {
   throw new Error(`Unexpected OpenAI-compatible response: ${resStr.slice(0, 200)}`);
 }
 
-// ── Provider registry ─────────────────────────────────────────────────────────
+// ── Provider registry (ordered fallback chain) ───────────────────────────────
 
 /**
- * Return the active provider function, or throw ProviderUnavailableError.
+ * Build an ordered list of all currently configured providers.
+ * Priority: IBM watsonx → Google Gemini → OpenAI-Compatible
  *
- * @returns {function(string): Promise<string>}
+ * @returns {Array<{name: string, fn: function}>}
  */
-function getProvider() {
+function getConfiguredProviders() {
+  const providers = [];
+  if (process.env.IBM_API_KEY && process.env.IBM_PROJECT_ID) {
+    providers.push({ name: 'IBM watsonx', fn: ibmWatsonxProvider });
+  }
   if (process.env.GEMINI_API_KEY) {
-    return geminiProvider;
+    providers.push({ name: 'Google Gemini', fn: geminiProvider });
   }
   if (process.env.OPENAI_API_KEY) {
-    return openAiCompatibleProvider;
+    providers.push({ name: 'OpenAI Compatible', fn: openAiCompatibleProvider });
   }
-  if (process.env.IBM_API_KEY && process.env.IBM_PROJECT_ID) {
-    return ibmWatsonxProvider;
-  }
-  throw new ProviderUnavailableError(
-    'No AI provider is configured. Set GEMINI_API_KEY, OPENAI_API_KEY, or IBM_API_KEY + IBM_PROJECT_ID in your .env file.'
-  );
+  return providers;
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
- * Verify the connection to the configured AI provider.
- * Makes a tiny test request to ensure the API key and endpoint are valid.
- * @returns {Promise<boolean>} true if successful, false otherwise
+ * Verify connectivity by trying each configured provider in order.
+ * Returns true (and the working provider name) on first success.
+ * Returns false if all providers fail or none are configured.
+ *
+ * @returns {Promise<{ok: boolean, provider: string|null}>}
  */
 async function verifyProviderConnection() {
-  if (!isProviderConfigured()) return false;
-  try {
-    const provider = getProvider();
-    // A very tiny prompt just to get a 200 OK response
-    await provider("Reply with the word 'OK'.");
-    return true;
-  } catch (error) {
-    console.error('[CodeLens] AI connection verification failed:', error.message);
-    return false;
+  const providers = getConfiguredProviders();
+  for (const { name, fn } of providers) {
+    try {
+      await fn("Reply with the word 'OK'.");
+      console.log(`[CodeLens] AI provider verified: ${name}`);
+      return { ok: true, provider: name };
+    } catch (err) {
+      console.warn(`[CodeLens] Provider '${name}' failed verification: ${err.message}`);
+    }
   }
+  return { ok: false, provider: null };
 }
 
 /**
  * Generate an answer for the given fully-assembled prompt.
+ * Tries each configured provider in order; moves to the next on failure.
+ * Throws ProviderUnavailableError if all providers fail or none are configured.
  *
  * @param {string} prompt  — complete prompt including all grounding context
  * @returns {Promise<string>} model response text
- * @throws {ProviderUnavailableError} if no provider is configured
- * @throws {Error} if the provider call fails
+ * @throws {ProviderUnavailableError}
  */
 async function generateAnswer(prompt) {
-  const provider = getProvider();
-  return provider(prompt);
-}
+  const providers = getConfiguredProviders();
+  if (providers.length === 0) {
+    throw new ProviderUnavailableError(
+      'No AI provider is configured. Set IBM_API_KEY + IBM_PROJECT_ID, GEMINI_API_KEY, or OPENAI_API_KEY in your .env file.'
+    );
+  }
 
-/**
- * Returns true if an AI provider is currently configured.
- * Used by the API to return a helpful 503 without attempting a call.
- *
- * @returns {boolean}
- */
-function isProviderConfigured() {
-  return !!(
-    process.env.GEMINI_API_KEY ||
-    process.env.OPENAI_API_KEY ||
-    (process.env.IBM_API_KEY && process.env.IBM_PROJECT_ID)
+  const errors = [];
+  for (const { name, fn } of providers) {
+    try {
+      const result = await fn(prompt);
+      if (errors.length > 0) {
+        console.warn(`[CodeLens] Fell back to provider '${name}' after ${errors.length} failure(s).`);
+      }
+      return result;
+    } catch (err) {
+      console.warn(`[CodeLens] Provider '${name}' failed: ${err.message}`);
+      errors.push(`${name}: ${err.message}`);
+    }
+  }
+
+  throw new ProviderUnavailableError(
+    `All configured AI providers failed.\n${errors.join('\n')}`
   );
 }
 
 /**
- * Returns the name of the active configured provider.
+ * Returns true if at least one AI provider is currently configured.
+ * Used by the health endpoint to signal whether AI features are available.
+ *
+ * @returns {boolean}
+ */
+function isProviderConfigured() {
+  return getConfiguredProviders().length > 0;
+}
+
+/**
+ * Returns the name of the primary (first) configured provider, or 'None'.
  *
  * @returns {string}
  */
 function getProviderName() {
-  if (process.env.GEMINI_API_KEY) return 'Google Gemini';
-  if (process.env.OPENAI_API_KEY) return 'OpenAI Compatible';
-  if (process.env.IBM_API_KEY && process.env.IBM_PROJECT_ID) return 'IBM watsonx';
-  return 'None';
+  const providers = getConfiguredProviders();
+  return providers.length > 0 ? providers[0].name : 'None';
 }
 
 // ── Minimal HTTPS POST helper ─────────────────────────────────────────────────

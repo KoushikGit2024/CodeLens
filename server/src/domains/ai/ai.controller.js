@@ -30,10 +30,12 @@ async function generateChat(req, res, next) {
 async function healthCheck(req, res, next) {
   try {
     const providerName = aiProvider.getProviderName();
-    res.json({ status: 'ok', provider: providerName });
+    const configured = aiProvider.isProviderConfigured();
+    console.log(`[CodeLens] /ai/health → configured=${configured}, provider=${providerName}`);
+    res.json({ status: 'ok', provider: providerName, configured });
   } catch (error) {
     if (error.name === 'ProviderUnavailableError') {
-      return res.status(503).json({ status: 'unavailable', error: error.message });
+      return res.status(503).json({ status: 'unavailable', configured: false, error: error.message });
     }
     next(error);
   }

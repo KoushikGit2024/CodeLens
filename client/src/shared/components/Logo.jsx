@@ -82,7 +82,7 @@ export function Logo({ className = "w-14 h-14", textClass = "text-xl", showText 
       {showText && (
         // 9. cinematic text
         <span className={`font-bold flex items-center transition-all duration-[600ms] ease-out group-hover:tracking-[0.03em] ${textClass}`}>
-          <span className="text-text transition-colors duration-[600ms] group-hover:text-white">Code</span>
+          <span className="text-text transition-colors duration-[600ms] group-hover:text-accent">Code</span>
           <span className="text-accent transition-colors duration-[600ms] group-hover:text-text">Lens</span>
         </span>
       )}
