@@ -1,81 +1,52 @@
+/**
+ * RepositoryAssistantPage.jsx
+ *
+ * It loads the conversational interface, then extracts user queries, 
+ * and then it applies the local AI context hook to proxy grounded requests to Watsonx.
+ */
 import { useState, useRef, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Loader2, ChevronLeft, MessageSquare, Send, File, Brain, Database, AlertTriangle, Layers, MapPin } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Loader2, Brain, Send, AlertTriangle, AlertCircle, Database } from 'lucide-react';
 import { repositoryApi } from '../../shared/api';
 import AiResponse from '../../shared/components/ai/AiResponse';
 import AiMarkdown from '../../shared/components/ai/AiMarkdown';
 import { useRepository } from '../../shared/context/RepositoryContext';
+import { useAI } from '../../shared/context/AIContext'; 
 
 export default function RepositoryAssistantPage() {
   const { repoId } = useParams();
-  const { repo, loading: repoLoading, error: repoError } = useRepository();
+  const { repo, loading: repoLoading, error: repoError, refetchRepo } = useRepository();
   const navigate = useNavigate();
   const bottomRef = useRef(null);
 
-  const [messages, setMessages] = useState([]);
   const [question, setQuestion] = useState('');
-  const [loading, setLoading] = useState(false);
 
-  const chatRepoIdRef = useRef(repoId);
-
-  useEffect(() => {
-    setMessages([]);
-    chatRepoIdRef.current = repoId;
-    async function loadChat() {
-      if (!repoId) return;
-      try {
-        const stored = localStorage.getItem(`codelens_chats_${repoId}_assistant`);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setMessages(parsed);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load chat history from localStorage', err);
-      }
-    }
-    loadChat();
-  }, [repoId]);
-
-  useEffect(() => {
-    if (messages.length > 0 && repoId && chatRepoIdRef.current === repoId) {
-      try {
-        localStorage.setItem(`codelens_chats_${repoId}_assistant`, JSON.stringify(messages));
-      } catch (err) {
-        console.error('Failed to save chat history to localStorage', err);
-      }
-    }
-  }, [messages, repoId]);
+  /**
+   * It initializes the AI state manager, then extracts IndexedDB chat histories, 
+   * and then it applies automatic message syncing for the assistant feature.
+   */
+  const { messages, isLoading, error: chatError, sendMessage } = useAI({ 
+    repoId, 
+    feature: 'assistant', 
+    contextData: null 
+  });
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, isLoading]);
 
-  async function handleSubmit(e, presetQuestion = null) {
+  /**
+   * It intercepts the form submission, then extracts the raw input text, 
+   * and then it applies it to the centralized sendMessage dispatcher.
+   */
+  const handleSubmit = async (e, presetQuestion = null) => {
     if (e) e.preventDefault();
     const q = (presetQuestion || question).trim();
-    if (!q || loading) return;
+    if (!q || isLoading) return;
 
     setQuestion('');
-    setMessages(prev => [...prev, { role: 'user', content: q }]);
-    setLoading(true);
-
-    try {
-      const res = await repositoryApi.askQuestion(repoId, q);
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: res.data.answer, // structured answer
-        intent: res.data.intent,
-        requiresAi: res.data.requiresAi
-      }]);
-    } catch (err) {
-      const msg = err?.response?.data?.error || err.message || 'Request failed';
-      setMessages(prev => [...prev, { role: 'error', content: msg }]);
-    } finally {
-      setLoading(false);
-    }
-  }
+    await sendMessage(q);
+  };
 
   if (repoLoading) {
     return <div className="p-8 text-white">Loading assistant...</div>;
@@ -93,7 +64,7 @@ export default function RepositoryAssistantPage() {
             <button 
               onClick={async () => {
                 await repositoryApi.analyze(repoId);
-                navigate(`/explore/${repoId}`);
+                await refetchRepo();
               }}
               className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors"
             >
@@ -137,12 +108,20 @@ export default function RepositoryAssistantPage() {
             <ChatMessage key={i} msg={msg} repoId={repoId} />
           ))}
 
-          {loading && (
+          {isLoading && (
             <div className="flex items-center gap-3 text-muted bg-panel border border-border rounded-lg p-4 self-start">
               <Loader2 className="w-5 h-5 animate-spin text-accent" />
               <span className="text-sm">Analyzing repository intelligence...</span>
             </div>
           )}
+          
+          {chatError && (
+             <div className="flex items-center gap-3 text-danger bg-danger/10 border border-danger/20 rounded-lg p-4 self-start">
+              <AlertTriangle className="w-5 h-5 shrink-0" />
+              <span className="text-sm">{chatError}</span>
+            </div>
+          )}
+
           <div ref={bottomRef} />
         </div>
       </div>
@@ -150,7 +129,7 @@ export default function RepositoryAssistantPage() {
       {/* ── Input Area ─────────────────────────────────────────────────────── */}
       <div className="bg-panel border-t border-border p-4 shrink-0">
         <form
-          onSubmit={handleSubmit}
+          onSubmit={(e) => handleSubmit(e)}
           className="max-w-4xl mx-auto relative flex items-center"
         >
           <input
@@ -158,12 +137,12 @@ export default function RepositoryAssistantPage() {
             value={question}
             onChange={e => setQuestion(e.target.value)}
             placeholder="Ask a question about the repository..."
-            disabled={loading}
+            disabled={isLoading}
             className="w-full bg-surface border border-border rounded-lg pl-4 pr-12 py-3 text-sm text-white placeholder-muted focus:outline-none focus:border-accent disabled:opacity-50"
           />
           <button
             type="submit"
-            disabled={loading || !question.trim()}
+            disabled={isLoading || !question.trim()}
             className="absolute right-2 flex items-center justify-center w-8 h-8 bg-accent text-white rounded disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/90 transition-colors"
           >
             <Send className="w-4 h-4" />
@@ -190,6 +169,10 @@ function SuggestionCard({ text, onClick }) {
   );
 }
 
+/**
+ * It examines the message role, then extracts the content payload, 
+ * and then it applies Markdown formatting for either the user or the AI Assistant.
+ */
 function ChatMessage({ msg, repoId }) {
   if (msg.role === 'user') {
     return (
@@ -208,24 +191,20 @@ function ChatMessage({ msg, repoId }) {
     );
   }
 
-  // Assistant message (Structured Answer)
-  const ans = msg.content;
-  const isDeterministic = !msg.requiresAi;
-
   return (
     <div className="self-start w-full max-w-4xl bg-panel border border-border rounded-lg overflow-hidden shadow-sm">
       <div className="bg-surface/50 border-b border-border px-4 py-2 flex items-center justify-between">
         <span className="text-xs font-medium text-white/80 flex items-center gap-1.5">
-          {isDeterministic ? <Database className="w-3.5 h-3.5 text-success" /> : <Brain className="w-3.5 h-3.5 text-accent" />}
-          {isDeterministic ? 'Deterministic Query' : 'AI Interpretation'}
+          <Brain className="w-3.5 h-3.5 text-accent" />
+          AI Interpretation
         </span>
         <span className="text-[10px] text-muted uppercase tracking-wider bg-surface px-1.5 py-0.5 rounded border border-border">
-          Intent: {msg.intent || 'GENERAL'}
+          CodeLens AI
         </span>
       </div>
       
       <div className="p-5">
-        <AiResponse data={ans} title={null} />
+        <AiResponse data={msg.content} title={null} />
       </div>
     </div>
   );

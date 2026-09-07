@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { RefreshCw, AlertCircle, Loader2, File, Box, Wrench, Layers, Cpu, Sparkles, GitBranch } from 'lucide-react';
+import { RefreshCw, AlertCircle, Loader2, File, Box, Wrench, Layers, Cpu, Sparkles, GitBranch, ChevronDown, ChevronRight } from 'lucide-react';
 import { ResizableLayout } from '../../shared/components/ResizableLayout';
 import { repositoryApi } from '../../shared/api';
 import AiResponse from '../../shared/components/ai/AiResponse';
@@ -232,7 +232,7 @@ function getHybridRadialLayout(nodes, rfEdges) {
   return nodes;
 }
 
-function graphToFlow(components, relations, selectedId, violations) {
+function graphToFlow(components = [], relations = [], selectedId, violations = []) {
   const violatingNames = new Set();
   violations.forEach(v => { violatingNames.add(v.sourceComponent); violatingNames.add(v.targetComponent); });
 
@@ -245,20 +245,24 @@ function graphToFlow(components, relations, selectedId, violations) {
     });
   }
 
-  let rfNodes = components.map(c => ({
-    id: c.name,
-    type: 'archNode',
-    data: {
-      label: c.name,
-      layer: c.layer,
-      isExternal: false,
-      isViolating: violatingNames.has(c.name),
-      isFocused: c.name === selectedId,
-      isFaded: selectedId ? !connectedNodes.has(c.name) : false,
-    },
-    position: { x: 0, y: 0 },
-    zIndex: 2,
-  }));
+  let rfNodes = components.map(c => {
+    const label = c.data?.label ?? c.id;
+    return {
+      id: label,
+      type: 'archNode',
+      data: {
+        label,
+        layer: c.data?.layer ?? c.layer,
+        isExternal: false,
+        isViolating: violatingNames.has(label),
+        isFocused: label === selectedId,
+        isFaded: selectedId ? !connectedNodes.has(label) : false,
+        health: c.health,
+      },
+      position: { x: 0, y: 0 },
+      zIndex: 2,
+    };
+  });
 
   // External targets
   relations.forEach(r => {
@@ -323,6 +327,7 @@ export default function ArchitecturePage() {
   const [selectedComponent, setSelectedComponent] = useState(null);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [aiError, setAiError] = useState(null);
+  const [expandedComponents, setExpandedComponents] = useState(new Set());
 
   const loadArchitecture = async () => {
     setLoading(true);
@@ -360,7 +365,7 @@ export default function ArchitecturePage() {
     if (!data?.model) return { rfNodes: [], rfEdges: [] };
     
     return graphToFlow(
-      data.model.components, 
+      data.model.components || [], 
       data.model.relations || [], 
       selectedComponent, 
       data.model.violations || []
@@ -446,8 +451,11 @@ export default function ArchitecturePage() {
                       </div>
                       
                       {(() => {
-                        const compData = data?.model?.components?.find(c => c.name === selectedComponent);
+                        const compData = data?.model?.components?.find(c => (c.data?.label ?? c.id) === selectedComponent);
                         if (!compData) return null;
+                        const compLabel = compData.data?.label ?? compData.id;
+                        const compLayer = compData.data?.layer ?? compData.layer;
+                        const compHealth = compData.health;
                         
                         const getSeverityColor = (severity) => {
                           switch (severity) {
@@ -462,23 +470,19 @@ export default function ArchitecturePage() {
                           <div className="flex flex-col gap-1.5 mt-3">
                             <div className="flex justify-between items-center">
                               <span className="text-xs text-muted">Layer</span>
-                              <span className="text-xs font-mono" style={{ color: layerColor(compData.layer, false).border }}>{compData.layer}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs text-muted">Files</span>
-                              <span className="text-xs text-text/80 font-mono">{compData.files?.length || 0}</span>
+                              <span className="text-xs font-mono" style={{ color: layerColor(compLayer, false).border }}>{compLayer}</span>
                             </div>
                             
-                            {compData.health && (
+                            {compHealth && (
                               <div className="flex justify-between items-start mt-2 pt-2 border-t border-white/5">
                                 <span className="text-xs text-muted">Health</span>
                                 <div className="flex flex-col items-end gap-1">
-                                  <span className={`border rounded px-1.5 py-0.5 text-[10px] font-medium capitalize flex items-center gap-1 ${getSeverityColor(compData.health.severity)}`}>
-                                    {compData.health.severity !== 'healthy' ? <AlertCircle className="w-3 h-3" /> : <GitBranch className="w-3 h-3" />}
-                                    {compData.health.severity}
+                                  <span className={`border rounded px-1.5 py-0.5 text-[10px] font-medium capitalize flex items-center gap-1 ${getSeverityColor(compHealth.severity)}`}>
+                                    {compHealth.severity !== 'healthy' ? <AlertCircle className="w-3 h-3" /> : <GitBranch className="w-3 h-3" />}
+                                    {compHealth.severity}
                                   </span>
-                                  {compData.health.risks.length > 0 && (
-                                    <span className="text-[10px] text-muted">{compData.health.risks.length} Risk(s)</span>
+                                  {compHealth.risks?.length > 0 && (
+                                    <span className="text-[10px] text-muted">{compHealth.risks.length} Risk(s)</span>
                                   )}
                                 </div>
                               </div>
@@ -544,37 +548,73 @@ export default function ArchitecturePage() {
               <section>
                 <p className="text-xs text-muted uppercase tracking-wider mb-3">Detected Components</p>
                 {data?.model?.components?.length > 0 ? (
-                  <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-1">
                     {data.model.components
-                      .filter(c => selectedComponent ? c.name === selectedComponent : true)
-                      .map((comp, i) => (
-                      <div key={i}>
-                        <div className="flex justify-between items-center mb-1.5">
-                          <span className="text-sm font-medium flex items-center gap-1.5">
-                            <Box className="w-4 h-4 text-warning" />
-                            {comp.name}
-                          </span>
-                          <span className="text-[10px] uppercase text-muted bg-surface px-1.5 py-0.5 rounded border border-white/5">
-                            {comp.layer}
-                          </span>
-                        </div>
-                        <div className="pl-6 border-l-2 border-white/5 ml-1.5 flex flex-col gap-1">
-                          {comp.files.map((file, j) => (
-                            <div key={j} className="flex items-center justify-between group min-w-0">
-                              <span className="text-[11px] text-muted font-mono truncate" title={file}>
-                                {file.split('/').pop()}
+                      .filter(c => selectedComponent ? (c.data?.label ?? c.id) === selectedComponent : true)
+                      .map((comp, i) => {
+                        const compLabel = comp.data?.label ?? comp.id;
+                        const compLayer = comp.data?.layer ?? comp.layer;
+                        const compFiles = comp.data?.files || [];
+                        const isExpanded = expandedComponents.has(compLabel);
+                        const toggle = () => setExpandedComponents(prev => {
+                          const next = new Set(prev);
+                          if (next.has(compLabel)) next.delete(compLabel); else next.add(compLabel);
+                          return next;
+                        });
+                        return (
+                          <div key={compLabel} className="rounded-md overflow-hidden border border-white/5">
+                            {/* Header row — click to expand/collapse */}
+                            <button
+                              onClick={toggle}
+                              className="w-full flex items-center justify-between px-2 py-1.5 hover:bg-white/5 transition-colors text-left"
+                            >
+                              <span className="flex items-center gap-1.5 min-w-0 flex-1">
+                                {isExpanded
+                                  ? <ChevronDown className="w-3.5 h-3.5 text-muted shrink-0" />
+                                  : <ChevronRight className="w-3.5 h-3.5 text-muted shrink-0" />
+                                }
+                                <Box className="w-3.5 h-3.5 text-warning shrink-0" />
+                                <span className="text-xs font-medium truncate" title={compLabel}>{compLabel}</span>
                               </span>
-                              <Link 
-                                to={`/explore/${repoId}/source?path=${encodeURIComponent(file)}`}
-                                className="opacity-0 group-hover:opacity-100 text-[10px] text-accent hover:underline ml-2"
+                              <span
+                                className="text-[9px] uppercase shrink-0 ml-2 px-1.5 py-0.5 rounded border"
+                                style={{
+                                  color: layerColor(compLayer, false).border,
+                                  borderColor: layerColor(compLayer, false).border + '55',
+                                  background: layerColor(compLayer, false).bg + '22',
+                                }}
                               >
-                                View
-                              </Link>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+                                {compLayer}
+                              </span>
+                            </button>
+
+                            {/* File list — shown when expanded */}
+                            {isExpanded && (
+                              <div className="border-t border-white/5 flex flex-col">
+                                {compFiles.length === 0 ? (
+                                  <span className="text-[10px] text-muted px-3 py-1.5 italic">No files</span>
+                                ) : compFiles.map((file, j) => (
+                                  <div
+                                    key={j}
+                                    className="flex items-center justify-between gap-2 px-3 py-1 hover:bg-white/5 group min-w-0"
+                                  >
+                                    <File className="w-3 h-3 text-muted shrink-0" />
+                                    <span className="text-[10px] text-muted font-mono truncate flex-1" title={file}>
+                                      {file.split('/').pop()}
+                                    </span>
+                                    <Link
+                                      to={`/explore/${repoId}/source?path=${encodeURIComponent(file)}`}
+                                      className="opacity-0 group-hover:opacity-100 text-[9px] text-accent hover:underline shrink-0 transition-opacity"
+                                    >
+                                      View
+                                    </Link>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                   </div>
                 ) : (
                   <span className="text-xs text-muted">No components detected.</span>

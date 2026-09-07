@@ -1,69 +1,13 @@
 /**
- * contextBuilder.js
+ * base.context.js
  *
- * Builds a structured, grounded context object for the AI Q&A layer.
- *
- * ── Architecture ──────────────────────────────────────────────────────────────
- *
- *   Question
- *      ↓
- *   buildContext(analysis, graph, question, extractPath, opts?)
- *      ├── 1. scoreFiles()         — deterministic relevance scoring
- *      ├── 2. expandWithDeps()     — add dependency/dependent files
- *      ├── 3. loadSourceSnippets() — read file content from disk
- *      └── 4. assembleContext()    — build the structured AiContext object
- *      ↓
- *   AiContext
- *
- * ── Relevance scoring ─────────────────────────────────────────────────────────
- *
- *   Each file in the repository receives a score (higher = more relevant):
- *
- *   +3  path/filename contains a query term (case-insensitive)
- *   +2  a symbol name in the file matches a query term
- *   +1  the file imports a package whose name matches a query term
- *   +1  the file is a dependency of a file that scored > 0
- *   +1  the file is a dependent of a file that scored > 0
- *
- *   Files with score 0 are excluded from context unless the repository is small.
- *
- * ── Context limits ────────────────────────────────────────────────────────────
- *
- *   MAX_FILES            — max number of files included in context    (default: 8)
- *   MAX_SOURCE_CHARS     — max total source characters included        (default: 24 000)
- *   MAX_SYMBOLS_PER_FILE — max symbols reported per file               (default: 20)
- *   SNIPPET_LINES        — lines to include around a relevant symbol   (default: 40)
- *
- * ── AiContext schema ──────────────────────────────────────────────────────────
- *
- * {
- *   question:   string
- *   repository: { name: string, totalFiles: number, languages: object }
- *   files: [
- *     {
- *       path:         string          — relative file path
- *       reason:       string          — human-readable reason for inclusion
- *       score:        number          — relevance score
- *       symbols:      string[]        — names of extracted symbols (functions, classes, …)
- *       dependencies: string[]        — files this file imports (internal only)
- *       dependents:   string[]        — files that import this file (internal only)
- *       source:       string | null   — source snippet or full content
- *     }
- *   ]
- *   totalSourceChars:  number
- *   truncated:         boolean         — true if context was cut due to size limit
- * }
+ * It initiates the grounding pipeline, then extracts deterministic code segments, 
+ * and then it applies hard token limits to structure a safe prompt for the LLM.
  */
-
-
-
-import { loadFile } from '../repository/persistence.store.js';
 
 import { buildDependencyGraph, getFileDependencies } from '../dependencies/dependency.analyzer.js';
 
-// ── Defaults ──────────────────────────────────────────────────────────────────
-
-const DEFAULTS = {
+export const DEFAULTS = {
   maxFiles:          8,
   maxSourceChars:    24_000,
   maxSymbolsPerFile: 20,
@@ -73,29 +17,20 @@ const DEFAULTS = {
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
- * Build an AiContext for the given question and repository analysis.
- *
- * @param {object}  analysis     — RepositoryAnalysis from repositoryAnalyzer
- * @param {string}  question     — the user's natural-language question
- * @param {string}  repoId       — repository ID
- * @param {object}  [opts]       — override default limits (and pass activeContext)
- * @returns {AiContext}
+ * It orchestrates file scoring, then extracts context snippets via the loader callback, 
+ * and then it applies length truncations to build the final AiContext object.
  */
-async function buildContext(analysis, question, repoId, opts = {}) {
+export async function buildContext(analysis, question, fileLoaderCallback, opts = {}) {
   const activeContext = opts.activeContext || null;
   const cfg = { ...DEFAULTS, ...opts };
 
-  // Build graph (needed for dependency expansion)
   const graph = buildDependencyGraph(analysis);
 
-  // 1. Score every file
   const terms   = extractQueryTerms(question);
   const scored  = scoreFiles(analysis, graph, terms, activeContext);
 
-  // 2. Expand with direct dependencies of top-ranked files
   expandWithDeps(scored, graph, cfg.maxFiles);
 
-  // 3. Select top N by score, then alphabetically for ties
   const selected = Array.from(scored.entries())
     .filter(([, s]) => s.score > 0)
     .sort(([pathA, sA], [pathB, sB]) => {
@@ -105,8 +40,7 @@ async function buildContext(analysis, question, repoId, opts = {}) {
     .slice(0, cfg.maxFiles)
     .map(([filePath, s]) => ({ filePath, ...s }));
 
-  // If nothing scored, fall back to first N files (small repo heuristic)
-  const useFallback = selected.length === 0 && analysis.files.length > 0;
+  const useFallback = selected.length === 0 && analysis?.files?.length > 0;
   const candidates = useFallback
     ? analysis.files.slice(0, cfg.maxFiles).map(f => ({
         filePath: f.filePath,
@@ -116,7 +50,6 @@ async function buildContext(analysis, question, repoId, opts = {}) {
       }))
     : selected;
 
-  // 4. Load source from disk for top files
   let totalChars = 0;
   let truncated  = false;
   const files    = [];
@@ -125,14 +58,12 @@ async function buildContext(analysis, question, repoId, opts = {}) {
     const fileAnalysis = analysis.files.find(f => f.filePath === candidate.filePath);
     const depInfo      = getFileDependencies(graph, candidate.filePath);
 
-    // Identify active context constraints
     const isContextFile = activeContext && candidate.filePath === activeContext.filePath;
     const startLine = isContextFile && activeContext.startLine ? Math.max(1, activeContext.startLine - 10) : null;
     const endLine = isContextFile && activeContext.endLine ? activeContext.endLine + 10 : null;
     
-    // Read source
     const candidateItem = { path: candidate.filePath };
-    const charsRead = await loadSourceSnippet(candidateItem, repoId, terms, fileAnalysis, cfg, startLine, endLine);
+    const charsRead = await loadSourceSnippet(candidateItem, fileLoaderCallback, terms, fileAnalysis, cfg, startLine, endLine);
     
     if (totalChars + charsRead > cfg.maxSourceChars && !isContextFile) {
         candidateItem.source = null;
@@ -146,9 +77,7 @@ async function buildContext(analysis, question, repoId, opts = {}) {
       reason:       candidate.reason,
       score:        candidate.score,
       symbols:      (candidate.symbols || []).slice(0, cfg.maxSymbolsPerFile),
-      dependencies: depInfo.dependencies
-        .filter(d => d.filePath)
-        .map(d => d.filePath),
+      dependencies: depInfo.dependencies.filter(d => d.filePath).map(d => d.filePath),
       dependents:   depInfo.dependents.map(d => d.filePath),
       source:       candidateItem.source || null,
       language:     fileAnalysis.language,
@@ -159,7 +88,7 @@ async function buildContext(analysis, question, repoId, opts = {}) {
     question,
     repository: {
       name:       analysis.name || 'unknown',
-      totalFiles: analysis.analyzedFiles || analysis.files.length,
+      totalFiles: analysis.analyzedFiles || analysis.files?.length || 0,
       languages:  analysis.languageSummary || {},
     },
     files,
@@ -171,13 +100,10 @@ async function buildContext(analysis, question, repoId, opts = {}) {
 // ── Relevance scoring ─────────────────────────────────────────────────────────
 
 /**
- * Tokenise a question into lowercase terms, removing stop words and
- * punctuation.  Returns an array of unique lowercase terms.
- *
- * @param {string} question
- * @returns {string[]}
+ * It splits the text query, then extracts meaningful keywords, 
+ * and then it applies a strict stop-word filter to return unique targets.
  */
-function extractQueryTerms(question) {
+export function extractQueryTerms(question) {
   const STOP_WORDS = new Set([
     'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
     'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'shall',
@@ -195,23 +121,18 @@ function extractQueryTerms(question) {
 }
 
 /**
- * Score all files in the analysis based on relevance to the query terms.
- *
- * @param {object}   analysis
- * @param {object}   graph     — DependencyGraph
- * @param {string[]} terms     — query terms
- * @param {object}   [activeContext]
- * @returns {Map<string, {score, reason, symbols}>}
+ * It evaluates each file AST against the query terms, then extracts substring matches, 
+ * and then it applies numeric scoring points for structural relevance.
  */
 function scoreFiles(analysis, graph, terms, activeContext = null) {
   const scored = new Map();
+  if (!analysis?.files) return scored;
 
   for (const fileAnalysis of analysis.files) {
     const fp        = fileAnalysis.filePath;
     let score = 0;
     const reasons = [];
 
-    // ── Active Context Boost ──────────────────────────────────────────────────
     if (activeContext && activeContext.filePath === fp) {
       score += 100;
       reasons.push('active file');
@@ -262,12 +183,8 @@ function scoreFiles(analysis, graph, terms, activeContext = null) {
 }
 
 /**
- * Boost scores of files that are direct dependencies or dependents of
- * already-scored files (score > 0), up to maxFiles total.
- *
- * @param {Map}    scored
- * @param {object} graph
- * @param {number} maxFiles
+ * It queries the dependency graph, then extracts neighboring modules, 
+ * and then it applies a secondary relevance boost based on coupling.
  */
 function expandWithDeps(scored, graph, maxFiles) {
   const seeded = Array.from(scored.entries())
@@ -299,27 +216,18 @@ function expandWithDeps(scored, graph, maxFiles) {
 // ── Source loading ────────────────────────────────────────────────────────────
 
 /**
- * Load a source snippet for a file.
- *
- * @param {object}      item
- * @param {string}      repoId
- * @param {string[]}    terms
- * @param {object|null} fileAnalysis
- * @param {object}      cfg
- * @param {number|null} startLine
- * @param {number|null} endLine
- * @returns {number} chars read
+ * It triggers the frontend loader callback, then extracts specific lines matching AST targets, 
+ * and then it applies string truncation to return a clean snippet.
  */
-async function loadSourceSnippet(item, repoId, terms, fileAnalysis, cfg, startLine = null, endLine = null) {
+async function loadSourceSnippet(item, fileLoaderCallback, terms, fileAnalysis, cfg, startLine = null, endLine = null) {
   try {
-    const sourceStr = await loadFile(repoId, item.path);
+    const sourceStr = await fileLoaderCallback(item.path);
     if (!sourceStr) {
       item.source = null;
       return 0;
     }
     const lines = sourceStr.split(/\r?\n/);
 
-    // If explicit line range is requested (via active context)
     if (startLine !== null && endLine !== null) {
       const idxStart = Math.max(0, startLine - 1);
       const idxEnd = Math.min(lines.length, endLine);
@@ -327,13 +235,11 @@ async function loadSourceSnippet(item, repoId, terms, fileAnalysis, cfg, startLi
       return item.source.length;
     }
 
-    // Small file? include whole thing
     if (lines.length <= cfg.snippetLines * 2) {
       item.source = sourceStr;
       return sourceStr.length;
     }
 
-    // Try to find a relevant symbol and extract lines around it
     if (fileAnalysis && fileAnalysis.symbols && terms.length > 0) {
       const termsLower = terms.map(t => t.toLowerCase());
       const match = fileAnalysis.symbols.find(sym =>
@@ -348,7 +254,6 @@ async function loadSourceSnippet(item, repoId, terms, fileAnalysis, cfg, startLi
       }
     }
 
-    // Fall back to beginning of file
     item.source = lines.slice(0, cfg.snippetLines).join('\n');
     return item.source.length;
   } catch (err) {
@@ -361,12 +266,10 @@ async function loadSourceSnippet(item, repoId, terms, fileAnalysis, cfg, startLi
 // ── Symbol helpers ────────────────────────────────────────────────────────────
 
 /**
- * Extract display names of all non-import/non-export symbols from a FileAnalysis.
- *
- * @param {object} fileAnalysis
- * @returns {string[]}
+ * It filters the symbol structures, then extracts the display identifiers, 
+ * and then it applies them into a flattened string array.
  */
-function extractSymbolNames(fileAnalysis) {
+export function extractSymbolNames(fileAnalysis) {
   if (!fileAnalysis || !fileAnalysis.symbols) return [];
   return fileAnalysis.symbols
     .filter(s => s.kind !== 'import' && s.kind !== 'export' && s.name)
@@ -374,10 +277,8 @@ function extractSymbolNames(fileAnalysis) {
 }
 
 /**
- * Extract all import source strings from a FileAnalysis.
- *
- * @param {object} fileAnalysis
- * @returns {string[]}
+ * It identifies AST import nodes, then extracts the literal source strings, 
+ * and then it applies them into a string array.
  */
 function extractImportSources(fileAnalysis) {
   if (!fileAnalysis || !fileAnalysis.symbols) return [];
@@ -389,18 +290,10 @@ function extractImportSources(fileAnalysis) {
 // ── Prompt assembly ───────────────────────────────────────────────────────────
 
 /**
- * Assemble the final text prompt to send to the AI model.
- *
- * The prompt:
- *   - Grounds the model in the supplied repository context
- *   - Explicitly prohibits fabricating files/functions/dependencies
- *   - Requests file references in the response
- *   - Instructs the model to acknowledge insufficient context
- *
- * @param {AiContext} context
- * @returns {string}
+ * It gathers the formatted repository metrics, then extracts the fetched source fragments, 
+ * and then it applies rigid guardrails to build the final LLM instructions.
  */
-function buildPrompt(context) {
+export function buildPrompt(context) {
   const lines = [];
 
   lines.push('You are CodeLens, a code intelligence assistant.');
@@ -457,13 +350,3 @@ function buildPrompt(context) {
 
   return lines.join('\n');
 }
-
-// ── Exports ───────────────────────────────────────────────────────────────────
-
-export { 
-  buildContext,
-  buildPrompt,
-  extractQueryTerms,   // exported for testing
-  extractSymbolNames,  // exported for testing
-  DEFAULTS,
- };

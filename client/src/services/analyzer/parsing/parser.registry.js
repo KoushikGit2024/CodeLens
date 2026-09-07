@@ -2,7 +2,7 @@
  * parser.registry.js (Frontend Version)
  *
  * Manages the lifecycle of web-tree-sitter and all language grammars in the browser.
- * Loads WASM files over the network from the /parsers/ public directory.
+ * Loads WASM files over the network from the /parsers/ public directory using Vite.
  */
 
 import Parser from 'web-tree-sitter';
@@ -14,8 +14,11 @@ const LANGUAGE_WASM_MAP = {
   tsx:        'tree-sitter-tsx.wasm',
   python:     'tree-sitter-python.wasm',
   java:       'tree-sitter-java.wasm',
+  c:          'tree-sitter-c.wasm',
   cpp:        'tree-sitter-cpp.wasm',
   kotlin:     'tree-sitter-kotlin.wasm',
+  go:         'tree-sitter-go.wasm',
+  rust:       'tree-sitter-rust.wasm',
 };
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -33,8 +36,9 @@ async function ensureInitialised() {
   initPromise = (async () => {
     await Parser.init({
       locateFile(scriptName) {
-        // web-tree-sitter asks for 'tree-sitter.wasm'
-        if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
+        // Handle Vite test environments vs production builds
+        const isTestEnv = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.MODE === 'test';
+        if (isTestEnv) {
           return 'public/parsers/' + scriptName;
         }
         return '/parsers/' + scriptName;
@@ -62,10 +66,9 @@ async function loadLanguage(languageId) {
   }
 
   // Load the WASM binary over HTTP from our public/parsers folder
-  let wasmUrl = `/parsers/${wasmFile}`;
-  if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
-    wasmUrl = `public/parsers/${wasmFile}`;
-  }
+  const isTestEnv = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.MODE === 'test';
+  const wasmUrl = isTestEnv ? `public/parsers/${wasmFile}` : `/parsers/${wasmFile}`;
+  
   const lang = await Parser.Language.load(wasmUrl);
   
   languageCache.set(languageId, lang);

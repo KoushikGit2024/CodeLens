@@ -1,7 +1,8 @@
 /**
  * JavaScriptParser.js
  *
- * Extracts symbols from JavaScript (and JSX) source files using Tree-sitter.
+ * It initializes the Tree-sitter parser, then extracts symbols from JavaScript/JSX code, 
+ * and then it applies the canonical schemas to build intelligence models.
  *
  * Symbols extracted:
  *   - Function declarations:       function foo() {}
@@ -15,77 +16,96 @@
  *   - ES module exports:           export function foo() {}; export default foo
  *   - CommonJS exports:            module.exports = { ... }  [as export symbol]
  *
- * Tree-sitter grammar node types used:
- *   function_declaration, generator_function_declaration,
- *   arrow_function, class_declaration, class,
- *   method_definition, import_statement, export_statement,
- *   lexical_declaration, variable_declaration
- *
  * How this file is structured:
- *   1. extractSymbols()    — entry point, walks the top-level program nodes
- *   2. visitNode()         — dispatcher: routes each node type to an extractor
- *   3. extract*()          — one function per symbol type
- *   4. helper utilities    — parameter extraction, name extraction
+ *   1. extractSymbols()           — It receives the root, then extracts all symbols, and then it applies the array output.
+ *   2. extractAdvancedFindings()  — It defines syntax queries, then extracts SAST/Test features, and then it applies the AnalysisFinding schema.
+ *   3. _walk()                    — It traverses the tree, then extracts node types, and then it applies the specific dispatchers.
  */
 
-'use strict';
-import { locationFromNode, createFunction, createArrow, createClass, createMethod, createImport, createExport, SymbolKind, createInterface, createStruct, createNamespace, createPackage, createConstructor, createVariable } from '../symbols';
-
-
+import { 
+  locationFromNode, createFunction, createArrow, createClass, 
+  createMethod, createImport, createExport, SymbolKind 
+} from '../symbols';
 import { BaseParser } from './base.parser.js';
 import { calculateComplexity } from '../../advanced/complexity.analyzer.js';
 import { generateStructuralHash } from '../../advanced/clone.analyzer.js';
 
-
-
-
-class JavaScriptParser extends BaseParser {
+export class JavaScriptParser extends BaseParser {
   constructor(tsParser) {
     super(tsParser, 'javascript');
   }
 
-  // ── Public entry point ──────────────────────────────────────────────────────
+  // ── Public entry points ─────────────────────────────────────────────────────
 
   /**
-   * Walk the AST and collect all symbols.
-   * Called by BaseParser.parseFile().
-   *
-   * @param {object} rootNode   — tree-sitter root node (type: 'program')
-   * @param {string} source     — original source text
-   * @returns {Symbol[]}
+   * It receives the top-level program node, then extracts the symbols via a depth-first walk, 
+   * and then it applies the collected array to the caller.
    */
   extractSymbols(rootNode, source) {
     const symbols = [];
-    this._walk(rootNode, source, symbols, null /* currentClassName */);
+    this._walk(rootNode, source, symbols, null);
     return symbols;
+  }
+
+  /**
+   * It receives the parsed AST root, then extracts the advanced static findings using S-expression queries, 
+   * and then it applies the canonical AnalysisFinding schema for the frontend intelligence dashboard.
+   */
+  extractAdvancedFindings(rootNode, filePath) {
+    const findings = [];
+
+    // It defines the dangerous sink query, then extracts the matching AST nodes, and then it applies the critical security finding schema.
+    const sinkQuery = `
+      (call_expression function: (identifier) @func (#match? @func "^(eval|setTimeout|setInterval|exec)$"))
+    `;
+    findings.push(...this.extractFindings(
+      rootNode, sinkQuery, filePath, 'security', 'DANGEROUS_SINK', 'security', 'critical',
+      'Dangerous sink detected: {text}',
+      'The function `{text}` can lead to remote code execution if provided with unsanitized user input.'
+    ));
+
+    // It defines the test block query, then extracts the test suite nodes, and then it applies the architectural info schema.
+    const testQuery = `
+      (call_expression function: (identifier) @test_func (#match? @test_func "^(describe|it|test)$"))
+    `;
+    findings.push(...this.extractFindings(
+      rootNode, testQuery, filePath, 'architecture', 'TEST_BLOCK', 'reliability', 'info',
+      'Test Suite / Case found',
+      'Identified test block: {text}'
+    ));
+
+    // It defines the floating promise query, then extracts unhandled promise chains, and then it applies the reliability warning schema.
+    const floatingPromiseQuery = `
+      (expression_statement (call_expression function: (member_expression property: (property_identifier) @prop (#match? @prop "^(then|catch)$")))) @floating
+    `;
+    findings.push(...this.extractFindings(
+      rootNode, floatingPromiseQuery, filePath, 'hygiene', 'FLOATING_PROMISE', 'reliability', 'warning',
+      'Floating Promise Chain',
+      'This promise chain is neither awaited nor returned, which may lead to unhandled rejections.'
+    ));
+
+    return findings;
   }
 
   // ── AST walker ──────────────────────────────────────────────────────────────
 
   /**
-   * Recursively walk an AST node, collecting symbols into `symbols`.
-   *
-   * We do a depth-first walk.  Class bodies are handled specially so that
-   * method extraction can record the containing class name.
-   *
-   * @param {object} node
-   * @param {string} source
-   * @param {Symbol[]} symbols        — accumulator
-   * @param {string|null} className   — name of enclosing class, if any
+   * It inspects the current node type, then extracts the specific language construct, 
+   * and then it applies the correct extraction method or walks the children.
    */
   _walk(node, source, symbols, className) {
     switch (node.type) {
       case 'function_declaration':
       case 'generator_function_declaration':
         this._extractFunction(node, source, symbols);
-        // Walk into function body for nested functions
+        // It identifies the function body, then extracts nested nodes, and then it applies the walk function recursively.
         this._walkChildren(node, source, symbols, null);
-        return; // don't fall through to default child walk
+        return;
 
       case 'class_declaration':
       case 'class':
         this._extractClass(node, source, symbols);
-        // Walk class body with the class name so methods know their owner
+        // It captures the class name context, then extracts the body nodes, and then it applies the parent identity to nested methods.
         this._walkClassBody(node, source, symbols);
         return;
 
@@ -93,12 +113,12 @@ class JavaScriptParser extends BaseParser {
         if (className) {
           this._extractMethod(node, source, symbols, className);
         }
-        // Walk method body for nested functions
+        // It enters the method body, then extracts inner declarations, and then it applies the recursive child walk.
         this._walkChildren(node, source, symbols, null);
         return;
 
-      case 'lexical_declaration':    // const/let
-      case 'variable_declaration':   // var
+      case 'lexical_declaration':
+      case 'variable_declaration':
         this._extractArrowFromDeclaration(node, source, symbols);
         this._extractCommonJsRequire(node, source, symbols);
         this._walkChildren(node, source, symbols, className);
@@ -106,16 +126,16 @@ class JavaScriptParser extends BaseParser {
 
       case 'export_statement':
         this._extractExport(node, source, symbols);
-        // Export may wrap a function/class — walk children so we pick up the inner symbol too
+        // It evaluates the exported wrapper, then extracts the inner functions/classes, and then it applies the standard child walk.
         this._walkChildren(node, source, symbols, className);
         return;
 
       case 'import_statement':
         this._extractImport(node, source, symbols);
-        return; // imports have no interesting children
+        return;
 
       case 'expression_statement':
-        // Catches: module.exports = { ... }
+        // It detects expression statements, then extracts CommonJS export patterns, and then it applies them to the symbol list.
         this._extractCommonJsExport(node, source, symbols);
         this._walkChildren(node, source, symbols, className);
         return;
@@ -125,7 +145,9 @@ class JavaScriptParser extends BaseParser {
     }
   }
 
-  /** Walk all children of a node. */
+  /**
+   * It iterates over the child count, then extracts each child node, and then it applies the main walk switch.
+   */
   _walkChildren(node, source, symbols, className) {
     for (let i = 0; i < node.childCount; i++) {
       this._walk(node.child(i), source, symbols, className);
@@ -133,8 +155,7 @@ class JavaScriptParser extends BaseParser {
   }
 
   /**
-   * Walk the class body, passing the class name to child nodes so that
-   * method_definition nodes can record their parent class.
+   * It locates the class body, then extracts the method nodes, and then it applies the enclosing class name to the traversal.
    */
   _walkClassBody(classNode, source, symbols) {
     const name = this._classNameFromNode(classNode, source);
@@ -148,23 +169,19 @@ class JavaScriptParser extends BaseParser {
   // ── Symbol extractors ────────────────────────────────────────────────────────
 
   /**
-   * Extract a function_declaration or generator_function_declaration.
-   *
-   * Handles:
-   *   function greet(name) {}
-   *   async function greet(name) {}
-   *   function* gen() {}
+   * It validates the function name node, then extracts the async/generator modifiers, 
+   * and then it applies the function factory to populate the symbol array.
    */
   _extractFunction(node, source, symbols) {
     const nameNode = node.childForFieldName('name');
-    if (!nameNode) return; // anonymous function expression — skip at top level
+    if (!nameNode) return;
 
-    const name      = nodeText(nameNode, source);
-    const isAsync   = nodeHasChild(node, 'async');
-    const isGen     = node.type === 'generator_function_declaration';
-    const params    = this._extractParams(node, source);
-    const complexity= calculateComplexity(node);
-    const hash      = generateStructuralHash(node);
+    const name       = nodeText(nameNode, source);
+    const isAsync    = nodeHasChild(node, 'async');
+    const isGen      = node.type === 'generator_function_declaration';
+    const params     = this._extractParams(node, source);
+    const complexity = calculateComplexity(node);
+    const hash       = generateStructuralHash(node);
 
     symbols.push(createFunction({
       name,
@@ -178,12 +195,8 @@ class JavaScriptParser extends BaseParser {
   }
 
   /**
-   * Extract an arrow function from a variable declarator.
-   *
-   * Handles:
-   *   const greet = (name) => {}
-   *   const add   = async (a, b) => a + b;
-   *   export const handler = () => {}   (export wrapper handled separately)
+   * It filters for variable declarators, then extracts the arrow function value, 
+   * and then it applies the arrow symbol factory.
    */
   _extractArrowFromDeclaration(node, source, symbols) {
     for (let i = 0; i < node.childCount; i++) {
@@ -191,15 +204,14 @@ class JavaScriptParser extends BaseParser {
       if (child.type !== 'variable_declarator') continue;
 
       const valueNode = child.childForFieldName('value');
-      if (!valueNode) continue;
-      if (valueNode.type !== 'arrow_function') continue;
+      if (!valueNode || valueNode.type !== 'arrow_function') continue;
 
       const nameNode = child.childForFieldName('name');
       if (!nameNode) continue;
 
-      const name    = nodeText(nameNode, source);
-      const isAsync = nodeHasChild(valueNode, 'async');
-      const params  = this._extractParams(valueNode, source);
+      const name       = nodeText(nameNode, source);
+      const isAsync    = nodeHasChild(valueNode, 'async');
+      const params     = this._extractParams(valueNode, source);
       const complexity = calculateComplexity(valueNode);
       const hash       = generateStructuralHash(valueNode);
 
@@ -215,18 +227,12 @@ class JavaScriptParser extends BaseParser {
   }
 
   /**
-   * Extract a class declaration.
-   *
-   * Handles:
-   *   class Animal {}
-   *   class Dog extends Animal {}
+   * It parses the class identifier, then extracts the heritage/superclass if present, 
+   * and then it applies the class factory configuration.
    */
   _extractClass(node, source, symbols) {
     const name = this._classNameFromNode(node, source);
 
-    // Superclass is inside a class_heritage node:  class Foo extends Bar {}
-    // class_declaration: [ class, name, class_heritage?, class_body ]
-    // class_heritage:    [ extends, identifier ]
     let superClass = null;
     const heritage = node.namedChildren.find(c => c.type === 'class_heritage');
     if (heritage) {
@@ -242,27 +248,20 @@ class JavaScriptParser extends BaseParser {
   }
 
   /**
-   * Extract a method from inside a class body.
-   *
-   * Handles:
-   *   constructor() {}
-   *   speak() {}
-   *   static create() {}
-   *   async fetchData() {}
-   *   get name() {}
-   *   set name(v) {}
+   * It reads the method name field, then extracts static/async modifiers, 
+   * and then it applies the method factory while linking the parent class.
    */
   _extractMethod(node, source, symbols, className) {
     const nameNode = node.childForFieldName('name');
     if (!nameNode) return;
 
-    const name      = nodeText(nameNode, source);
-    const isStatic  = nodeHasChild(node, 'static');
-    const isAsync   = nodeHasChild(node, 'async');
-    const isGen     = nodeHasChild(node, '*');
-    const params    = this._extractParams(node, source);
-    const complexity= calculateComplexity(node);
-    const hash      = generateStructuralHash(node);
+    const name       = nodeText(nameNode, source);
+    const isStatic   = nodeHasChild(node, 'static');
+    const isAsync    = nodeHasChild(node, 'async');
+    const isGen      = nodeHasChild(node, '*');
+    const params     = this._extractParams(node, source);
+    const complexity = calculateComplexity(node);
+    const hash       = generateStructuralHash(node);
 
     symbols.push(createMethod({
       name,
@@ -278,13 +277,8 @@ class JavaScriptParser extends BaseParser {
   }
 
   /**
-   * Extract an ES module import statement.
-   *
-   * Handles:
-   *   import fs from 'fs'
-   *   import { readFile, writeFile as wf } from 'fs'
-   *   import * as path from 'path'
-   *   import 'dotenv/config'
+   * It isolates the import source, then extracts the specifier clauses, 
+   * and then it applies them to construct a unified ES module import symbol.
    */
   _extractImport(node, source, symbols) {
     const sourceNode = node.childForFieldName('source');
@@ -293,16 +287,10 @@ class JavaScriptParser extends BaseParser {
     const moduleSource = stripQuotes(nodeText(sourceNode, source));
     const specifiers   = [];
 
-    // The import clause is child(1) of import_statement:
-    //   import [clause] from [source]
-    // child(0) = 'import' keyword (anon)
-    // child(1) = import_clause (if clause present) OR 'from' keyword (if side-effect)
-    // child(2) = 'from' keyword (anon)  OR the source string (if side-effect)
     const child1 = node.child(1);
     const clauseNode = (child1 && child1.type === 'import_clause') ? child1 : null;
 
     if (!clauseNode) {
-      // Side-effect import:  import 'dotenv/config'
       specifiers.push({ name: moduleSource, alias: null, type: 'side-effect' });
     } else {
       this._walkImportClause(clauseNode, source, specifiers);
@@ -315,22 +303,22 @@ class JavaScriptParser extends BaseParser {
     }));
   }
 
-  /** Walk an import clause node to extract specifiers. */
+  /**
+   * It iterates through the import clause, then extracts named/namespace/default identifiers, 
+   * and then it applies them to the specifier array passed by reference.
+   */
   _walkImportClause(clauseNode, source, specifiers) {
     for (let i = 0; i < clauseNode.childCount; i++) {
       const child = clauseNode.child(i);
 
       if (child.type === 'identifier') {
-        // Default import:  import fs from 'fs'
         specifiers.push({ name: nodeText(child, source), alias: null, type: 'default' });
 
       } else if (child.type === 'namespace_import') {
-        // Namespace import:  import * as path from 'path'
         const idNode = child.namedChildren.find(n => n.type === 'identifier');
         if (idNode) specifiers.push({ name: nodeText(idNode, source), alias: null, type: 'namespace' });
 
       } else if (child.type === 'named_imports') {
-        // Named imports:  { readFile, writeFile as wf }
         for (const specNode of child.namedChildren) {
           if (specNode.type !== 'import_specifier') continue;
           const nameNode  = specNode.childForFieldName('name');
@@ -348,29 +336,18 @@ class JavaScriptParser extends BaseParser {
   }
 
   /**
-   * Extract ES module export statements.
-   *
-   * Handles:
-   *   export function foo() {}
-   *   export const bar = ...
-   *   export default foo
-   *   export default function() {}
-   *   export { foo, bar }
-   *   export { foo as baz } from '../../../analyzers/module'
-   *   export * from '../../../analyzers/module'
+   * It evaluates the export wrapper, then extracts the declaration or default value, 
+   * and then it applies the export factory for tracking modular boundaries.
    */
   _extractExport(node, source, symbols) {
     const isDefault = nodeHasNamedChild(node, 'export_clause') === false
                    && this._nodeChildText(node, source).startsWith('export default');
 
-    // Check for re-export source:  export { ... } from '../../../analyzers/x'
     const sourceNode = node.childForFieldName('source');
     const reexportSource = sourceNode ? stripQuotes(nodeText(sourceNode, source)) : null;
 
-    // export default <expr|function|class>
     if (this._hasDirectChild(node, 'default')) {
-      const valueNode = node.childForFieldName('value')
-                     || node.childForFieldName('declaration');
+      const valueNode = node.childForFieldName('value') || node.childForFieldName('declaration');
       let name = null;
       if (valueNode) {
         if (valueNode.type === 'identifier') {
@@ -388,7 +365,6 @@ class JavaScriptParser extends BaseParser {
       return;
     }
 
-    // export { foo, bar } or export { foo } from '../../../analyzers/x'
     const clauseNode = this._findNamedChild(node, 'export_clause');
     if (clauseNode) {
       for (const spec of clauseNode.namedChildren) {
@@ -406,7 +382,6 @@ class JavaScriptParser extends BaseParser {
       return;
     }
 
-    // export * from '../../../analyzers/x'
     if (reexportSource) {
       symbols.push(createExport({
         exportType: 'reexport',
@@ -417,7 +392,6 @@ class JavaScriptParser extends BaseParser {
       return;
     }
 
-    // export function foo() {} / export class Foo {} / export const bar = ...
     const declNode = node.childForFieldName('declaration');
     if (!declNode) return;
 
@@ -433,23 +407,8 @@ class JavaScriptParser extends BaseParser {
   }
 
   /**
-   * Extract CommonJS require() calls from a variable declaration.
-   *
-   * Handles:
-   *   const User = require('../../../analyzers/models/User')
-   *   const express = require('express')
-   *   const { Router } = require('express')
-   *   const { readFile: rf } = require('fs')
-   *   var db = require('../../../analyzers/db')
-   *
-   * Emitted as an ImportSymbol with the same shape as ES module imports,
-   * so that the dependency analyzer can treat both uniformly.
-   * The specifier type is 'cjs-default' for the whole-module form and
-   * 'cjs-named' for destructured forms.
-   *
-   * @param {object} node    — lexical_declaration or variable_declaration
-   * @param {string} source
-   * @param {Symbol[]} symbols
+   * It scans variable declarators, then extracts the require() call arguments, 
+   * and then it applies the data into standard ImportSymbols to unify ESM and CJS dependencies.
    */
   _extractCommonJsRequire(node, source, symbols) {
     for (let i = 0; i < node.childCount; i++) {
@@ -459,17 +418,14 @@ class JavaScriptParser extends BaseParser {
       const valueNode = declarator.childForFieldName('value');
       if (!valueNode) continue;
 
-      // Support:  require('x')  or  require('x').something (member access after require)
       const callNode = _findRequireCall(valueNode, source);
       if (!callNode) continue;
 
-      // Extract the module specifier string from the call arguments
       const argsNode = callNode.childForFieldName('arguments');
       if (!argsNode) continue;
-      // First argument of require()
+      
       const firstArg = argsNode.namedChildren[0];
-      if (!firstArg) continue;
-      if (firstArg.type !== 'string' && firstArg.type !== 'template_string') continue;
+      if (!firstArg || (firstArg.type !== 'string' && firstArg.type !== 'template_string')) continue;
 
       const moduleSource = stripQuotes(nodeText(firstArg, source));
       const location     = locationFromNode(declarator);
@@ -479,24 +435,20 @@ class JavaScriptParser extends BaseParser {
       if (!nameNode) continue;
 
       if (nameNode.type === 'identifier') {
-        // const User = require('../../../analyzers/models/User')
         specifiers.push({
           name:  nodeText(nameNode, source),
           alias: null,
           type:  'cjs-default',
         });
       } else if (nameNode.type === 'object_pattern') {
-        // const { Router, Application } = require('express')
         for (const prop of nameNode.namedChildren) {
           if (prop.type === 'shorthand_property_identifier_pattern') {
-            // { Router }
             specifiers.push({
               name:  nodeText(prop, source),
               alias: null,
               type:  'cjs-named',
             });
           } else if (prop.type === 'pair_pattern') {
-            // { readFile: rf }
             const keyNode = prop.childForFieldName('key');
             const valNode = prop.childForFieldName('value');
             if (keyNode) {
@@ -513,7 +465,7 @@ class JavaScriptParser extends BaseParser {
       if (specifiers.length === 0) continue;
 
       symbols.push(createImport({
-        source:     moduleSource,
+        source: moduleSource,
         specifiers,
         location,
       }));
@@ -521,12 +473,8 @@ class JavaScriptParser extends BaseParser {
   }
 
   /**
-   * Extract CommonJS module.exports assignments.
-   *
-   * Handles:
-   *   module.exports = { foo, bar };
-   *   module.exports = MyClass;
-   *   module.exports.foo = function() {};
+   * It checks for assignment expressions, then extracts the module.exports prefix, 
+   * and then it applies the right-hand object properties to the export tracking.
    */
   _extractCommonJsExport(node, source, symbols) {
     const expr = node.child(0);
@@ -567,33 +515,15 @@ class JavaScriptParser extends BaseParser {
   // ── Parameter extraction ─────────────────────────────────────────────────────
 
   /**
-   * Extract parameter names from a function-like node.
-   * Complex patterns (destructuring, rest, default values) are represented
-   * as '_' so that the parameter count is still correct.
-   *
-   * @param {object} fnNode   — function_declaration, method_definition, arrow_function
-   * @param {string} source
-   * @returns {string[]}
+   * It evaluates function-like nodes, then extracts the parameter identifiers, 
+   * and then it applies fallback underscores for complex destructuring logic.
    */
   _extractParams(fnNode, source) {
-    // Arrow functions with a single unparenthesized parameter use a different
-    // field name and structure:   x => x * 2
-    //   arrow_function: [ identifier "x", "=>", body ]
-    //   The 'parameter' field (singular) is set.
-    //
-    // Arrow functions with parenthesized params:  (x, y) => ...
-    //   arrow_function: [ formal_parameters "(x, y)", "=>", body ]
-    //   The 'parameters' field (plural) is set.
-    //
-    // Regular functions and methods always use 'parameters'.
-
-    // First try 'parameters' (formal_parameters node)
     const paramsNode = fnNode.childForFieldName('parameters');
     if (paramsNode) {
       return this._extractFromFormalParams(paramsNode, source);
     }
 
-    // Then try 'parameter' (single unparenthesized arrow param)
     const singleParam = fnNode.childForFieldName('parameter');
     if (singleParam) {
       if (singleParam.type === 'identifier') {
@@ -605,7 +535,10 @@ class JavaScriptParser extends BaseParser {
     return [];
   }
 
-  /** Extract params from a formal_parameters node. */
+  /**
+   * It loops through formal parameters, then extracts valid argument names or rest patterns, 
+   * and then it applies them to the output parameter list.
+   */
   _extractFromFormalParams(paramsNode, source) {
     const params = [];
     for (const p of paramsNode.namedChildren) {
@@ -613,10 +546,8 @@ class JavaScriptParser extends BaseParser {
         case 'identifier':
           params.push(nodeText(p, source));
           break;
-        // TypeScript: typed param  name: Type
         case 'required_parameter':
         case 'optional_parameter': {
-          // first named child is the identifier (or pattern)
           const nameNode = p.namedChildren[0];
           if (nameNode && nameNode.type === 'identifier') {
             params.push(nodeText(nameNode, source));
@@ -627,7 +558,6 @@ class JavaScriptParser extends BaseParser {
         }
         case 'assignment_pattern': {
           const name = p.childForFieldName('left');
-          // The left side may itself be a required_parameter in TS
           if (name && name.type === 'identifier') {
             params.push(nodeText(name, source));
           } else if (name) {
@@ -652,15 +582,24 @@ class JavaScriptParser extends BaseParser {
 
   // ── Utilities ────────────────────────────────────────────────────────────────
 
+  /**
+   * It finds the class name node, then extracts the text content, and then it applies '<anonymous>' as a fallback.
+   */
   _classNameFromNode(node, source) {
     const nameNode = node.childForFieldName('name');
     return nameNode ? nodeText(nameNode, source) : '<anonymous>';
   }
 
+  /**
+   * It safely checks the node text, then extracts it via error catching, and then it applies a blank string on failure.
+   */
   _nodeChildText(node, source) {
     try { return nodeText(node, source); } catch { return ''; }
   }
 
+  /**
+   * It loops through child nodes, then extracts their type properties, and then it applies a boolean check for a match.
+   */
   _hasDirectChild(node, type) {
     for (let i = 0; i < node.childCount; i++) {
       if (node.child(i).type === type) return true;
@@ -668,6 +607,9 @@ class JavaScriptParser extends BaseParser {
     return false;
   }
 
+  /**
+   * It queries the child array, then extracts the first child matching the desired type, and then it applies the node reference to the caller.
+   */
   _findNamedChild(node, type) {
     for (let i = 0; i < node.childCount; i++) {
       const c = node.child(i);
@@ -677,8 +619,8 @@ class JavaScriptParser extends BaseParser {
   }
 
   /**
-   * Extract exported names from a declaration node.
-   * Used for  export function foo() {}  and  export const a = 1, b = 2
+   * It checks for standard name fields, then extracts declarator identifiers if missing, 
+   * and then it applies them to the exported names array.
    */
   _namesFromDeclaration(declNode, source) {
     const names = [];
@@ -687,7 +629,6 @@ class JavaScriptParser extends BaseParser {
       names.push(nodeText(nameNode, source));
       return names;
     }
-    // lexical/variable declaration: may have multiple declarators
     for (let i = 0; i < declNode.childCount; i++) {
       const c = declNode.child(i);
       if (c.type === 'variable_declarator') {
@@ -702,18 +643,14 @@ class JavaScriptParser extends BaseParser {
 // ── Module-level helpers ──────────────────────────────────────────────────────
 
 /**
- * Extract the text of a node from the source string using byte positions.
- *
- * @param {object} node
- * @param {string} source
- * @returns {string}
+ * It identifies the byte boundaries, then extracts the string slice, and then it applies it as a textual representation.
  */
 function nodeText(node, source) {
   return source.slice(node.startIndex, node.endIndex);
 }
 
 /**
- * Returns true if the node has a direct child with the given type.
+ * It iterates through all children, then extracts the node type, and then it applies a true condition if it matches.
  */
 function nodeHasChild(node, type) {
   for (let i = 0; i < node.childCount; i++) {
@@ -723,30 +660,21 @@ function nodeHasChild(node, type) {
 }
 
 /**
- * Returns true if the node has a named child with the given type.
- * Unlike nodeHasChild, this only looks at named (non-anonymous) children.
+ * It scans the named children array, then extracts their types, and then it applies the array `some` condition.
  */
 function nodeHasNamedChild(node, type) {
   return node.namedChildren.some(c => c.type === type);
 }
 
 /**
- * Remove surrounding quotes from a string literal value.
+ * It evaluates the raw string literal, then extracts the boundary quote characters, and then it applies a regex replacement.
  */
 function stripQuotes(str) {
   return str.replace(/^['"`]|['"`]$/g, '');
 }
 
 /**
- * Find a require() call_expression node inside a value node.
- *
- * Handles:
- *   require('x')                     — direct call
- *   require('x').default             — member access on require result
- *
- * @param {object} node    — value node from a variable_declarator
- * @param {string} source  — full source text
- * @returns {object|null}  — call_expression node, or null
+ * It examines a value node, then extracts nested require function calls, and then it applies recursion for member expressions.
  */
 function _findRequireCall(node, source) {
   if (node.type === 'call_expression') {
@@ -755,12 +683,9 @@ function _findRequireCall(node, source) {
       return node;
     }
   }
-  // require('x').something  →  member_expression whose object is the call
   if (node.type === 'member_expression') {
     const obj = node.childForFieldName('object');
     if (obj) return _findRequireCall(obj, source);
   }
   return null;
 }
-
-export { JavaScriptParser };

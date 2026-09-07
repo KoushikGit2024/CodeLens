@@ -1,3 +1,9 @@
+/**
+ * AIStatusIndicator.jsx
+ *
+ * It monitors the global AI context, then extracts the provider connection status, 
+ * and then it applies deterministic fallback UI configurations when offline.
+ */
 import React, { useState } from 'react';
 import { Sparkles, CloudOff, AlertTriangle, AlertCircle, X } from 'lucide-react';
 import { useAIState } from '../../shared/context/AIContext';
@@ -8,6 +14,10 @@ export default function AIStatusIndicator() {
 
   if (aiState === 'loading') return null;
 
+  /**
+   * It evaluates the AI state machine, then extracts the active status string, 
+   * and then it applies a unified configuration object for the indicator UI.
+   */
   const getConfig = () => {
     switch (aiState) {
       case 'enhanced':
@@ -72,6 +82,10 @@ export default function AIStatusIndicator() {
   const config = getConfig();
   if (!config) return null;
 
+  /**
+   * It tracks the user click event, then extracts the popover visibility boolean, 
+   * and then it applies absolute positioning to render the status dropdown.
+   */
   return (
     <div className="relative">
       <button 

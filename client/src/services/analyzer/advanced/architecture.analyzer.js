@@ -1,104 +1,53 @@
 /**
  * architecture.analyzer.js
  * 
- * Implements architecture intelligence. Groups files into logical components,
- * identifies layers, detects entry points, and surfaces API boundaries.
+ * It evaluates directory structures, then extracts logical layer mappings, 
+ * and then it applies architectural validation to surface API boundaries and rule violations.
  */
 
 import { validateArchitecture } from './architecture.rules.js';
+import { createAnalysisNode } from '../parsing/symbols.js';
 
 // ── Heuristics Configuration ──────────────────────────────────────────────────
 
 const LAYER_MAPPING = [
   { layer: 'Presentation', patterns: [/\.jsx$/, /\.tsx$/, /\/components\//, /\/pages\//, /\/views\//, /\/ui\//] },
-  { layer: 'API',          patterns: [/\/controllers\//, /\/routes\//, /\/api\//, /Controller\.js$/] },
-  { layer: 'Service',      patterns: [/\/services\//, /Service\.js$/, /\/core\//] },
-  { layer: 'Data',         patterns: [/\/models\//, /\/repositories\//, /\/db\//, /Model\.js$/] },
+  { layer: 'API',          patterns: [/\/controllers\//, /\/routes\//, /\/api\//, /Controller\.(js|ts|go|java|rs)$/] },
+  { layer: 'Service',      patterns: [/\/services\//, /Service\.(js|ts|go|java|rs)$/, /\/core\//] },
+  { layer: 'Data',         patterns: [/\/models\//, /\/repositories\//, /\/db\//, /Model\.(js|ts|go|java|rs)$/] },
 ];
 
 const ENTRY_POINT_NAMES = new Set([
   'server.js', 'app.js', 'index.js', 'main.js', 'main.jsx', 'index.jsx',
-  'src/server.js', 'src/app.js', 'src/index.js', 'src/main.js', 'src/main.jsx', 'src/index.jsx', 'src/index.tsx', 'src/main.tsx'
+  'src/server.js', 'src/app.js', 'src/index.js', 'src/main.js', 'src/main.jsx', 'src/index.jsx', 'src/index.tsx', 'src/main.tsx',
+  'main.go', 'main.rs', 'application.java', 'src/main.rs'
 ]);
-
-// ── Dependency Helpers (Ported from dependency.analyzer) ──────────────────────
-
-function getIsolatedFiles(graph) {
-  const connected = new Set();
-  for (const edge of graph.edges) {
-    if (edge.source.startsWith('file:')) connected.add(edge.source);
-    if (edge.target.startsWith('file:')) connected.add(edge.target);
-  }
-  
-  const isolated = [];
-  for (const node of graph.nodes) {
-    if (node.type === 'file' && !connected.has(node.id)) {
-      isolated.push(node.filePath);
-    }
-  }
-  return isolated;
-}
-
-function detectCycles(graph) {
-  const adj = new Map();
-  for (const e of graph.edges) {
-    if (e.source.startsWith('file:') && e.target.startsWith('file:')) {
-      if (!adj.has(e.source)) adj.set(e.source, []);
-      adj.get(e.source).push(e.target);
-    }
-  }
-
-  const visited = new Set();
-  const stack = new Set();
-  const cycles = [];
-
-  function dfs(node, path) {
-    visited.add(node);
-    stack.add(node);
-    path.push(node);
-
-    const neighbors = adj.get(node) || [];
-    for (const neighbor of neighbors) {
-      if (!visited.has(neighbor)) {
-        dfs(neighbor, path);
-      } else if (stack.has(neighbor)) {
-        const cycleStart = path.indexOf(neighbor);
-        cycles.push(path.slice(cycleStart).map(id => id.replace('file:', '')));
-      }
-    }
-
-    stack.delete(node);
-    path.pop();
-  }
-
-  for (const node of graph.nodes) {
-    if (node.type === 'file' && !visited.has(node.id)) {
-      dfs(node.id, []);
-    }
-  }
-
-  return cycles;
-}
-
 
 // ── Detection Logic ───────────────────────────────────────────────────────────
 
+/**
+ * It checks the file path against regex patterns, then extracts the matching layer designation, 
+ * and then it applies a 'Core/Other' fallback if no match is found.
+ */
 export function detectLayer(filePath) {
   for (const mapping of LAYER_MAPPING) {
     if (mapping.patterns.some(p => p.test(filePath))) {
       return mapping.layer;
     }
   }
-  return 'Core/Other'; // Default fallback
+  return 'Core/Other';
 }
 
+/**
+ * It tokenizes the file paths to find common prefixes, then extracts the meaningful directory clusters, 
+ * and then it applies the AnalysisNode schema to build distinct component objects.
+ */
 export function detectComponents(analysis, graph) {
   if (!analysis.files || analysis.files.length === 0) return [];
 
-  // 1. Drop filename from each path to find common directory prefix
   const paths = analysis.files.map(f => {
     const p = f.filePath.split('/');
-    p.pop(); // drop file name
+    p.pop(); 
     return p;
   });
 
@@ -111,21 +60,19 @@ export function detectComponents(analysis, graph) {
   }
 
   const prefixLen = commonPrefix.length;
-  const componentsMap = new Map(); // componentName -> { name, files, layer }
+  const componentsMap = new Map(); 
   const wrappers = new Set(['src', 'app', 'lib', 'packages', 'main', 'java', 'test', 'tests', 'com', 'org', 'net']);
 
   for (const file of analysis.files) {
     const rawParts = file.filePath.split('/');
-    rawParts.pop(); // drop file name when generating component name
+    rawParts.pop(); 
     const meaningfulParts = rawParts.slice(prefixLen).filter(p => !wrappers.has(p));
     
     let compName = 'root';
     if (meaningfulParts.length > 0) {
       if (meaningfulParts.length > 1 && prefixLen <= 1) {
-        // Shallow prefix (e.g. monorepo client/server), keep 2 levels for granularity
         compName = meaningfulParts.slice(0, 2).join('/');
       } else {
-        // Deep prefix (e.g. single app com/project/...), keep 1 level
         compName = meaningfulParts[0];
       }
     }
@@ -133,26 +80,38 @@ export function detectComponents(analysis, graph) {
     const layer = detectLayer(file.filePath);
 
     if (!componentsMap.has(compName)) {
-      componentsMap.set(compName, { name: compName, files: [], layer: 'Core/Other' });
+      // It initiates a new component cluster, then extracts its label, and then it applies the React Flow node schema.
+      componentsMap.set(compName, createAnalysisNode({
+        id: `comp-${compName}`,
+        type: 'componentNode',
+        label: compName,
+        layer: 'Core/Other',
+      }));
+      // We attach the raw file list temporarily to build the relations later
+      componentsMap.get(compName)._files = [];
     }
     
-    const comp = componentsMap.get(compName);
-    comp.files.push(file.filePath);
+    const compNode = componentsMap.get(compName);
+    compNode._files.push(file.filePath);
     
     if (layer !== 'Core/Other') {
-      if (comp.layer === 'Core/Other' || layer === 'Presentation' || layer === 'API') {
-         comp.layer = layer;
+      if (compNode.data.layer === 'Core/Other' || layer === 'Presentation' || layer === 'API') {
+         compNode.data.layer = layer;
       }
     }
   }
 
-  return Array.from(componentsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  return Array.from(componentsMap.values()).sort((a, b) => a.data.label.localeCompare(b.data.label));
 }
 
+/**
+ * It counts incoming edges across the graph, then extracts nodes with standard filenames, 
+ * and then it applies a low-degree threshold filter to confirm true entry points.
+ */
 export function detectEntryPoints(graph) {
   const inDegree = new Map();
   for (const n of graph.nodes) {
-    if (n.type === 'file') inDegree.set(n.id, 0);
+    if (n.type === 'fileNode') inDegree.set(n.id, 0);
   }
   for (const e of graph.edges) {
     if (e.target.startsWith('file:')) {
@@ -162,20 +121,25 @@ export function detectEntryPoints(graph) {
 
   const entryPoints = [];
   for (const node of graph.nodes) {
-    if (node.type !== 'file') continue;
-    const name = node.filePath.toLowerCase();
+    if (node.type !== 'fileNode') continue;
+    
+    const name = node.data.filePath.toLowerCase();
     const basename = name.split('/').pop();
     
     const isStandardName = ENTRY_POINT_NAMES.has(name) || ENTRY_POINT_NAMES.has(basename);
     
     if (isStandardName && (inDegree.get(node.id) || 0) <= 2) {
-      entryPoints.push(node.filePath);
+      entryPoints.push(node.data.filePath);
     }
   }
   
   return entryPoints.sort();
 }
 
+/**
+ * It filters the analysis payload for API layer files, then extracts their export symbols, 
+ * and then it applies them into an array mapping the system's public boundaries.
+ */
 export function extractApiBoundaries(analysis) {
   const apiBoundaries = [];
   
@@ -197,11 +161,8 @@ export function extractApiBoundaries(analysis) {
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
- * Builds the architecture model from analysis and graph.
- * 
- * @param {object} analysis - RepositoryAnalysis
- * @param {object} graph - DependencyGraph
- * @returns {object} ArchitectureModel
+ * It integrates components and entry points, then extracts inter-component relations, 
+ * and then it applies the rule validator to generate the final ArchitectureModel.
  */
 export function buildArchitectureModel(analysis, graph) {
   const components = detectComponents(analysis, graph);
@@ -211,10 +172,12 @@ export function buildArchitectureModel(analysis, graph) {
   const componentRelations = [];
   const compMap = new Map();
   
-  for (const comp of components) {
-    for (const f of comp.files) {
-      compMap.set(f, comp.name);
+  for (const compNode of components) {
+    for (const f of compNode._files) {
+      compMap.set(f, compNode.data.label);
     }
+    compNode.data.files = [...compNode._files]; // persist for sidebar display
+    delete compNode._files; // Clean up temporary data
   }
 
   for (const edge of graph.edges) {
@@ -258,17 +221,10 @@ export function buildArchitectureModel(analysis, graph) {
   const violations = validateArchitecture(components, uniqueRelations);
 
   return {
-    components,
-    relations: uniqueRelations,
-    entryPoints,
+    layers: components,
+    uniqueRelations,
+    boundaryViolations: violations,
     apiBoundaries,
-    isolatedFiles: getIsolatedFiles(graph),
-    cycles: detectCycles(graph),
-    unresolvedDependencies: graph.meta?.unresolvedImports || 0,
-    violations,
-    meta: {
-      totalComponents: components.length,
-      builtAt: new Date().toISOString()
-    }
+    entryPoints
   };
 }

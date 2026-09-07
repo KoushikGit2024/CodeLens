@@ -1,13 +1,13 @@
-
+/**
+ * refactoring.strategies.js
+ * 
+ * It maps risk categories, then extracts specific programmatic flaws, 
+ * and then it applies actionable mitigation techniques for the developer.
+ */
 
 import { RISK_CATEGORIES } from './risk.analyzer.js';
 
-/**
- * Maps deterministic engineering risks to actionable refactoring strategies.
- * These are recommendations and do not automatically modify source code.
- */
-
-const REFACTORING_STRATEGIES = {
+export const REFACTORING_STRATEGIES = {
   // --- DEPENDENCY RISKS ---
   CIRCULAR_DEPENDENCY: [
     {
@@ -139,7 +139,11 @@ const REFACTORING_STRATEGIES = {
   ]
 };
 
-function getStrategiesForRisk(risk) {
+/**
+ * It evaluates the risk object, then extracts title keywords, 
+ * and then it applies the corresponding strategy array to the candidate output.
+ */
+export function getStrategiesForRisk(risk) {
   switch (risk.category) {
     case RISK_CATEGORIES.DEPENDENCY:
       if (risk.title.includes('Circular')) return REFACTORING_STRATEGIES.CIRCULAR_DEPENDENCY;
@@ -164,8 +168,3 @@ function getStrategiesForRisk(risk) {
       return [];
   }
 }
-
-export { 
-  REFACTORING_STRATEGIES,
-  getStrategiesForRisk
- };

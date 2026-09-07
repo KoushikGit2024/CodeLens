@@ -29,6 +29,9 @@ export const EXTENSION_MAP = new Map([
   // Java
   ['.java', 'java'],
 
+  // C
+  ['.c', 'c'],
+
   // C++
   ['.cpp',  'cpp'],
   ['.cc',   'cpp'],
@@ -39,6 +42,12 @@ export const EXTENSION_MAP = new Map([
   // Kotlin
   ['.kt',   'kotlin'],
   ['.kts',  'kotlin'],
+
+  // Go
+  ['.go', 'go'],
+
+  // Rust
+  ['.rs', 'rust'],
 ]);
 
 /**

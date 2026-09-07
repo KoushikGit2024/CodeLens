@@ -1,3 +1,10 @@
+/**
+ * repository.analyzer.js
+ *
+ * It coordinates the language parser instances, then extracts individual file ASTs, 
+ * and then it applies a caching algorithm to perform rapid incremental scans.
+ */
+
 import { detectLanguage } from '../parsing/language.detector.js';
 import { getParser } from '../parsing/parser.registry.js';
 import { JavaScriptParser } from '../parsing/languages/javascript.parser.js';
@@ -6,6 +13,9 @@ import { PythonParser } from '../parsing/languages/python.parser.js';
 import { JavaParser } from '../parsing/languages/java.parser.js';
 import { CppParser } from '../parsing/languages/cpp.parser.js';
 import { KotlinParser } from '../parsing/languages/kotlin.parser.js';
+import { GoParser } from '../parsing/languages/go.parser.js';
+import { RustParser } from '../parsing/languages/rust.parser.js';
+import { CParser } from '../parsing/languages/c.parser.js';
 import { createFileAnalysis } from '../parsing/symbols.js';
 import { hashContent } from './fingerprint.js';
 import { loadAllFiles } from './persistence.store.js';
@@ -18,8 +28,15 @@ const PARSER_FACTORIES = {
   java:       (tsParser) => new JavaParser(tsParser),
   cpp:        (tsParser) => new CppParser(tsParser),
   kotlin:     (tsParser) => new KotlinParser(tsParser),
+  go:         (tsParser) => new GoParser(tsParser),
+  rust:       (tsParser) => new RustParser(tsParser),
+  c:          (tsParser) => new CParser(tsParser),
 };
 
+/**
+ * It loads the source files from IndexedDB, then extracts ASTs sequentially, 
+ * and then it applies deterministic hashing to skip unmodified files.
+ */
 export async function analyzeRepository(repoId, previousAnalysis = null, onProgress = null, options = {}) {
   if (onProgress) onProgress('scanning_files');
   
@@ -58,7 +75,7 @@ export async function analyzeRepository(repoId, previousAnalysis = null, onProgr
   for (const fileRecord of sourceFiles) {
     currentIndex++;
     
-    // Yield the event loop to allow UI to update
+    // Yield the event loop to allow UI/Worker to update
     await new Promise(resolve => setTimeout(resolve, 0));
     
     if (onProgress) {
@@ -66,7 +83,7 @@ export async function analyzeRepository(repoId, previousAnalysis = null, onProgr
     }
     
     const relPath  = fileRecord.filePath;
-    const content = fileRecord.content;
+    const content  = fileRecord.content;
     const language = detectLanguage(relPath);
 
     if (!language || !PARSER_FACTORIES[language]) {
@@ -74,7 +91,6 @@ export async function analyzeRepository(repoId, previousAnalysis = null, onProgr
       continue;
     }
 
-    // ── Incremental Hash Check ──────────────────────────────────────────────
     const hash = await hashContent(content);
     let cachedAnalysis = null;
 
@@ -83,7 +99,6 @@ export async function analyzeRepository(repoId, previousAnalysis = null, onProgr
     }
 
     if (cachedAnalysis && cachedAnalysis.hash === hash && cachedAnalysis.language === language) {
-      // Cache HIT! Reuse previous analysis exactly as is.
       result.files.push(cachedAnalysis);
       
       result.meta.cacheHits++;
@@ -98,7 +113,6 @@ export async function analyzeRepository(repoId, previousAnalysis = null, onProgr
       continue;
     }
 
-    // Cache MISS! Reparse the file
     result.meta.cacheMisses++;
     if (cachedAnalysis) {
       result.meta.modifiedFiles++;
@@ -107,7 +121,7 @@ export async function analyzeRepository(repoId, previousAnalysis = null, onProgr
     }
 
     const fileAnalysis = await analyzeFileContent(content, relPath, language);
-    fileAnalysis.hash = hash; // Tag with hash for future incremental runs
+    fileAnalysis.hash = hash; 
     
     result.files.push(fileAnalysis);
 
@@ -120,7 +134,6 @@ export async function analyzeRepository(repoId, previousAnalysis = null, onProgr
     result.languageSummary[language] = (result.languageSummary[language] ?? 0) + 1;
   }
 
-  // Detect deleted files
   if (previousAnalysis && previousAnalysis.files) {
     for (const oldFile of previousAnalysis.files) {
       if (!result.files.some(f => f.filePath === oldFile.filePath)) {
@@ -134,6 +147,10 @@ export async function analyzeRepository(repoId, previousAnalysis = null, onProgr
   return result;
 }
 
+/**
+ * It resolves the WebAssembly instance, then extracts deterministic node symbols and findings, 
+ * and then it applies the unified file envelope.
+ */
 export async function analyzeFileContent(source, relPath, language) {
   const lineCount = source.split(/\r\n|\n/).length;
 
@@ -154,5 +171,16 @@ export async function analyzeFileContent(source, relPath, language) {
 
   const fileAnalysis = await parser.parseFile(source, relPath);
   fileAnalysis.lineCount = lineCount;
+  
+  // It triggers the deterministic findings logic, then extracts SAST results, and then it applies them to the payload.
+  if (typeof parser.extractAdvancedFindings === 'function') {
+    try {
+      const rootNode = tsParser.parse(source).rootNode;
+      fileAnalysis.findings = parser.extractAdvancedFindings(rootNode, relPath);
+    } catch (e) {
+      console.warn(`[repository.analyzer.js] Advanced finding extraction failed for ${relPath}`);
+    }
+  }
+
   return fileAnalysis;
 }

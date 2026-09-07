@@ -1,12 +1,11 @@
-'use strict';
-
 /**
  * clone.analyzer.js
  *
- * Detects structural code clones (copy-pasted code) across files.
- * It ignores variable names, literals, and comments, focusing only on the
- * structural AST nodes to find exact logical duplicates.
+ * It scans the repository ASTs, then extracts structural fingerprints, 
+ * and then it applies hash grouping to identify exact logical code clones.
  */
+
+import { createAnalysisFinding } from '../parsing/symbols.js';
 
 const cyrb53 = function(str, seed = 0) {
     let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed;
@@ -20,7 +19,6 @@ const cyrb53 = function(str, seed = 0) {
     return (4294967296 * (2097151 & h2) + (h1>>>0)).toString(16);
 };
 
-// Nodes we typically ignore when building a structural string
 const IGNORED_NODES = new Set([
   'identifier',
   'property_identifier',
@@ -28,14 +26,14 @@ const IGNORED_NODES = new Set([
   'number',
   'comment',
   'regex',
-  'template_string'
+  'template_string',
+  'string_literal',
+  'number_literal'
 ]);
 
 /**
- * Generates a structural hash for a given tree-sitter AST node.
- * 
- * @param {object} node 
- * @returns {string} SHA-256 hash
+ * It traverses the syntax tree, then extracts node types while skipping literals, 
+ * and then it applies a hashing algorithm to return a structural fingerprint.
  */
 function generateStructuralHash(node) {
   let structureStr = '';
@@ -51,7 +49,6 @@ function generateStructuralHash(node) {
 
   walk(node);
 
-  // If the function is too small (e.g. fewer than 5 structural elements), ignore it to avoid false positive clones
   const elements = structureStr.split(':').length - 1;
   if (elements < 5) return null;
 
@@ -59,16 +56,14 @@ function generateStructuralHash(node) {
 }
 
 /**
- * Groups a flat list of functions by their structural hash to find clones.
- * 
- * @param {object[]} allFunctions - Flat array of Function/Method/Arrow symbols from all files
- * @returns {object[]} Array of clone groups
+ * It maps all repository functions, then extracts identically hashed groups, 
+ * and then it applies the findings schema to return code clone alerts.
  */
-function detectClones(allFunctions) {
+function detectClones(allFunctions, filePath) {
   const hashMap = new Map();
 
   for (const fn of allFunctions) {
-    if (!fn.hash) continue; // skip if no hash or too small
+    if (!fn.hash) continue; 
 
     if (!hashMap.has(fn.hash)) {
       hashMap.set(fn.hash, []);
@@ -77,21 +72,41 @@ function detectClones(allFunctions) {
   }
 
   const clones = [];
+  const findings = [];
+
   for (const [hash, group] of hashMap.entries()) {
-    // Only flag as clone if it appears in more than 1 place
     if (group.length > 1) {
       clones.push({
         hash,
         count: group.length,
         instances: group
       });
+
+      // It builds the instance array, then extracts the specific line locations, and then it applies the frontend AnalysisFinding schema.
+      for (const instance of group) {
+        findings.push(createAnalysisFinding({
+          id: `CLONE-${hash}-${instance.name}-${instance.location.startLine}`,
+          analyzerId: 'clone',
+          ruleId: 'STRUCTURAL_DUPLICATION',
+          category: 'maintainability',
+          severity: 'warning',
+          title: `Code Clone Detected: ${instance.name}`,
+          message: `This structure is duplicated ${group.length} times across the codebase. Consider extracting it into a shared utility.`,
+          filePath: instance.filePath || filePath,
+          range: {
+            startLine: instance.location.startLine,
+            startColumn: instance.location.startColumn,
+            endLine: instance.location.endLine,
+            endColumn: instance.location.endColumn
+          }
+        }));
+      }
     }
   }
 
-  // Sort by count descending
   clones.sort((a, b) => b.count - a.count);
 
-  return clones;
+  return { cloneGroups: clones, findings };
 }
 
 export { generateStructuralHash, detectClones };

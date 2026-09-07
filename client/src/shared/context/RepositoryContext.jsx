@@ -1,6 +1,13 @@
+/**
+ * RepositoryContext.jsx
+ *
+ * It initiates the repository state hooks, then extracts progress events via the worker, 
+ * and then it applies instantaneous UI re-renders without blind polling.
+ */
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { repositoryApi } from '../api';
+import { onProgress } from '../../services/analyzer/analyzer.client.js';
 
 const RepositoryContext = createContext(null);
 
@@ -11,6 +18,10 @@ export function RepositoryProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  /**
+   * It calls the local API, then extracts the IndexedDB repository record, 
+   * and then it applies the payload to the component state.
+   */
   const fetchRepo = useCallback(async () => {
     if (!repoId) return;
     setLoading(true);
@@ -19,8 +30,6 @@ export function RepositoryProvider({ children }) {
       const repoRes = await repositoryApi.get(repoId);
       setRepo(repoRes.data);
       
-      // Only attempt to fetch the file tree if the repository is fully ready.
-      // If it's still analyzing, endpoints will return 409.
       if (repoRes.data.status === 'ready') {
         try {
           const treeRes = await repositoryApi.listFiles(repoId);
@@ -43,33 +52,17 @@ export function RepositoryProvider({ children }) {
     fetchRepo();
   }, [fetchRepo]);
 
-  // Polling mechanism for when the repo is actively analyzing
+  // It intercepts the active worker status, then extracts specific progress callbacks, and then it applies them to refresh the repository data in real-time.
   useEffect(() => {
-    let interval;
     if (repo && repo.status === 'analyzing') {
-      interval = setInterval(async () => {
-        try {
-          const repoRes = await repositoryApi.get(repoId);
-          setRepo(repoRes.data);
-          
-          if (repoRes.data.status === 'ready') {
-            clearInterval(interval);
-            try {
-              const treeRes = await repositoryApi.listFiles(repoId);
-              setFileTree(treeRes.data.tree);
-            } catch (treeErr) {
-              console.warn("Failed to fetch file tree", treeErr);
-            }
-          }
-        } catch (err) {
-          console.warn("Polling error", err);
+      const unsubscribe = onProgress((progressRepoId, phase, details) => {
+        if (progressRepoId === repoId) {
+          fetchRepo();
         }
-      }, 1000);
+      });
+      return () => unsubscribe();
     }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [repo?.status, repoId]);
+  }, [repo?.status, repoId, fetchRepo]);
 
   const value = {
     repoId,

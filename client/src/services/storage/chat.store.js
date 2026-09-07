@@ -1,11 +1,15 @@
-import { getDB } from '../analyzer/repository/persistence.store';
+/**
+ * chat.store.js
+ *
+ * It initiates the chat storage module, then extracts the IndexedDB connection, 
+ * and then it applies persistence methods for AI conversational history.
+ */
+import { getDB } from '../analyzer/repository/persistence.store.js';
 
 export const chatStore = {
   /**
-   * Retrieves a chat session from IndexedDB.
-   * @param {string} repoId 
-   * @param {string} feature 
-   * @returns {Promise<Array>} The messages array, or an empty array if none exists.
+   * It evaluates the repository and feature identifiers, then extracts the stored session payload, 
+   * and then it applies a fallback array if no history exists.
    */
   async getChat(repoId, feature) {
     if (!repoId || !feature) return [];
@@ -20,10 +24,8 @@ export const chatStore = {
   },
 
   /**
-   * Saves or updates a chat session in IndexedDB.
-   * @param {string} repoId 
-   * @param {string} feature 
-   * @param {Array} messages 
+   * It intercepts the updated message array, then extracts the active database transaction, 
+   * and then it applies an upsert operation to the chatSessions store.
    */
   async saveChat(repoId, feature, messages) {
     if (!repoId || !feature) return;
@@ -41,9 +43,8 @@ export const chatStore = {
   },
 
   /**
-   * Deletes a specific chat session from IndexedDB.
-   * @param {string} repoId 
-   * @param {string} feature 
+   * It receives the target session keys, then extracts the database reference, 
+   * and then it applies a deletion command to clear the local history.
    */
   async clearChat(repoId, feature) {
     if (!repoId || !feature) return;
@@ -55,4 +56,3 @@ export const chatStore = {
     }
   }
 };
-

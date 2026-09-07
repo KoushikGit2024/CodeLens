@@ -1,71 +1,64 @@
+/**
+ * RepositoryIntelligencePage.jsx
+ *
+ * It initiates the intelligence dashboard, then extracts local repository schemas, 
+ * and then it applies offline metrics to render the structural UI.
+ */
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { repositoryApi } from '../../shared/api';
 import AiResponse from '../../shared/components/ai/AiResponse';
 import { 
-  ChevronLeft, Loader2, AlertCircle, RefreshCw, CheckCircle, Wrench,
-  Box, GitMerge, FileText, AlertTriangle, ShieldAlert, BookOpen
+  AlertCircle, Box, GitMerge, FileText, AlertTriangle, ShieldAlert, BookOpen, Loader2, Wrench, CheckCircle
 } from 'lucide-react';
-import AIStatusIndicator from '../assistant/AIStatusIndicator';
-import { useAIState } from '../../shared/context/AIContext';
+import { useAIState, useAI } from '../../shared/context/AIContext';
 import { useRepository } from '../../shared/context/RepositoryContext';
 import { useToast } from '../../shared/context/ToastContext';
 import AnalysisProgress from './AnalysisProgress';
 
 export default function RepositoryIntelligencePage() {
   const { repoId } = useParams();
-  const { repo, loading: repoLoading, error: repoError } = useRepository();
+  const { repo, loading: repoLoading, error: repoError, refetchRepo } = useRepository();
   const navigate = useNavigate();
   const { addToast } = useToast();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
-  const [currentPhase, setCurrentPhase] = useState('uploading');
-  const [phaseDetails, setPhaseDetails] = useState(null);
   
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState(null);
-  const [aiData, setAiDataState] = useState(null);
-  const { aiState, reportAiError } = useAIState();
+  const { aiState } = useAIState();
 
-  // Persist aiData to localStorage so it survives page refreshes
-  const setAiData = (data) => {
-    setAiDataState(data);
-    if (data) {
-      try { localStorage.setItem(`ai_synthesis_${repoId}`, JSON.stringify(data)); } catch (_) {}
-    }
-  };
+  /**
+   * It registers the AI context hook, then extracts the IndexedDB chat history, 
+   * and then it applies the messaging state to drive the side panel UI.
+   */
+  const { 
+    messages: aiMessages, 
+    isLoading: aiLoading, 
+    error: aiError, 
+    sendMessage 
+  } = useAI({ repoId, feature: 'intelligence' });
 
-  // Restore last AI synthesis on mount
-  useEffect(() => {
-    if (!repoId) return;
-    try {
-      const cached = localStorage.getItem(`ai_synthesis_${repoId}`);
-      if (cached) setAiDataState(JSON.parse(cached));
-    } catch (_) {}
-  }, [repoId]);
+  // The latest message in the array is our synthesized summary
+  const aiData = aiMessages.length > 0 ? aiMessages[aiMessages.length - 1].content : null;
 
-
+  /**
+   * It fetches the unified intelligence object, then extracts the specific metrics, 
+   * and then it applies them to the dashboard state.
+   */
   const loadIntelligence = async (wasAnalyzing = false) => {
     setError(null);
-    setLoading(true);
     try {
       const res = await repositoryApi.getIntelligence(repoId);
-      if (res.status === 202) {
-        setCurrentPhase(res.data.phase || 'scanning_files');
-        setPhaseDetails(res.data.phaseDetails || null);
-        setTimeout(() => loadIntelligence(true), 1000);
-      } else {
-        setData(res.data.intelligence || res.data);
-        if (wasAnalyzing) {
-          setCurrentPhase('ready');
-          setTimeout(() => {
-            setLoading(false);
-          }, 1500);
-        } else {
+      setData(res.data.intelligence || res.data);
+      
+      if (wasAnalyzing) {
+        // It detects a recent extraction completion, then extracts a small delay, and then it applies it for a smooth UI transition.
+        setTimeout(() => {
           setLoading(false);
-        }
+        }, 1500);
+      } else {
+        setLoading(false);
       }
     } catch (err) {
       setError(err?.response?.data?.error || err.message);
@@ -73,30 +66,26 @@ export default function RepositoryIntelligencePage() {
     }
   };
 
-  useEffect(() => {
-    loadIntelligence();
-  }, [repoId]);
-
-  // Reload data seamlessly when the background analysis finishes and becomes ready
+  /**
+   * It observes the global repository state, then extracts the ready flag, 
+   * and then it applies the data loader automatically when the background worker finishes.
+   */
   useEffect(() => {
     if (repo?.status === 'ready') {
-      loadIntelligence();
+      loadIntelligence(repo.phase === 'ready' && loading);
     }
-  }, [repo?.status]);
+  }, [repo?.status, repoId]);
 
+  /**
+   * It triggers the AI synthesis request, then extracts the natural language insights, 
+   * and then it applies the generated overview to the IndexedDB store.
+   */
   const handleUnderstandRepository = async () => {
-    setAiLoading(true);
-    setAiError(null);
     try {
-      const res = await repositoryApi.getIntelligence(repoId, { generateAi: true });
-      setAiData(res.data.insights);
+      await sendMessage("Provide a comprehensive executive summary of this repository, including its architecture, tech stack, and overall engineering health.");
       addToast({ title: 'AI Synthesis Complete', description: 'Repository intelligence has been successfully generated.', type: 'success' });
     } catch (err) {
-      setAiError(err?.response?.data?.error || err.message || 'Failed to generate AI intelligence.');
-      addToast({ title: 'AI Generation Failed', description: err.message, type: 'error' });
-      reportAiError();
-    } finally {
-      setAiLoading(false);
+      addToast({ title: 'AI Generation Failed', description: err.message || 'Failed to synthesize data.', type: 'error' });
     }
   };
 
@@ -104,8 +93,8 @@ export default function RepositoryIntelligencePage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface text-text">
         <AnalysisProgress 
-          currentPhase={repo?.phase || currentPhase} 
-          phaseDetails={repo?.phaseDetails || phaseDetails} 
+          currentPhase={repo?.phase} 
+          phaseDetails={repo?.phaseDetails} 
         />
       </div>
     );
@@ -124,7 +113,7 @@ export default function RepositoryIntelligencePage() {
 
   if (error || repoError) {
     const errorMsg = error || repoError;
-    const isNotReady = errorMsg.toLowerCase().includes('not ready') || errorMsg.toLowerCase().includes('pending');
+    const isNotReady = errorMsg.toLowerCase().includes('not ready') || errorMsg.toLowerCase().includes('pending') || errorMsg.toLowerCase().includes('graph not available');
 
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface">
@@ -136,7 +125,6 @@ export default function RepositoryIntelligencePage() {
               onClick={async () => {
                 await repositoryApi.analyze(repoId);
                 await refetchRepo();
-                loadIntelligence(true); // Restart polling with analyzing=true
               }}
               className="px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-lg text-sm font-medium transition-colors"
             >
@@ -156,11 +144,9 @@ export default function RepositoryIntelligencePage() {
 
   return (
     <div className="flex-1 h-full w-full overflow-hidden flex flex-row bg-surface text-text">
-        {/* ── Main Content Area ──────────────────────────────────────────────── */}
         <main className="flex-1 overflow-y-auto p-6 flex flex-col gap-6 custom-scrollbar">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             
-            {/* Repository Basics */}
             <div className="bg-panel border border-border p-4 rounded flex flex-col gap-2">
               <h3 className="text-sm font-medium text-text flex items-center gap-2">
                 <FileText className="w-4 h-4 text-accent" />
@@ -182,7 +168,6 @@ export default function RepositoryIntelligencePage() {
               </div>
             </div>
 
-            {/* Architecture */}
             <div className="bg-panel border border-border p-4 rounded flex flex-col gap-2">
               <div className="flex justify-between items-center">
                 <h3 className="text-sm font-medium text-text flex items-center gap-2">
@@ -205,7 +190,6 @@ export default function RepositoryIntelligencePage() {
               </div>
             </div>
 
-            {/* Dependencies */}
             <div className="bg-panel border border-border p-4 rounded flex flex-col gap-2">
                <div className="flex justify-between items-center">
                 <h3 className="text-sm font-medium text-text flex items-center gap-2">
@@ -230,7 +214,6 @@ export default function RepositoryIntelligencePage() {
               )}
             </div>
 
-            {/* Engineering Health */}
              <div className="bg-panel border border-border p-4 rounded flex flex-col gap-2">
                <div className="flex justify-between items-center">
                 <h3 className="text-sm font-medium text-text flex items-center gap-2">
@@ -253,7 +236,6 @@ export default function RepositoryIntelligencePage() {
 
           </div>
 
-          {/* Recommended Actions */}
           <section className="bg-panel border border-border p-5 rounded mt-2">
             <h3 className="text-sm font-medium text-text mb-4 flex items-center gap-2">
               <span className="flex items-center justify-center w-5 h-5 rounded-full bg-accent/20 text-accent text-xs font-bold">!</span>
@@ -323,13 +305,12 @@ export default function RepositoryIntelligencePage() {
           </section>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
-             {/* Hotspots */}
              <section className="bg-panel border border-border p-5 rounded">
                <h3 className="text-sm font-medium text-text mb-4 flex items-center gap-2">
                  <AlertTriangle className="w-4 h-4 text-warning" />
                  Repository Hotspots
                </h3>
-               {data.hotspots.length > 0 ? (
+               {data.hotspots && data.hotspots.length > 0 ? (
                  <div className="flex flex-col gap-3">
                    {data.hotspots.slice(0, 5).map((h, i) => (
                      <div key={i} className="flex flex-col gap-1 pb-3 border-b border-white/5 last:border-0 last:pb-0">
@@ -353,7 +334,6 @@ export default function RepositoryIntelligencePage() {
                )}
              </section>
 
-             {/* Refactoring Priorities */}
              <section className="bg-panel border border-border p-5 rounded">
                <div className="flex justify-between items-center mb-4">
                   <h3 className="text-sm font-medium text-text flex items-center gap-2">
@@ -363,7 +343,7 @@ export default function RepositoryIntelligencePage() {
                   <Link to={`/explore/${repoId}/refactoring`} className="text-[10px] text-accent hover:underline">View All ({data.refactoring.candidateCount})</Link>
                </div>
                
-               {data.refactoring.topCandidates.length > 0 ? (
+               {data.refactoring.topCandidates && data.refactoring.topCandidates.length > 0 ? (
                  <div className="flex flex-col gap-3">
                    {data.refactoring.topCandidates.map((c, i) => (
                      <div key={i} className="flex flex-col gap-1 pb-3 border-b border-white/5 last:border-0 last:pb-0">
@@ -385,7 +365,6 @@ export default function RepositoryIntelligencePage() {
              </section>
           </div>
 
-          {/* ── Quick Explore Actions ────────────────────────────────────────── */}
           <section className="mt-8">
             <h3 className="text-sm font-semibold text-text mb-4 flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-accent"></span>
@@ -394,7 +373,8 @@ export default function RepositoryIntelligencePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               <button 
                 onClick={handleUnderstandRepository} 
-                className="bg-surface/30 border border-white/5 p-4 rounded hover:border-accent hover:bg-surface transition-all flex flex-col gap-2 text-left group"
+                disabled={aiLoading}
+                className="bg-surface/30 border border-white/5 p-4 rounded hover:border-accent hover:bg-surface transition-all flex flex-col gap-2 text-left group disabled:opacity-50 disabled:cursor-not-allowed"
               >
                  <div className="flex items-center gap-2 text-text font-medium group-hover:text-accent transition-colors">
                    <BookOpen className="w-4 h-4 text-accent" /> 

@@ -1,6 +1,11 @@
+/**
+ * EngineeringHealthPage.jsx
+ *
+ * It initiates the structural risk view, then extracts specific deterministic flaws, 
+ * and then it applies them into visually categorized severity cards.
+ */
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, Loader2, AlertCircle, RefreshCw, ShieldAlert, CheckCircle, LayoutDashboard, FileText, Copy, Ghost, ChevronDown, ChevronUp, Code, ArrowRight } from 'lucide-react';
-import AIStatusIndicator from '../assistant/AIStatusIndicator';
+import { Loader2, RefreshCw, ShieldAlert, Copy, Ghost, ArrowRight } from 'lucide-react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { repositoryApi } from '../../shared/api';
 import AiResponse from '../../shared/components/ai/AiResponse';
@@ -8,6 +13,10 @@ import PageHeader from '../../shared/components/PageHeader';
 import { useToast } from '../../shared/context/ToastContext';
 
 const RiskCard = ({ risk, repoId, navigate }) => {
+  /**
+   * It evaluates the risk severity string, then extracts the specific priority level, 
+   * and then it applies the corresponding Tailwind color badge.
+   */
   const getSeverityBadge = (severity) => {
     const map = {
       critical: 'bg-red-500/20 text-red-500 border border-red-500/30',
@@ -25,7 +34,7 @@ const RiskCard = ({ risk, repoId, navigate }) => {
           <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">{risk.category}</span>
         </div>
         <h3 className="text-base font-semibold text-text mb-2 line-clamp-2" title={risk.title}>{risk.title}</h3>
-        <p className="text-xs text-muted line-clamp-3 leading-relaxed flex-1">{risk.description}</p>
+        <p className="text-xs text-muted line-clamp-3 leading-relaxed flex-1">{risk.description || risk.message}</p>
         
         {risk.file && (
           <div className="mt-4 pt-4 border-t border-white/5">
@@ -71,6 +80,10 @@ const EngineeringHealthPage = () => {
     fetchData();
   }, [repoId]);
 
+  /**
+   * It triggers the risk API endpoint, then extracts the compiled engineering model, 
+   * and then it applies the data to the dashboard component state.
+   */
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -88,15 +101,6 @@ const EngineeringHealthPage = () => {
     if (score >= 70) return 'text-yellow-500';
     if (score >= 50) return 'text-orange-500';
     return 'text-red-500';
-  };
-
-  const getSeverityBadge = (severity) => {
-    const map = {
-      critical: 'bg-red-500/20 text-red-500 border border-red-500/30',
-      high: 'bg-orange-500/20 text-orange-500 border border-orange-500/30',
-      warning: 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/30'
-    };
-    return `px-2 py-0.5 rounded text-xs uppercase font-medium ${map[severity] || ''}`;
   };
 
   if (loading) {
@@ -122,6 +126,12 @@ const EngineeringHealthPage = () => {
   }
 
   const filteredRisks = model.risks.filter(r => !fileFilter || r.file === fileFilter);
+
+  // It parses the unified risk array, then extracts specific quality issues, and then it applies them to the dead code and clone lists.
+  const deadCodeFiles = model.risks.filter(r => r.title === 'Dead / Unreachable File').map(r => r.file);
+  const clonesList = model.risks
+    .filter(r => r.title === 'Structural Code Clone')
+    .map(r => ({ count: r.evidence?.count || 0, instances: r.evidence?.instances || [] }));
 
   return (
     <div className="flex h-full flex-col overflow-auto bg-surface text-text">
@@ -151,48 +161,48 @@ const EngineeringHealthPage = () => {
       <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-4">
         <div className="rounded border border-border bg-panel p-4">
           <div className="text-sm text-muted">Total Risks</div>
-          <div className="mt-1 text-2xl font-semibold">{model.metrics.totalRisks}</div>
+          <div className="mt-1 text-2xl font-semibold">{model.metrics?.totalRisks || 0}</div>
         </div>
         <div className="rounded border border-border bg-panel p-4">
           <div className="text-sm text-danger">Critical Risks</div>
-          <div className="mt-1 text-2xl font-semibold">{model.metrics.critical}</div>
+          <div className="mt-1 text-2xl font-semibold">{model.metrics?.critical || 0}</div>
         </div>
         <div className="rounded border border-border bg-panel p-4">
           <div className="text-sm text-warning">High Risks</div>
-          <div className="mt-1 text-2xl font-semibold">{model.metrics.high}</div>
+          <div className="mt-1 text-2xl font-semibold">{model.metrics?.high || 0}</div>
         </div>
         <div className="rounded border border-border bg-panel p-4">
           <div className="text-sm text-amber-400">Warnings</div>
-          <div className="mt-1 text-2xl font-semibold">{model.metrics.warning}</div>
+          <div className="mt-1 text-2xl font-semibold">{model.metrics?.warning || 0}</div>
         </div>
       </div>
 
-      {(model.deadCode?.length > 0 || model.clones?.length > 0) && (
+      {(deadCodeFiles.length > 0 || clonesList.length > 0) && (
         <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {model.deadCode?.length > 0 && (
+          {deadCodeFiles.length > 0 && (
             <div className="rounded border border-border bg-panel p-5">
               <div className="flex items-center gap-2 text-warning mb-2">
                 <Ghost className="w-5 h-5" />
-                <h3 className="font-semibold text-text">Dead / Unused Files ({model.deadCode.length})</h3>
+                <h3 className="font-semibold text-text">Dead / Unused Files ({deadCodeFiles.length})</h3>
               </div>
               <p className="text-sm text-muted mb-3">These files are never imported or called from any entry point.</p>
-              <div className="max-h-40 overflow-y-auto space-y-1">
-                {model.deadCode.map(f => (
+              <div className="max-h-40 overflow-y-auto space-y-1 custom-scrollbar">
+                {deadCodeFiles.map(f => (
                   <div key={f} className="text-xs font-mono text-muted bg-surface px-2 py-1 rounded truncate">{f}</div>
                 ))}
               </div>
             </div>
           )}
 
-          {model.clones?.length > 0 && (
+          {clonesList.length > 0 && (
             <div className="rounded border border-border bg-panel p-5">
               <div className="flex items-center gap-2 text-danger mb-2">
                 <Copy className="w-5 h-5" />
-                <h3 className="font-semibold text-text">Structural Code Clones ({model.clones.length})</h3>
+                <h3 className="font-semibold text-text">Structural Code Clones ({clonesList.length})</h3>
               </div>
               <p className="text-sm text-muted mb-3">These function groups have identical logical structures across the codebase.</p>
-              <div className="max-h-40 overflow-y-auto space-y-3">
-                {model.clones.slice(0, 5).map((c, i) => (
+              <div className="max-h-40 overflow-y-auto space-y-3 custom-scrollbar">
+                {clonesList.slice(0, 5).map((c, i) => (
                   <div key={i} className="text-sm bg-surface p-2 rounded">
                     <div className="text-text font-medium mb-1">Clone Group {i + 1} (Copied {c.count} times)</div>
                     {c.instances.map((inst, idx) => (

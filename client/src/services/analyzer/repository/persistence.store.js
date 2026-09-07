@@ -1,10 +1,18 @@
+/**
+ * persistence.store.js
+ *
+ * It initiates the browser's native IndexedDB, then extracts asynchronous data layers, 
+ * and then it applies CRUD operations to persist repository ASTs entirely client-side.
+ */
+
 import { openDB } from 'idb';
 
 const DB_NAME = 'CodeLensDB';
-const DB_VERSION = 3; // Bumped for 'chatSessions' store
+const DB_VERSION = 3; 
 
 /**
- * Initialize IndexedDB.
+ * It requests an IndexedDB connection, then extracts object store requirements, 
+ * and then it applies version-safe schema upgrades.
  */
 export async function getDB() {
   return openDB(DB_NAME, DB_VERSION, {
@@ -22,7 +30,6 @@ export async function getDB() {
         db.createObjectStore('chatSessions', { keyPath: ['repoId', 'feature'] });
       }
       
-      // Migration from version 1 to 2: Split analysis out of 'repos' store
       if (oldVersion < 2 && db.objectStoreNames.contains('repos')) {
         const repoStore = transaction.objectStore('repos');
         const analysisStore = transaction.objectStore('analysis');
@@ -42,11 +49,11 @@ export async function getDB() {
 }
 
 /**
- * Save the meta information of a repository record.
+ * It reads the overarching record, then extracts lightweight metadata, 
+ * and then it applies a storage put operation to save status flags.
  */
 export async function saveMeta(record) {
   const db = await getDB();
-  // Extract only meta fields, excluding analysis and chats
   const meta = {
     id: record.id,
     name: record.name,
@@ -66,7 +73,8 @@ export async function saveMeta(record) {
 }
 
 /**
- * Save the analysis result for a repository.
+ * It checks for analysis payloads, then extracts the AST JSON, 
+ * and then it applies it to the dedicated analysis storage table.
  */
 export async function saveAnalysis(record) {
   if (!record.analysis) return;
@@ -78,7 +86,8 @@ export async function saveAnalysis(record) {
 }
 
 /**
- * Save both meta and analysis.
+ * It intercepts save calls, then extracts meta and analysis fragments, 
+ * and then it applies them sequentially to the database.
  */
 export async function save(record) {
   await saveMeta(record);
@@ -86,7 +95,8 @@ export async function save(record) {
 }
 
 /**
- * Load a single repository record from IDB.
+ * It targets a specific repository ID, then extracts the metadata and heavy AST payload, 
+ * and then it applies a unified object reconstruction.
  */
 export async function load(id) {
   const db = await getDB();
@@ -101,7 +111,8 @@ export async function load(id) {
 }
 
 /**
- * Load all repository records.
+ * It queries the repos table, then extracts all stored configurations, 
+ * and then it applies a flat array return.
  */
 export async function loadAll() {
   const db = await getDB();
@@ -109,22 +120,20 @@ export async function loadAll() {
 }
 
 /**
- * Remove a repository and all its files from IDB.
+ * It initiates multiple write transactions, then extracts matching keys across all stores, 
+ * and then it applies deletion commands to wipe a repository cleanly.
  */
 export async function remove(id) {
   const db = await getDB();
   
-  // Remove repo metadata
   const txRepos = db.transaction('repos', 'readwrite');
   await txRepos.objectStore('repos').delete(id);
   await txRepos.done;
   
-  // Remove analysis
   const txAnalysis = db.transaction('analysis', 'readwrite');
   await txAnalysis.objectStore('analysis').delete(id);
   await txAnalysis.done;
   
-  // Remove associated files
   const txFiles = db.transaction('files', 'readwrite');
   const store = txFiles.objectStore('files');
   let cursor = await store.openCursor();
@@ -138,7 +147,8 @@ export async function remove(id) {
 }
 
 /**
- * Remove only the analysis data for a repo.
+ * It targets the analysis store, then extracts the specified ID payload, 
+ * and then it applies deletion to clear large AST data without losing metadata.
  */
 export async function removeAnalysis(id) {
   const db = await getDB();
@@ -151,7 +161,8 @@ export async function removeAnalysis(id) {
 // ── File Storage API ──────────────────────────────────────────────────────────
 
 /**
- * Save a file to the virtual file system.
+ * It receives source code, then extracts the repository and file path bounds, 
+ * and then it applies an IndexedDB insertion for the virtual file system.
  */
 export async function saveFile(repoId, filePath, content) {
   const db = await getDB();
@@ -159,7 +170,8 @@ export async function saveFile(repoId, filePath, content) {
 }
 
 /**
- * Load a file from the virtual file system.
+ * It queries the file store, then extracts the specific text buffer, 
+ * and then it applies a string return or null fallback.
  */
 export async function loadFile(repoId, filePath) {
   const db = await getDB();
@@ -168,8 +180,8 @@ export async function loadFile(repoId, filePath) {
 }
 
 /**
- * Load all files for a given repository.
- * Returns an array of { repoId, filePath, content }.
+ * It accesses the files table, then extracts all records matching the repoId, 
+ * and then it applies them into a complete source code array.
  */
 export async function loadAllFiles(repoId) {
   const db = await getDB();
@@ -187,8 +199,8 @@ export async function loadAllFiles(repoId) {
 }
 
 /**
- * List all file paths for a given repository (without loading content).
- * Returns an array of strings (file paths).
+ * It traverses the file cursor, then extracts just the file path string keys, 
+ * and then it applies them to a lightweight directory manifest.
  */
 export async function listFilePaths(repoId) {
   const db = await getDB();

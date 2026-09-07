@@ -1,3 +1,9 @@
+/**
+ * DependencyGraphPage.jsx
+ *
+ * It initiates the React Flow layout engine, then extracts the node positions, 
+ * and then it applies interactivity for exploring the architectural dependency graph.
+ */
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import ReactFlow, { Background, Controls, MiniMap, useNodesState, useEdgesState } from 'reactflow';
@@ -12,7 +18,7 @@ import ContextBreadcrumbs from '../../shared/components/ContextBreadcrumbs';
 // Import abstractions
 import { graphToFlow, couplingColor, NODE_W, NODE_H } from './graphUtils';
 import { nodeTypes, edgeTypes } from './GraphNodes';
-import { StatRow, FileDetailPanel, PackageDetailPanel } from './GraphSidebar';
+import { StatRow, FileDetailPanel, PackageDetailPanel } from './GraphSideBar';
 
 const LAYOUT_OPTIONS = [
   { key: 'clustered', label: 'Clustered', icon: LayoutGrid, tip: 'Group files by directory into visual clusters' },
@@ -33,7 +39,6 @@ export default function DependencyGraphPage() {
   const [infoLoading, setInfoLoading] = useState(false);
   const [showExternalPackages, setShowExternalPackages] = useState(false);
   
-  // New State for controlling Force Layout spread
   const [spread, setSpread] = useState(50);
   
   const layoutType = searchParams.get('layout') || 'clustered';
@@ -51,6 +56,10 @@ export default function DependencyGraphPage() {
 
   const simRef = useRef(null);
 
+  /**
+   * It requests the dependency graph, then extracts the mapped arrays from the store, 
+   * and then it applies them to the component state safely.
+   */
   const loadGraph = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -66,6 +75,10 @@ export default function DependencyGraphPage() {
 
   useEffect(() => { loadGraph(); }, [loadGraph]);
 
+  /**
+   * It tracks the repository status flag, then extracts the ongoing analysis state, 
+   * and then it applies an automatic polling sequence until the graph finishes.
+   */
   useEffect(() => {
     let timer;
     if (graph?.status === 'analyzing') {
@@ -74,16 +87,18 @@ export default function DependencyGraphPage() {
     return () => clearTimeout(timer);
   }, [graph, loadGraph]);
 
-  // Main graph builder
+  /**
+   * It observes the layout dependencies, then extracts the structural positioning array, 
+   * and then it applies the nodes and edges to the React Flow instance.
+   */
   useEffect(() => {
-    if (!graph) return;
+    if (!graph?.nodes) return;
     
     const { rfNodes, rfEdges, dirColorMap: dcm } = graphToFlow(graph, selected, showExternalPackages, layoutType);
     setDirColorMap(dcm || new Map());
     
     if (layoutType === 'force') {
       if (simRef.current) {
-        // If sim exists, just update ReactFlow node styles/colors without destroying physics
         setNodes(currentNodes => {
            return currentNodes.map(cn => {
              const updated = rfNodes.find(n => n.id === cn.id);
@@ -103,7 +118,6 @@ export default function DependencyGraphPage() {
         .filter(e => nodeIndex.has(e.source) && nodeIndex.has(e.target))
         .map(e => ({ source: nodeIndex.get(e.source), target: nodeIndex.get(e.target) }));
 
-      // Initialize Simulation (initial parameters will immediately be tuned by the spread useEffect below)
       simRef.current = forceSimulation(simNodes)
         .force('charge', forceManyBody())
         .force('link', forceLink(simEdges))
@@ -138,13 +152,15 @@ export default function DependencyGraphPage() {
 
   }, [graph, selected, showExternalPackages, layoutType]);
 
-  // LIVE PHYSICS UPDATE: Reacts to spread slider dynamically
+  /**
+   * It monitors the slider value, then extracts gravity and repulsion multipliers, 
+   * and then it applies them to the dynamic d3-force physics engine.
+   */
   useEffect(() => {
     if (layoutType === 'force' && simRef.current) {
-      // Scale 0-100 to actual physics parameters
-      const chargeStrength = -50 - (spread * 15);      // Repulsion: -50 (tight) to -1550 (loose)
-      const gravityStrength = 0.15 - (spread * 0.0013); // Gravity: 0.15 (strong center) to 0.02 (drift)
-      const linkDist = 30 + (spread * 2);               // Spring dist: 30 to 230
+      const chargeStrength = -50 - (spread * 15);      
+      const gravityStrength = 0.15 - (spread * 0.0013); 
+      const linkDist = 30 + (spread * 2);              
 
       simRef.current.force('charge', forceManyBody().strength(chargeStrength));
       simRef.current.force('x', forceX(0).strength(gravityStrength));
@@ -153,7 +169,6 @@ export default function DependencyGraphPage() {
       const linkForce = simRef.current.force('link');
       if (linkForce) linkForce.distance(linkDist).strength(0.8);
 
-      // Give the physics engine a gentle nudge to settle into the new parameters
       simRef.current.alpha(0.3).restart();
     }
   }, [spread, layoutType]);
@@ -195,12 +210,16 @@ export default function DependencyGraphPage() {
     }
   }, [layoutType]);
 
+  /**
+   * It catches node clicks, then extracts the specific file identifier, 
+   * and then it applies a secondary API fetch to load detailed sidebar statistics.
+   */
   const onNodeClick = useCallback(async (_ev, rfNode) => {
     if (rfNode.type === 'group') return;
     const nodeId = rfNode.id;
     setSelected(prev => prev === nodeId ? null : nodeId); 
 
-    if (rfNode.data.nodeType !== 'file') {
+    if (rfNode.data.nodeType !== 'fileNode' && rfNode.data.nodeType !== 'file') {
       setFileInfo(null);
       return;
     }
@@ -231,7 +250,7 @@ export default function DependencyGraphPage() {
       edges:      graph.meta.totalEdges,
       unresolved: graph.meta.unresolvedImports,
       cycles:     graph.cycles?.length ?? 0,
-      isolated:   graph.isolatedFiles?.length ?? 0,
+      isolated:   graph.nodes.filter(n => n.type === 'fileNode' && n.data?.isIsolated).length ?? 0,
     };
   }, [graph]);
 
@@ -323,7 +342,6 @@ export default function DependencyGraphPage() {
                   ))}
                 </div>
                 
-                {/* User-controllable spread slider, visible only in force layout */}
                 {layoutType === 'force' && (
                   <div className="mt-4 p-2 bg-surface/50 border border-border/50 rounded flex flex-col gap-2">
                     <div className="flex justify-between items-center">
@@ -351,17 +369,18 @@ export default function DependencyGraphPage() {
                     <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${showExternalPackages ? 'translate-x-4' : 'translate-x-0'} border`} />
                   </button>
                 </div>
-                <p className="text-muted mt-1" style={{ fontSize: 10 }}>Show npm packages as nodes</p>
+                <p className="text-muted mt-1" style={{ fontSize: 10 }}>Show npm/system packages</p>
               </section>
 
+              {/* Reverted back to Directories map */}
               {layoutType === 'clustered' && dirColorMap.size > 0 && (
                 <section className="border-t border-border pt-3">
                   <p className="text-muted uppercase tracking-wider mb-2">Directories</p>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-1.5">
                     {[...dirColorMap.entries()].map(([dir, color]) => (
                       <div key={dir} className="flex items-center gap-2">
-                        <span style={{ width: 8, height: 8, borderRadius: 2, background: color, display: 'inline-block', flexShrink: 0 }} />
-                        <span className="truncate text-muted" title={dir}>{dir.split('/').pop() || dir}</span>
+                        <span style={{ width: 10, height: 10, borderRadius: 3, background: color, display: 'inline-block', flexShrink: 0 }} />
+                        <span className="truncate text-muted font-medium">{dir.split('/').pop() || dir}</span>
                       </div>
                     ))}
                   </div>
@@ -378,7 +397,7 @@ export default function DependencyGraphPage() {
                 <div className="flex justify-between text-muted" style={{ fontSize: 9 }}>
                   <span>Low</span><span>High</span>
                 </div>
-                <p className="text-muted mt-1" style={{ fontSize: 10 }}>Node color = total connections (in + out)</p>
+                <p className="text-muted mt-1" style={{ fontSize: 10 }}>Node color = total connections</p>
               </section>
             </div>
           )

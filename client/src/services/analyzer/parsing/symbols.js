@@ -1,40 +1,17 @@
 /**
  * symbols.js
  *
- * Canonical internal data model for all symbols extracted from source files.
+ * Canonical internal data model for all symbols and static analysis findings 
+ * extracted from source files.
  *
  * This module contains only factory functions and constants — no parsing
- * logic.  It is the single source of truth for what every symbol looks like
- * in memory.  Both the parsers (JavaScript, TypeScript) and any future
- * consumer (dependency graph, AI context builder, etc.) depend on this
- * module rather than on each other.
- *
- * ── Symbol types ──────────────────────────────────────────────────────────────
- *
- *   function      — named function declaration:  function foo() {}
- *   arrow         — arrow function assigned to a variable: const foo = () => {}
- *   class         — class declaration or expression
- *   method        — method inside a class body
- *   import        — import statement (ES module or CommonJS require)
- *   export        — export statement (named, default, re-export)
- *
- * ── Location ──────────────────────────────────────────────────────────────────
- *
- *   All symbols carry a `location` object with:
- *     startLine   (1-based)
- *     startColumn (0-based)
- *     endLine     (1-based)
- *     endColumn   (0-based)
- *
- *   tree-sitter uses 0-based rows; we convert to 1-based lines on extraction
- *   so that line numbers match what developers see in editors.
+ * logic. It is the single source of truth for what every symbol, finding, 
+ * graph node, and repository payload looks like in memory.
  */
-
-'use strict';
 
 // ── Symbol type constants ─────────────────────────────────────────────────────
 
-const SymbolKind = Object.freeze({
+export const SymbolKind = Object.freeze({
   FUNCTION: 'function',
   ARROW:    'arrow',
   CLASS:    'class',
@@ -56,9 +33,8 @@ const SymbolKind = Object.freeze({
  * Converts tree-sitter's 0-based row to 1-based line numbers.
  *
  * @param {object} node  — tree-sitter SyntaxNode
- * @returns {Location}
  */
-function locationFromNode(node) {
+export function locationFromNode(node) {
   return {
     startLine:   node.startPosition.row + 1,
     startColumn: node.startPosition.column,
@@ -67,221 +43,59 @@ function locationFromNode(node) {
   };
 }
 
-// ── Symbol factories ──────────────────────────────────────────────────────────
+// ── AST Symbol Factories ──────────────────────────────────────────────────────
 
-/**
- * FunctionSymbol
- *
- * Represents a named function declaration.
- *
- * Fields:
- *   kind       {string}   always 'function'
- *   name       {string}   function name
- *   async      {boolean}  true if declared with async keyword
- *   generator  {boolean}  true if declared with * (generator function)
- *   params     {string[]} parameter names (best-effort; complex patterns become '_')
- *   location   {Location}
- *
- * @param {object} opts
- * @returns {FunctionSymbol}
- *
- * @example
- *   { kind:'function', name:'greet', async:false, generator:false,
- *     params:['name'], location:{ startLine:3, startColumn:0, endLine:5, endColumn:1 } }
- */
-function createFunction({ name, async: isAsync = false, generator = false, params = [], location, complexity = 1, hash = null }) {
+export function createFunction({ name, async: isAsync = false, generator = false, params = [], location, complexity = 1, hash = null }) {
   return { kind: SymbolKind.FUNCTION, name, async: isAsync, generator, params, location, complexity, hash };
 }
 
-/**
- * ArrowSymbol
- *
- * Represents an arrow function assigned to a variable:
- *   const greet = (name) => { ... }
- *   export const add = (a, b) => a + b;
- *
- * Fields:
- *   kind       {string}   always 'arrow'
- *   name       {string}   name of the variable being assigned to
- *   async      {boolean}
- *   params     {string[]}
- *   location   {Location}
- *
- * @param {object} opts
- * @returns {ArrowSymbol}
- */
-function createArrow({ name, async: isAsync = false, params = [], location, complexity = 1, hash = null }) {
+export function createArrow({ name, async: isAsync = false, params = [], location, complexity = 1, hash = null }) {
   return { kind: SymbolKind.ARROW, name, async: isAsync, params, location, complexity, hash };
 }
 
-/**
- * ClassSymbol
- *
- * Fields:
- *   kind        {string}    always 'class'
- *   name        {string}    class name (or '<anonymous>' for anonymous classes)
- *   superClass  {string|null}  name of extended class, or null
- *   location    {Location}
- *
- * @param {object} opts
- * @returns {ClassSymbol}
- */
-function createClass({ name, superClass = null, location }) {
+export function createClass({ name, superClass = null, location }) {
   return { kind: SymbolKind.CLASS, name, superClass, location };
 }
 
-/**
- * MethodSymbol
- *
- * A method inside a class body.
- *
- * Fields:
- *   kind        {string}   always 'method'
- *   name        {string}   method name
- *   className   {string}   name of the containing class
- *   static      {boolean}  true for static methods
- *   async       {boolean}
- *   generator   {boolean}
- *   visibility  {string}   'public' | 'private' | 'protected' (TS only; default 'public')
- *   params      {string[]}
- *   location    {Location}
- *
- * @param {object} opts
- * @returns {MethodSymbol}
- */
-function createMethod({ name, className, static: isStatic = false, async: isAsync = false,
-                        generator = false, visibility = 'public', params = [], location, decorators = [], complexity = 1, hash = null }) {
+export function createMethod({ name, className, static: isStatic = false, async: isAsync = false,
+                               generator = false, visibility = 'public', params = [], location, decorators = [], complexity = 1, hash = null }) {
   return { kind: SymbolKind.METHOD, name, className, static: isStatic,
            async: isAsync, generator, visibility, params, location, decorators, complexity, hash };
 }
 
-/**
- * InterfaceSymbol
- */
-function createInterface({ name, location }) {
+export function createInterface({ name, location }) {
   return { kind: SymbolKind.INTERFACE, name, location };
 }
 
-/**
- * StructSymbol
- */
-function createStruct({ name, location }) {
+export function createStruct({ name, location }) {
   return { kind: SymbolKind.STRUCT, name, location };
 }
 
-/**
- * NamespaceSymbol
- */
-function createNamespace({ name, location }) {
+export function createNamespace({ name, location }) {
   return { kind: SymbolKind.NAMESPACE, name, location };
 }
 
-/**
- * PackageSymbol
- */
-function createPackage({ name, location }) {
+export function createPackage({ name, location }) {
   return { kind: SymbolKind.PACKAGE, name, location };
 }
 
-/**
- * ConstructorSymbol
- */
-function createConstructor({ className, params = [], visibility = 'public', location }) {
+export function createConstructor({ className, params = [], visibility = 'public', location }) {
   return { kind: SymbolKind.CONSTRUCTOR, name: 'constructor', className, params, visibility, location };
 }
 
-/**
- * VariableSymbol
- */
-function createVariable({ name, location }) {
+export function createVariable({ name, location }) {
   return { kind: SymbolKind.VARIABLE, name, location };
 }
 
-/**
- * ImportSymbol
- *
- * Represents an import statement.
- *
- * Fields:
- *   kind         {string}    always 'import'
- *   source       {string}    module specifier, e.g. './auth', 'express'
- *   specifiers   {ImportSpecifier[]}
- *     Each specifier: { name: string, alias: string|null, type: 'default'|'named'|'namespace'|'side-effect' }
- *   location     {Location}
- *
- * @example
- *   import fs from 'fs'
- *   → specifiers: [{ name:'fs', alias:null, type:'default' }]
- *
- *   import { readFile as rf, writeFile } from 'fs'
- *   → specifiers: [
- *       { name:'readFile', alias:'rf', type:'named' },
- *       { name:'writeFile', alias:null, type:'named' },
- *     ]
- *
- *   import * as path from 'path'
- *   → specifiers: [{ name:'path', alias:null, type:'namespace' }]
- *
- *   import 'dotenv/config'
- *   → specifiers: [{ name:'dotenv/config', alias:null, type:'side-effect' }]
- *
- * @param {object} opts
- * @returns {ImportSymbol}
- */
-function createImport({ source, specifiers = [], location }) {
+export function createImport({ source, specifiers = [], location }) {
   return { kind: SymbolKind.IMPORT, source, specifiers, location };
 }
 
-/**
- * ExportSymbol
- *
- * Fields:
- *   kind      {string}         always 'export'
- *   exportType {string}        'named' | 'default' | 'reexport'
- *   name      {string|null}    exported name (null for default exports of expressions)
- *   source    {string|null}    source module for re-exports, e.g. './utils'
- *   location  {Location}
- *
- * @example
- *   export function greet() {}
- *   → { exportType:'named', name:'greet', source:null }
- *
- *   export default greet
- *   → { exportType:'default', name:'greet', source:null }
- *
- *   export { foo, bar } from '../../analyzers/utils'
- *   → { exportType:'reexport', name:'foo', source:'./utils' }
- *      { exportType:'reexport', name:'bar', source:'./utils' }
- *
- * @param {object} opts
- * @returns {ExportSymbol}
- */
-function createExport({ exportType, name = null, source = null, location }) {
+export function createExport({ exportType, name = null, source = null, location }) {
   return { kind: SymbolKind.EXPORT, exportType, name, source, location };
 }
 
-// ── FileAnalysis factory ──────────────────────────────────────────────────────
-
-/**
- * FileAnalysis
- *
- * The complete analysis result for a single source file.
- *
- * Fields:
- *   filePath    {string}     relative path within the repository
- *   language    {string}     detected language, e.g. 'javascript'
- *   lineCount   {number}     number of lines in the file
- *   symbols     {Symbol[]}   all extracted symbols in source order
- *   hasErrors   {boolean}    true if the tree-sitter parse produced errors
- *                            (file was still analysed as best-effort)
- *   error       {string|null} non-null only if analysis was completely aborted
- *                             (e.g. file read failed, unrecoverable parse crash)
- *   analyzedAt  {string}     ISO timestamp
- *
- * @param {object} opts
- * @returns {FileAnalysis}
- */
-function createFileAnalysis({ filePath, language, lineCount = 0, symbols = [], hasErrors = false, error = null }) {
+export function createFileAnalysis({ filePath, language, lineCount = 0, symbols = [], hasErrors = false, error = null }) {
   return {
     filePath,
     language,
@@ -293,20 +107,54 @@ function createFileAnalysis({ filePath, language, lineCount = 0, symbols = [], h
   };
 }
 
-export {
-  SymbolKind,
-  locationFromNode,
-  createFunction,
-  createArrow,
-  createClass,
-  createMethod,
-  createImport,
-  createExport,
-  createInterface,
-  createStruct,
-  createNamespace,
-  createPackage,
-  createConstructor,
-  createVariable,
-  createFileAnalysis,
-};
+// ── Static Analysis Factories (CodeLens Native Types) ───────────────────────
+
+/**
+ * Creates a standard analysis finding for Monaco Editor markers and Dashboard cards.
+ */
+export function createAnalysisFinding({ id, analyzerId, ruleId, category, severity, title, message, filePath, range, metrics = {}, suggestedAction = null }) {
+  return { id, analyzerId, ruleId, category, severity, title, message, filePath, range, metrics, suggestedAction };
+}
+
+/**
+ * Creates a React Flow compatible Node for Dependency and Architecture graphing.
+ */
+export function createAnalysisNode({ id, type = 'fileNode', position = { x: 0, y: 0 }, label, filePath = null, layer = 'unknown', healthScore = 100, metrics = { inDegree: 0, outDegree: 0, loc: 0, complexity: 0 }, findingsCount = { critical: 0, warning: 0 } }) {
+  return {
+    id,
+    type,
+    position,
+    data: { label, filePath, layer, healthScore, metrics, findingsCount }
+  };
+}
+
+/**
+ * Creates a React Flow compatible Edge for Dependency Graphing.
+ */
+export function createAnalysisEdge({ id, source, target, type = 'default', animated = false, importCount = 1, isCircular = false, specifiers = [] }) {
+  return {
+    id,
+    source,
+    target,
+    type,
+    animated,
+    data: { importCount, isCircular, specifiers }
+  };
+}
+
+/**
+ * Initializes the master payload structure used by the Frontend UI and IBM watsonx Proxy.
+ */
+export function createRepositoryIntelligencePayload({ repoId, fingerprint, totalFiles = 0, totalLinesOfCode = 0, languages = {} }) {
+  return {
+    repository: { repoId, fingerprint, totalFiles, totalLinesOfCode, languages },
+    summary: { healthScore: 100, riskScore: 0, totalFindings: 0, criticalIssuesCount: 0 },
+    domains: {
+      complexity: { files: [], findings: [] },
+      dependencies: { graph: { nodes: [], edges: [] }, circularDependencies: [], findings: [] },
+      clones: { cloneGroups: [], findings: [] },
+      architecture: { layers: [], boundaryViolations: [] },
+      reachability: { entrypoints: [], unreachableFiles: [], unusedExports: [] }
+    }
+  };
+}

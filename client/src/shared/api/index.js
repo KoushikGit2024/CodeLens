@@ -1,3 +1,9 @@
+/**
+ * index.js (API Bridge)
+ *
+ * It intercepts frontend data requests, then extracts local IndexedDB payloads, 
+ * and then it applies them to the UI or proxies prompts to the Watsonx backend.
+ */
 import axios from 'axios';
 import JSZip from 'jszip';
 import { v4 as uuidv4 } from 'uuid';
@@ -14,16 +20,15 @@ import { buildQuestionContext } from '../../services/analyzer/advanced/question.
 import { buildPrompt } from '../../services/analyzer/advanced/base.context.js';
 import { buildOverviewContext, buildModuleContext, buildOverviewPrompt, buildModulePrompt } from '../../services/analyzer/advanced/documentation.context.js';
 
-// We can still keep an api instance for any true backend calls (like health checks or LLM proxied calls)
+// It initiates the axios instance, then extracts the base configuration, and then it applies a timeout for LLM proxy calls.
 const api = axios.create({
   baseURL: '/api',
   timeout: 60_000,
 });
 
 /**
- * Builds a nested file tree from a flat array of file paths.
- * Expected output structure matches backend buildFileTree:
- * [{ type: 'directory', name: 'src', path: 'src', children: [...] }, { type: 'file', name: 'index.js', path: 'index.js' }]
+ * It iterates over flat file paths, then extracts their directory segments, 
+ * and then it applies nested object creation to build a hierarchical UI tree.
  */
 function buildFileTreeFromPaths(paths) {
   const root = { type: 'directory', name: 'root', path: '', children: [] };
@@ -62,23 +67,25 @@ function buildFileTreeFromPaths(paths) {
 
 // ── Offline-First API Client ──────────────────────────────────────────────────
 export const repositoryApi = {
-  /** List all uploaded repositories */
+  /**
+   * It queries the IndexedDB store, then extracts all saved repository records, 
+   * and then it applies a descending chronological sort for the dashboard.
+   */
   async listAll() {
     const repos = await repositoryStore.getAll();
-    // Sort descending by uploadedAt
     repos.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
-    
-    // Mimic axios response shape
     return { data: repos };
   },
 
-  /** Upload a ZIP file. Returns { id, name, status } */
+  /**
+   * It receives the ZIP file, then extracts its uncompressed text contents, 
+   * and then it applies them to the local virtual file system before triggering the Web Worker.
+   */
   async upload(file, options = {}, onProgress = () => {}) {
     const repoId = uuidv4();
     const repoName = file.name.replace(/\.zip$/i, '');
     
-    // 1. Mark as extracting
-    onProgress({ loaded: 10, total: 100 }); // Fake progress for parsing
+    onProgress({ loaded: 10, total: 100 });
     
     const record = {
       id: repoId,
@@ -91,7 +98,6 @@ export const repositoryApi = {
     await repositoryStore.set(repoId, record);
     
     try {
-      // 2. Unzip using JSZip
       const zip = await JSZip.loadAsync(file);
       const files = Object.keys(zip.files).filter(name => !zip.files[name].dir);
       
@@ -101,7 +107,6 @@ export const repositoryApi = {
       
       let processedCount = 0;
       for (const filePath of files) {
-        // Default directories to ignore (exact match of a path segment)
         const defaultIgnores = ['.git', 'node_modules', 'dist', 'build', 'coverage', '.next', 'out'];
         const pathSegments = filePath.split('/');
         const shouldIgnore = ignorePatterns.some(p => filePath.includes(p)) || 
@@ -126,14 +131,10 @@ export const repositoryApi = {
         }
       }
       
-      // 3. Kick off Web Worker Analysis (non-blocking)
-      // The startAnalysis call resolves when complete. We don't await it here so the UI returns early
-      // just like the backend controller does.
       startAnalysis(repoId, options).catch(err => {
         console.error('Background analysis failed:', err);
       });
       
-      // Respond immediately — client polls GET /:id for status
       return { data: { id: repoId, name: repoName, status: 'analyzing' } };
       
     } catch (err) {
@@ -143,14 +144,12 @@ export const repositoryApi = {
     }
   },
 
-  /** Get repository record by id */
   async get(id) {
     const record = await repositoryStore.get(id);
     if (!record) throw new Error('Repository not found');
     return { data: record };
   },
 
-  /** Re-run analysis on an existing repository */
   async reanalyze(id, options = {}) {
     const record = await repositoryStore.get(id);
     if (!record) throw new Error('Repository not found');
@@ -165,7 +164,6 @@ export const repositoryApi = {
     return { data: { id, status: 'analyzing' } };
   },
 
-  /** Batch manage repositories (delete or clear analysis) */
   async batchManage(ids, action) {
     if (action === 'delete') {
       for (const id of ids) {
@@ -179,7 +177,10 @@ export const repositoryApi = {
     return { data: { success: true } };
   },
 
-  /** Get file tree */
+  /**
+   * It requests the file manifest, then extracts the absolute path keys, 
+   * and then it applies the tree builder to return a navigatable UI object.
+   */
   async listFiles(id) {
     const record = await repositoryStore.get(id);
     if (!record) throw new Error('Repository not found');
@@ -190,50 +191,47 @@ export const repositoryApi = {
     return { data: { id: record.id, name: record.name, tree } };
   },
 
-  /** Get a single file's content */
+  /**
+   * It queries the IndexedDB files store, then extracts the string buffer, 
+   * and then it applies a language mapping heuristic for the Monaco editor.
+   */
   async getFile(id, filePath) {
     const content = await persistenceStore.loadFile(id, filePath);
     if (content === null) throw new Error('File not found');
 
-    // Derive language from file extension so the Monaco editor gets the right
-    // syntax highlighter. This mirrors what the server-side getFile endpoint
-    // returned as the `language` field that ExplorerPage destructures.
     const ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase();
     const EXT_TO_LANG = {
       '.js': 'javascript', '.mjs': 'javascript', '.cjs': 'javascript', '.jsx': 'javascript',
       '.ts': 'typescript', '.tsx': 'typescript', '.mts': 'typescript', '.cts': 'typescript',
       '.py': 'python', '.java': 'java',
       '.cpp': 'cpp', '.cc': 'cpp', '.cxx': 'cpp', '.h': 'cpp', '.hpp': 'cpp',
+      '.go': 'go', '.rs': 'rust', '.c': 'c',
       '.json': 'json', '.md': 'markdown', '.css': 'css',
       '.html': 'html', '.htm': 'html', '.xml': 'xml',
       '.yaml': 'yaml', '.yml': 'yaml', '.sh': 'shell', '.env': 'ini',
     };
     const language = EXT_TO_LANG[ext] || 'plaintext';
 
-    // ExplorerPage destructures { content, language } from fileRes.value.data
     return { data: { content, language } };
   },
 
-  /** Get full dependency graph */
   async getDependencyGraph(id) {
     const record = await repositoryStore.get(id);
-    if (!record || !record.analysis || !record.analysis.graph) {
-      throw new Error('Graph not available');
-    }
+    if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
     return { data: record.analysis.graph };
   },
 
-  /** Get dependency info for a single file */
+  /**
+   * It resolves a single file node, then extracts its incoming and outgoing edges, 
+   * and then it applies structural mapping to return isolated dependency info.
+   */
   async getFileDependencyInfo(id, filePath) {
     const record = await repositoryStore.get(id);
-    if (!record || !record.analysis || !record.analysis.graph) {
-      throw new Error('Graph not available');
-    }
+    if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
+    
     const graph = record.analysis.graph;
-    // Map file path to 'file:path' ID format
     const nodeId = `file:${filePath}`;
     
-    // Emulate getFileDependencies logic
     const dependencies = graph.edges
       .filter(e => e.source === nodeId)
       .map(e => {
@@ -260,7 +258,6 @@ export const repositoryApi = {
       
     const externalPackages = [...new Set(dependencies.filter(d => d.package).map(d => d.package))];
 
-    // Compute Health metrics for this specific file
     const architecture = buildArchitectureModel(record.analysis, graph);
     const engineeringHealth = buildEngineeringRiskModel(record.analysis, graph, architecture);
     
@@ -289,16 +286,14 @@ export const repositoryApi = {
     };
   },
 
-  // ── Offline Advanced Intelligence Endpoints ──────────────────────────────────
   async getArchitecture(id, options = {}) {
     const record = await repositoryStore.get(id);
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
     const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
-    
     const health = buildEngineeringRiskModel(record.analysis, record.analysis.graph, architecture);
 
-    architecture.components.forEach(comp => {
-      const compRisks = health.risks.filter(r => comp.files.includes(r.file) || (r.category === 'ARCHITECTURE' && r.evidence?.component === comp.name));
+    architecture.layers.forEach(comp => {
+      const compRisks = health.risks.filter(r => comp.data.files?.includes(r.file) || (r.category === 'ARCHITECTURE' && r.evidence?.component === comp.data.label));
       
       let severity = 'healthy';
       if (compRisks.some(r => r.severity === 'critical')) severity = 'critical';
@@ -311,17 +306,23 @@ export const repositoryApi = {
       };
     });
     
-    if (options.generateAi) {
-      // Stub: in reality we would POST the computed context to Watsonx
-      // For now, we will return the deterministic model
-      return { data: { model: architecture } };
-    }
-    return { data: { model: architecture } };
+    // Normalize shape: ArchitecturePage expects { components, relations, violations }
+    // but buildArchitectureModel returns { layers, boundaryViolations, ... }
+    const model = {
+      components: architecture.layers || [],
+      relations: architecture.uniqueRelations || [],
+      violations: architecture.boundaryViolations || [],
+      apiBoundaries: architecture.apiBoundaries || [],
+      entryPoints: architecture.entryPoints || [],
+    };
+
+    return { data: { model } };
   },
 
   async getIntelligence(repoId, options = {}) {
     const record = await repositoryStore.get(repoId);
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
+    
     const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
     const intelligence = buildRepositoryIntelligence(record.analysis, record.analysis.graph, architecture);
 
@@ -331,14 +332,13 @@ export const repositoryApi = {
         .map(([l, n]) => `${l} (${n} files)`).join(', ');
 
       const hotspotList = (intelligence.hotspots || []).slice(0, 5)
-        .map(h => `  - ${h.file} (hotspot score: ${h.score})`).join('\n');
+        .map(h => `  - ${h.filePath} (hotspot score: ${h.score})`).join('\n');
 
       const topCandidates = (intelligence.refactoring.topCandidates || [])
         .map(c => `  - ${c.title} [${c.priority}]`).join('\n');
 
       const prompt = `You are CodeLens, a senior software architect and code intelligence assistant.
 Analyze the following deterministic repository metrics and produce a clear, concise, high-level overview.
-Be direct and actionable. Focus on what matters most to a developer who has just opened this codebase.
 
 REPOSITORY: ${intelligence.repository.name}
 FILES: ${intelligence.repository.fileCount} source files
@@ -380,7 +380,7 @@ Provide a 3-5 paragraph technical summary covering: overall codebase health, mai
           `Engineering health score: ${intelligence.engineeringHealth.score}/100 (${intelligence.engineeringHealth.critical} critical, ${intelligence.engineeringHealth.high} high issues)`,
           `${intelligence.refactoring.candidateCount} refactoring candidate(s) identified`,
         ],
-        references: (intelligence.hotspots || []).slice(0, 5).map(h => h.file)
+        references: (intelligence.hotspots || []).slice(0, 5).map(h => h.filePath)
       };
       return { data: { intelligence, insights } };
     }
@@ -428,15 +428,10 @@ Provide a 3-5 paragraph technical summary covering: overall codebase health, mai
     return { data: impact };
   },
 
-  async getRefactoringInsights(repoId, candidateId) {
-    return { data: { insights: "AI refactoring insights not yet ported to offline-first." } };
-  },
-
   async autoFixRefactoringCandidate(repoId, candidateId) {
     const record = await repositoryStore.get(repoId);
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
     
-    // Re-build refactoring intelligence to find the candidate
     const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
     const risks = buildEngineeringRiskModel(record.analysis, record.analysis.graph, architecture);
     const refactoring = buildRefactoringIntelligence(risks, record.analysis, record.analysis.graph);
@@ -470,13 +465,11 @@ ${originalCode}
     const res = await api.post(`/ai/chat`, { prompt });
     const responseText = res.data?.response || res.data || '';
     
-    // Extract code from markdown block
     let refactoredCode = responseText;
     const codeBlockMatch = responseText.match(/```[a-z]*\n([\s\S]*?)\n```/);
     if (codeBlockMatch) {
       refactoredCode = codeBlockMatch[1];
     } else {
-      // fallback just in case Watsonx didn't use backticks
       refactoredCode = responseText;
     }
 
@@ -484,14 +477,18 @@ ${originalCode}
   },
 
   // ── AI Prompt Endpoints ──────────────────────────────────────────────────────
-  async askQuestion(id, question, activeContext) {
+  /**
+   * It maps the active file context, then extracts local database loaders, 
+   * and then it applies the context builder to proxy structured prompts to the LLM.
+   */
+  async askQuestion(id, question, activeContext, history = []) {
     const record = await repositoryStore.get(id);
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Analysis not available');
 
-    // Build the giant prompt string offline!
-    const { routing, contextData } = await buildQuestionContext(record.analysis, question, id, activeContext);
+    // Dynamically inject the local IDB loader instead of failing on backend paths
+    const fileLoaderCallback = (path) => persistenceStore.loadFile(id, path);
+    const { contextData } = await buildQuestionContext(record.analysis, question, fileLoaderCallback, activeContext);
     
-    // Convert to a raw prompt
     const promptContext = {
        question,
        repository: contextData.meta,
@@ -500,13 +497,11 @@ ${originalCode}
     };
     const rawPrompt = buildPrompt(promptContext);
     
-    // Append facts manually for now
     const fullPrompt = contextData.facts.length > 0 
       ? `Facts:\n${contextData.facts.join('\n')}\n\n${rawPrompt}` 
       : rawPrompt;
 
-    // Send the compiled prompt to the generic backend AI endpoint
-    return api.post(`/ai/chat`, { prompt: fullPrompt });
+    return api.post(`/ai/chat`, { prompt: fullPrompt, history });
   },
 
   async getOverviewDocumentation(id, options = {}) {
@@ -552,16 +547,13 @@ ${originalCode}
     startAnalysis(id, {}).catch(err => console.error('Background analysis failed:', err));
     return { data: { success: true } };
   },
-  getCiReport: (repoId) => Promise.resolve({ data: { status: 'CI reporting requires integration.' } }),
 };
 
 export const getAiHealth = () => api.get('/ai/health').then(res => res.data);
 export const getEngineeringRisks = (id) => repositoryApi.getRisks(id).then(res => res.data);
-export const getEngineeringInsights = (id) => Promise.resolve({ insights: "Insights generation requires WatsonX." });
 export const getRefactoringIntelligence = (id) => repositoryApi.getRefactoringIntelligence(id).then(res => res.data);
 export const getRefactoringCandidate = (id, candidateId) => repositoryApi.getRefactoringIntelligence(id).then(res => res.data.candidates.find(c => c.id === candidateId));
 export const getRefactoringImpact = (id, candidateId) => repositoryApi.getChangeImpact(id).then(res => res.data);
-export const getRefactoringInsights = (id, candidateId) => repositoryApi.getRefactoringInsights(id, candidateId).then(res => res.data);
 export const autoFixRefactoringCandidate = (id, candidateId) => repositoryApi.autoFixRefactoringCandidate(id, candidateId).then(res => res.data);
 
 export default api;

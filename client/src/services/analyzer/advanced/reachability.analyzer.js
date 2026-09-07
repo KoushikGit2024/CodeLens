@@ -1,24 +1,17 @@
-'use strict';
-
 /**
  * reachability.analyzer.js
  *
- * Performs reachability analysis on the dependency graph to find dead (unused) code.
- * Starting from a set of known entry points (e.g., index.js, App.jsx, main.go),
- * this analyzer performs a Breadth-First Search (BFS) forward through the directed
- * dependency edges.
- *
- * Any node (file) that is not visited is considered unreachable (Dead Code).
+ * It receives the dependency graph, then extracts entry point edges, 
+ * and then it applies a Breadth-First Search to isolate dead code.
  */
 
-
 /**
- * Heuristics to identify entry points of a project.
+ * It checks the file path string, then extracts standard application roots, 
+ * and then it applies a boolean evaluation to confirm entry points.
  */
 function isEntryPoint(filePath) {
   const normalized = filePath.toLowerCase();
   
-  // Common entry points
   if (
     normalized.endsWith('index.js') || 
     normalized.endsWith('index.ts') || 
@@ -29,6 +22,7 @@ function isEntryPoint(filePath) {
     normalized.endsWith('app.jsx') ||
     normalized.endsWith('app.tsx') ||
     normalized.endsWith('main.go') ||
+    normalized.endsWith('main.rs') ||
     normalized.endsWith('application.java')
   ) {
     return true;
@@ -38,10 +32,8 @@ function isEntryPoint(filePath) {
 }
 
 /**
- * Finds all unreachable files in the dependency graph.
- *
- * @param {object} graph - The file-level dependency graph (nodes and edges)
- * @returns {object} { unreachableFiles: string[], entryPoints: string[] }
+ * It evaluates the dependency graph, then extracts unvisited nodes via BFS, 
+ * and then it applies the results to return unreachable file paths.
  */
 function analyzeReachability(graph) {
   if (!graph || !graph.nodes || !graph.edges) {
@@ -52,26 +44,22 @@ function analyzeReachability(graph) {
     ? graph.nodes.map(n => n.id) 
     : Object.keys(graph.nodes);
   
-  // 1. Identify Entry Points
+  // It filters graph nodes, then extracts those lacking incoming edges, and then it applies them to the entry point list.
   const entryPoints = nodeIds.filter(id => {
-    // Remove "file:" prefix if present
     const rawPath = id.replace(/^file:/, '');
     if (isEntryPoint(rawPath)) return true;
     
     const inDegree = graph.edges.filter(e => e.target === id).length;
     const outDegree = graph.edges.filter(e => e.source === id).length;
-    // A file with out edges but no in edges is practically an entry point
     return inDegree === 0 && outDegree > 0;
   });
 
-  // 2. Perform BFS to find all reachable nodes
   const visited = new Set(entryPoints);
   const queue = [...entryPoints];
 
   while (queue.length > 0) {
     const current = queue.shift();
     
-    // Find all outgoing edges from 'current'
     const outgoing = graph.edges.filter(e => e.source === current);
     
     for (const edge of outgoing) {
@@ -82,7 +70,7 @@ function analyzeReachability(graph) {
     }
   }
 
-  // 3. Find Unreachable nodes
+  // It compares the full node list to visited nodes, then extracts the diff, and then it applies it to the dead code array.
   const unreachableFiles = nodeIds.filter(id => !visited.has(id));
 
   return {

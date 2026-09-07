@@ -1,3 +1,9 @@
+/**
+ * AIContext.jsx
+ *
+ * It initiates the AI tracking hooks, then extracts structured conversational payloads, 
+ * and then it applies local active-file bindings before sending queries to Watsonx.
+ */
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { getAiHealth, repositoryApi } from '../api';
 import { chatStore } from '../../services/storage/chat.store';
@@ -5,7 +11,7 @@ import { chatStore } from '../../services/storage/chat.store';
 const AIContext = createContext();
 
 export function AIProvider({ children }) {
-  const [aiState, setAiState] = useState('loading'); // 'loading', 'enhanced', 'offline', 'unavailable', 'error'
+  const [aiState, setAiState] = useState('loading'); 
 
   useEffect(() => {
     const checkHealth = async () => {
@@ -13,7 +19,6 @@ export function AIProvider({ children }) {
         const { configured } = await getAiHealth();
         setAiState(configured ? 'enhanced' : 'offline');
       } catch (err) {
-        // Server unreachable or AI not configured — treat as offline, not an app error
         console.warn('AI health check failed, falling back to offline mode:', err.message);
         setAiState('offline');
       }
@@ -36,9 +41,6 @@ export function useAIState() {
   return useContext(AIContext);
 }
 
-/**
- * Custom hook for managing individual AI chat sessions backed by IndexedDB.
- */
 export function useAI({ repoId, feature, contextData }) {
   const { aiState, reportAiError } = useAIState();
   const [messages, setMessages] = useState([]);
@@ -46,7 +48,6 @@ export function useAI({ repoId, feature, contextData }) {
   const [error, setError] = useState(null);
   const [lastFailedPrompt, setLastFailedPrompt] = useState(null);
 
-  // Load chat history from IndexedDB on mount or feature change
   useEffect(() => {
     let mounted = true;
     if (!repoId || !feature) return;
@@ -66,6 +67,10 @@ export function useAI({ repoId, feature, contextData }) {
     return () => { mounted = false; };
   }, [repoId, feature]);
 
+  /**
+   * It evaluates the user submission, then extracts Monaco context ranges, 
+   * and then it applies the query and history to the local API processor.
+   */
   const sendMessage = useCallback(async (prompt) => {
     if (!prompt.trim() || !repoId || !feature) return;
     
@@ -78,21 +83,20 @@ export function useAI({ repoId, feature, contextData }) {
     setLastFailedPrompt(null);
 
     try {
-      const activeContext = {
-        baseData: contextData,
-        history: optimisticMessages
-      };
+      const activeContext = contextData?.filePath ? {
+        filePath: contextData.filePath,
+        startLine: contextData.startLine,
+        endLine: contextData.endLine
+      } : null;
       
-      const res = await repositoryApi.askQuestion(repoId, prompt.trim(), activeContext);
+      const res = await repositoryApi.askQuestion(repoId, prompt.trim(), activeContext, optimisticMessages);
       
-      const finalMessages = [...optimisticMessages, { role: 'assistant', content: res.data.answer }];
+      const finalMessages = [...optimisticMessages, { role: 'assistant', content: res.data.answer || res.data.response }];
       setMessages(finalMessages);
       
-      // Persist to IndexedDB
       await chatStore.saveChat(repoId, feature, finalMessages);
     } catch (err) {
       console.error(err);
-      // Roll back the optimistic user message so the user can retry cleanly
       setMessages(messages);
       setLastFailedPrompt(prompt.trim());
       setError(err.response?.data?.error || err.message || 'Failed to get AI response.');

@@ -1,51 +1,24 @@
 /**
  * dependencyGraph.js
  *
- * Builds a deterministic, serialisable dependency graph from a RepositoryAnalysis.
+ * It ingests the resolved AST imports, then extracts the dependencies, 
+ * and then it applies the canonical AnalysisGraph schema for React Flow rendering.
  *
- * ── Graph model ──────────────────────────────────────────────────────────────
- *
- * Nodes:
- *   { id, type: 'file',     filePath }
- *   { id, type: 'package',  name }
- *
- * Edges:
- *   {
- *     source:   string  — id of the source node (file that imports)
- *     target:   string  — id of the target node (file or package imported)
- *     type:     'imports' | 'requires' | 'depends_on'
- *     evidence: {
- *       specifier:   string             — raw import/require string
- *       importedNames: string[]         — bound names, e.g. ['Router', 'json']
- *       location:    Location | null    — source location from AST
- *     }
- *   }
- *
- * Edge type semantics:
- *   'imports'    — ES module import statement
- *   'requires'   — CommonJS require() call
- *   'depends_on' — aggregated edge (one per unique source→target pair)
- *
- * ── Cycle safety ─────────────────────────────────────────────────────────────
- *   Circular dependencies are represented faithfully in the graph.
- *   No DFS/traversal is needed to build the graph itself, so cycles cannot
- *   cause infinite loops.  Cycle detection is provided as a derived query.
- *
- * ── Determinism ──────────────────────────────────────────────────────────────
- *   Nodes and edges are sorted before being frozen into the output object.
- *   Given the same RepositoryAnalysis the output is always identical.
+ * How this file is structured:
+ *   1. buildDependencyGraph() — It triggers module resolution, then extracts nodes/edges, and then it applies the deterministic React Flow schema.
+ *   2. getFileDependencies()  — It filters the edge array, then extracts a specific file's connections, and then it applies the focused subset.
+ *   3. detectCycles()         — It maps adjacency lists, then extracts backward references, and then it applies DFS to detect cyclic dependencies.
  */
 
 import { resolveAllImports, buildKnownFilesSet } from './module.resolver.js';
+import { createAnalysisNode, createAnalysisEdge } from '../parsing/symbols.js';
 
 // ── Node/edge ID helpers ──────────────────────────────────────────────────────
 
-/** Stable node ID for an internal file. */
 function fileNodeId(filePath) {
   return `file:${filePath}`;
 }
 
-/** Stable node ID for an external package. */
 function packageNodeId(name) {
   return `pkg:${name}`;
 }
@@ -53,50 +26,37 @@ function packageNodeId(name) {
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
- * Build the dependency graph for an entire repository.
- *
- * @param {object} analysis   — RepositoryAnalysis from repositoryAnalyzer
- * @returns {DependencyGraph}
- *
- * DependencyGraph shape:
- * {
- *   nodes:  Node[]
- *   edges:  Edge[]
- *   meta: {
- *     totalFiles:         number
- *     totalPackages:      number
- *     totalEdges:         number
- *     unresolvedImports:  number
- *     builtAt:            string (ISO)
- *   }
- * }
+ * It resolves all repository imports, then extracts React Flow compatible nodes and edges, 
+ * and then it applies deterministic sorting to guarantee stable graph UI rendering.
  */
-function buildDependencyGraph(analysis) {
+export function buildDependencyGraph(analysis) {
   const knownFiles = buildKnownFilesSet(analysis);
   const resolvedMap = resolveAllImports(analysis, knownFiles);
 
-  // ── Collect nodes ────────────────────────────────────────────────────────────
-  const nodesMap = new Map(); // id → Node
+  const nodesMap = new Map(); // id → AnalysisNode
+  const edgesMap = new Map(); // edgeKey → AnalysisEdge
 
-  // Every file in the analysis becomes a file node
+  // It iterates over every file, then extracts its path, and then it applies the AnalysisNode schema.
   for (const f of analysis.files) {
     const id = fileNodeId(f.filePath);
-    nodesMap.set(id, { id, type: 'file', filePath: f.filePath });
+    nodesMap.set(id, createAnalysisNode({
+      id,
+      type: 'fileNode',
+      label: f.filePath.split('/').pop(),
+      filePath: f.filePath
+    }));
   }
-
-  // ── Collect edges ─────────────────────────────────────────────────────────
-  // Use a Map keyed by "sourceId|targetId" to deduplicate; keep all evidence
-  const edgesMap = new Map(); // edgeKey → Edge
 
   let unresolvedCount = 0;
 
+  // It maps over resolved files, then extracts individual targets, and then it applies the AnalysisEdge schema.
   for (const [filePath, imports] of resolvedMap) {
     const sourceId = fileNodeId(filePath);
 
     for (const ri of imports) {
       if (ri.kind === 'unresolved') {
         unresolvedCount++;
-        continue; // skip — not fabricated
+        continue; 
       }
 
       let targetId;
@@ -104,47 +64,57 @@ function buildDependencyGraph(analysis) {
       if (ri.kind === 'external') {
         targetId = packageNodeId(ri.specifier);
         if (!nodesMap.has(targetId)) {
-          nodesMap.set(targetId, { id: targetId, type: 'package', name: ri.specifier });
+          nodesMap.set(targetId, createAnalysisNode({
+            id: targetId,
+            type: 'moduleNode',
+            label: ri.specifier
+          }));
         }
       } else {
-        // internal
         targetId = fileNodeId(ri.resolvedTo);
       }
 
-      // Determine edge type from specifier types in the import symbol
       const isCjs = ri.specifiers && ri.specifiers.some(
         s => s.type === 'cjs-default' || s.type === 'cjs-named'
       );
-      const edgeType = isCjs ? 'requires' : 'imports';
-
-      // Deduplicate on source+target; accumulate evidence per edge
+      
       const edgeKey = `${sourceId}|${targetId}`;
 
       if (!edgesMap.has(edgeKey)) {
-        edgesMap.set(edgeKey, {
+        edgesMap.set(edgeKey, createAnalysisEdge({
+          id: edgeKey,
           source: sourceId,
           target: targetId,
-          type:   edgeType,
-          evidence: {
-            specifier:     ri.specifier,
-            importedNames: _extractNames(ri.specifiers),
-            location:      ri.location || null,
-          },
-        });
+          type: isCjs ? 'smoothstep' : 'default',
+          importCount: 1,
+          specifiers: _extractNames(ri.specifiers)
+        }));
+      } else {
+        // Increment weight for multiple imports of the same target
+        const existingEdge = edgesMap.get(edgeKey);
+        existingEdge.data.importCount += 1;
+        existingEdge.data.specifiers.push(..._extractNames(ri.specifiers));
       }
-      // If duplicate edge (e.g. file imported twice), keep first evidence only.
-      // The edge type stays as-is (first occurrence wins).
     }
   }
 
+  // Deterministic Sorting
   const nodes = Array.from(nodesMap.values()).sort((a, b) => a.id.localeCompare(b.id));
   const edges = Array.from(edgesMap.values()).sort((a, b) => {
     const cmp = a.source.localeCompare(b.source);
     return cmp !== 0 ? cmp : a.target.localeCompare(b.target);
   });
 
-  const fileNodes    = nodes.filter(n => n.type === 'file');
-  const packageNodes = nodes.filter(n => n.type === 'package');
+  const fileNodes    = nodes.filter(n => n.type === 'fileNode');
+  const packageNodes = nodes.filter(n => n.type === 'moduleNode');
+
+  // Compute In/Out degrees for graph metrics
+  edges.forEach(edge => {
+    const src = nodesMap.get(edge.source);
+    const tgt = nodesMap.get(edge.target);
+    if (src) src.data.metrics.outDegree += 1;
+    if (tgt) tgt.data.metrics.inDegree += 1;
+  });
 
   return {
     nodes,
@@ -162,22 +132,10 @@ function buildDependencyGraph(analysis) {
 // ── Derived queries ───────────────────────────────────────────────────────────
 
 /**
- * Return direct dependencies of a file (what it imports).
- *
- * @param {object}      graph     — DependencyGraph
- * @param {string}      filePath  — relative file path
- * @returns {FileDependencies}
- *
- * {
- *   filePath:      string
- *   dependencies:  DependencyEntry[]   — files/packages this file imports
- *   dependents:    DependencyEntry[]   — files that import this file
- *   externalPackages: string[]         — external package names imported
- *   dependencyCount:  number
- *   dependentCount:   number
- * }
+ * It searches the full graph edge array, then extracts matching source/target connections, 
+ * and then it applies them into structured incoming and outgoing lists.
  */
-function getFileDependencies(graph, filePath) {
+export function getFileDependencies(graph, filePath) {
   const sourceId = fileNodeId(filePath);
 
   const dependencies  = [];
@@ -189,29 +147,26 @@ function getFileDependencies(graph, filePath) {
       const targetNode = graph.nodes.find(n => n.id === edge.target);
       if (!targetNode) continue;
 
-      if (targetNode.type === 'file') {
+      if (targetNode.type === 'fileNode') {
         dependencies.push({
-          filePath:  targetNode.filePath,
-          edgeType:  edge.type,
-          evidence:  edge.evidence,
+          filePath:  targetNode.data.filePath,
+          evidence:  edge.data,
         });
-      } else if (targetNode.type === 'package') {
-        externalPkgs.add(targetNode.name);
+      } else if (targetNode.type === 'moduleNode') {
+        externalPkgs.add(targetNode.data.label);
         dependencies.push({
-          package:  targetNode.name,
-          edgeType: edge.type,
-          evidence: edge.evidence,
+          package:  targetNode.data.label,
+          evidence: edge.data,
         });
       }
     }
 
     if (edge.target === sourceId) {
       const sourceNode = graph.nodes.find(n => n.id === edge.source);
-      if (sourceNode && sourceNode.type === 'file') {
+      if (sourceNode && sourceNode.type === 'fileNode') {
         dependents.push({
-          filePath: sourceNode.filePath,
-          edgeType: edge.type,
-          evidence: edge.evidence,
+          filePath: sourceNode.data.filePath,
+          evidence: edge.data,
         });
       }
     }
@@ -228,12 +183,10 @@ function getFileDependencies(graph, filePath) {
 }
 
 /**
- * Return all files that have no edges (neither imports nor is imported).
- *
- * @param {object} graph
- * @returns {string[]} file paths
+ * It iterates the edges to find connected ids, then extracts the disconnected nodes, 
+ * and then it applies them to the isolated files array.
  */
-function getIsolatedFiles(graph) {
+export function getIsolatedFiles(graph) {
   const connected = new Set();
   for (const edge of graph.edges) {
     connected.add(edge.source);
@@ -241,23 +194,19 @@ function getIsolatedFiles(graph) {
   }
 
   return graph.nodes
-    .filter(n => n.type === 'file' && !connected.has(n.id))
-    .map(n => n.filePath)
+    .filter(n => n.type === 'fileNode' && !connected.has(n.id))
+    .map(n => n.data.filePath)
     .sort();
 }
 
 /**
- * Detect cycles in the dependency graph using iterative DFS.
- * Only considers file→file edges (ignores external packages).
- *
- * @param {object} graph
- * @returns {string[][]}  — array of cycle paths (each path is an array of filePaths)
+ * It builds an adjacency list, then extracts recursion paths, 
+ * and then it applies Depth First Search (DFS) to identify circular edges.
  */
-function detectCycles(graph) {
-  // Build adjacency list (file id → file id[])
+export function detectCycles(graph) {
   const adj = new Map();
   for (const node of graph.nodes) {
-    if (node.type === 'file') adj.set(node.id, []);
+    if (node.type === 'fileNode') adj.set(node.id, []);
   }
   for (const edge of graph.edges) {
     if (!adj.has(edge.source) || !adj.has(edge.target)) continue;
@@ -273,11 +222,10 @@ function detectCycles(graph) {
     _dfsCycles(startId, adj, visited, inStack, [], cycles);
   }
 
-  // Convert node IDs back to file paths
   return cycles.map(cycle =>
     cycle.map(id => {
       const node = graph.nodes.find(n => n.id === id);
-      return node ? node.filePath : id;
+      return node ? node.data.filePath : id;
     })
   );
 }
@@ -291,7 +239,6 @@ function _dfsCycles(nodeId, adj, visited, inStack, path, cycles) {
     if (!visited.has(neighbour)) {
       _dfsCycles(neighbour, adj, visited, inStack, path, cycles);
     } else if (inStack.has(neighbour)) {
-      // Found a cycle — record the cycle path from neighbour onward
       const cycleStart = path.indexOf(neighbour);
       if (cycleStart !== -1) {
         cycles.push(path.slice(cycleStart).concat(neighbour));
@@ -305,6 +252,10 @@ function _dfsCycles(nodeId, adj, visited, inStack, path, cycles) {
 
 // ── Private helpers ───────────────────────────────────────────────────────────
 
+/**
+ * It filters side-effect specifiers, then extracts the valid aliases, 
+ * and then it applies them to the output name array.
+ */
 function _extractNames(specifiers) {
   if (!specifiers || !specifiers.length) return [];
   return specifiers
@@ -312,14 +263,3 @@ function _extractNames(specifiers) {
     .map(s => s.alias || s.name)
     .filter(Boolean);
 }
-
-// ── Exports ───────────────────────────────────────────────────────────────────
-
-export {
-  buildDependencyGraph,
-  getFileDependencies,
-  getIsolatedFiles,
-  detectCycles,
-  fileNodeId,
-  packageNodeId,
-};

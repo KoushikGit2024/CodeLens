@@ -1,3 +1,9 @@
+/**
+ * RefactoringPage.jsx
+ *
+ * It initiates the technical debt dashboard, then extracts deterministic refactoring candidates, 
+ * and then it applies them to a prioritized triage interface.
+ */
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
@@ -48,6 +54,10 @@ const formatCategory = (category) => {
 };
 
 // ── Candidate Card ────────────────────────────────────────────────────────────
+/**
+ * It evaluates the priority level, then extracts the specific styling metadata, 
+ * and then it applies them to render the interactive list item.
+ */
 const CandidateCard = ({ candidate, isSelected, onSelect, priorityLevel }) => {
   const meta = PRIORITY_META[priorityLevel] || PRIORITY_META.warning;
   return (
@@ -79,9 +89,9 @@ const CandidateCard = ({ candidate, isSelected, onSelect, priorityLevel }) => {
           </span>
         </div>
       )}
-      {candidate.description && (
+      {candidate.summary && (
         <p className="text-[11px] text-muted leading-relaxed line-clamp-2">
-          {candidate.description}
+          {candidate.summary}
         </p>
       )}
     </button>
@@ -89,6 +99,10 @@ const CandidateCard = ({ candidate, isSelected, onSelect, priorityLevel }) => {
 };
 
 // ── Issue Group ───────────────────────────────────────────────────────────────
+/**
+ * It sorts the candidate array, then extracts the grouped issues, 
+ * and then it applies a collapsible UI section for navigation.
+ */
 const IssueGroup = ({ issueTitle, issueData, priorityLevel, selectedCandidateId, setSelectedCandidateId }) => {
   const [isOpen, setIsOpen] = useState(true);
   const sorted = [...issueData.items].sort((a, b) => b.priorityScore - a.priorityScore);
@@ -126,6 +140,10 @@ const IssueGroup = ({ issueTitle, issueData, priorityLevel, selectedCandidateId,
 };
 
 // ── Priority Section ──────────────────────────────────────────────────────────
+/**
+ * It maps over the priority clusters, then extracts maximum severity scores, 
+ * and then it applies a descending sort for the sidebar groups.
+ */
 const PrioritySection = ({ priorityLevel, group, selectedCandidateId, setSelectedCandidateId }) => {
   const [isOpen, setIsOpen] = useState(true);
   const meta = PRIORITY_META[priorityLevel] || PRIORITY_META.warning;
@@ -176,6 +194,10 @@ const PrioritySection = ({ priorityLevel, group, selectedCandidateId, setSelecte
 };
 
 // ── Page ──────────────────────────────────────────────────────────────────────
+/**
+ * It triggers the offline refactoring intelligence endpoint, then extracts the deterministic candidates, 
+ * and then it applies them to the resizable triage layout.
+ */
 export default function RefactoringPage() {
   const { repoId } = useParams();
   const navigate = useNavigate();
@@ -314,7 +336,10 @@ export default function RefactoringPage() {
 }
 
 // ── Center Panel ──────────────────────────────────────────────────────────────
-
+/**
+ * It fetches the change impact payload, then extracts the directly affected files, 
+ * and then it applies them alongside the suggested strategies for manual or AI review.
+ */
 function CandidateDetail({ candidate, repoId }) {
   const [impact, setImpact] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -433,7 +458,7 @@ function CandidateDetail({ candidate, repoId }) {
         <div className="border border-border rounded p-4 min-w-0">
           <h3 className="text-[11px] font-medium text-muted uppercase tracking-wider mb-3">Affected Files</h3>
           <ul className="space-y-1.5">
-            {candidate.files.map(f => {
+            {candidate.files?.map(f => {
               const range = candidate.fileRanges && candidate.fileRanges[f];
               let url = `/explore/${repoId}/source?path=${encodeURIComponent(f)}`;
               if (range?.startLine && range?.endLine) url += `&line=${range.startLine}-${range.endLine}`;
@@ -536,7 +561,10 @@ function CandidateDetail({ candidate, repoId }) {
 }
 
 // ── Right Panel ───────────────────────────────────────────────────────────────
-
+/**
+ * It queries the AI proxy, then extracts the generated refactoring strategy, 
+ * and then it applies the markdown response to the advisor panel.
+ */
 function AiAdvisor({ candidate, repoId }) {
   const [insights, setInsights] = useState(null);
   const [loading, setLoading] = useState(false);

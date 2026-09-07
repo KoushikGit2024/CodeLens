@@ -1,30 +1,27 @@
-'use strict';
-
 /**
  * complexity.analyzer.js
  *
- * Calculates Cyclomatic Complexity of a given Tree-sitter AST node.
- * It counts branching nodes such as if, for, while, catch, and logical operators.
+ * It receives a given AST node, then extracts cyclomatic branching logic, 
+ * and then it applies a base score calculation to output a final structural metric.
  */
 
 const COMPLEXITY_NODE_TYPES = new Set([
   'if_statement',
+  'if_expression',       // Used in Kotlin/Rust
   'for_statement',
   'for_in_statement',
   'while_statement',
   'do_statement',
   'catch_clause',
   'ternary_expression',
-  'switch_case', // each case is a branch
-  'binary_expression' // we will check for && and ||
+  'switch_case',
+  'when_expression',     // Used in Kotlin
+  'binary_expression'
 ]);
 
 /**
- * Calculates the cyclomatic complexity of an AST node by walking its children.
- * Base complexity is 1.
- * 
- * @param {object} node - Tree-sitter syntax node
- * @returns {number} Complexity score
+ * It walks the AST children, then extracts matching branch node types, 
+ * and then it applies an incremental counter to return the total cyclomatic score.
  */
 function calculateComplexity(node) {
   let complexity = 1;
@@ -34,6 +31,7 @@ function calculateComplexity(node) {
       if (n.type === 'binary_expression') {
         const operatorNode = n.childForFieldName('operator');
         if (operatorNode) {
+          // It evaluates the operator token, then extracts boolean comparators, and then it applies a complexity increment.
           const operator = operatorNode.text || operatorNode.type;
           if (operator === '&&' || operator === '||' || operator === '??') {
             complexity++;
