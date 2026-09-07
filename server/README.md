@@ -4,14 +4,12 @@ This directory contains the Node.js/Express server that powers CodeLens.
 
 ## Responsibilities
 
-The backend orchestrates the entire intelligence pipeline. It extracts uploaded repositories into a sandbox, parses the code into ASTs using WebAssembly Tree-sitter grammars, builds dependency graphs, analyzes architecture, detects engineering risks, and communicates with IBM watsonx for AI synthesis.
+The backend orchestrates the entire intelligence pipeline. Communicates with IBM watsonx for AI synthesis.
 
 ## Technology Stack
 
 - **Node.js 18+**
 - **Express.js**
-- **web-tree-sitter** (AST parsing)
-- **Multer / Adm-Zip** (Upload and extraction)
 - **Jest** (Testing)
 - **IBM watsonx SDK** (AI Provider)
 
@@ -27,11 +25,6 @@ server/
 │   │   ├── middleware/       # Express middleware
 │   │   └── ai/               # AI provider clients (Watsonx)
 │   ├── domains/              # Feature-oriented vertical slices
-│   │   ├── repository/       # Upload, storage, and persistence
-│   │   ├── parsing/          # AST generation and language detection
-│   │   ├── dependencies/     # Dependency graph construction
-│   │   ├── architecture/     # Component mapping and diagrams
-│   │   ├── engineering/      # Health, risks, and refactoring
 │   │   └── assistant/        # Q&A routing and generators
 ├── tests/                    # Jest test suites (mirroring domains/)
 ├── .data/                    # Runtime extracted repositories (git-ignored)

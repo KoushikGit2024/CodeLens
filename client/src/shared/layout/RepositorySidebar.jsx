@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, NavLink, useParams } from 'react-router-dom';
+import { Link, NavLink, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   FileCode2, 
@@ -49,7 +49,17 @@ const NAV_GROUPS = [
 
 export default function RepositorySidebar() {
   const { repoId } = useParams();
-  const [collapsed, setCollapsed] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  const collapsed = searchParams.get('sidebar') === 'closed';
+  const setCollapsed = (isClosed) => {
+    setSearchParams(prev => {
+      if (isClosed) prev.set('sidebar', 'closed');
+      else prev.delete('sidebar');
+      return prev;
+    }, { replace: true });
+  };
+
   const [collapsedGroups, setCollapsedGroups] = useState({});
 
   const toggleGroup = (groupId) => {
@@ -63,7 +73,7 @@ export default function RepositorySidebar() {
       <div className={clsx("h-12 flex items-center shrink-0 border-b border-border transition-all", collapsed ? "justify-center px-0" : "justify-between px-4")}>
         {!collapsed ? (
           <>
-            <Link to="/" className="flex items-center hover:opacity-80 transition-opacity">
+            <Link to={`/${collapsed ? '?sidebar=closed' : ''}`} className="flex items-center hover:opacity-80 transition-opacity">
               <Logo className="w-5 h-5" textClass="text-[16px]" showText={true} />
             </Link>
             <button 
@@ -75,7 +85,7 @@ export default function RepositorySidebar() {
             </button>
           </>
         ) : (
-          <Link to="/" className="flex items-center hover:opacity-80 transition-opacity">
+          <Link to={`/${collapsed ? '?sidebar=closed' : ''}`} className="flex items-center hover:opacity-80 transition-opacity">
             <Logo className="w-6 h-6" showText={false} />
           </Link>
         )}
@@ -120,15 +130,15 @@ export default function RepositorySidebar() {
                   return (
                     <NavLink
                       key={item.id}
-                      to={`/explore/${repoId}/${item.to}`}
+                      to={`/explore/${repoId}/${item.to}${collapsed ? '?sidebar=closed' : ''}`}
                       end={item.to === ''}
                       title={collapsed ? item.label : undefined}
                       className={({ isActive }) => clsx(
-                        "flex items-center rounded text-[13px] transition-all duration-200 group relative overflow-hidden",
+                        "flex items-center rounded-r text-[13px] transition-all duration-200 group relative overflow-hidden border-l-2",
                         collapsed ? "justify-center w-10 h-10 mb-1" : "gap-3 px-2.5 py-1.5 w-full",
                         isActive 
-                          ? "bg-accent/10 text-white font-medium" 
-                          : "text-muted hover:bg-surface hover:text-white"
+                          ? "border-accent text-white font-medium bg-accent/[0.07]" 
+                          : "border-transparent text-muted hover:bg-white/[0.04] hover:text-white"
                       )}
                     >
                       {({ isActive }) => (
@@ -154,11 +164,11 @@ export default function RepositorySidebar() {
           to="/"
           title={collapsed ? "Upload New Repository" : undefined}
           className={({ isActive }) => clsx(
-            "flex items-center rounded text-[13px] transition-all duration-200 group min-w-0",
+            "flex items-center rounded-r text-[13px] transition-all duration-200 group min-w-0 border-l-2",
             collapsed ? "justify-center w-10 h-10" : "gap-3 px-2.5 py-2 w-full",
             isActive 
-              ? "bg-accent/10 text-white font-medium" 
-              : "text-muted hover:bg-surface hover:text-white"
+              ? "border-accent text-white font-medium bg-accent/[0.07]" 
+              : "border-transparent text-muted hover:bg-white/[0.04] hover:text-white"
           )}
         >
           {({ isActive }) => (

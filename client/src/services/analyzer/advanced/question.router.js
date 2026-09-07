@@ -1,14 +1,11 @@
-
-
 /**
- * questionRouter.js
+ * question.router.js
  *
- * Implements a heuristic intent classifier to determine what kind of context
- * a question requires, and whether it can be answered deterministically
- * without calling the AI provider.
+ * It intercepts the raw user question, then extracts keyword heuristics, 
+ * and then it applies an intent classification mapping to route the request efficiently.
  */
 
-const INTENTS = {
+export const INTENTS = {
   METRICS: 'METRICS',
   DEPENDENCY: 'DEPENDENCY',
   ARCHITECTURE: 'ARCHITECTURE',
@@ -19,12 +16,10 @@ const INTENTS = {
 };
 
 /**
- * Categorize a question based on simple regex heuristics.
- *
- * @param {string} question
- * @returns {object} { intent, requiresAi, targetFile }
+ * It evaluates the question string against regex rules, then extracts the closest logical intent, 
+ * and then it applies deterministic flags to skip the AI provider when possible.
  */
-function routeQuestion(question, analysis, activeContext = null) {
+export function routeQuestion(question, analysis, activeContext = null) {
   const q = question.toLowerCase();
 
   const result = {
@@ -33,8 +28,8 @@ function routeQuestion(question, analysis, activeContext = null) {
     targetFile: activeContext?.filePath || null,
   };
 
-  // Check if a specific file is mentioned in the prompt (only if we don't have an active context)
-  if (!result.targetFile && analysis) {
+  // It scans the analysis files array, then extracts a matching file path from the query, and then it applies it to the targetFile property.
+  if (!result.targetFile && analysis?.files) {
     const fileMatch = analysis.files.find(f => {
       const basename = f.filePath.split('/').pop().toLowerCase();
       return q.includes(f.filePath.toLowerCase()) || q.includes(basename);
@@ -44,7 +39,6 @@ function routeQuestion(question, analysis, activeContext = null) {
     }
   }
 
-  // 1. Repository Overview
   if (
     q.match(/overview of this repository/) ||
     q.match(/how is this project structured/) ||
@@ -57,7 +51,6 @@ function routeQuestion(question, analysis, activeContext = null) {
     return result;
   }
 
-  // 2. Metrics / Counts (Deterministic)
   if (
     q.match(/how many (files|modules|components|packages)/) ||
     q.match(/count of (files|modules)/)
@@ -67,7 +60,6 @@ function routeQuestion(question, analysis, activeContext = null) {
     return result;
   }
 
-  // 2. Dependencies (Can be deterministic if asking "what depends on X" or "what does X import")
   if (
     q.match(/what depends on /) ||
     q.match(/which files depend on /) ||
@@ -76,13 +68,11 @@ function routeQuestion(question, analysis, activeContext = null) {
   ) {
     result.intent = INTENTS.DEPENDENCY;
     if (result.targetFile) {
-      // If we know the file, we can answer this deterministically
       result.requiresAi = false;
     }
     return result;
   }
 
-  // 3. Architecture
   if (
     q.match(/architecture/) ||
     q.match(/layer/) ||
@@ -94,14 +84,12 @@ function routeQuestion(question, analysis, activeContext = null) {
     q.match(/coupled files/)
   ) {
     result.intent = INTENTS.ARCHITECTURE;
-    // We let AI explain architecture, though we could make entry points deterministic
     if (q.match(/what are the entry points/)) {
       result.requiresAi = false;
     }
     return result;
   }
 
-  // 4. Refactoring
   if (
     q.match(/refactor/) ||
     q.match(/technical debt/) ||
@@ -112,7 +100,6 @@ function routeQuestion(question, analysis, activeContext = null) {
     return result;
   }
 
-  // 5. File Explanation
   if (
     q.match(/what does .* do/) ||
     q.match(/explain /) ||
@@ -124,8 +111,3 @@ function routeQuestion(question, analysis, activeContext = null) {
 
   return result;
 }
-
-export { 
-  INTENTS,
-  routeQuestion,
- };

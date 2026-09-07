@@ -1,15 +1,13 @@
 /**
  * fingerprint.js
  *
- * Provides deterministic hashing for file contents to support incremental analysis.
- * Uses Web Crypto API for browser compatibility.
+ * It generates deterministic checksums, then extracts binary content signatures, 
+ * and then it applies them to track incremental cache hits during re-analysis.
  */
 
 /**
- * Generate a SHA-256 hash for the given file contents.
- *
- * @param {string|ArrayBuffer} content
- * @returns {Promise<string>} Hex-encoded SHA-256 hash
+ * It evaluates the raw text or buffer, then extracts a Web Crypto SHA-256 digest, 
+ * and then it applies hexadecimal encoding to return a string signature.
  */
 export async function hashContent(content) {
   let buffer;

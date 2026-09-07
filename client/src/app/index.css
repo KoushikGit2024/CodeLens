@@ -3,12 +3,25 @@
 @tailwind utilities;
 
 /* ── Base ──────────────────────────────────────────────────────────────────── */
+:root {
+  /* Refined Graphite-Indigo Palette (Space-separated RGB for Tailwind opacity support) */
+  --color-surface: 12 14 20;     /* #0c0e14 - deepest background — near-black with cool tint */
+  --color-panel:   17 19 24;     /* #111318 - sidebars, headers — slightly lifted */
+  --color-border:  29 33 48;     /* #1D2130 - structural dividers — very subtle */
+  --color-accent:  77 126 255;   /* #4D7EFF - calm periwinkle blue — not harsh */
+  --color-muted:   107 122 153;  /* #6B7A99 - secondary text — blue-grey */
+  --color-text:    203 213 232;  /* #CBD5E8 - primary text — soft cool off-white */
+  --color-success: 52 168 90;    /* #34a85a */
+  --color-warning: 212 146 58;   /* #d4923a */
+  --color-danger:  224 82 82;    /* #e05252 */
+}
+
 html, body, #root {
   height: 100%;
   margin: 0;
   padding: 0;
-  background-color: #0d1117;
-  color: #e6edf3;
+  background-color: rgb(var(--color-surface)); /* Notice the rgb() wrapper here now */
+  color: rgb(var(--color-text));               /* Notice the rgb() wrapper here now */
   font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.6;
@@ -28,4 +41,34 @@ html, body, #root {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #484f58;
+}
+
+/* ── React Flow Dark Theme Overrides ─────────────────────────────────────── */
+
+.react-flow__controls {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3) !important;
+  border: 1px solid rgb(var(--color-border)) !important;
+  border-radius: 6px !important;
+  overflow: hidden !important;
+}
+
+.react-flow__controls-button {
+  background-color: rgb(var(--color-panel)) !important;
+  border-bottom: 1px solid rgb(var(--color-border)) !important;
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: none !important;
+}
+
+.react-flow__controls-button:hover {
+  background-color: rgb(var(--color-surface)) !important;
+}
+
+.react-flow__controls-button svg {
+  fill: rgb(var(--color-muted)) !important;
+}
+
+.react-flow__controls-button:hover svg {
+  fill: rgb(var(--color-text)) !important;
 }

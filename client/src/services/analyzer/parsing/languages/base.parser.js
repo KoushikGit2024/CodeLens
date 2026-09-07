@@ -3,29 +3,23 @@
  *
  * Abstract base class for language-specific AST parsers.
  *
- * Every language parser (JavaScriptParser, TypeScriptParser, …) must extend
- * this class and implement the `extractSymbols` method.
+ * Every language parser (JavaScriptParser, TypeScriptParser, …) extends
+ * this class and implements the `extractSymbols` method.
  *
  * Responsibilities:
  *   - Holds the tree-sitter Parser instance for the language.
- *   - Provides a safe `parse(source)` method that catches exceptions and
+ *   - Provides a safe `parseFile(source, filePath)` method that catches exceptions and
  *     wraps tree-sitter errors into structured results.
+ *   - Provides Tree-sitter query helpers for deterministic static analysis.
  *   - Defines the contract that all language parsers must satisfy.
- *
- * Design note:
- *   BaseParser is intentionally not abstract in the JavaScript sense because
- *   Node.js does not enforce it.  The convention is: if `extractSymbols` is
- *   not overridden, it throws, which makes the violation obvious in tests.
  */
-
-'use strict';
 
 import { createFileAnalysis } from '../symbols';
 
 export class BaseParser {
   /**
-   * @param {object} tsParser  — a configured tree-sitter Parser instance
-   *                             (returned by parserRegistry.getParser)
+   * @param {object} tsParser   — a configured tree-sitter Parser instance
+   *                              (returned by parserRegistry.getParser)
    * @param {string} languageId — e.g. 'javascript'
    */
   constructor(tsParser, languageId) {
@@ -81,7 +75,6 @@ export class BaseParser {
 
   /**
    * Extract symbols from the AST root node.
-   *
    * MUST be implemented by every concrete subclass.
    *
    * @param {object} rootNode  — tree-sitter root SyntaxNode
@@ -92,5 +85,72 @@ export class BaseParser {
   extractSymbols(rootNode, source) {
     throw new Error(`${this.constructor.name} must implement extractSymbols()`);
   }
-}
 
+  /**
+   * Executes a Tree-sitter S-expression query and extracts findings matching 
+   * the CodeLens canonical AnalysisFinding schema for the Monaco Editor and Dashboard.
+   */
+  extractFindings(rootNode, queryString, filePath, analyzerId, ruleId, category, severity, titleTemplate, messageTemplate) {
+    try {
+      const language = this.tsParser.getLanguage();
+      const query = language.query(queryString);
+      const matches = query.matches(rootNode);
+      
+      return matches.map((match, index) => {
+        const primaryCapture = match.captures[0];
+        const node = primaryCapture.node;
+        
+        return {
+          id: `${analyzerId}-${ruleId}-${filePath}-${node.startPosition.row}-${index}`,
+          analyzerId,
+          ruleId,
+          category,
+          severity,
+          title: titleTemplate.replace('{text}', node.text.substring(0, 40)),
+          message: messageTemplate.replace('{text}', node.text),
+          filePath,
+          range: {
+            startLine: node.startPosition.row + 1, // 1-based for Monaco
+            startColumn: node.startPosition.column + 1,
+            endLine: node.endPosition.row + 1,
+            endColumn: node.endPosition.column + 1
+          },
+          metrics: {}
+        };
+      });
+    } catch (error) {
+      console.warn(`Query execution failed for ${ruleId} on ${filePath}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Extracts string dependencies (imports/requires) to build the React Flow graph.
+   */
+  extractDependencies(rootNode, queryString) {
+    try {
+      const language = this.tsParser.getLanguage();
+      const query = language.query(queryString);
+      const matches = query.matches(rootNode);
+      return matches.map(match => {
+        const text = match.captures[0].node.text;
+        return text.replace(/['"<>;]/g, ''); // Strip quotes and brackets
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Counts AST nodes representing structural data like cyclomatic complexity.
+   */
+  calculateComplexity(rootNode, queryString) {
+    try {
+      const language = this.tsParser.getLanguage();
+      const query = language.query(queryString);
+      return query.matches(rootNode).length;
+    } catch {
+      return 0;
+    }
+  }
+}

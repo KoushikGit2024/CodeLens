@@ -115,6 +115,7 @@ Thumbs.db
 # AI Agents and Documentation
 .bob/
 .agents/
+graphify-out
 
 # CodeLens persistent data (uploaded repos + analysis cache)
 .data/

@@ -1,8 +1,13 @@
+/**
+ * UploadPage.jsx
+ *
+ * It provides the drag-and-drop workspace UI, then extracts the provided ZIP archive entirely client-side, 
+ * and then it applies the files to IndexedDB before launching the Web Worker analysis.
+ */
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload, Loader2, AlertCircle, Code, Box, Network, Bot, Clock, FolderOpen, Eraser, Trash2, Database, Inbox } from 'lucide-react';
+import { Upload, Loader2, AlertCircle, Code, Box, Network, Bot, FolderOpen, Eraser, Trash2, Database, Inbox } from 'lucide-react';
 import { repositoryApi } from '../../shared/api';
-import { Link } from 'react-router-dom';
 import { Logo } from '../../shared/components/Logo';
 
 export default function UploadPage() {
@@ -24,6 +29,10 @@ export default function UploadPage() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
 
+  /**
+   * It detects clicks outside the dropdown menu, then extracts the target DOM node, 
+   * and then it applies a state update to close the menu if needed.
+   */
   useEffect(() => {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -34,6 +43,10 @@ export default function UploadPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  /**
+   * It requests the repository list from the offline API, then extracts the stored workspaces, 
+   * and then it applies them to the recentRepos state.
+   */
   const refreshRepos = async () => {
     setLoadingRepos(true);
     try {
@@ -63,8 +76,21 @@ export default function UploadPage() {
     handleLoadRepos();
   }, [navigate]);
 
+  /**
+   * It evaluates the selected batch action, then extracts user confirmation, 
+   * and then it applies the command to the offline API to manage workspace data.
+   */
   const handleBatchAction = async (action) => {
     if (selectedRepos.size === 0) return;
+    
+    if (action === 'delete') {
+      const confirmed = window.confirm(`Are you sure you want to permanently delete ${selectedRepos.size} workspace(s)? This action cannot be undone.`);
+      if (!confirmed) return;
+    } else if (action === 'clear_analysis') {
+      const confirmed = window.confirm(`Are you sure you want to clear the analysis data for ${selectedRepos.size} workspace(s)? You will need to re-analyze them.`);
+      if (!confirmed) return;
+    }
+
     setBatchActionRunning(true);
     try {
       await repositoryApi.batchManage(Array.from(selectedRepos), action);
@@ -103,6 +129,10 @@ export default function UploadPage() {
     }
   };
 
+  /**
+   * It inspects the uploaded file, then extracts the extension format, 
+   * and then it applies a validation check ensuring only ZIPs are accepted.
+   */
   const handleFile = useCallback((f) => {
     setError(null);
     if (!f.name.endsWith('.zip')) {
@@ -124,6 +154,10 @@ export default function UploadPage() {
     if (f) handleFile(f);
   };
 
+  /**
+   * It triggers the upload sequence, then extracts the ZIP contents via JSZip inside the browser, 
+   * and then it applies the background analysis worker before navigating the user.
+   */
   const onUpload = async () => {
     if (!file) return;
     setUploading(true);
@@ -266,7 +300,7 @@ export default function UploadPage() {
               </p>
             </div>
 
-            {/* Action Buttons - Push to bottom if space allows */}
+            {/* Action Buttons */}
             <div className="mt-auto pt-6 flex flex-col gap-3 shrink-0">
               <button
                 onClick={onUpload}
@@ -281,7 +315,6 @@ export default function UploadPage() {
                 {uploading ? 'Processing Repository...' : 'Analyze Repository'}
               </button>
 
-              {/* Return to active repository escape hatch */}
               {lastRepoId && (
                 <button
                   onClick={() => navigate(`/explore/${lastRepoId}`)}
@@ -291,13 +324,12 @@ export default function UploadPage() {
                 </button>
               )}
             </div>
-            {/* Spacer to prevent content from touching bottom border when scrolled */}
             <div className="shrink-0 h-2 mt-2" />
             </div>
           </div>
         </div>
 
-        {/* Right Column: Feature Grid */}
+        {/* Right Column: Feature Grid & Workspaces */}
         <div className="w-full lg:w-[45%] flex flex-col lg:min-h-0">
           <div className="bg-panel border border-border rounded-2xl shadow-sm flex-1 flex flex-col lg:overflow-hidden relative">
             <div 
@@ -305,7 +337,6 @@ export default function UploadPage() {
               style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
               
-              {/* Recent Workspaces Box */}
           {!import.meta.env.PROD && (
             <div className="bg-panel border border-border rounded-xl p-5 shadow-sm mb-6 flex flex-col sm:flex-row items-center gap-4">
               <div className="flex-1 w-full">
@@ -412,7 +443,7 @@ export default function UploadPage() {
                 {selectedRepos.size > 0 && (
                   <div className="flex items-center gap-2 mr-4 border-r border-border/50 pr-4">
                     {selectedRepos.has(lastRepoId) && (
-                      <span className="text-[11px] font-medium text-orange-400 mr-2 flex items-center gap-1 hidden md:flex bg-orange-500/10 px-2 py-1 rounded border border-orange-500/20">
+                      <span className="text-[11px] font-medium text-orange-400 mr-2 hidden items-center gap-1 md:flex bg-orange-500/10 px-2 py-1 rounded border border-orange-500/20">
                         <AlertCircle className="w-3.5 h-3.5" />
                         Modifying active workspace
                       </span>
@@ -447,7 +478,6 @@ export default function UploadPage() {
               </div>
             </div>
             
-            {/* List Header */}
             <div className="px-5 py-3 border-b border-border/50 bg-surface/50 flex items-center gap-4 text-xs font-semibold text-muted uppercase tracking-wider shrink-0">
               <input 
                 type="checkbox" 
@@ -459,7 +489,6 @@ export default function UploadPage() {
               <span className="w-24 text-right">Status</span>
             </div>
 
-            {/* Scrollable List */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
               {loadingRepos ? (
                 <div className="flex flex-col items-center justify-center p-12 text-muted">
@@ -498,7 +527,7 @@ export default function UploadPage() {
                           )}
                         </div>
                         <p className="text-[11px] text-muted mt-0.5 truncate">
-                          Analyzed {new Date(repo.uploadedAt).toLocaleDateString()}
+                          {isReady ? 'Analyzed' : repo.status === 'error' ? 'Analysis failed' : repo.status === 'analyzing' ? 'Analyzing' : 'Uploaded'} on {new Date(repo.uploadedAt).toLocaleDateString()}
                         </p>
                       </div>
 
@@ -508,13 +537,16 @@ export default function UploadPage() {
                         </span>
                         
                         <button
-                          onClick={() => {
+                          onClick={async () => {
+                            if (!isReady) {
+                              await repositoryApi.reanalyze(repo.id);
+                            }
                             setShowManager(false);
                             navigate(`/explore/${repo.id}`);
                           }}
                           className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${isReady ? 'bg-accent hover:bg-accent-hover text-white' : 'bg-surface border border-border text-muted hover:text-white'}`}
                         >
-                          {isReady ? 'Open' : 'View'}
+                          {isReady ? 'Open' : 'Re-Analyze'}
                         </button>
                       </div>
                     </div>

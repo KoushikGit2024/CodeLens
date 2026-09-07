@@ -1,131 +1,478 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+/**
+ * ImpactPage.jsx
+ *
+ * It initiates the change impact dashboard, then extracts selected file dependencies, 
+ * and then it applies the dagre layout to visualize the deterministic blast radius.
+ */
+import React, { useEffect, useState, useMemo } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { Activity, CheckSquare, Loader2, GitCommit, AlertCircle } from 'lucide-react';
 import { repositoryApi } from '../../shared/api';
 import { useRepository } from '../../shared/context/RepositoryContext';
+import { useToast } from '../../shared/context/ToastContext';
+import PageHeader from '../../shared/components/PageHeader';
+import { ResizableLayout } from '../../shared/components/ResizableLayout';
+import ReactFlow, { 
+  Controls, 
+  MiniMap, 
+  MarkerType, 
+  Handle, 
+  Position,
+  applyNodeChanges 
+} from 'reactflow';
+import 'reactflow/dist/style.css';
+import dagre from 'dagre';
+import { FileTree } from '../explorer/FileTree';
+
+// ── Dagre Layout & Smart Packing Helper ───────────────────────────
+const dagreGraph = new dagre.graphlib.Graph();
+dagreGraph.setDefaultEdgeLabel(() => ({}));
+
+const getLayoutedElements = (nodes, edges, direction = 'TB') => {
+  if (nodes.length === 0) return { nodes, edges };
+
+  dagreGraph.setGraph({ 
+    rankdir: direction,
+    nodesep: 120, 
+    ranksep: 250, 
+    edgesep: 50,  
+    ranker: 'network-simplex' 
+  });
+
+  const nodeWidth = 160;
+  const nodeHeight = 65;
+
+  nodes.forEach((node) => {
+    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+  });
+
+  edges.forEach((edge) => {
+    dagreGraph.setEdge(edge.source, edge.target);
+  });
+
+  dagre.layout(dagreGraph);
+
+  const ranks = {};
+  nodes.forEach(node => {
+    const pos = dagreGraph.node(node.id);
+    const yKey = Math.round(pos.y / 10) * 10; 
+    if (!ranks[yKey]) ranks[yKey] = [];
+    ranks[yKey].push({ ...node, dagreX: pos.x, dagreY: pos.y });
+  });
+
+  const sortedYs = Object.keys(ranks).map(Number).sort((a, b) => a - b);
+  
+  const X_GAP = 60;   
+  const Y_GAP = 140;  
+  const CLUSTER_THRESHOLD = 350; 
+  
+  let totalYShift = 0;
+  const finalNodes = [];
+
+  sortedYs.forEach(yKey => {
+    const rankNodes = ranks[yKey].sort((a, b) => a.dagreX - b.dagreX);
+    
+    const clusters = [];
+    let currentCluster = [rankNodes[0]];
+
+    for (let i = 1; i < rankNodes.length; i++) {
+      if (rankNodes[i].dagreX - rankNodes[i-1].dagreX > CLUSTER_THRESHOLD) {
+        clusters.push(currentCluster);
+        currentCluster = [rankNodes[i]];
+      } else {
+        currentCluster.push(rankNodes[i]);
+      }
+    }
+    clusters.push(currentCluster);
+
+    let maxLocalYShift = 0;
+
+    clusters.forEach(cluster => {
+      const clusterCenterX = cluster.reduce((sum, n) => sum + n.dagreX, 0) / cluster.length;
+      let clusterYShift = 0;
+      
+      // FIX: Dynamically calculate nodes per row to form a nice square for massive clusters
+      const dynamicMaxNodesPerRow = Math.max(5, Math.ceil(Math.sqrt(cluster.length)));
+
+      for (let i = 0; i < cluster.length; i += dynamicMaxNodesPerRow) {
+        const subGroup = cluster.slice(i, i + dynamicMaxNodesPerRow);
+        const subGroupWidth = (subGroup.length * nodeWidth) + ((subGroup.length - 1) * X_GAP);
+        const startX = clusterCenterX - (subGroupWidth / 2) + (nodeWidth / 2);
+
+        subGroup.forEach((node, index) => {
+          const { dagreX, dagreY, ...cleanNode } = node; 
+          
+          finalNodes.push({
+            ...cleanNode,
+            targetPosition: direction === 'TB' ? Position.Top : Position.Left,
+            sourcePosition: direction === 'TB' ? Position.Bottom : Position.Right,
+            position: {
+              x: (startX + index * (nodeWidth + X_GAP)) - (nodeWidth / 2),
+              y: (node.dagreY + totalYShift + clusterYShift) - (nodeHeight / 2),
+            }
+          });
+        });
+
+        if (i + dynamicMaxNodesPerRow < cluster.length) {
+          clusterYShift += nodeHeight + Y_GAP;
+        }
+      }
+
+      if (clusterYShift > maxLocalYShift) {
+        maxLocalYShift = clusterYShift;
+      }
+    });
+
+    totalYShift += maxLocalYShift;
+  });
+
+  return { nodes: finalNodes, edges };
+};
+
+// ── Custom Impact Node ────────────────────────────────────────────
+
+/**
+ * It evaluates the node's impact level, then extracts specific severity colors, 
+ * and then it applies them to the aesthetic glow and borders of the React Flow element.
+ */
+const ImpactNode = ({ data }) => {
+  const isChanged = data.impactLevel === 'changed';
+  const isDirect = data.impactLevel === 'direct';
+  
+  const bg = isChanged ? '#da3633cc' : isDirect ? '#d29922cc' : '#8957e5cc';
+  const border = isChanged ? '#ff7b72' : isDirect ? '#e3b341' : '#a371f7';
+  const shadow = isChanged ? '0 0 15px rgba(255,123,114,0.4)' : isDirect ? '0 0 10px rgba(227,179,65,0.3)' : '0 4px 6px rgba(0,0,0,0.3)';
+  
+  return (
+    <div
+      style={{
+        width: 160,
+        borderRadius: 8,
+        border: `2px solid ${border}`,
+        background: bg,
+        backdropFilter: 'blur(6px)',
+        padding: '10px',
+        color: '#CBD5E8',
+        fontFamily: 'monospace',
+        fontSize: '11px',
+        boxShadow: shadow,
+        transition: 'all 0.2s ease'
+      }}
+    >
+      <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
+      <div style={{ padding: '6px 10px', display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={data.label}>
+          {data.label}
+        </div>
+        <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.9 }}>
+          {data.impactLevel}
+        </div>
+      </div>
+      <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
+    </div>
+  );
+};
+
+const impactNodeTypes = { impactNode: ImpactNode };
 
 export default function ImpactPage() {
   const { repoId } = useParams();
+  const navigate = useNavigate();
   const { repo, loading: repoLoading, error: repoError } = useRepository();
+  const { addToast } = useToast();
+  
   const [impact, setImpact] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const impactRes = await repositoryApi.getChangeImpact(repoId);
-        setImpact(impactRes.data);
-      } catch (err) {
-        setError(err.response?.data?.error || err.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchData();
-  }, [repoId]);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  const [nodes, setNodes] = useState([]);
+  const [edges, setEdges] = useState([]);
+  const [rfInstance, setRfInstance] = useState(null);
 
-  if (loading || repoLoading) return <div className="p-8 text-white">Loading impact analysis...</div>;
-  if (error || repoError) return <div className="p-8 text-red-400">Error: {error || repoError}</div>;
+  /**
+   * It maps the file paths from the analysis array, then extracts nested directory chunks, 
+   * and then it applies them into a hierarchical tree object for the sidebar selector.
+   */
+  const fileTreeNodes = useMemo(() => {
+    const treeMap = { type: 'directory', children: {} };
+    const paths = repo?.analysis?.files?.map(f => f.filePath) || [];
+    
+    paths.forEach(path => {
+      const parts = path.split('/');
+      let current = treeMap;
+      let currentPath = '';
+      
+      for (let i = 0; i < parts.length - 1; i++) {
+        const part = parts[i];
+        currentPath = currentPath ? `${currentPath}/${part}` : part;
+        if (!current.children[part]) {
+          current.children[part] = { name: part, path: currentPath, type: 'directory', children: {} };
+        }
+        current = current.children[part];
+      }
+      
+      const fileName = parts[parts.length - 1];
+      currentPath = currentPath ? `${currentPath}/${fileName}` : fileName;
+      current.children[fileName] = { name: fileName, path: currentPath, type: 'file' };
+    });
+
+    const convertMapToArray = (map) => {
+      return Object.values(map.children || {}).map(node => {
+        if (node.type === 'directory') {
+          return { ...node, children: convertMapToArray(node) };
+        }
+        return node;
+      }).sort((a, b) => {
+        if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+    };
+
+    return convertMapToArray(treeMap);
+  }, [repo]);
+
+  /**
+   * It tracks the deterministic impact payload, then extracts the affected paths and corresponding edges, 
+   * and then it applies the smart dagre packer to layout the graphical nodes.
+   */
+  useEffect(() => {
+    if (!impact || !repo?.analysis?.graph) return;
+    const { changedFiles, directlyAffectedFiles, transitivelyAffectedFiles } = impact;
+    
+    const relevantFiles = new Set([
+      ...(changedFiles || []),
+      ...(directlyAffectedFiles || []),
+      ...(transitivelyAffectedFiles || [])
+    ]);
+    
+    const rfNodes = [];
+    relevantFiles.forEach(file => {
+      let impactLevel = 'transitive';
+      if (changedFiles?.includes(file)) impactLevel = 'changed';
+      else if (directlyAffectedFiles?.includes(file)) impactLevel = 'direct';
+      
+      const label = file.split('/').pop();
+      
+      rfNodes.push({
+        id: `file:${file}`,
+        type: 'impactNode',
+        data: { label, fullPath: file, impactLevel },
+        position: { x: 0, y: 0 } 
+      });
+    });
+    
+    const rfEdges = [];
+    repo.analysis.graph.edges?.forEach(e => {
+      const sourceFile = e.source.replace(/^file:/, '');
+      const targetFile = e.target.replace(/^file:/, '');
+      if (relevantFiles.has(sourceFile) && relevantFiles.has(targetFile)) {
+        rfEdges.push({
+          id: `${e.source}-${e.target}`,
+          source: `file:${sourceFile}`,
+          target: `file:${targetFile}`,
+          type: 'default',
+          animated: false,
+          style: { 
+            stroke: '#8957e5', 
+            opacity: 0.7, 
+            strokeWidth: 2,
+            strokeDasharray: '5, 5' 
+          },
+          markerEnd: { type: MarkerType.ArrowClosed, color: '#8957e5' }
+        });
+      }
+    });
+
+    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(rfNodes, rfEdges, 'TB');
+    
+    setNodes(layoutedNodes);
+    setEdges(layoutedEdges);
+    
+    if (rfInstance) {
+      setTimeout(() => {
+        window.requestAnimationFrame(() => {
+          rfInstance.fitView({ padding: 0.2, duration: 800 });
+        });
+      }, 50);
+    }
+
+  }, [impact, repo, rfInstance]);
+
+  /**
+   * It handles the analysis trigger, then extracts the offline downstream impact, 
+   * and then it applies UI toast notifications for completion or failure.
+   */
+  const analyzeImpact = async () => {
+    if (selectedFiles.length === 0) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const impactRes = await repositoryApi.getChangeImpact(repoId, selectedFiles);
+      setImpact(impactRes.data);
+      addToast({ 
+        title: 'Impact Analysis Complete', 
+        description: `Identified ${impactRes.data.transitivelyAffectedFiles?.length || 0} transitive dependencies.`, 
+        type: 'success' 
+      });
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+      addToast({ 
+        title: 'Analysis Failed', 
+        description: err.response?.data?.error || err.message, 
+        type: 'error' 
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleFile = (filePath) => {
+    setSelectedFiles(prev => 
+      prev.includes(filePath) ? prev.filter(f => f !== filePath) : [...prev, filePath]
+    );
+  };
+
+  if (repoLoading) return <div className="p-8 flex justify-center text-muted"><Loader2 className="w-6 h-6 animate-spin" /></div>;
+
+  if (repoError || error) {
+    const errorMsg = repoError || error;
+    const isNotReady = errorMsg.toLowerCase().includes('not ready') || errorMsg.toLowerCase().includes('pending');
+    
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-surface">
+        <div className="text-center bg-panel p-8 rounded-xl border border-border">
+          <AlertCircle className="w-8 h-8 text-danger mx-auto mb-3" />
+          <h2 className="text-lg font-semibold text-white mb-2">Analysis Unavailable</h2>
+          <p className="text-muted mb-6 text-sm">{errorMsg}</p>
+          {isNotReady ? (
+            <button 
+              onClick={async () => {
+                await repositoryApi.analyze(repoId);
+                navigate(`/explore/${repoId}`);
+              }}
+              className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              Start Analysis
+            </button>
+          ) : (
+            <button onClick={() => navigate(-1)} className="text-sm text-accent hover:underline">← Go back</button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex-1 h-full overflow-y-auto custom-scrollbar bg-surface text-slate-300 p-8 font-sans">
-      <div className="max-w-5xl mx-auto space-y-8">
-        
-        <header className="flex justify-between items-end border-b border-slate-700 pb-4">
-          <div>
-            <h1 className="text-3xl font-bold text-white tracking-tight">Change Impact Analysis</h1>
-            <p className="text-slate-400 mt-1">Repository: {repo?.name}</p>
-          </div>
-        </header>
-
-        {impact?.changedFiles?.length === 0 ? (
-          <div className="bg-slate-800 rounded-lg p-6 text-center text-slate-400 border border-slate-700">
-            No files were changed in the latest analysis version.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
-            {/* Changed Files */}
-            <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden shadow-lg">
-              <div className="bg-slate-800/50 px-4 py-3 border-b border-slate-700">
-                <h2 className="text-lg font-semibold text-white">Changed Files</h2>
-              </div>
-              <ul className="p-4 space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
-                {impact?.changedFiles?.map(f => (
-                  <li key={f} className="text-sm font-mono text-yellow-300 bg-yellow-400/10 px-2 py-1 rounded">
-                    <Link to={`/explore/${repoId}/source?path=${encodeURIComponent(f)}`} className="hover:underline">
-                      {f}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Affected Components */}
-            <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden shadow-lg">
-              <div className="bg-slate-800/50 px-4 py-3 border-b border-slate-700">
-                <h2 className="text-lg font-semibold text-white">Affected Architecture Components</h2>
-              </div>
-              <ul className="p-4 space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
-                {impact?.affectedComponents?.length === 0 ? (
-                  <li className="text-sm text-slate-500 italic">No specific architectural components affected.</li>
-                ) : impact?.affectedComponents?.map(c => (
-                  <li key={c} className="text-sm font-medium text-purple-300 bg-purple-400/10 px-2 py-1 rounded">
-                    {c}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Direct Dependents */}
-            <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden shadow-lg">
-              <div className="bg-slate-800/50 px-4 py-3 border-b border-slate-700">
-                <h2 className="text-lg font-semibold text-white flex justify-between">
-                  <span>Directly Affected Files</span>
-                  <span className="text-sm text-slate-400 font-normal bg-slate-700 px-2 py-0.5 rounded-full">
-                    {impact?.directlyAffectedFiles?.length}
-                  </span>
-                </h2>
-              </div>
-              <ul className="p-4 space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
-                {impact?.directlyAffectedFiles?.length === 0 ? (
-                  <li className="text-sm text-slate-500 italic">No files directly depend on the changes.</li>
-                ) : impact?.directlyAffectedFiles?.map(f => (
-                  <li key={f} className="text-sm font-mono text-orange-300 bg-orange-400/10 px-2 py-1 rounded truncate" title={f}>
-                    <Link to={`/explore/${repoId}/source?path=${encodeURIComponent(f)}`} className="hover:underline">
-                      {f}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Transitive Dependents */}
-            <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden shadow-lg">
-              <div className="bg-slate-800/50 px-4 py-3 border-b border-slate-700">
-                <h2 className="text-lg font-semibold text-white flex justify-between">
-                  <span>Transitively Affected Files</span>
-                  <span className="text-sm text-slate-400 font-normal bg-slate-700 px-2 py-0.5 rounded-full">
-                    {impact?.transitivelyAffectedFiles?.length}
-                  </span>
-                </h2>
-              </div>
-              <ul className="p-4 space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
-                {impact?.transitivelyAffectedFiles?.length === 0 ? (
-                  <li className="text-sm text-slate-500 italic">No downstream files affected.</li>
-                ) : impact?.transitivelyAffectedFiles?.map(f => (
-                  <li key={f} className="text-sm font-mono text-red-300 bg-red-400/10 px-2 py-1 rounded truncate" title={f}>
-                    <Link to={`/explore/${repoId}/source?path=${encodeURIComponent(f)}`} className="hover:underline">
-                      {f}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-          </div>
-        )}
-      </div>
+    <div className="flex flex-col h-full bg-surface">
+      <ResizableLayout
+        panels={[
+          {
+            id: 'impact-results',
+            defaultSize: 70,
+            minWidth: 400,
+            content: (
+              <main className="flex-1 overflow-hidden flex flex-col bg-surface/50 h-full">
+                <div className="px-6 pt-6 shrink-0">
+                  <PageHeader 
+                    title="Change Impact Analysis" 
+                    description="Select files that you plan to modify. The deterministic engine will traverse the dependency graph to identify exactly which files and architectural components will be affected downstream."
+                    icon={Activity}
+                  />
+                </div>
+                <div className="flex-1 p-6 pt-2 h-full flex flex-col min-h-0">
+                  {!impact ? (
+                    <div className="flex-1 h-full flex flex-col items-center justify-center text-muted gap-3 bg-panel rounded border border-border border-dashed">
+                      <Activity className="w-10 h-10 opacity-30" />
+                      <p className="text-sm">Select files from the sidebar and click "Analyze Impact".</p>
+                    </div>
+                  ) : (
+                    <div className="flex-1 w-full h-full bg-surface border border-border rounded shadow-inner relative overflow-hidden">
+                      <ReactFlow
+                        onInit={setRfInstance}
+                        nodes={nodes}
+                        edges={edges}
+                        nodeTypes={impactNodeTypes}
+                        onNodesChange={(changes) => setNodes((nds) => applyNodeChanges(changes, nds))}
+                        fitView
+                        minZoom={0.01} 
+                        maxZoom={2}
+                        nodesConnectable={false}
+                        nodesDraggable={true} 
+                        proOptions={{ hideAttribution: true }}
+                      >
+                        <Controls showInteractive={false} className="bg-panel border-border" />
+                      </ReactFlow>
+                      <div className="absolute top-4 right-4 bg-panel/90 border border-border rounded p-3 text-xs flex flex-col gap-2 backdrop-blur-sm shadow-xl">
+                        <div className="font-semibold text-white/90 border-b border-border/50 pb-2 mb-1">Impact Legend</div>
+                        <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#da3633] shadow-[0_0_8px_rgba(218,54,51,0.6)]"></div> Changed Files</div>
+                        <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#d29922] shadow-[0_0_8px_rgba(210,153,34,0.6)]"></div> Directly Affected</div>
+                        <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#8957e5] shadow-[0_0_8px_rgba(137,87,229,0.6)]"></div> Transitively Affected</div>
+                      </div>
+                    </div>
+                )}
+                </div>
+              </main>
+            )
+          },
+          {
+            id: 'file-selector',
+            defaultSize: 30,
+            minWidth: 250,
+            collapsible: true,
+            collapseDirection: 'right',
+            title: 'Files to Modify',
+            icon: <CheckSquare />,
+            content: (
+              <aside className="flex-1 flex flex-col bg-panel h-full p-4 overflow-hidden border-l border-border">
+                <input 
+                  type="text"
+                  placeholder="Search files..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-sm text-white placeholder-muted focus:outline-none focus:border-accent mb-4 shrink-0 transition-colors"
+                />
+                
+                <div className="flex-1 overflow-auto custom-scrollbar border border-border rounded bg-surface py-2 mb-4">
+                  {fileTreeNodes.length === 0 ? (
+                    <div className="text-sm text-muted p-6 text-center flex flex-col items-center gap-2">
+                      <File className="w-6 h-6 opacity-30" />
+                      No files found.
+                    </div>
+                  ) : (
+                    <FileTree 
+                      nodes={fileTreeNodes} 
+                      mode="select" 
+                      selectedFiles={selectedFiles} 
+                      onToggleFile={toggleFile} 
+                      searchTerm={searchTerm} 
+                    />
+                  )}
+                </div>
+                
+                <div className="flex flex-col gap-3 shrink-0 pt-3 border-t border-border/50">
+                  <div className="text-xs text-muted flex justify-between items-center bg-surface/50 p-2 rounded border border-border/30">
+                    <span className="font-medium text-white/80">{selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''} selected</span>
+                    {selectedFiles.length > 0 && (
+                      <button onClick={() => setSelectedFiles([])} className="text-danger hover:underline hover:text-danger/80 transition-colors">Clear All</button>
+                    )}
+                  </div>
+                  <button 
+                    onClick={analyzeImpact}
+                    disabled={selectedFiles.length === 0 || loading}
+                    className="w-full bg-accent hover:bg-accent-hover text-white px-4 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-sm"
+                  >
+                    {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {loading ? 'Calculating Blast Radius...' : 'Analyze Impact'}
+                  </button>
+                </div>
+              </aside>
+            )
+          }
+        ]}
+      />
     </div>
   );
 }

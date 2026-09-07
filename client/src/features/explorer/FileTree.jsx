@@ -17,34 +17,83 @@ function fileIconColor(name) {
   return EXT_COLOR[ext] || '#9ca3af';
 }
 
-export function FileTree({ nodes, selectedPath, onSelectFile, depth = 0 }) {
+function defaultHighlightMatch(text, query) {
+  if (!query) return text;
+  const parts = text.split(new RegExp(`(${query})`, 'gi'));
+  return (
+    <>
+      {parts.map((part, i) => 
+        part.toLowerCase() === query.toLowerCase() 
+          ? <span key={i} className="bg-accent/40 text-text font-semibold rounded-sm px-0.5">{part}</span> 
+          : part
+      )}
+    </>
+  );
+}
+
+// Recursively checks if a node or its children match the search term
+function nodeMatchesSearch(node, term) {
+  if (!term) return true;
+  const lowerTerm = term.toLowerCase();
+  if (node.path.toLowerCase().includes(lowerTerm)) return true;
+  if (node.type === 'directory' && node.children) {
+    return node.children.some(child => nodeMatchesSearch(child, term));
+  }
+  return false;
+}
+
+export function FileTree({ 
+  nodes, 
+  selectedPath, 
+  onSelectFile, 
+  depth = 0,
+  mode = 'navigate', // 'navigate' | 'select'
+  selectedFiles = [],
+  onToggleFile = () => {},
+  searchTerm = '',
+  highlightMatch = defaultHighlightMatch
+}) {
   return (
     <ul className="select-none">
-      {nodes.map((node) => (
-        <FileTreeNode
-          key={node.path}
-          node={node}
-          depth={depth}
-          selectedPath={selectedPath}
-          onSelectFile={onSelectFile}
-        />
-      ))}
+      {nodes.map((node) => {
+        if (searchTerm && !nodeMatchesSearch(node, searchTerm)) return null;
+        
+        return (
+          <FileTreeNode
+            key={node.path}
+            node={node}
+            depth={depth}
+            selectedPath={selectedPath}
+            onSelectFile={onSelectFile}
+            mode={mode}
+            selectedFiles={selectedFiles}
+            onToggleFile={onToggleFile}
+            searchTerm={searchTerm}
+            highlightMatch={highlightMatch}
+          />
+        );
+      })}
     </ul>
   );
 }
 
-function FileTreeNode({ node, depth, selectedPath, onSelectFile }) {
-  // Auto-collapse only at depth > 1 so top-level folders start open
-  const [open, setOpen] = useState(depth < 1);
-  const isSelected = node.path === selectedPath;
+function FileTreeNode({ 
+  node, depth, selectedPath, onSelectFile, 
+  mode, selectedFiles, onToggleFile, searchTerm, highlightMatch 
+}) {
+  // Sets all folders to be open by default
+  const [open, setOpen] = useState(true);
+  
+  const isSelected = mode === 'navigate' ? node.path === selectedPath : false;
+  const isChecked = mode === 'select' ? selectedFiles.includes(node.path) : false;
   const isAncestor = selectedPath?.startsWith(node.path + '/');
   const indentPx = depth * 14;
 
   useEffect(() => {
-    if (isAncestor) {
+    if (isAncestor || Boolean(searchTerm)) {
       setOpen(true);
     }
-  }, [isAncestor]);
+  }, [isAncestor, searchTerm]);
 
   if (node.type === 'directory') {
     const hasChildren = node.children?.length > 0;
@@ -53,11 +102,11 @@ function FileTreeNode({ node, depth, selectedPath, onSelectFile }) {
         <button
           onClick={() => setOpen((o) => !o)}
           style={{ paddingLeft: `${indentPx + 4}px` }}
-          className="min-w-max text-left flex items-center gap-1.5 py-[3px] pr-2 rounded text-xs group text-white/60 hover:text-white hover:bg-white/5 transition-colors"
+          className="w-full text-left flex items-center gap-1.5 py-[3px] pr-2 rounded text-xs group text-text/60 hover:text-text hover:bg-white/5 transition-colors"
           title={node.name}
         >
           {/* chevron */}
-          <span className="shrink-0 w-3 h-3 flex items-center justify-center text-white/30 group-hover:text-white/60">
+          <span className="shrink-0 w-3 h-3 flex items-center justify-center text-text/30 group-hover:text-text/60">
             <ChevronRight
               className={`w-3 h-3 transition-transform duration-150 ${
                 open && hasChildren ? 'rotate-90' : ''
@@ -71,11 +120,13 @@ function FileTreeNode({ node, depth, selectedPath, onSelectFile }) {
               : <Folder className="w-3.5 h-3.5 text-yellow-400/60" />
             }
           </span>
-          {/* label — no truncation, allow scroll */}
-          <span className="whitespace-nowrap min-w-0 font-medium" title={node.name}>{node.name}</span>
+          {/* label */}
+          <span className="whitespace-nowrap min-w-0 font-medium truncate" title={node.name}>
+            {highlightMatch(node.name, searchTerm)}
+          </span>
           {/* child count badge */}
           {hasChildren && (
-            <span className="ml-auto shrink-0 text-[9px] text-white/20 group-hover:text-white/40 tabular-nums">
+            <span className="ml-auto shrink-0 text-[9px] text-text/20 group-hover:text-text/40 tabular-nums">
               {node.children.filter(c => c.type === 'file').length > 0
                 ? node.children.filter(c => c.type === 'file').length
                 : ''}
@@ -83,9 +134,9 @@ function FileTreeNode({ node, depth, selectedPath, onSelectFile }) {
           )}
         </button>
 
-        {/* children — rendered with a subtle indent guide line */}
+        {/* children */}
         {open && hasChildren && (
-          <div className="relative">
+          <div className="relative overflow-hidden">
             <span
               className="absolute top-0 bottom-0 border-l border-white/[0.06]"
               style={{ left: `${indentPx + 11}px` }}
@@ -95,6 +146,11 @@ function FileTreeNode({ node, depth, selectedPath, onSelectFile }) {
               depth={depth + 1}
               selectedPath={selectedPath}
               onSelectFile={onSelectFile}
+              mode={mode}
+              selectedFiles={selectedFiles}
+              onToggleFile={onToggleFile}
+              searchTerm={searchTerm}
+              highlightMatch={highlightMatch}
             />
           </div>
         )}
@@ -104,32 +160,61 @@ function FileTreeNode({ node, depth, selectedPath, onSelectFile }) {
 
   // ── File node ──────────────────────────────────────────────────────────────
   const iconColor = fileIconColor(node.name);
+  
+  const commonClasses = `w-full text-left flex items-center gap-1.5 py-[3px] pr-2 rounded text-xs transition-colors group ${
+    mode === 'navigate' ? 'cursor-pointer' : 'cursor-default'
+  } ${
+    isSelected
+      ? 'text-text bg-accent/15 border-l-2 border-accent'
+      : 'text-text/60 hover:text-text hover:bg-white/5 border-l-2 border-transparent'
+  }`;
+
+  const nodeContent = (
+    <>
+      <span className="shrink-0 w-3" />
+      
+      {mode === 'select' && (
+        <input 
+          type="checkbox"
+          checked={isChecked}
+          onChange={() => onToggleFile(node.path)}
+          className="shrink-0 w-3.5 h-3.5 rounded border-border text-accent focus:ring-accent bg-panel cursor-pointer"
+        />
+      )}
+      
+      <FileCode
+        className="w-3.5 h-3.5 shrink-0"
+        style={{ color: isSelected || isChecked ? iconColor : iconColor + 'aa' }}
+      />
+      
+      <span className={`whitespace-nowrap min-w-0 font-mono text-[11px] truncate ${
+        isSelected || isChecked ? 'text-text font-medium' : 'group-hover:text-text'
+      }`}>
+        {highlightMatch(node.name, searchTerm)}
+      </span>
+    </>
+  );
+
   return (
     <li>
-      <button
-        onClick={() => onSelectFile(node.path)}
-        style={{ paddingLeft: `${indentPx + 4}px` }}
-        className={`min-w-max text-left flex items-center gap-1.5 py-[3px] pr-2 rounded text-xs transition-colors group ${
-          isSelected
-            ? 'text-white bg-accent/15 border-l-2 border-accent'
-            : 'text-white/60 hover:text-white hover:bg-white/5 border-l-2 border-transparent'
-        }`}
-        title={node.path}
-      >
-        {/* spacer to align with folder chevron */}
-        <span className="shrink-0 w-3" />
-        {/* coloured file icon */}
-        <FileCode
-          className="w-3.5 h-3.5 shrink-0"
-          style={{ color: isSelected ? iconColor : iconColor + 'aa' }}
-        />
-        {/* filename — no truncation, allow scroll */}
-        <span className={`whitespace-nowrap min-w-0 font-mono text-[11px] ${
-          isSelected ? 'text-white font-medium' : 'group-hover:text-white'
-        }`}>
-          {node.name}
-        </span>
-      </button>
+      {mode === 'select' ? (
+        <label 
+          style={{ paddingLeft: `${indentPx + 4}px` }} 
+          className={commonClasses}
+          title={node.path}
+        >
+          {nodeContent}
+        </label>
+      ) : (
+        <button 
+          style={{ paddingLeft: `${indentPx + 4}px` }} 
+          className={commonClasses}
+          onClick={() => onSelectFile(node.path)}
+          title={node.path}
+        >
+          {nodeContent}
+        </button>
+      )}
     </li>
   );
 }

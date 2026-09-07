@@ -1,29 +1,34 @@
 /**
  * analyzer.client.js
  * 
- * Provides a Promise-based API for the main thread to interact with the analyzer worker.
+ * It initializes the Web Worker bridge, then extracts asynchronous messages, 
+ * and then it applies Promise resolution for the main thread UI.
  */
 
 let worker = null;
 const subscribers = new Set();
-const pendingResolvers = new Map(); // repoId -> { resolve, reject }
+const pendingResolvers = new Map(); 
 
+/**
+ * It evaluates the worker instance, then extracts lifecycle events, 
+ * and then it applies broadcast listeners for the UI subscribers.
+ */
 export function initWorker() {
   if (worker) return;
-  // Initialize the worker using Vite's Web Worker syntax
+  
   worker = new Worker(new URL('./analyzer.worker.js', import.meta.url), { type: 'module' });
   
   worker.onmessage = (event) => {
     const { type, repoId, phase, details, result, error } = event.data;
     
-    // Broadcast progress to all subscribers
+    // It filters for progress events, then extracts phase details, and then it applies them to all active UI listeners.
     if (type === 'PROGRESS') {
       for (const cb of subscribers) {
         cb(repoId, phase, details);
       }
     }
     
-    // Resolve/reject the pending Promise for this repo
+    // It captures terminal events, then extracts the mapped promise resolvers, and then it applies resolve or reject logic.
     if (type === 'COMPLETE' || type === 'ERROR') {
       const resolvers = pendingResolvers.get(repoId);
       if (resolvers) {
@@ -36,7 +41,7 @@ export function initWorker() {
 
   worker.onerror = (error) => {
     console.error('[analyzer.client] Worker script error:', error);
-    // Reject all pending promises
+    // It intercepts fatal crashes, then extracts pending UI tasks, and then it applies a global rejection to prevent hanging loading spinners.
     for (const [repoId, resolvers] of pendingResolvers.entries()) {
       resolvers.reject(new Error('Worker script crashed or failed to load. Check console for details.'));
     }
@@ -49,11 +54,8 @@ export function initWorker() {
 }
 
 /**
- * Start the analysis process for a repository.
- * 
- * @param {string} repoId 
- * @param {Object} options 
- * @returns {Promise<Object>} Resolves with the final RepositoryAnalysis object when complete.
+ * It allocates a new tracking promise, then extracts the repository payload, 
+ * and then it applies a START message to the background worker thread.
  */
 export function startAnalysis(repoId, options = {}) {
   initWorker();
@@ -65,10 +67,8 @@ export function startAnalysis(repoId, options = {}) {
 }
 
 /**
- * Subscribe to progress updates for any running analysis.
- * 
- * @param {Function} callback (repoId, phase, details)
- * @returns {Function} Unsubscribe function
+ * It captures the callback reference, then extracts progress updates, 
+ * and then it applies them to the subscriber set for React component re-renders.
  */
 export function onProgress(callback) {
   subscribers.add(callback);
@@ -76,14 +76,14 @@ export function onProgress(callback) {
 }
 
 /**
- * Terminate the worker (useful for cleanup on unmount, or interrupting).
+ * It commands the worker to halt, then extracts pending promises, 
+ * and then it applies rejection to cleanly free up browser memory.
  */
 export function terminateWorker() {
   if (worker) {
     worker.terminate();
     worker = null;
     
-    // Reject all pending
     for (const [repoId, resolvers] of pendingResolvers.entries()) {
       resolvers.reject(new Error('Worker terminated'));
     }

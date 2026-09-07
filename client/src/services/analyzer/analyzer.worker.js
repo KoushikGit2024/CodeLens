@@ -1,14 +1,23 @@
+/**
+ * analyzer.worker.js
+ * 
+ * It receives the worker initialization payload, then extracts the repository analysis pipeline, 
+ * and then it applies the computational results back to the main UI thread.
+ */
+
 import { analyzeRepository } from './repository/repository.analyzer.js';
 import { buildDependencyGraph } from './dependencies/dependency.analyzer.js';
 import { buildArchitectureModel } from './advanced/architecture.analyzer.js';
 import * as repositoryStore from './repository/repository.store.js';
-import * as persistenceStore from './repository/persistence.store.js';
 
-// Small yield so the polling loop can observe each phase even on fast repos
+// It triggers a manual timeout, then extracts the thread lock, and then it applies a brief pause so UI polling can catch up.
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+/**
+ * It initiates the repository state, then extracts sequential AST and graph models, 
+ * and then it applies the final unified analysis to the browser's IndexedDB.
+ */
 export async function executeAnalysisPipeline(repoId, options = {}, postMessage = () => {}) {
-  // 1. Mark repo as analyzing
   let record = await repositoryStore.get(repoId);
   if (!record) {
     record = { id: repoId, name: `Repo-${repoId}`, uploadedAt: new Date().toISOString() };
@@ -17,14 +26,13 @@ export async function executeAnalysisPipeline(repoId, options = {}, postMessage 
   
   await repositoryStore.update(repoId, { status: 'analyzing', phase: 'scanning_files' });
 
+  // It captures the current phase, then extracts progress details, and then it applies a state update to the local repository store.
   const onProgress = async (phase, details) => {
     await repositoryStore.update(repoId, { phase, phaseDetails: details });
     postMessage({ type: 'PROGRESS', repoId, phase, details });
-    // Yield briefly so the UI polling can observe this phase
     await sleep(400);
   };
 
-  // 2. Run AST Analysis
   const previousAnalysis = record.analysis || null;
   const analysis = await analyzeRepository(repoId, previousAnalysis, onProgress, options);
   
@@ -32,29 +40,31 @@ export async function executeAnalysisPipeline(repoId, options = {}, postMessage 
     throw new Error(analysis.error);
   }
 
-  // 3. Run Dependency Graph Engine
   await onProgress('building_graph');
   const graph = buildDependencyGraph(analysis);
   analysis.graph = graph;
 
-  // 4. Run Architecture Analysis
   await onProgress('building_architecture');
   const architecture = buildArchitectureModel(analysis, graph);
   analysis.architecture = architecture;
 
-  // 5. Show finalizing step briefly before marking ready
-  await onProgress('ready');
-
-  // 6. Finalize
+  // It finalizes the database transaction, then extracts the complete analysis object, and then it applies it to IndexedDB BEFORE notifying the UI.
   await repositoryStore.update(repoId, { 
     status: 'ready', 
     phase: 'ready', 
     analysis 
   });
 
+  // Now it is completely safe to tell the UI to fetch the final data
+  await onProgress('ready');
+
   return analysis;
 }
 
+/**
+ * It intercepts the main thread command, then extracts the repository identifier, 
+ * and then it applies the full pipeline execution inside the isolated worker context.
+ */
 self.onmessage = async (event) => {
   const { type, repoId, options = {} } = event.data;
 

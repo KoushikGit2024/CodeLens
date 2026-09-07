@@ -1,74 +1,28 @@
 /**
  * moduleResolver.js
  *
- * Resolves JavaScript/TypeScript import/require specifiers to actual files
- * inside a repository.
+ * It takes the AST import symbols, then extracts the target paths, 
+ * and then it applies repository-aware resolution to connect internal graphs.
  *
- * ── Resolution algorithm ─────────────────────────────────────────────────────
- *
- * Given:
- *   - importingFile:  relative path of the file that contains the import
- *   - specifier:      the raw import string, e.g. './utils/helper' or 'express'
- *   - knownFiles:     Set of relative file paths present in the repository
- *
- * Step 1 — Classify the specifier
- *   - Relative (starts with './' or '../'):  attempt file resolution (steps 2–4)
- *   - Absolute/bare (e.g. 'express', '@org/pkg'):  external package, stop here
- *
- * Step 2 — Exact match (specifier already has extension)
- *   Candidate = join(dir(importingFile), specifier)
- *   If knownFiles contains candidate → resolved.
- *
- * Step 3 — Extension probing
- *   Try appending each supported extension in order:
- *     .js  .jsx  .ts  .tsx
- *   First match wins.
- *
- * Step 4 — Index file resolution
- *   If specifier resolves to a directory that is referenced, try:
- *     <specifier>/index.js
- *     <specifier>/index.jsx
- *     <specifier>/index.ts
- *     <specifier>/index.tsx
- *   First match wins.
- *
- * Step 5 — Unresolved
- *   Return { resolved: false, reason: '...' }
- *
- * ── Limitations ──────────────────────────────────────────────────────────────
- *
- *   - No tsconfig.json path aliases (e.g. @/components/Button)
- *   - No package.json "exports" field resolution
- *   - No webpack/vite alias resolution
- *   - No URL imports (ESM with http:// specifiers)
- *   - Only JS/TS files are resolved; CSS/JSON/asset imports remain unresolved
- *
- * These are intentional scope restrictions for Step 3. Document and extend
- * as needed in later steps.
+ * How this file is structured:
+ *   1. classifySpecifier()  — It analyzes the import string, then extracts its origin pattern, and then it applies a relative/alias/external tag.
+ *   2. resolveImport()      — It reads the importing file path, then extracts the specifier candidates, and then it applies the known files map to find a match.
+ *   3. resolveAllImports()  — It loops through the entire analysis payload, then extracts all file symbols, and then it applies resolution to the whole repository.
  */
 
 import path from 'path-browserify';
 
-// Supported extensions tried in order during extension probing.
-const RESOLUTION_EXTENSIONS = ['.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.cpp', '.cc', '.cxx', '.h', '.hpp'];
+export const RESOLUTION_EXTENSIONS = ['.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.cpp', '.cc', '.cxx', '.h', '.hpp', '.go', '.rs', '.c'];
 
 /**
- * Classify a module specifier.
- *
- * @param {string} specifier
- * @returns {'relative'|'external'}
+ * It evaluates the specifier string, then extracts its leading characters, 
+ * and then it applies the corresponding module resolution category.
  */
-function classifySpecifier(specifier, isCpp = false, isJava = false, isPython = false) {
-  if (isCpp) {
-    // C++ includes are either absolute (system) or relative to current file usually
-    // But our parser extracts external as 'external' and internal as 'internal' already via type
-    // We will just let C++ imports pass through as relative if they aren't marked external by parser
+export function classifySpecifier(specifier, isCpp = false, isJava = false, isPython = false, isGo = false, isRust = false) {
+  if (isCpp || isGo || isRust) {
     return specifier.startsWith('/') || specifier.startsWith('./') || specifier.startsWith('../') ? 'relative' : 'relative';
   }
   if (isPython || isJava) {
-    // Python and Java use dotted paths. They are typically absolute from root, or relative if starting with '.' (Python).
-    // Let's treat them all as relative to the repo root if they are not explicitly relative.
-    // Actually, we'll handle them inside resolveImport specifically.
     return 'relative';
   }
 
@@ -84,25 +38,10 @@ function classifySpecifier(specifier, isCpp = false, isJava = false, isPython = 
 }
 
 /**
- * Resolve a single import specifier to a file path inside the repository.
- *
- * @param {object} opts
- * @param {string}      opts.importingFile  — relative path of the importing file (forward slashes)
- * @param {string}      opts.specifier      — raw import/require string
- * @param {Set<string>} opts.knownFiles     — set of all relative repository file paths
- *
- * @returns {ResolvedImport}
- *
- * ResolvedImport shape:
- * {
- *   specifier:  string       — original specifier
- *   kind:       'internal' | 'external' | 'unresolved'
- *   resolvedTo: string|null  — relative path of the target file (kind === 'internal')
- *   reason:     string|null  — why resolution failed (kind === 'unresolved')
- * }
+ * It parses the raw import text, then extracts possible file extensions, 
+ * and then it applies the internal path matching logic to return a ResolvedImport object.
  */
-function resolveImport({ importingFile, specifier, knownFiles, type }) {
-  // Strip Vite/Webpack query params and hashes (e.g., "?worker", "?url") for resolution
+export function resolveImport({ importingFile, specifier, knownFiles, type }) {
   let cleanSpecifier = specifier;
   const qIndex = cleanSpecifier.indexOf('?');
   if (qIndex !== -1) cleanSpecifier = cleanSpecifier.substring(0, qIndex);
@@ -112,51 +51,42 @@ function resolveImport({ importingFile, specifier, knownFiles, type }) {
   const ext = path.posix.extname(importingFile).toLowerCase();
   const isPython = ext === '.py';
   const isJava   = ext === '.java' || ext === '.kt' || ext === '.kts';
-  const isCpp    = ['.cpp', '.cc', '.cxx', '.h', '.hpp'].includes(ext);
+  const isCpp    = ['.cpp', '.cc', '.cxx', '.h', '.hpp', '.c'].includes(ext);
+  const isGo     = ext === '.go';
+  const isRust   = ext === '.rs';
 
-  // C++ parser already classifies internal vs external via 'type'
-  if (isCpp && type === 'external') {
+  if ((isCpp || isRust) && type === 'external') {
     return { specifier, kind: 'external', resolvedTo: null, reason: null };
   }
 
-  const kind = classifySpecifier(cleanSpecifier, isCpp, isJava, isPython);
+  const kind = classifySpecifier(cleanSpecifier, isCpp, isJava, isPython, isGo, isRust);
 
-  if (kind === 'external' && !isPython && !isJava && !isCpp) {
+  if (kind === 'external' && !isPython && !isJava && !isCpp && !isGo && !isRust) {
     return { specifier, kind: 'external', resolvedTo: null, reason: null };
   }
 
   let baseCandidates = [];
   const importDir = path.posix.dirname(importingFile);
 
-  if (!isPython && !isJava && !isCpp && kind === 'alias') {
+  if (!isPython && !isJava && !isCpp && !isGo && !isRust && kind === 'alias') {
     const stripped = specifier.replace(/^[@~]\/?/, '');
     baseCandidates.push(normalisePath(stripped));
     baseCandidates.push(normalisePath(path.posix.join('src', stripped)));
     baseCandidates.push(normalisePath(path.posix.join('lib', stripped)));
   } else if (isPython) {
-    // Python dotted paths: `foo.bar` -> `foo/bar`
-    // If it's relative like `.foo`, it means sibling. `..foo` means parent.
-    // Actually, `from . import foo` gives specifier `.` or `.foo`.
-    // Tree-sitter might give `foo.bar`.
     let pyPath = cleanSpecifier;
     if (pyPath.startsWith('.')) {
-      // Relative import
       pyPath = pyPath.replace(/^\.+/, (match) => {
          return '../'.repeat(match.length - 1) + './';
       });
       pyPath = pyPath.replace(/\./g, '/');
       baseCandidates.push(normalisePath(path.posix.join(importDir, pyPath)));
     } else {
-      // Absolute import from repo root
       pyPath = pyPath.replace(/\./g, '/');
       baseCandidates.push(normalisePath(pyPath));
     }
   } else if (isJava) {
-    // Java/Kotlin: convert dotted import `com.example.Foo` → `com/example/Foo`
-    // Then find any known file whose path *ends with* that suffix (handles deep src layouts)
     let javaPath = cleanSpecifier.replace(/\./g, '/');
-
-    // Strip wildcard imports: `com.example.*` → `com/example`
     const isWildcard = javaPath.endsWith('/*');
     if (isWildcard) javaPath = javaPath.slice(0, -2);
 
@@ -172,7 +102,6 @@ function resolveImport({ importingFile, specifier, knownFiles, type }) {
       ) {
         return { specifier, kind: 'internal', resolvedTo: knownFile, reason: null };
       }
-      // Wildcard: match any file inside the package directory
       if (isWildcard) {
         const pkgDir = javaPath + '/';
         if (
@@ -181,35 +110,37 @@ function resolveImport({ importingFile, specifier, knownFiles, type }) {
            knownFile.startsWith(pkgDir)) &&
           (knownFile.endsWith('.kt') || knownFile.endsWith('.java'))
         ) {
-          // Don't return a single file for wildcards — mark as unresolved to avoid false edges
           break;
         }
       }
     }
-
-    // Not found internally — it's an external package (Android SDK, stdlib, etc.)
     return { specifier, kind: 'external', resolvedTo: null, reason: null };
+  } else if (isGo) {
+    // Go imports are usually absolute paths relative to GOPATH/module root, treated as external if not found
+    baseCandidates.push(normalisePath(cleanSpecifier));
+  } else if (isRust) {
+    // Rust modules usually map directly to files `foo.rs` or `foo/mod.rs`
+    baseCandidates.push(normalisePath(path.posix.join(importDir, cleanSpecifier)));
+    baseCandidates.push(normalisePath(cleanSpecifier));
   } else if (isCpp) {
     baseCandidates.push(normalisePath(path.posix.join(importDir, cleanSpecifier)));
   } else {
-    // JS/TS relative imports (./foo, ../bar, etc.)
     baseCandidates.push(normalisePath(path.posix.join(importDir, cleanSpecifier)));
   }
 
-  // Step 3 & 4 — probing candidates
   let extensionsToTry = RESOLUTION_EXTENSIONS;
   if (isPython) extensionsToTry = ['.py'];
   else if (isJava) extensionsToTry = ['.java'];
-  else if (isCpp) extensionsToTry = ['.cpp', '.cc', '.cxx', '.h', '.hpp'];
+  else if (isCpp) extensionsToTry = ['.cpp', '.cc', '.cxx', '.h', '.hpp', '.c'];
+  else if (isGo) extensionsToTry = ['.go'];
+  else if (isRust) extensionsToTry = ['.rs'];
   else extensionsToTry = ['.js', '.jsx', '.ts', '.tsx'];
 
   for (const rawCandidate of baseCandidates) {
-    // Step 2 — exact match
     if (knownFiles.has(rawCandidate)) {
       return { specifier, kind: 'internal', resolvedTo: rawCandidate, reason: null };
     }
 
-    // Step 3 — extension probing
     for (const ext of extensionsToTry) {
       const candidate = rawCandidate + ext;
       if (knownFiles.has(candidate)) {
@@ -217,13 +148,17 @@ function resolveImport({ importingFile, specifier, knownFiles, type }) {
       }
     }
 
-    // Step 4 — index file resolution
     if (isPython) {
       const candidate = normalisePath(path.posix.join(rawCandidate, `__init__.py`));
       if (knownFiles.has(candidate)) {
         return { specifier, kind: 'internal', resolvedTo: candidate, reason: null };
       }
-    } else if (!isJava && !isCpp) {
+    } else if (isRust) {
+      const candidate = normalisePath(path.posix.join(rawCandidate, `mod.rs`));
+      if (knownFiles.has(candidate)) {
+        return { specifier, kind: 'internal', resolvedTo: candidate, reason: null };
+      }
+    } else if (!isJava && !isCpp && !isGo) {
       for (const ext of extensionsToTry) {
         const candidate = normalisePath(path.posix.join(rawCandidate, `index${ext}`));
         if (knownFiles.has(candidate)) {
@@ -233,13 +168,10 @@ function resolveImport({ importingFile, specifier, knownFiles, type }) {
     }
   }
 
-  // If Java/Python and not found, maybe it's external (e.g. `import requests` or `import java.util.*`)
-  if (isPython || isJava) {
+  if (isPython || isJava || isGo || isRust) {
      return { specifier, kind: 'external', resolvedTo: null, reason: null };
   }
 
-  // Step 5 — unresolved
-  // If an alias starting with '@' couldn't be resolved internally, it's likely a scoped npm package (e.g., @mui/material)
   if (kind === 'alias' && specifier.startsWith('@')) {
     return { specifier, kind: 'external', resolvedTo: null, reason: null };
   }
@@ -253,12 +185,10 @@ function resolveImport({ importingFile, specifier, knownFiles, type }) {
 }
 
 /**
- * Build a Set of all known file paths from a RepositoryAnalysis.
- *
- * @param {object} analysis  — RepositoryAnalysis produced by repositoryAnalyzer
- * @returns {Set<string>}
+ * It iterates over the analyzed files, then extracts their paths, 
+ * and then it applies them into a Set for fast lookup.
  */
-function buildKnownFilesSet(analysis) {
+export function buildKnownFilesSet(analysis) {
   const set = new Set();
   for (const f of analysis.files) {
     if (f.filePath) set.add(normalisePath(f.filePath));
@@ -267,15 +197,10 @@ function buildKnownFilesSet(analysis) {
 }
 
 /**
- * Resolve all imports across every file in a RepositoryAnalysis.
- *
- * Returns a Map: filePath → ResolvedImport[]
- *
- * @param {object}      analysis    — RepositoryAnalysis
- * @param {Set<string>} knownFiles  — from buildKnownFilesSet()
- * @returns {Map<string, ResolvedImport[]>}
+ * It iterates through the repository files, then extracts all internal symbols, 
+ * and then it applies the resolver logic to map them together.
  */
-function resolveAllImports(analysis, knownFiles) {
+export function resolveAllImports(analysis, knownFiles) {
   const result = new Map();
 
   for (const fileAnalysis of analysis.files) {
@@ -311,24 +236,11 @@ function resolveAllImports(analysis, knownFiles) {
 }
 
 /**
- * Normalise a path to forward slashes and strip any leading './'.
- * Keeps leading '../' intact so relative resolution works correctly.
- *
- * @param {string} p
- * @returns {string}
+ * It detects the slash characters, then extracts OS specific backslashes, 
+ * and then it applies standard POSIX formatting.
  */
 function normalisePath(p) {
-  // Replace backslashes (Windows)
   p = p.replace(/\\/g, '/');
-  // Remove leading './' added by path.posix.join when joining with an empty dir
   if (p.startsWith('./')) p = p.slice(2);
   return p;
 }
-
-export {
-  resolveImport,
-  resolveAllImports,
-  buildKnownFilesSet,
-  classifySpecifier,
-  RESOLUTION_EXTENSIONS,
-};

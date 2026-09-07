@@ -1,14 +1,13 @@
-
+/**
+ * refactoring.analyzer.js
+ * 
+ * It evaluates engineering risks, then extracts contextual severity metrics, 
+ * and then it applies heuristic multipliers to output actionable refactoring candidates.
+ */
 
 import { SEVERITY } from './risk.analyzer.js';
 import { getStrategiesForRisk } from './refactoring.strategies.js';
-
-/**
- * refactoringAnalyzer.js
- * 
- * Deterministically analyzes engineering risks and generates actionable
- * refactoring candidates with transparent priority scoring.
- */
+import { analyzeChangeImpact } from './change.impact.js';
 
 const SEVERITY_MULTIPLIER = {
   [SEVERITY.CRITICAL]: 3.0,
@@ -16,8 +15,10 @@ const SEVERITY_MULTIPLIER = {
   [SEVERITY.WARNING]: 1.0
 };
 
-// Impact is estimated based on category for simplicity, but could be refined.
-// Cycles are inherently high impact. Size is localized impact unless heavily depended upon.
+/**
+ * It checks the risk category, then extracts the corresponding impact weight, 
+ * and then it applies a decimal multiplier for the final score calculation.
+ */
 function estimateImpactMultiplier(riskCategory) {
   switch (riskCategory) {
     case 'DEPENDENCY': return 3.0;
@@ -28,8 +29,10 @@ function estimateImpactMultiplier(riskCategory) {
   }
 }
 
-// Confidence indicates how certain the deterministic engine is that this is a flaw.
-// Cycles are absolute. Isolated files might just be test files (low confidence).
+/**
+ * It inspects the risk title, then extracts specific deterministic flags, 
+ * and then it applies a numeric confidence rating and label.
+ */
 function determineConfidence(risk) {
   if (risk.title.includes('Circular Dependency')) return { score: 1.0, label: 'high' };
   if (risk.title.includes('Cross-Layer Violation')) return { score: 0.9, label: 'high' };
@@ -38,19 +41,21 @@ function determineConfidence(risk) {
   if (risk.title.includes('Large file')) return { score: 0.7, label: 'medium' };
   if (risk.title.includes('fan-out')) return { score: 0.7, label: 'medium' };
   
-  if (risk.title.includes('fan-in')) return { score: 0.5, label: 'low' }; // Might be a healthy utility
-  if (risk.title.includes('Isolated Module')) return { score: 0.3, label: 'low' }; // Might be dead code, or just an entrypoint
+  if (risk.title.includes('fan-in')) return { score: 0.5, label: 'low' }; 
+  if (risk.title.includes('Isolated Module')) return { score: 0.3, label: 'low' }; 
   
   return { score: 0.5, label: 'medium' };
 }
 
-function calculatePriority(risk) {
+/**
+ * It processes the risk object, then extracts multiplier factors, 
+ * and then it applies a bounding function to generate a normalized 1-100 priority score.
+ */
+export function calculatePriority(risk) {
   const severityMultiplier = SEVERITY_MULTIPLIER[risk.severity] || 1.0;
   const impactMultiplier = estimateImpactMultiplier(risk.category);
   const confidence = determineConfidence(risk);
   
-  // Base maximum score roughly 100: 3.0 * 3.0 * 1.0 = 9.0 -> normalized to ~100
-  // e.g. 9 * 11 = 99
   const rawScore = severityMultiplier * impactMultiplier * confidence.score * 11;
   const priorityScore = Math.min(100, Math.round(rawScore));
   
@@ -71,8 +76,14 @@ function calculatePriority(risk) {
   };
 }
 
-function extractFilesFromRisk(risk) {
+/**
+ * It analyzes the risk evidence payload, then extracts file references and line numbers, 
+ * and then it applies them into a unified array mapping.
+ */
+function extractFilesAndRangesFromRisk(risk) {
   const files = new Set();
+  const fileRanges = {};
+
   if (risk.file) files.add(risk.file);
   
   if (risk.evidence) {
@@ -82,34 +93,60 @@ function extractFilesFromRisk(risk) {
     if (risk.evidence.sourceComp && risk.evidenceFile) {
        files.add(risk.evidenceFile);
     }
+    
+    if (risk.evidence.location && risk.file) {
+      fileRanges[risk.file] = {
+        startLine: risk.evidence.location.startLine,
+        endLine: risk.evidence.location.endLine
+      };
+    }
+    
+    if (risk.evidence.instances) {
+      risk.evidence.instances.forEach(instance => {
+        files.add(instance.filePath);
+        if (instance.location) {
+          fileRanges[instance.filePath] = {
+            startLine: instance.location.startLine,
+            endLine: instance.location.endLine
+          };
+        }
+      });
+    }
+    
+    if (risk.evidence.lineCount && risk.file && !fileRanges[risk.file]) {
+      fileRanges[risk.file] = {
+        startLine: 1,
+        endLine: risk.evidence.lineCount
+      };
+    }
   }
-  return Array.from(files);
+  return { files: Array.from(files), fileRanges };
 }
 
 /**
- * Convert engineering risks into actionable refactoring candidates.
- * 
- * @param {object} engineeringRiskModel - output of buildEngineeringRiskModel
- * @returns {object} RefactoringIntelligenceModel
+ * It parses the engineering risk model, then extracts actionable items, 
+ * and then it applies strategy mapping to output structured refactoring candidates.
  */
-function buildRefactoringIntelligence(engineeringRiskModel) {
+export function buildRefactoringIntelligence(engineeringRiskModel, analysis, graph) {
   const candidates = [];
 
+  if (!engineeringRiskModel?.risks) {
+    return { summary: "No risks provided.", candidateCount: 0, critical: 0, high: 0, topPriorityScore: 0, candidates: [] };
+  }
+
   for (const risk of engineeringRiskModel.risks) {
-    // We only create candidates for actionable risks
-    if (risk.title.includes('Unresolved Dependencies')) continue; // usually a setup/npm install issue, not a refactor
+    if (risk.title.includes('Unresolved Dependencies')) continue; 
 
     const priorityInfo = calculatePriority(risk);
     const strategies = getStrategiesForRisk(risk);
-    const affectedFiles = extractFilesFromRisk(risk);
+    const { files: affectedFiles, fileRanges } = extractFilesAndRangesFromRisk(risk);
 
     const idString = `${risk.title}|${risk.category}|${affectedFiles.join(',')}`;
     
-    // Simple deterministic string hash for browser (equivalent purpose to md5)
     let hash = 0;
     for (let i = 0; i < idString.length; i++) {
       hash = (hash << 5) - hash + idString.charCodeAt(i);
-      hash |= 0; // Convert to 32bit integer
+      hash |= 0; 
     }
     const deterministicId = Math.abs(hash).toString(16).padEnd(12, '0').substring(0, 12);
 
@@ -124,20 +161,33 @@ function buildRefactoringIntelligence(engineeringRiskModel) {
       
       summary: risk.description,
       files: affectedFiles,
+      fileRanges: fileRanges,
       evidence: risk.evidence,
       
       suggestedStrategies: strategies,
       
-      // These will be populated on-demand via the impact endpoint or populated loosely here
-      estimatedScope: {
-        fileCount: affectedFiles.length
-      }
+      // It assesses the affected files array, then extracts downstream impact using BFS, and then it applies the metrics to the candidate.
+      estimatedScope: (() => {
+        let direct = affectedFiles.length;
+        let downstream = 0;
+        if (analysis && graph && affectedFiles.length > 0) {
+          try {
+            const impact = analyzeChangeImpact(analysis, graph, affectedFiles);
+            downstream = impact.transitivelyAffectedFiles.length;
+          } catch (e) {
+            console.warn("[refactoring.analyzer] Failed to calculate impact for refactoring candidate");
+          }
+        }
+        return {
+          fileCount: direct,
+          downstreamImpact: downstream
+        };
+      })()
     };
 
     candidates.push(candidate);
   }
 
-  // Sort by priority score descending
   candidates.sort((a, b) => b.priorityScore - a.priorityScore);
 
   return {
@@ -149,8 +199,3 @@ function buildRefactoringIntelligence(engineeringRiskModel) {
     candidates
   };
 }
-
-export { 
-  buildRefactoringIntelligence,
-  calculatePriority
- };

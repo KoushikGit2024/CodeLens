@@ -1,3 +1,9 @@
+/**
+ * AnalysisProgress.jsx
+ *
+ * It maps the active worker phase, then extracts visual indicator logic, 
+ * and then it applies the animated UI steps to show offline parsing progress.
+ */
 import React from 'react';
 import { Loader2, CheckCircle, Circle } from 'lucide-react';
 
@@ -6,13 +12,16 @@ const PHASES = [
   { id: 'extracting', label: 'Extracting files' },
   { id: 'scanning_files', label: 'Detecting languages' },
   { id: 'analyzing_ast', label: 'Parsing source files' },
-  { id: 'finalizing_analysis', label: 'Processing file relations' },
   { id: 'building_graph', label: 'Building dependency graph' },
   { id: 'building_architecture', label: 'Building architecture model' },
   { id: 'ready', label: 'Finalizing repository intelligence' }
 ];
 
 export default function AnalysisProgress({ currentPhase, phaseDetails }) {
+  /**
+   * It inspects the current phase ID, then extracts its array index position, 
+   * and then it applies conditional rendering for completed, active, and pending steps.
+   */
   const currentIndex = PHASES.findIndex(p => p.id === currentPhase);
   
   return (

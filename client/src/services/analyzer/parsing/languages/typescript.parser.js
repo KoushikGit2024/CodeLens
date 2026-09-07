@@ -1,9 +1,10 @@
 /**
  * TypeScriptParser.js
  *
- * Extracts symbols from TypeScript (and TSX) source files using Tree-sitter.
+ * It extends the JavaScript parser, then extracts TypeScript-specific syntax nodes, 
+ * and then it applies the shared static analysis schemas to the results.
  *
- * TypeScript is a superset of JavaScript.  The tree-sitter TypeScript grammar
+ * TypeScript is a superset of JavaScript. The tree-sitter TypeScript grammar
  * parses all valid JavaScript as well, so this parser extends JavaScriptParser
  * and adds TypeScript-specific symbol types:
  *
@@ -11,32 +12,19 @@
  *   - TypeScript type aliases     (type_alias_declaration)
  *   - TypeScript access modifiers on class methods (public/private/protected)
  *
- * All JavaScript symbol types (functions, classes, imports, exports, arrows)
- * are inherited and work unchanged because the TS grammar uses identical node
- * types for them.
- *
- * We re-use the 'function' and 'class' SymbolKinds for TS function/class
- * declarations.  Interfaces and type aliases are emitted as 'class' and
- * 'function' symbols respectively with a flag indicating their TypeScript
- * origin, keeping the data model simple without introducing TS-only kinds.
- *
- * Node types specific to TypeScript grammar:
- *   interface_declaration
- *   type_alias_declaration
- *   accessibility_modifier  (on method_definition: public/private/protected)
- *   abstract_class_declaration
+ * How this file is structured:
+ *   1. extractAdvancedFindings() — It inherits JS findings, then extracts TS-specific type safety rules, and then it applies them to the finding array.
+ *   2. _walk()                   — It intercepts TS-specific node types, then extracts them, and then it applies the JavaScript fallback for the rest.
+ *   3. _extract*()               — It parses TypeScript syntax, then extracts the identifiers, and then it applies the canonical Symbol schema.
  */
 
-'use strict';
-
-import { JavaScriptParser } from './javascript.parser';
+import { JavaScriptParser } from './javascript.parser.js';
 import {
   locationFromNode,
   createClass,
   createMethod,
-  createFunction,
-  SymbolKind,
-} from '../symbols';
+  createFunction
+} from '../symbols.js';
 
 // We need the nodeText helper — reproduce it here (it is not exported from JavaScriptParser)
 function nodeText(node, source) {
@@ -50,15 +38,51 @@ function nodeHasChild(node, type) {
   return false;
 }
 
-class TypeScriptParser extends JavaScriptParser {
+export class TypeScriptParser extends JavaScriptParser {
   constructor(tsParser) {
     // Call JavaScriptParser constructor but override languageId
     super(tsParser);
     this.languageId = 'typescript';
   }
 
+  // ── Override Findings to intercept TS-specific analysis ─────────────────────
+
+  /**
+   * It calls the base JS findings, then extracts TypeScript specific typing issues, 
+   * and then it applies them into a unified array of analysis findings.
+   */
+  extractAdvancedFindings(rootNode, filePath) {
+    // Inherit JS analysis (SAST, Tests, Async Hygiene)
+    const baseFindings = super.extractAdvancedFindings(rootNode, filePath);
+    const tsFindings = [];
+
+    // It defines the explicit any type query, then extracts the occurrences, and then it applies the maintainability warning schema.
+    const anyTypeQuery = `(predefined_type) @type (#eq? @type "any")`;
+    tsFindings.push(...this.extractFindings(
+      rootNode, anyTypeQuery, filePath, 'strictness', 'ANY_TYPE_USAGE', 'maintainability', 'warning',
+      'Explicit `any` type used',
+      'Using `any` defeats TypeScript\'s strict typing. Consider using `unknown` or a specific interface.'
+    ));
+
+    // It isolates the exported declarations, then extracts the API boundary elements, and then it applies the architectural info schema.
+    const exportQuery = `
+      (export_statement declaration: (_) @exported_decl)
+    `;
+    tsFindings.push(...this.extractFindings(
+      rootNode, exportQuery, filePath, 'architecture', 'PUBLIC_API_SURFACE', 'architecture', 'info',
+      'Public Export Detected',
+      'This declaration is part of the file\'s public API surface.'
+    ));
+
+    return [...baseFindings, ...tsFindings];
+  }
+
   // ── Override _walk to intercept TS-specific node types ────────────────────
 
+  /**
+   * It evaluates the AST node type, then extracts interface/type declarations, 
+   * and then it applies the parent JavaScript parser walk for all other types.
+   */
   _walk(node, source, symbols, className) {
     switch (node.type) {
       case 'interface_declaration':
@@ -91,15 +115,7 @@ class TypeScriptParser extends JavaScriptParser {
   // ── TypeScript-specific extractors ────────────────────────────────────────
 
   /**
-   * Extract an interface declaration.
-   *
-   * interface User { id: number; name: string; }
-   *
-   * Emitted as a ClassSymbol with name suffix indicating it is an interface.
-   * Using the 'class' kind makes the interface appear alongside classes in the
-   * symbol list, which is where consumers expect it conceptually.
-   *
-   * The `tsKind` field is added to distinguish it from true classes.
+   * It locates the interface name, then extracts the identifier, and then it applies the class symbol factory with a tsKind tag.
    */
   _extractInterface(node, source, symbols) {
     const nameNode = node.childForFieldName('name');
@@ -112,14 +128,7 @@ class TypeScriptParser extends JavaScriptParser {
   }
 
   /**
-   * Extract a type alias.
-   *
-   * type UserId = string;
-   * type Handler = (req: Request) => void;
-   *
-   * Emitted as a FunctionSymbol (type aliases are typically utility/structural
-   * definitions that live alongside functions in an index).
-   * The `tsKind` field is set to 'type' to distinguish from real functions.
+   * It queries the type alias syntax, then extracts the type name, and then it applies the function symbol factory with a tsKind tag.
    */
   _extractTypeAlias(node, source, symbols) {
     const nameNode = node.childForFieldName('name');
@@ -132,14 +141,7 @@ class TypeScriptParser extends JavaScriptParser {
   }
 
   /**
-   * Extract a TypeScript class method, including access modifiers.
-   *
-   * class Foo {
-   *   public greet(): void {}
-   *   private _helper() {}
-   *   protected compute(): number {}
-   *   static create(): Foo {}
-   * }
+   * It checks for visibility modifiers, then extracts the method signature, and then it applies the method symbol factory.
    */
   _extractMethodTS(node, source, symbols, className) {
     const nameNode = node.childForFieldName('name');
@@ -161,7 +163,6 @@ class TypeScriptParser extends JavaScriptParser {
       }
     }
 
-    const { createMethod } = require('../symbols');
     symbols.push(createMethod({
       name,
       className,
@@ -174,5 +175,3 @@ class TypeScriptParser extends JavaScriptParser {
     }));
   }
 }
-
-export { TypeScriptParser };

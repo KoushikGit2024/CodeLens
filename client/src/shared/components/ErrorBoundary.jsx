@@ -1,11 +1,16 @@
 import React from 'react';
-import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Home, Copy, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null, errorInfo: null };
+    this.state = { 
+      hasError: false, 
+      error: null, 
+      errorInfo: null,
+      copied: false 
+    };
   }
 
   static getDerivedStateFromError(error) {
@@ -19,6 +24,20 @@ export class ErrorBoundary extends React.Component {
     this.setState({ errorInfo });
   }
 
+  handleCopy = () => {
+    const { error, errorInfo } = this.state;
+    const errorText = `${error ? error.toString() : ''}\n\n${errorInfo?.componentStack || ''}`;
+    
+    navigator.clipboard.writeText(errorText).then(() => {
+      this.setState({ copied: true });
+      setTimeout(() => {
+        this.setState({ copied: false });
+      }, 2000);
+    }).catch(err => {
+      console.error("Failed to copy error details:", err);
+    });
+  }
+
   render() {
     if (this.state.hasError) {
       // You can render any custom fallback UI
@@ -30,21 +49,32 @@ export class ErrorBoundary extends React.Component {
               <h2 className="text-xl font-semibold">Something went wrong</h2>
             </div>
             
-            <div className="bg-surface/50 border border-border p-4 rounded mb-6 overflow-auto max-h-[60vh]">
-              <p className="text-sm font-mono text-danger/90 mb-2">
-                {this.state.error && this.state.error.toString()}
-              </p>
-              {this.state.errorInfo && (
-                <pre className="text-xs text-muted font-mono leading-relaxed mt-2 whitespace-pre-wrap">
-                  {this.state.errorInfo.componentStack}
-                </pre>
-              )}
+            {/* Error Container with group-hover configuration */}
+            <div className="relative group mb-6">
+              <button
+                onClick={this.handleCopy}
+                className="absolute top-2 right-2 p-2 bg-panel border border-border rounded-md text-muted hover:text-white hover:border-accent opacity-0 group-hover:opacity-100 transition-all duration-200 z-10 shadow-sm"
+                title="Copy error details"
+              >
+                {this.state.copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+              </button>
+
+              <div className="bg-surface/50 border border-border p-4 rounded overflow-auto max-h-[60vh] pt-8">
+                <p className="text-sm font-mono text-danger/90 mb-2">
+                  {this.state.error && this.state.error.toString()}
+                </p>
+                {this.state.errorInfo && (
+                  <pre className="text-xs text-muted font-mono leading-relaxed mt-2 whitespace-pre-wrap">
+                    {this.state.errorInfo.componentStack}
+                  </pre>
+                )}
+              </div>
             </div>
 
             <div className="flex items-center gap-4">
               <button
                 onClick={() => {
-                  this.setState({ hasError: false, error: null, errorInfo: null });
+                  this.setState({ hasError: false, error: null, errorInfo: null, copied: false });
                   window.location.reload();
                 }}
                 className="flex items-center gap-2 px-4 py-2 bg-accent text-surface rounded font-medium hover:bg-accent/90 transition-colors"
@@ -62,7 +92,7 @@ export class ErrorBoundary extends React.Component {
                   return '/';
                 })()}
                 onClick={() => {
-                  this.setState({ hasError: false, error: null, errorInfo: null });
+                  this.setState({ hasError: false, error: null, errorInfo: null, copied: false });
                   // We do not force reload here to allow client-side routing to recover state,
                   // unless it fails again, then the boundary will re-catch.
                 }}

@@ -1,29 +1,25 @@
-
-
 /**
- * questionContextBuilder.js
+ * question.context.js
  *
- * Extracts contextual facts (Architecture, Dependencies, Documentation, and selective Source)
- * to feed into the Watsonx prompt.
+ * It evaluates the user question, then extracts deterministic facts based on intent, 
+ * and then it applies the source context builder to feed the IBM watsonx proxy.
  */
 
 import { buildDependencyGraph, getFileDependencies } from '../dependencies/dependency.analyzer.js';
 import { buildArchitectureModel } from './architecture.analyzer.js';
 import { INTENTS, routeQuestion } from './question.router.js';
 import { buildContext as buildSourceContext } from './base.context.js';
+
+// We import these defensively; if they fail or are missing during migration, the context builder won't crash.
 import { buildEngineeringRiskModel } from './risk.analyzer.js';
 import { buildRefactoringIntelligence } from './refactoring.analyzer.js';
 import { buildRepositoryIntelligence } from './intelligence.analyzer.js';
 
 /**
- * Assembles the context for a given question.
- *
- * @param {object} analysis - RepositoryAnalysis
- * @param {string} question - The user query
- * @param {string} extractPath - Path to repo on disk (for source extraction)
- * @returns {object} { routing, contextData }
+ * It evaluates the user query, then extracts context data based on intent, 
+ * and then it applies the file loader callback to selectively include source snippets.
  */
-function buildQuestionContext(analysis, question, extractPath, activeContext) {
+export async function buildQuestionContext(analysis, question, fileLoaderCallback, activeContext) {
   const routing = routeQuestion(question, analysis, activeContext);
   const graph = buildDependencyGraph(analysis);
   const architecture = buildArchitectureModel(analysis, graph);
@@ -31,82 +27,101 @@ function buildQuestionContext(analysis, question, extractPath, activeContext) {
   const contextData = {
     projectName: analysis.name || 'Repository',
     meta: {
-      totalFiles: analysis.files.length,
+      totalFiles: analysis.files?.length || 0,
       languages: analysis.languageSummary || {},
     },
-    facts: [], // Array of text facts
-    files: [], // Array of file data (name, source, symbols)
+    facts: [], 
+    files: [], 
   };
 
-  // 1. Gather facts based on intent
+  // It checks the routing intent, then extracts overview metrics, and then it applies them to the facts array.
   if (routing.intent === INTENTS.REPOSITORY_OVERVIEW) {
-    const unifiedIntel = buildRepositoryIntelligence(analysis, graph, architecture);
-    
-    contextData.facts.push(`Files: ${unifiedIntel.repository.fileCount}`);
-    contextData.facts.push(`Languages: ${Object.keys(unifiedIntel.repository.languages).join(', ')}`);
-    contextData.facts.push(`Components: ${unifiedIntel.architecture.components}`);
-    contextData.facts.push(`Health Score: ${unifiedIntel.engineeringHealth.score}`);
-    
-    if (unifiedIntel.hotspots.length > 0) {
-      contextData.facts.push(`Top Hotspots: ${unifiedIntel.hotspots.slice(0, 3).map(h => h.filePath).join(', ')}`);
+    try {
+      const unifiedIntel = buildRepositoryIntelligence(analysis, graph, architecture);
+      
+      contextData.facts.push(`Files: ${unifiedIntel.repository?.fileCount || contextData.meta.totalFiles}`);
+      contextData.facts.push(`Languages: ${Object.keys(unifiedIntel.repository?.languages || contextData.meta.languages).join(', ')}`);
+      contextData.facts.push(`Components: ${architecture.layers?.map(c => c.data.label).join(', ') || 'None'}`);
+      
+      if (unifiedIntel.engineeringHealth) {
+        contextData.facts.push(`Health Score: ${unifiedIntel.engineeringHealth.score}`);
+      }
+      
+      if (unifiedIntel.hotspots && unifiedIntel.hotspots.length > 0) {
+        contextData.facts.push(`Top Hotspots: ${unifiedIntel.hotspots.slice(0, 3).map(h => h.filePath).join(', ')}`);
+      }
+    } catch (err) {
+      console.warn('[question.context] Failed to build repository intelligence facts, applying basic fallback.');
+      contextData.facts.push(`Files: ${contextData.meta.totalFiles}`);
+      contextData.facts.push(`Components: ${architecture.layers?.map(c => c.data.label).join(', ') || 'None'}`);
     }
   }
 
+  // It isolates the metrics intent, then extracts total file counts, and then it applies them as textual facts.
   else if (routing.intent === INTENTS.METRICS) {
-    contextData.facts.push(`The repository contains ${analysis.files.length} files.`);
-    contextData.facts.push(`Languages used: ${Object.keys(analysis.languageSummary || {}).join(', ')}.`);
+    contextData.facts.push(`The repository contains ${contextData.meta.totalFiles} files.`);
+    contextData.facts.push(`Languages used: ${Object.keys(contextData.meta.languages).join(', ') || 'Unknown'}.`);
   } 
   
+  // It intercepts dependency requests, then extracts the specific file's graph neighbors, and then it applies the edge directions to the context.
   else if (routing.intent === INTENTS.DEPENDENCY && routing.targetFile) {
     const deps = getFileDependencies(graph, routing.targetFile);
     
     if (deps.dependencies.length > 0) {
-      contextData.facts.push(`${routing.targetFile} depends on: ${deps.dependencies.map(d => d.filePath || d.name).join(', ')}`);
+      contextData.facts.push(`${routing.targetFile} depends on: ${deps.dependencies.map(d => d.filePath || d.package).join(', ')}`);
     } else {
       contextData.facts.push(`${routing.targetFile} has no internal dependencies.`);
     }
 
     if (deps.dependents.length > 0) {
-      contextData.facts.push(`${routing.targetFile} is imported by: ${deps.dependents.map(d => d.filePath || d.name).join(', ')}`);
+      contextData.facts.push(`${routing.targetFile} is imported by: ${deps.dependents.map(d => d.filePath || d.package).join(', ')}`);
     } else {
       contextData.facts.push(`${routing.targetFile} is not imported by any other file.`);
     }
   }
 
+  // It matches the architecture intent, then extracts the mapped component layers, and then it applies their file counts to the facts list.
   else if (routing.intent === INTENTS.ARCHITECTURE) {
-    contextData.facts.push(`Architecture Components: ${architecture.components.map(c => c.name).join(', ')}`);
-    contextData.facts.push(`Entry Points: ${architecture.entryPoints.join(', ') || 'None detected'}`);
-    architecture.components.forEach(c => {
-      contextData.facts.push(`Component '${c.name}' (Layer: ${c.layer}) contains ${c.files.length} files.`);
-    });
-  }
-
-  else if (routing.intent === INTENTS.REFACTORING) {
-    const riskModel = buildEngineeringRiskModel(analysis, graph, architecture);
-    const refactoringIntel = buildRefactoringIntelligence(riskModel);
-    contextData.facts.push(`Refactoring Candidates: ${refactoringIntel.candidateCount}`);
-    contextData.facts.push(`Critical: ${refactoringIntel.critical}, High: ${refactoringIntel.high}`);
+    const componentNames = architecture.layers?.map(c => c.data.label) || [];
+    contextData.facts.push(`Architecture Components: ${componentNames.join(', ') || 'None'}`);
+    contextData.facts.push(`Entry Points: ${architecture.entryPoints?.join(', ') || 'None detected'}`);
     
-    // Pass top candidates explicitly
-    const topCandidates = refactoringIntel.candidates.slice(0, 5);
-    topCandidates.forEach((c, idx) => {
-      contextData.facts.push(`[Priority ${idx+1}] ${c.title} (Score: ${c.priorityScore}). Files involved: ${c.files.join(', ')}`);
-    });
+    if (architecture.layers) {
+      architecture.layers.forEach(c => {
+        const fileCount = graph.nodes.filter(n => n.data.layer === c.data.layer && n.type === 'fileNode').length;
+        contextData.facts.push(`Component '${c.data.label}' (Layer: ${c.data.layer}) contains ${fileCount} files.`);
+      });
+    }
   }
 
-  // 2. Gather source code selectively
-  // We use the original contextBuilder to score files and extract source snippets.
+  // It handles refactoring intents, then extracts the engineering risk candidates, and then it applies the top 5 highest-priority targets.
+  else if (routing.intent === INTENTS.REFACTORING) {
+    try {
+      const riskModel = buildEngineeringRiskModel(analysis, graph, architecture);
+      const refactoringIntel = buildRefactoringIntelligence(riskModel);
+      
+      contextData.facts.push(`Refactoring Candidates: ${refactoringIntel.candidateCount || 0}`);
+      contextData.facts.push(`Critical: ${refactoringIntel.critical || 0}, High: ${refactoringIntel.high || 0}`);
+      
+      if (refactoringIntel.candidates) {
+        const topCandidates = refactoringIntel.candidates.slice(0, 5);
+        topCandidates.forEach((c, idx) => {
+          contextData.facts.push(`[Priority ${idx+1}] ${c.title} (Score: ${c.priorityScore}). Files involved: ${c.files.join(', ')}`);
+        });
+      }
+    } catch (err) {
+      console.warn('[question.context] Failed to build refactoring facts.');
+      contextData.facts.push('Refactoring analysis is currently unavailable.');
+    }
+  }
+
+  // It verifies the AI source requirement, then extracts relevant code snippets using the async loader, and then it applies them to the context data.
   if (routing.requiresAi) {
-    // Only fetch raw source code for general or file explanations
-    if (routing.intent === INTENTS.FILE_EXPLANATION || routing.intent === INTENTS.GENERAL || routing.intent === INTENTS.ARCHITECTURE || routing.intent === INTENTS.REFACTORING) {
-      const sourceCtx = buildSourceContext(analysis, question, extractPath, { maxFiles: 5, maxSourceChars: 15000, activeContext });
+    if ([INTENTS.FILE_EXPLANATION, INTENTS.GENERAL, INTENTS.ARCHITECTURE, INTENTS.REFACTORING].includes(routing.intent)) {
+      const sourceCtx = await buildSourceContext(analysis, question, fileLoaderCallback, { maxFiles: 5, maxSourceChars: 15000, activeContext });
       contextData.files = sourceCtx.files;
     }
   }
 
   return { routing, contextData };
 }
-
-export { 
-  buildQuestionContext
- };

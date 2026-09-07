@@ -1,23 +1,24 @@
-
-
-import { v4 as uuidv4 } from 'uuid';
-import { getFileDependencies } from '../dependencies/dependency.analyzer.js';
-
 /**
- * engineeringRiskAnalyzer.js
+ * risk.analyzer.js
  * 
- * Analyzes repository structure, dependencies, and architecture to identify
- * potential engineering risks (coupling, size, cycles, layer violations).
+ * It evaluates repository structures, then extracts dependency patterns, 
+ * and then it applies threshold heuristic rules to surface engineering risks.
  */
 
-const RISK_CATEGORIES = {
+import { v4 as uuidv4 } from 'uuid';
+import { getFileDependencies, detectCycles, getIsolatedFiles } from '../dependencies/dependency.analyzer.js';
+import { detectClones } from './clone.analyzer.js';
+import { analyzeReachability } from './reachability.analyzer.js';
+
+export const RISK_CATEGORIES = {
   SIZE: 'SIZE',
   COUPLING: 'COUPLING',
   DEPENDENCY: 'DEPENDENCY',
-  ARCHITECTURE: 'ARCHITECTURE'
+  ARCHITECTURE: 'ARCHITECTURE',
+  QUALITY: 'QUALITY'
 };
 
-const SEVERITY = {
+export const SEVERITY = {
   CRITICAL: 'critical',
   HIGH: 'high',
   WARNING: 'warning'
@@ -28,7 +29,9 @@ const THRESHOLDS = {
   FILE_LINES_WARNING: 300,
   EXPORTS_WARNING: 15,
   FAN_IN_WARNING: 10,
-  FAN_OUT_WARNING: 15
+  FAN_OUT_WARNING: 15,
+  COMPLEXITY_HIGH: 15,
+  COMPLEXITY_WARNING: 10
 };
 
 const SEVERITY_PENALTY = {
@@ -37,23 +40,26 @@ const SEVERITY_PENALTY = {
   [SEVERITY.WARNING]: 2
 };
 
+/**
+ * It receives risk parameters, then extracts structured metadata, 
+ * and then it applies a UUID to generate a consistent risk object.
+ */
 function createRisk(category, severity, title, description, file, evidence = {}) {
-  return {
-    id: uuidv4(),
-    category,
-    severity,
-    title,
-    description,
-    file,
-    evidence
-  };
+  // Using native browser crypto if available, falling back to uuidv4 for safety
+  const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : uuidv4();
+  return { id, category, severity, title, description, file, evidence };
 }
 
+/**
+ * It iterates over the AST files, then extracts line counts and exports, 
+ * and then it applies numerical thresholds to identify bloated files.
+ */
 function analyzeSizeRisks(analysis) {
   const risks = [];
   
+  if (!analysis?.files) return risks;
+
   for (const file of analysis.files) {
-    // 1. Line count
     if (file.lineCount > THRESHOLDS.FILE_LINES_HIGH) {
       risks.push(createRisk(
         RISK_CATEGORIES.SIZE,
@@ -74,8 +80,7 @@ function analyzeSizeRisks(analysis) {
       ));
     }
 
-    // 2. Export surface
-    const exportCount = file.symbols.filter(s => s.kind === 'export').length;
+    const exportCount = (file.symbols || []).filter(s => s.kind === 'export').length;
     if (exportCount > THRESHOLDS.EXPORTS_WARNING) {
       risks.push(createRisk(
         RISK_CATEGORIES.SIZE,
@@ -91,13 +96,17 @@ function analyzeSizeRisks(analysis) {
   return risks;
 }
 
+/**
+ * It maps file paths against the dependency graph, then extracts their node degrees, 
+ * and then it applies limits to flag high coupling bottlenecks.
+ */
 function analyzeCouplingRisks(analysis, graph) {
   const risks = [];
+  if (!analysis?.files || !graph?.edges) return risks;
 
   for (const file of analysis.files) {
     const deps = getFileDependencies(graph, file.filePath);
     
-    // 1. Fan-in
     if (deps.dependentCount > THRESHOLDS.FAN_IN_WARNING) {
       risks.push(createRisk(
         RISK_CATEGORIES.COUPLING,
@@ -109,7 +118,6 @@ function analyzeCouplingRisks(analysis, graph) {
       ));
     }
 
-    // 2. Fan-out
     if (deps.dependencyCount > THRESHOLDS.FAN_OUT_WARNING) {
       risks.push(createRisk(
         RISK_CATEGORIES.COUPLING,
@@ -125,44 +133,141 @@ function analyzeCouplingRisks(analysis, graph) {
   return risks;
 }
 
-function analyzeDependencyRisks(architecture) {
+/**
+ * It analyzes the graph edges, then extracts backward cyclic references, 
+ * and then it applies severe risk tags to cyclical and isolated files.
+ */
+function analyzeDependencyRisks(graph) {
   const risks = [];
+  if (!graph) return risks;
 
-  // 1. Cycles
-  if (architecture.cycles) {
-    for (const cycle of architecture.cycles) {
-      risks.push(createRisk(
-        RISK_CATEGORIES.DEPENDENCY,
-        SEVERITY.CRITICAL,
-        'Circular Dependency Detected',
-        `Cycle path: ${cycle.join(' → ')}`,
-        cycle[0], // Attribute to the first file in cycle
-        { cyclePath: cycle }
-      ));
-    }
+  const cycles = detectCycles(graph);
+  for (const cycle of cycles) {
+    risks.push(createRisk(
+      RISK_CATEGORIES.DEPENDENCY,
+      SEVERITY.CRITICAL,
+      'Circular Dependency Detected',
+      `Cycle path: ${cycle.join(' → ')}`,
+      cycle[0], 
+      { cyclePath: cycle }
+    ));
   }
 
-  // 2. Unresolved imports
-  if (architecture.unresolvedDependencies > 0) {
+  if (graph.meta && graph.meta.unresolvedImports > 0) {
     risks.push(createRisk(
       RISK_CATEGORIES.DEPENDENCY,
       SEVERITY.HIGH,
       'Unresolved Dependencies',
-      `Repository contains ${architecture.unresolvedDependencies} unresolved import(s). This may indicate broken internal paths or missing external packages.`,
+      `Repository contains ${graph.meta.unresolvedImports} unresolved import(s). This may indicate broken internal paths or missing external packages.`,
       null,
-      { count: architecture.unresolvedDependencies }
+      { count: graph.meta.unresolvedImports }
     ));
   }
 
-  // 3. Isolated files
-  if (architecture.isolatedFiles) {
-    for (const isolated of architecture.isolatedFiles) {
+  const isolatedFiles = getIsolatedFiles(graph);
+  for (const isolated of isolatedFiles) {
+    risks.push(createRisk(
+      RISK_CATEGORIES.DEPENDENCY,
+      SEVERITY.WARNING,
+      'Isolated Module',
+      'File is neither imported by nor imports any other internal file.',
+      isolated,
+      {}
+    ));
+  }
+
+  return risks;
+}
+
+/**
+ * It parses the pre-calculated architecture model, then extracts layer violations, 
+ * and then it applies them directly into the risk registry.
+ */
+function analyzeArchitectureRisks(architecture) {
+  const risks = [];
+  if (!architecture?.boundaryViolations) return risks;
+
+  for (const violation of architecture.boundaryViolations) {
+    risks.push(createRisk(
+      RISK_CATEGORIES.ARCHITECTURE,
+      violation.severity || SEVERITY.HIGH,
+      'Cross-Layer Violation',
+      violation.message || violation.description,
+      violation.filePath,
+      { sourceComp: violation.filePath, ruleId: violation.ruleId }
+    ));
+  }
+
+  return risks;
+}
+
+/**
+ * It aggregates function ASTs, then extracts structural clones and dead code, 
+ * and then it applies the findings as quality maintenance warnings.
+ */
+function analyzeCodeQualityRisks(analysis, graph) {
+  const risks = [];
+  const allFunctions = [];
+  
+  if (analysis?.files) {
+    for (const file of analysis.files) {
+      if (file.hasErrors || file.error) continue;
+      
+      for (const sym of (file.symbols || [])) {
+        if (['function', 'method', 'arrow'].includes(sym.kind)) {
+          allFunctions.push({ ...sym, filePath: file.filePath });
+          
+          if (sym.complexity > THRESHOLDS.COMPLEXITY_HIGH) {
+            risks.push(createRisk(
+              RISK_CATEGORIES.QUALITY,
+              SEVERITY.HIGH,
+              'High Cyclomatic Complexity',
+              `${sym.kind} '${sym.name}' has a high complexity score of ${sym.complexity}. Consider refactoring.`,
+              file.filePath,
+              { name: sym.name, complexity: sym.complexity, location: sym.location }
+            ));
+          } else if (sym.complexity > THRESHOLDS.COMPLEXITY_WARNING) {
+            risks.push(createRisk(
+              RISK_CATEGORIES.QUALITY,
+              SEVERITY.WARNING,
+              'Elevated Complexity',
+              `${sym.kind} '${sym.name}' has a complexity score of ${sym.complexity}.`,
+              file.filePath,
+              { name: sym.name, complexity: sym.complexity, location: sym.location }
+            ));
+          }
+        }
+      }
+    }
+  }
+
+  const { cloneGroups } = detectClones(allFunctions, "repository");
+  if (cloneGroups) {
+    for (const clone of cloneGroups) {
+      const filePaths = clone.instances.map(i => i.filePath);
       risks.push(createRisk(
-        RISK_CATEGORIES.DEPENDENCY,
+        RISK_CATEGORIES.QUALITY,
         SEVERITY.WARNING,
-        'Isolated Module',
-        'File is neither imported by nor imports any other internal file.',
-        isolated,
+        'Structural Code Clone',
+        `Found ${clone.count} instances of structurally identical code.`,
+        filePaths[0],
+        { count: clone.count, instances: clone.instances }
+      ));
+    }
+  }
+
+  const reachability = analyzeReachability(graph);
+  if (reachability?.unreachableFiles) {
+    for (const deadFile of reachability.unreachableFiles) {
+      if (deadFile.startsWith('pkg:') || deadFile.startsWith('moduleNode')) continue;
+      
+      const rawPath = deadFile.replace(/^file:/, '');
+      risks.push(createRisk(
+        RISK_CATEGORIES.QUALITY,
+        SEVERITY.WARNING,
+        'Dead / Unreachable File',
+        'This file is never imported by any other file in the repository.',
+        rawPath,
         {}
       ));
     }
@@ -171,41 +276,12 @@ function analyzeDependencyRisks(architecture) {
   return risks;
 }
 
-function analyzeArchitectureRisks(architecture) {
-  const risks = [];
-  
-  if (!architecture.components || !architecture.relations) return risks;
-
-  const componentLayerMap = new Map();
-  for (const comp of architecture.components) {
-    componentLayerMap.set(comp.name, comp.layer);
-  }
-
-  for (const rel of architecture.relations) {
-    if (rel.targetType !== 'internal') continue;
-
-    const sourceLayer = componentLayerMap.get(rel.source);
-    const targetLayer = componentLayerMap.get(rel.target);
-
-    // Rule: Presentation layer should not depend directly on Data layer
-    if (sourceLayer === 'Presentation' && targetLayer === 'Data') {
-      risks.push(createRisk(
-        RISK_CATEGORIES.ARCHITECTURE,
-        SEVERITY.HIGH,
-        'Cross-Layer Violation',
-        `Presentation component "${rel.source}" depends directly on Data component "${rel.target}".`,
-        rel.evidenceFile,
-        { sourceComp: rel.source, targetComp: rel.target, sourceLayer, targetLayer }
-      ));
-    }
-  }
-
-  return risks;
-}
-
+/**
+ * It reduces the risk payload, then extracts the severity penalties, 
+ * and then it applies a final calculation for an overall health score.
+ */
 function calculateScoreAndLevel(risks) {
   let score = 100;
-  
   for (const risk of risks) {
     score -= (SEVERITY_PENALTY[risk.severity] || 0);
   }
@@ -220,6 +296,10 @@ function calculateScoreAndLevel(risks) {
   return { score, riskLevel };
 }
 
+/**
+ * It aggregates the file-level penalties, then extracts the top offenders, 
+ * and then it applies a descending sort to return the primary hotspots.
+ */
 function determineHotspots(risks) {
   const fileScores = new Map();
 
@@ -229,28 +309,23 @@ function determineHotspots(risks) {
     fileScores.set(risk.file, (fileScores.get(risk.file) || 0) + penalty);
   }
 
-  const sortedFiles = Array.from(fileScores.entries())
-    .sort((a, b) => b[1] - a[1]) // Sort descending by penalty
-    .slice(0, 5) // Top 5
+  return Array.from(fileScores.entries())
+    .sort((a, b) => b[1] - a[1]) 
+    .slice(0, 5) 
     .map(entry => entry[0]);
-
-  return sortedFiles;
 }
 
 /**
- * Build the engineering risk model.
- *
- * @param {object} analysis - RepositoryAnalysis
- * @param {object} graph - DependencyGraph
- * @param {object} architecture - ArchitectureModel
- * @returns {object} EngineeringRiskModel
+ * It orchestrates the sub-analyzers, then extracts all potential failures, 
+ * and then it applies aggregation to build the comprehensive risk profile.
  */
-function buildEngineeringRiskModel(analysis, graph, architecture) {
+export function buildEngineeringRiskModel(analysis, graph, architecture) {
   const risks = [
     ...analyzeSizeRisks(analysis),
     ...analyzeCouplingRisks(analysis, graph),
-    ...analyzeDependencyRisks(architecture),
-    ...analyzeArchitectureRisks(architecture)
+    ...analyzeDependencyRisks(graph),
+    ...analyzeArchitectureRisks(architecture),
+    ...analyzeCodeQualityRisks(analysis, graph)
   ];
 
   const { score, riskLevel } = calculateScoreAndLevel(risks);
@@ -270,12 +345,6 @@ function buildEngineeringRiskModel(analysis, graph, architecture) {
     metrics,
     hotspots,
     risks,
-    recommendations: [] // Stub for AI/deterministic recommendations
+    recommendations: [] 
   };
 }
-
-export { 
-  buildEngineeringRiskModel,
-  RISK_CATEGORIES,
-  SEVERITY
- };

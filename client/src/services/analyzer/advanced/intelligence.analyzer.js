@@ -1,18 +1,19 @@
-
+/**
+ * intelligence.analyzer.js
+ * 
+ * It ingests the core AST analysis payloads, then extracts architectural hotspots, 
+ * and then it applies an aggregation function to compile a unified health index.
+ */
 
 import { buildEngineeringRiskModel } from './risk.analyzer.js';
 import { buildRefactoringIntelligence } from './refactoring.analyzer.js';
 
 /**
- * repositoryIntelligence.js
- * 
- * Aggregates existing deterministic models into a unified Repository Intelligence model.
- * Also calculates deterministic hotspots based on file size, coupling, architecture, and risks.
+ * It iterates over files and edges, then extracts proxy metrics for coupling and size, 
+ * and then it applies a bounding logic to identify critical structural hotspots.
  */
-
-// Bounded hotspot calculation to avoid penalizing legitimate healthy utilities
-function calculateHotspots(analysis, graph, architectureModel, refactoringIntel) {
-  const fileScores = new Map(); // filePath -> { score, reasons: [] }
+export function calculateHotspots(analysis, graph, architectureModel, refactoringIntel) {
+  const fileScores = new Map(); 
 
   function getOrInit(filePath) {
     if (!fileScores.has(filePath)) {
@@ -27,59 +28,53 @@ function calculateHotspots(analysis, graph, architectureModel, refactoringIntel)
     data.reasons.push(reason);
   }
 
-  // 1. File Size
-  analysis.files.forEach(f => {
-    if (f.symbols && f.symbols.length > 30) {
-      addScore(f.filePath, 10, 'Many symbols exported/defined');
-    }
-    // Optional: Size by line count could be added if we had raw line counts,
-    // but AST node counts or symbol counts are a decent proxy.
-  });
-
-  // 2. Dependencies (Fan-in / Fan-out)
-  graph.nodes.forEach(n => {
-    if (n.type !== 'file') return;
-    const filePath = n.filePath;
-    
-    let fanOut = 0;
-    let fanIn = 0;
-    
-    graph.edges.forEach(e => {
-      if (e.source === n.id) fanOut++;
-      if (e.target === n.id) fanIn++;
+  if (analysis?.files) {
+    analysis.files.forEach(f => {
+      if (f.symbols && f.symbols.length > 30) {
+        addScore(f.filePath, 10, 'Many symbols exported/defined');
+      }
     });
+  }
 
-    if (fanOut > 10) addScore(filePath, 15, 'High fan-out (coordinates many dependencies)');
-    if (fanOut > 20) addScore(filePath, 20, 'Extremely high fan-out (potential God module)');
-    
-    if (fanIn > 15) {
-       // High fan-in might be a utility. We add some points because it's *important*,
-       // but it's only a *problematic* hotspot if combined with high fan-out or size.
-       addScore(filePath, 10, 'High fan-in (widely used)');
-    }
-  });
+  if (graph?.nodes && graph?.edges) {
+    graph.nodes.forEach(n => {
+      if (n.type !== 'fileNode') return;
+      const filePath = n.data.filePath;
+      
+      let fanOut = 0;
+      let fanIn = 0;
+      
+      graph.edges.forEach(e => {
+        if (e.source === n.id) fanOut++;
+        if (e.target === n.id) fanIn++;
+      });
 
-  // 3. Architecture Entry Points
-  architectureModel.entryPoints.forEach(ep => {
-    addScore(ep, 20, 'Architectural entry point');
-  });
-
-  // 4. Refactoring / Risks
-  refactoringIntel.candidates.forEach(c => {
-    // Determine priority weight
-    const weight = c.priority === 'critical' ? 40 : (c.priority === 'high' ? 25 : 10);
-    
-    c.files.forEach(filePath => {
-      addScore(filePath, weight, `Involved in ${c.priority} priority refactoring candidate`);
+      if (fanOut > 10) addScore(filePath, 15, 'High fan-out (coordinates many dependencies)');
+      if (fanOut > 20) addScore(filePath, 20, 'Extremely high fan-out (potential God module)');
+      if (fanIn > 15) {
+        addScore(filePath, 10, 'High fan-in (widely used)');
+      }
     });
-  });
+  }
 
-  // Construct final array
+  if (architectureModel?.entryPoints) {
+    architectureModel.entryPoints.forEach(ep => {
+      addScore(ep, 20, 'Architectural entry point');
+    });
+  }
+
+  if (refactoringIntel?.candidates) {
+    refactoringIntel.candidates.forEach(c => {
+      const weight = c.priority === 'critical' ? 40 : (c.priority === 'high' ? 25 : 10);
+      c.files.forEach(filePath => {
+        addScore(filePath, weight, `Involved in ${c.priority} priority refactoring candidate`);
+      });
+    });
+  }
+
   const hotspots = [];
   fileScores.forEach((data, filePath) => {
-    // Only include files with meaningful scores (e.g., >= 20)
     if (data.score >= 20) {
-      // Cap the score roughly at 100
       const normalizedScore = Math.min(100, data.score);
       hotspots.push({
         filePath,
@@ -89,35 +84,45 @@ function calculateHotspots(analysis, graph, architectureModel, refactoringIntel)
     }
   });
 
-  // Sort descending
   hotspots.sort((a, b) => b.score - a.score);
 
-  return hotspots.slice(0, 15); // Top 15 hotspots
+  return hotspots.slice(0, 15);
 }
 
-function buildRepositoryIntelligence(analysis, graph, architectureModel) {
-  // Aggregate existing models
-  const engineeringHealth = buildEngineeringRiskModel(analysis, graph, architectureModel);
-  const refactoringIntel = buildRefactoringIntelligence(engineeringHealth);
+/**
+ * It resolves the various advanced models, then extracts their topmost metrics, 
+ * and then it applies them into a single comprehensive repository intelligence payload.
+ */
+export function buildRepositoryIntelligence(analysis, graph, architectureModel) {
+  let engineeringHealth = { score: 100, metrics: { critical: 0, high: 0, warning: 0 } };
+  let refactoringIntel = { candidateCount: 0, critical: 0, high: 0, topPriorityScore: 0, candidates: [] };
+  
+  try {
+    engineeringHealth = buildEngineeringRiskModel(analysis, graph, architectureModel);
+    refactoringIntel = buildRefactoringIntelligence(engineeringHealth);
+  } catch (err) {
+    console.warn('[intelligence.analyzer] Using degraded health metrics due to missing sub-analyzers.');
+  }
+  
   const hotspots = calculateHotspots(analysis, graph, architectureModel, refactoringIntel);
 
   return {
     repository: {
       name: analysis.name || 'Repository',
-      fileCount: analysis.files.length,
+      fileCount: analysis.files?.length || 0,
       languages: analysis.languageSummary || {},
       analysisVersion: analysis.meta?.analysisVersion
     },
     architecture: {
-      components: architectureModel.components.length,
-      layers: [...new Set(architectureModel.components.map(c => c.layer))],
-      entryPoints: architectureModel.entryPoints
+      components: architectureModel?.layers?.length || 0,
+      layers: [...new Set((architectureModel?.layers || []).map(c => c.data.layer))],
+      entryPoints: architectureModel?.entryPoints || []
     },
     dependencies: {
-      nodes: graph.nodes.length,
-      edges: graph.edges.length,
-      cycles: graph.cycles ? graph.cycles.length : 0,
-      unresolved: graph.meta.unresolvedImports
+      nodes: graph?.nodes?.length || 0,
+      edges: graph?.edges?.length || 0,
+      cycles: graph?.cycles ? graph.cycles.length : 0,
+      unresolved: graph?.meta?.unresolvedImports || 0
     },
     engineeringHealth: {
       score: engineeringHealth.score,
@@ -130,7 +135,7 @@ function buildRepositoryIntelligence(analysis, graph, architectureModel) {
       critical: refactoringIntel.critical,
       high: refactoringIntel.high,
       topPriorityScore: refactoringIntel.topPriorityScore,
-      topCandidates: refactoringIntel.candidates.slice(0, 3).map(c => ({
+      topCandidates: (refactoringIntel.candidates || []).slice(0, 3).map(c => ({
         id: c.id,
         title: c.title,
         priority: c.priority,
@@ -140,8 +145,3 @@ function buildRepositoryIntelligence(analysis, graph, architectureModel) {
     hotspots: hotspots
   };
 }
-
-export { 
-  buildRepositoryIntelligence,
-  calculateHotspots
- };

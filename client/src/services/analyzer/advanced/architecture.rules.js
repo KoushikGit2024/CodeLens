@@ -1,8 +1,11 @@
 /**
  * architecture.rules.js
  * 
- * Enforces strict architectural boundaries and rules based on detected components and their dependencies.
+ * It registers strict boundary policies, then extracts layer interaction violations, 
+ * and then it applies the unified AnalysisFinding schema for the dashboard.
  */
+
+import { createAnalysisFinding } from '../parsing/symbols.js';
 
 export const ARCHITECTURE_RULES = [
   {
@@ -18,7 +21,7 @@ export const ARCHITECTURE_RULES = [
     id: 'rule-api-isolation',
     name: 'API Layer Isolation',
     description: 'API components should not depend on Presentation components.',
-    severity: 'high',
+    severity: 'warning',
     evaluate: (srcComp, tgtComp) => {
       return srcComp.layer === 'API' && tgtComp.layer === 'Presentation';
     }
@@ -34,40 +37,57 @@ export const ARCHITECTURE_RULES = [
   }
 ];
 
-export function validateArchitecture(components, relations) {
-  const violations = [];
+/**
+ * It maps component layers, then extracts forbidden dependency edges, 
+ * and then it applies the findings schema to return architectural breaches.
+ */
+export function validateArchitecture(components, edges) {
+  const findings = [];
   
-  // Create a map for quick layer lookup
   const compLayerMap = new Map();
   for (const comp of components) {
-    compLayerMap.set(comp.name, comp.layer);
+    // Key by label (= what relations use as source/target), not by node id
+    const label = comp.data?.label ?? comp.id;
+    compLayerMap.set(label, comp.data?.layer ?? 'Core/Other');
   }
 
-  for (const rel of relations) {
-    if (rel.targetType !== 'internal') continue; // Rules only apply to internal components
-
-    const srcLayer = compLayerMap.get(rel.source);
-    const tgtLayer = compLayerMap.get(rel.target);
+  for (const edge of edges) {
+    const srcLayer = compLayerMap.get(edge.source);
+    const tgtLayer = compLayerMap.get(edge.target);
 
     if (!srcLayer || !tgtLayer) continue;
 
-    const srcCompMock = { name: rel.source, layer: srcLayer };
-    const tgtCompMock = { name: rel.target, layer: tgtLayer };
+    const srcCompMock = { name: edge.source, layer: srcLayer };
+    const tgtCompMock = { name: edge.target, layer: tgtLayer };
 
     for (const rule of ARCHITECTURE_RULES) {
       if (rule.evaluate(srcCompMock, tgtCompMock)) {
-        violations.push({
-          ruleId: rule.id,
-          name: rule.name,
-          description: rule.description,
-          severity: rule.severity,
-          sourceComponent: rel.source,
-          targetComponent: rel.target,
-          evidenceFile: rel.evidenceFile
+        
+        // It detects a rule failure, then extracts the edge source, and then it applies the frontend finding format.
+        findings.push({
+          ...createAnalysisFinding({
+            id: `ARCH-${rule.id}-${edge.source}`,
+            analyzerId: 'architecture',
+            ruleId: rule.id,
+            category: 'architecture',
+            severity: rule.severity,
+            title: rule.name,
+            message: `Boundary violation: ${edge.source} (${srcLayer}) directly imports ${edge.target} (${tgtLayer}).\nRule: ${rule.description}`,
+            filePath: edge.evidenceFile || edge.source,
+            range: {
+              startLine: 1,
+              startColumn: 1,
+              endLine: 1,
+              endColumn: 1
+            }
+          }),
+          // Extra fields consumed by graphToFlow for node/edge highlighting
+          sourceComponent: edge.source,
+          targetComponent: edge.target,
         });
       }
     }
   }
 
-  return violations;
+  return findings;
 }

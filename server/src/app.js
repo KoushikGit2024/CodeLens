@@ -1,9 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 
-const healthRouter = require('./domains/engineering/engineering.routes');
-const repositoryRouter = require('./domains/repository/repository.routes');
-const docsRouter = require('./domains/assistant/docs.routes');
+const aiRouter = require('./domains/ai/ai.routes');
 
 const app = express();
 
@@ -22,9 +20,7 @@ app.get('/', (_req, res) => {
   });
 });
 
-app.use('/api/health', healthRouter);
-app.use('/api/repository', repositoryRouter);
-app.use('/api/docs', docsRouter);
+app.use('/api/ai', aiRouter);
 
 // ── 404 handler ───────────────────────────────────────────────────────────────
 app.use((_req, res) => {
