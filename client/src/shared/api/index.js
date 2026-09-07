@@ -316,6 +316,28 @@ export const repositoryApi = {
       entryPoints: architecture.entryPoints || [],
     };
 
+    if (options.generateAi) {
+      const prompt = `You are a software architect analyzing a codebase.
+Provide a clear, 2-3 paragraph architectural evaluation based on these metrics.
+
+Components: ${model.components.map(c => c.data.label).join(', ')}
+Total Relations: ${model.relations.length}
+Boundary Violations: ${model.violations.length}
+Entry Points: ${model.entryPoints.join(', ')}
+
+Evaluate the modularity, coupling, and any apparent risks based on the violations.`;
+
+      const aiResponse = await api.post('/ai/chat', { prompt, jsonMode: true });
+      let insights = null;
+      try {
+        const raw = (aiResponse.data.response || '').trim().replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+        insights = JSON.parse(raw);
+      } catch (e) {
+        insights = { summary: aiResponse.data.response };
+      }
+      return { data: { model, insights } };
+    }
+
     return { data: { model } };
   },
 
@@ -388,12 +410,77 @@ Provide a 3-5 paragraph technical summary covering: overall codebase health, mai
     return { data: { intelligence } };
   },
 
-  async getRisks(repoId) {
+  async getRisks(repoId, options = {}) {
     const record = await repositoryStore.get(repoId);
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
     const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
     const risks = buildEngineeringRiskModel(record.analysis, record.analysis.graph, architecture);
+
+    if (options.generateAi) {
+      const prompt = `You are a senior technical lead reviewing engineering health metrics.
+Overall Score: ${risks.score}
+Critical Risks: ${risks.risks.filter(r => r.severity === 'critical').length}
+High Risks: ${risks.risks.filter(r => r.severity === 'high').length}
+Total Hotspots: ${risks.hotspots.length}
+
+Please provide a 2-3 paragraph interpretation of these metrics, highlighting what the most critical areas of concern might be and what a general mitigation strategy should look like.
+Format the output as JSON with the following structure:
+{
+  "summary": "High level interpretation text",
+  "limitations": "Potential limitations or risks text"
+}`;
+      const aiResponse = await api.post('/ai/chat', { prompt, jsonMode: true });
+      let insights = null;
+      try {
+        const raw = (aiResponse.data.response || '').trim().replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+        insights = JSON.parse(raw);
+      } catch (e) {
+        insights = { summary: aiResponse.data.response };
+      }
+      return { data: { ...risks, insights } };
+    }
+
     return { data: risks };
+  },
+
+  async getRefactoringInsights(repoId, candidateId) {
+    const record = await repositoryStore.get(repoId);
+    if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
+    const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
+    const risks = buildEngineeringRiskModel(record.analysis, record.analysis.graph, architecture);
+    const refactoring = buildRefactoringIntelligence(risks, record.analysis, record.analysis.graph);
+    
+    const candidate = refactoring.candidates.find(c => c.id === candidateId);
+    if (!candidate) throw new Error('Candidate not found');
+
+    const prompt = `You are an expert software architect. Analyze the following refactoring candidate and provide a detailed strategy.
+Title: ${candidate.title}
+Summary: ${candidate.summary}
+Affected Files: ${candidate.files?.join(', ')}
+Severity: ${candidate.severity}
+
+Generate a structured JSON response matching this exact schema:
+{
+  "summary": "A 1-paragraph summary of the approach",
+  "recommendations": [
+    {
+      "strategy": "Name of the strategy",
+      "reasoning": "Why this is recommended",
+      "steps": ["Step 1", "Step 2"]
+    }
+  ],
+  "limitations": ["Risk 1", "Limitation 1"]
+}`;
+
+    const res = await api.post('/ai/chat', { prompt, jsonMode: true });
+    let insights;
+    try {
+      const raw = (res.data.response || '').trim().replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+      insights = JSON.parse(raw);
+    } catch (e) {
+      throw new Error('Failed to parse AI response as JSON.');
+    }
+    return { data: insights };
   },
 
   async getChangeImpact(repoId, files) {
@@ -485,7 +572,16 @@ ${originalCode}
     const record = await repositoryStore.get(id);
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Analysis not available');
 
-    // Dynamically inject the local IDB loader instead of failing on backend paths
+    // On follow-up turns, skip the expensive context rebuild entirely.
+    // The server-side formatWithHistory() will prepend prior turns so the model
+    // already has grounding — re-scoring every file on each message is pure waste.
+    const isFirstTurn = !history || history.length === 0;
+
+    if (!isFirstTurn) {
+      return api.post(`/ai/chat`, { prompt: question, history });
+    }
+
+    // First turn only: build full deterministic context and attach it to the prompt.
     const fileLoaderCallback = (path) => persistenceStore.loadFile(id, path);
     const { contextData } = await buildQuestionContext(record.analysis, question, fileLoaderCallback, activeContext);
     
@@ -514,10 +610,20 @@ ${originalCode}
     if (options.generateAi) {
       const prompt = buildOverviewPrompt(context);
       const aiResponse = await api.post(`/ai/chat`, { prompt, jsonMode: true });
-      return { data: { facts: context, aiGenerated: aiResponse.data.response } };
+      let aiInterpretation = null;
+      try {
+        // The server's ai.service.js already strips fences and parses JSON when jsonMode=true,
+        // but the response is re-serialised as a string to keep the client contract uniform.
+        const raw = (aiResponse.data.response || '').trim()
+          .replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+        aiInterpretation = JSON.parse(raw);
+      } catch (e) {
+        console.warn('[getOverviewDocumentation] Failed to parse AI JSON:', e.message);
+      }
+      return { data: { facts: context, aiInterpretation } };
     }
     
-    return { data: { facts: context } };
+    return { data: { facts: context, aiInterpretation: null } };
   },
   
   async getModuleDocumentation(id, path, options = {}) {
@@ -530,10 +636,18 @@ ${originalCode}
     if (options.generateAi) {
       const prompt = buildModulePrompt(context);
       const aiResponse = await api.post(`/ai/chat`, { prompt, jsonMode: true });
-      return { data: { facts: context, aiGenerated: aiResponse.data.response } };
+      let aiInterpretation = null;
+      try {
+        const raw = (aiResponse.data.response || '').trim()
+          .replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+        aiInterpretation = JSON.parse(raw);
+      } catch (e) {
+        console.warn('[getModuleDocumentation] Failed to parse AI JSON:', e.message);
+      }
+      return { data: { facts: context, aiInterpretation } };
     }
     
-    return { data: { facts: context } };
+    return { data: { facts: context, aiInterpretation: null } };
   },
 
   // ── CI / Trigger Endpoints ───────────────────────────────────────────────────

@@ -116,11 +116,18 @@ export async function buildQuestionContext(analysis, question, fileLoaderCallbac
   }
 
   // It verifies the AI source requirement, then extracts relevant code snippets using the async loader, and then it applies them to the context data.
-  if (routing.requiresAi) {
-    if ([INTENTS.FILE_EXPLANATION, INTENTS.GENERAL, INTENTS.ARCHITECTURE, INTENTS.REFACTORING].includes(routing.intent)) {
-      const sourceCtx = await buildSourceContext(analysis, question, fileLoaderCallback, { maxFiles: 5, maxSourceChars: 15000, activeContext });
-      contextData.files = sourceCtx.files;
-    }
+  // REPOSITORY_OVERVIEW intentionally excluded — facts-only context is sufficient for high-level questions
+  // and adding 24k chars of source would inflate the prompt without improving the answer quality.
+  const INTENTS_NEEDING_SOURCE = [
+    INTENTS.FILE_EXPLANATION,
+    INTENTS.GENERAL,
+    INTENTS.ARCHITECTURE,
+    INTENTS.REFACTORING,
+  ];
+
+  if (routing.requiresAi && INTENTS_NEEDING_SOURCE.includes(routing.intent)) {
+    const sourceCtx = await buildSourceContext(analysis, question, fileLoaderCallback, { maxFiles: 5, maxSourceChars: 15000, activeContext });
+    contextData.files = sourceCtx.files;
   }
 
   return { routing, contextData };

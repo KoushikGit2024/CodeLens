@@ -373,7 +373,8 @@ export default function RepositoryIntelligencePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               <button 
                 onClick={handleUnderstandRepository} 
-                disabled={aiLoading}
+                disabled={aiLoading || aiState !== 'enhanced'}
+                title={aiState !== 'enhanced' ? 'AI is not configured' : ''}
                 className="bg-surface/30 border border-white/5 p-4 rounded hover:border-accent hover:bg-surface transition-all flex flex-col gap-2 text-left group disabled:opacity-50 disabled:cursor-not-allowed"
               >
                  <div className="flex items-center gap-2 text-text font-medium group-hover:text-accent transition-colors">

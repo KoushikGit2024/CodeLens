@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { FileText, Cpu, AlertTriangle, Link as LinkIcon, Box, Layers, Play, Loader2, Copy, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import AiResponse from '../../shared/components/ai/AiResponse';
+import { useAIState } from '../../shared/context/AIContext';
 
 export default function ModuleDocumentation({ docs, repoId, onGenerateAi, isGeneratingAi }) {
+  const { aiState } = useAIState();
   const [copied, setCopied] = useState(false);
 
   if (!docs) return <div className="text-muted text-sm flex items-center justify-center h-full">Loading documentation...</div>;
@@ -131,7 +133,8 @@ export default function ModuleDocumentation({ docs, repoId, onGenerateAi, isGene
             </div>
             <button
               onClick={onGenerateAi}
-              disabled={isGeneratingAi}
+              disabled={isGeneratingAi || aiState !== 'enhanced'}
+              title={aiState !== 'enhanced' ? 'AI is not configured' : ''}
               className="flex items-center gap-2 px-4 py-2 bg-accent/10 border border-accent/30 hover:bg-accent/20 text-accent rounded font-medium transition-colors disabled:opacity-50"
             >
               {isGeneratingAi ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}

@@ -11,6 +11,7 @@ import { repositoryApi } from '../../shared/api';
 import AiResponse from '../../shared/components/ai/AiResponse';
 import PageHeader from '../../shared/components/PageHeader';
 import { useToast } from '../../shared/context/ToastContext';
+import { useAIState } from '../../shared/context/AIContext';
 
 const RiskCard = ({ risk, repoId, navigate }) => {
   /**
@@ -67,6 +68,7 @@ const EngineeringHealthPage = () => {
   const { repoId } = useParams();
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const { aiState } = useAIState();
   const [searchParams] = useSearchParams();
   const fileFilter = searchParams.get('file');
   
@@ -251,9 +253,11 @@ const EngineeringHealthPage = () => {
                 setLoadingInsights(false);
               }
             }}
-            className="px-4 py-2 bg-accent/20 text-accent rounded hover:bg-accent/30 transition-colors"
+            disabled={loadingInsights || aiState !== 'enhanced'}
+            title={aiState !== 'enhanced' ? 'AI is not configured' : ''}
+            className="px-4 py-2 bg-accent/20 text-accent rounded hover:bg-accent/30 transition-colors disabled:opacity-50"
           >
-            Generate AI Interpretation
+            {loadingInsights ? 'Generating...' : 'Generate AI Interpretation'}
           </button>
         </div>
       )}

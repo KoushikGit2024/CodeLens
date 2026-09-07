@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import { DiffEditor } from '@monaco-editor/react';
 import { ResizableLayout } from '../../shared/components/ResizableLayout';
+import { useToast } from '../../shared/context/ToastContext';
+import { useAIState } from '../../shared/context/AIContext';
 import { repositoryApi } from '../../shared/api';
 import AiResponse from '../../shared/components/ai/AiResponse';
 import PageHeader from '../../shared/components/PageHeader';
@@ -346,6 +348,7 @@ function CandidateDetail({ candidate, repoId }) {
   const [fixing, setFixing] = useState(false);
   const [fixResult, setFixResult] = useState(null);
   const [fixError, setFixError] = useState(null);
+  const { aiState } = useAIState();
 
   useEffect(() => {
     setFixResult(null);
@@ -405,7 +408,9 @@ function CandidateDetail({ candidate, repoId }) {
                 setFixing(false);
               }
             }}
-            disabled={fixing || !!fixResult}
+            
+            disabled={fixing || !!fixResult || aiState !== 'enhanced'}
+            title={aiState !== 'enhanced' ? 'AI is not configured' : ''}
             className="flex items-center gap-2 px-3 py-1.5 bg-accent hover:bg-accent/80 disabled:opacity-40 text-[#CBD5E8] rounded text-sm font-medium transition-colors"
           >
             {fixing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
@@ -568,6 +573,7 @@ function CandidateDetail({ candidate, repoId }) {
 function AiAdvisor({ candidate, repoId }) {
   const [insights, setInsights] = useState(null);
   const [loading, setLoading] = useState(false);
+  const { aiState } = useAIState();
 
   const loadInsights = async () => {
     setLoading(true);
@@ -600,7 +606,9 @@ function AiAdvisor({ candidate, repoId }) {
             <p className="text-sm text-muted">Generate a customized AI refactoring strategy for this candidate.</p>
             <button
               onClick={loadInsights}
-              className="px-4 py-2 border border-accent/30 text-accent hover:bg-accent/8 rounded transition-colors text-sm"
+              disabled={aiState !== 'enhanced'}
+              title={aiState !== 'enhanced' ? 'AI is not configured' : ''}
+              className="px-4 py-2 border border-accent/30 text-accent hover:bg-accent/8 rounded transition-colors text-sm disabled:opacity-50"
             >
               Generate AI Strategy
             </button>
