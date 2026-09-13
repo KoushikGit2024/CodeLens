@@ -15,7 +15,8 @@ const DB_VERSION = 3;
  * and then it applies version-safe schema upgrades.
  */
 export async function getDB() {
-  if (typeof window === 'undefined' || !window.indexedDB) {
+  const env = typeof window !== 'undefined' ? window : (typeof self !== 'undefined' ? self : null);
+  if (!env || !env.indexedDB) {
     throw new Error('IndexedDB is not supported or is blocked in this environment.');
   }
 
