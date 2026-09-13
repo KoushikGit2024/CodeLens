@@ -1,8 +1,14 @@
 {
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/((?!parsers/|assets/|.*\\.(?:js|mjs|wasm|css|svg|png|json)$).*)",
       "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/parsers/(.*)\\.wasm",
+      "headers": [{ "key": "Content-Type", "value": "application/wasm" }]
     }
   ]
 }

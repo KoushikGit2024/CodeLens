@@ -22,10 +22,12 @@ import { AIProvider } from '../shared/context/AIContext';
 import { ToastProvider } from '../shared/context/ToastContext';
 import RepositoryShell from '../shared/layout/RepositoryShell';
 import { ErrorBoundary } from '../shared/components/ErrorBoundary';
+import { EnvironmentGuard } from '../shared/components/EnvironmentGuard';
 
 export default function App() {
   return (
-    <ErrorBoundary>
+    <EnvironmentGuard>
+      <ErrorBoundary>
       <ToastProvider>
         <AuthProvider>
           <AIProvider>
@@ -60,6 +62,7 @@ export default function App() {
           </AIProvider>
         </AuthProvider>
       </ToastProvider>
-    </ErrorBoundary>
+      </ErrorBoundary>
+    </EnvironmentGuard>
   );
 }
