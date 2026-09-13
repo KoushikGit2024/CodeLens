@@ -372,14 +372,23 @@ export default function RepositoryIntelligencePage() {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               <button 
-                onClick={handleUnderstandRepository} 
-                disabled={aiLoading || aiState !== 'enhanced'}
-                title={aiState !== 'enhanced' ? 'AI is not configured' : ''}
+                onClick={() => {
+                  if (aiState.authState === 'unauthenticated') {
+                    navigate('/auth/signin');
+                    return;
+                  }
+                  handleUnderstandRepository();
+                }} 
+                disabled={aiLoading || aiState.status === 'loading' || (aiState.authState !== 'unauthenticated' && (aiState.status === 'offline' || aiState.quotaStatus === 'exhausted'))}
+                title={
+                  aiState.status === 'offline' ? 'No AI provider configured' :
+                  aiState.quotaStatus === 'exhausted' ? 'AI quota exceeded' : ''
+                }
                 className="bg-surface/30 border border-white/5 p-4 rounded hover:border-accent hover:bg-surface transition-all flex flex-col gap-2 text-left group disabled:opacity-50 disabled:cursor-not-allowed"
               >
                  <div className="flex items-center gap-2 text-text font-medium group-hover:text-accent transition-colors">
                    <BookOpen className="w-4 h-4 text-accent" /> 
-                   Understand Codebase
+                   {aiState.authState === 'unauthenticated' ? 'Sign in to Understand Codebase' : 'Understand Codebase'}
                  </div>
                  <span className="text-xs text-muted">Generate an AI overview of the entire repository structure.</span>
               </button>

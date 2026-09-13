@@ -129,11 +129,16 @@ export default function AiResponse({ data, title = "AI Intelligence", onNavigate
   const [input, setInput] = useState('');
   const chatEndRef = useRef(null);
 
-  const handleAskQuestion = (e) => {
+  const handleAskQuestion = async (e) => {
     e.preventDefault();
     if (!input.trim() || isAsking) return;
-    sendMessage(input);
+    const currentInput = input;
     setInput('');
+    try {
+      await sendMessage(currentInput);
+    } catch (err) {
+      // Error is handled in AIContext via error state, no additional action needed here
+    }
     setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
   };
 

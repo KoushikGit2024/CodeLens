@@ -166,21 +166,28 @@ export async function analyzeFileContent(source, relPath, language) {
     });
   }
 
-  const factory = PARSER_FACTORIES[language];
-  const parser  = factory(tsParser);
+  try {
+    const factory = PARSER_FACTORIES[language];
+    const parser  = factory(tsParser);
 
-  const fileAnalysis = await parser.parseFile(source, relPath);
-  fileAnalysis.lineCount = lineCount;
-  
-  // It triggers the deterministic findings logic, then extracts SAST results, and then it applies them to the payload.
-  if (typeof parser.extractAdvancedFindings === 'function') {
-    try {
-      const rootNode = tsParser.parse(source).rootNode;
-      fileAnalysis.findings = parser.extractAdvancedFindings(rootNode, relPath);
-    } catch (e) {
-      console.warn(`[repository.analyzer.js] Advanced finding extraction failed for ${relPath}`);
+    const fileAnalysis = await parser.parseFile(source, relPath);
+    fileAnalysis.lineCount = lineCount;
+    
+    // It triggers the deterministic findings logic, then extracts SAST results, and then it applies them to the payload.
+    if (typeof parser.extractAdvancedFindings === 'function') {
+      let advancedTree = null;
+      try {
+        advancedTree = tsParser.parse(source);
+        fileAnalysis.findings = parser.extractAdvancedFindings(advancedTree.rootNode, relPath);
+      } catch (e) {
+        console.warn(`[repository.analyzer.js] Advanced finding extraction failed for ${relPath}`);
+      } finally {
+        if (advancedTree) advancedTree.delete();
+      }
     }
-  }
 
-  return fileAnalysis;
+    return fileAnalysis;
+  } finally {
+    if (tsParser) tsParser.delete();
+  }
 }

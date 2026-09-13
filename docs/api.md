@@ -102,13 +102,57 @@ All endpoints return JSON unless otherwise specified.
 
 ---
 
-## AI API (IBM watsonx)
+## AI API (Proxy)
+
+> **Authentication Required:** All endpoints in this section (except `/health`) require a valid Supabase JWT passed via the `Authorization: Bearer <token>` header.
+
+### `GET /api/ai/health`
+- **Purpose**: Public server health check for AI providers.
+- **Returns**: `{ status: 'ok', configured: true }`
+
+### `GET /api/ai/status`
+- **Purpose**: Fetches the authenticated user's AI provider status, Auth state, and Quota usage.
+- **Returns**: 
+  ```json
+  {
+    "authState": "authenticated",
+    "providerConfigured": true,
+    "quotaStatus": "available",
+    "usage": {
+      "requests": 10,
+      "requestLimit": 100,
+      "tokens": 5000,
+      "tokenLimit": 500000,
+      "periodEnd": "2023-12-31T00:00:00Z"
+    }
+  }
+  ```
+
+### `POST /api/ai/chat`
+- **Purpose**: Proxies a prompt to the configured AI provider. Enforces quota limits and records usage.
+- **Body**: `{ prompt: "...", history: [...], jsonMode: false }`
+- **Returns**: `{ response: "..." }`
+- **Errors**: `401 Unauthorized`, `429 Too Many Requests` (Quota exhausted).
+
+---
+
+## Assets API
+
+### `GET /api/assets/auth`
+- **Purpose**: Returns an ImageKit authentication signature for secure client-side uploads.
+- **Auth**: Required.
+- **Returns**: `{ token: "...", expire: 1234567890, signature: "..." }`
+
+---
+
+## Legacy AI API (Client-Side IndexedDB Mocks)
+
+> **Note:** The following endpoints are currently mocked client-side using `repositoryApi` in `client/src/shared/api/index.js` and do not have actual Express backend routes yet.
 
 ### `POST /api/repository/:id/question`
 - **Purpose**: Submits a user question to the AI Repository Assistant.
 - **Body**: `{ question: "What does AuthController do?" }`
 - **Returns**: `{ answer: "...", references: [...] }`
-- **AI Involved**: Yes.
 
 ### `POST /api/repository/:id/ask`
 - **Purpose**: Legacy AI Q&A endpoint. (Use `/question` instead).

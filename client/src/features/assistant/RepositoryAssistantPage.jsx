@@ -25,11 +25,14 @@ export default function RepositoryAssistantPage() {
    * It initializes the AI state manager, then extracts IndexedDB chat histories, 
    * and then it applies automatic message syncing for the assistant feature.
    */
-  const { messages, isLoading, error: chatError, sendMessage } = useAI({ 
+  const { messages, isLoading, error: chatError, sendMessage, effectiveState } = useAI({ 
     repoId, 
     feature: 'assistant', 
     contextData: null 
   });
+
+  const isExhausted = effectiveState === 'quota_exhausted';
+  const disableInput = isLoading || isExhausted;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -42,10 +45,14 @@ export default function RepositoryAssistantPage() {
   const handleSubmit = async (e, presetQuestion = null) => {
     if (e) e.preventDefault();
     const q = (presetQuestion || question).trim();
-    if (!q || isLoading) return;
+    if (!q || disableInput) return;
 
     setQuestion('');
-    await sendMessage(q);
+    try {
+      await sendMessage(q);
+    } catch (err) {
+      // Error handled globally by AIContext
+    }
   };
 
   if (repoLoading) {
@@ -95,11 +102,11 @@ export default function RepositoryAssistantPage() {
                 Ask a natural-language question. Answers are grounded in the repository's structural facts.
               </p>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl mx-auto text-left">
-                <SuggestionCard text="What are the entry points?" onClick={(q) => handleSubmit(null, q)} />
-                <SuggestionCard text="How many files are in this project?" onClick={(q) => handleSubmit(null, q)} />
-                <SuggestionCard text="What are the main architectural components?" onClick={(q) => handleSubmit(null, q)} />
-                <SuggestionCard text="How does authentication work?" onClick={(q) => handleSubmit(null, q)} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl mx-auto text-left" title={isExhausted ? "AI limit exceeded" : ""}>
+                <SuggestionCard text="What are the entry points?" onClick={(q) => handleSubmit(null, q)} disabled={disableInput} />
+                <SuggestionCard text="How many files are in this project?" onClick={(q) => handleSubmit(null, q)} disabled={disableInput} />
+                <SuggestionCard text="What are the main architectural components?" onClick={(q) => handleSubmit(null, q)} disabled={disableInput} />
+                <SuggestionCard text="How does authentication work?" onClick={(q) => handleSubmit(null, q)} disabled={disableInput} />
               </div>
             </div>
           )}
@@ -130,19 +137,20 @@ export default function RepositoryAssistantPage() {
       <div className="bg-panel border-t border-border p-4 shrink-0">
         <form
           onSubmit={(e) => handleSubmit(e)}
-          className="max-w-4xl mx-auto relative flex items-center"
+          className="max-w-4xl mx-auto relative flex items-center group"
+          title={isExhausted ? "AI limit exceeded" : ""}
         >
           <input
             type="text"
             value={question}
             onChange={e => setQuestion(e.target.value)}
             placeholder="Ask a question about the repository..."
-            disabled={isLoading}
+            disabled={disableInput}
             className="w-full bg-surface border border-border rounded-lg pl-4 pr-12 py-3 text-sm text-white placeholder-muted focus:outline-none focus:border-accent disabled:opacity-50"
           />
           <button
             type="submit"
-            disabled={isLoading || !question.trim()}
+            disabled={disableInput || !question.trim()}
             className="absolute right-2 flex items-center justify-center w-8 h-8 bg-accent text-white rounded disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/90 transition-colors"
           >
             <Send className="w-4 h-4" />
@@ -158,11 +166,12 @@ export default function RepositoryAssistantPage() {
   );
 }
 
-function SuggestionCard({ text, onClick }) {
+function SuggestionCard({ text, onClick, disabled }) {
   return (
     <button
       onClick={() => onClick(text)}
-      className="bg-panel border border-border hover:border-accent/50 hover:bg-surface rounded-lg p-3 text-sm text-white/90 text-left transition-colors"
+      disabled={disabled}
+      className="bg-panel border border-border hover:border-accent/50 hover:bg-surface rounded-lg p-3 text-sm text-white/90 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {text}
     </button>

@@ -68,6 +68,8 @@ export class BaseParser {
         hasErrors,
         error: `Symbol extraction error: ${err.message}`,
       });
+    } finally {
+      if (tree) tree.delete();
     }
 
     return createFileAnalysis({ filePath, language: this.languageId, symbols, hasErrors });
@@ -91,13 +93,15 @@ export class BaseParser {
    * the CodeLens canonical AnalysisFinding schema for the Monaco Editor and Dashboard.
    */
   extractFindings(rootNode, queryString, filePath, analyzerId, ruleId, category, severity, titleTemplate, messageTemplate) {
+    let query = null;
     try {
       const language = this.tsParser.getLanguage();
-      const query = language.query(queryString);
+      query = language.query(queryString);
       const matches = query.matches(rootNode);
       
       return matches.map((match, index) => {
         const primaryCapture = match.captures[0];
+        if (!primaryCapture) return null;
         const node = primaryCapture.node;
         
         return {
@@ -117,10 +121,12 @@ export class BaseParser {
           },
           metrics: {}
         };
-      });
+      }).filter(Boolean);
     } catch (error) {
       console.warn(`Query execution failed for ${ruleId} on ${filePath}:`, error);
       return [];
+    } finally {
+      if (query) query.delete();
     }
   }
 
@@ -128,9 +134,10 @@ export class BaseParser {
    * Extracts string dependencies (imports/requires) to build the React Flow graph.
    */
   extractDependencies(rootNode, queryString) {
+    let query = null;
     try {
       const language = this.tsParser.getLanguage();
-      const query = language.query(queryString);
+      query = language.query(queryString);
       const matches = query.matches(rootNode);
       return matches.map(match => {
         const text = match.captures[0].node.text;
@@ -138,6 +145,8 @@ export class BaseParser {
       });
     } catch {
       return [];
+    } finally {
+      if (query) query.delete();
     }
   }
 
@@ -145,12 +154,15 @@ export class BaseParser {
    * Counts AST nodes representing structural data like cyclomatic complexity.
    */
   calculateComplexity(rootNode, queryString) {
+    let query = null;
     try {
       const language = this.tsParser.getLanguage();
-      const query = language.query(queryString);
+      query = language.query(queryString);
       return query.matches(rootNode).length;
     } catch {
       return 0;
+    } finally {
+      if (query) query.delete();
     }
   }
 }

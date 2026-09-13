@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { Upload, Loader2, AlertCircle, Code, Box, Network, Bot, FolderOpen, Eraser, Trash2, Database, Inbox } from 'lucide-react';
 import { repositoryApi } from '../../shared/api';
 import { Logo } from '../../shared/components/Logo';
+import UserAvatarWidget from '../account/UserAvatarWidget';
 
 export default function UploadPage() {
   const navigate = useNavigate();
@@ -191,6 +192,9 @@ export default function UploadPage() {
           <p className="text-muted text-sm mt-1 max-w-md leading-relaxed hidden md:block">
             Upload your codebase to extract architecture, map dependencies, and generate intelligent documentation.
           </p>
+        </div>
+        <div className="flex items-center gap-4">
+          <UserAvatarWidget />
         </div>
       </div>
 

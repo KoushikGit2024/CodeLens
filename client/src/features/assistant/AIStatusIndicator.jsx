@@ -9,17 +9,13 @@ import { Sparkles, CloudOff, AlertTriangle, AlertCircle, X } from 'lucide-react'
 import { useAIState } from '../../shared/context/AIContext';
 
 export default function AIStatusIndicator() {
-  const { aiState } = useAIState();
+  const { effectiveState, retryConnection, aiState } = useAIState();
   const [showPopover, setShowPopover] = useState(false);
 
-  if (aiState === 'loading') return null;
+  if (effectiveState === 'loading') return null;
 
-  /**
-   * It evaluates the AI state machine, then extracts the active status string, 
-   * and then it applies a unified configuration object for the indicator UI.
-   */
   const getConfig = () => {
-    switch (aiState) {
+    switch (effectiveState) {
       case 'enhanced':
         return {
           label: 'AI Enhanced',
@@ -33,6 +29,28 @@ export default function AIStatusIndicator() {
             'AI summaries', 'Natural-language Q&A', 'AI recommendations'
           ],
           unavailable: []
+        };
+      case 'unauthenticated':
+        return {
+          label: 'Sign in for AI',
+          icon: <Sparkles className="w-3.5 h-3.5" />,
+          colorClass: 'text-white border-accent bg-accent/20 hover:bg-accent/40 shadow-[0_0_8px_rgba(var(--color-accent),0.3)]',
+          title: 'Sign In Required',
+          desc: 'You must be signed in to access AI-enhanced features.',
+          action: { label: 'Sign In', link: '/auth/signin' },
+          available: ['Repository analysis', 'Dependency graph', 'Architecture', 'Engineering health', 'Code viewer'],
+          unavailable: ['AI summaries', 'Natural-language Q&A', 'AI recommendations']
+        };
+      case 'quota_exhausted':
+        return {
+          label: 'Limit Reached',
+          icon: <AlertCircle className="w-3.5 h-3.5" />,
+          colorClass: 'text-danger border-danger/30 bg-danger/10',
+          title: 'AI Quota Exhausted',
+          desc: 'You have reached your AI usage limit for this billing period.',
+          action: { label: 'View Usage', link: '/account' },
+          available: ['Repository analysis', 'Dependency graph', 'Architecture', 'Engineering health', 'Code viewer'],
+          unavailable: ['AI summaries', 'Natural-language Q&A', 'AI recommendations']
         };
       case 'offline':
         return {
@@ -56,6 +74,7 @@ export default function AIStatusIndicator() {
           colorClass: 'text-warning border-warning/30 bg-warning/10',
           title: 'AI Unavailable',
           desc: 'CodeLens is configured for AI, but the provider is temporarily failing or unreachable. Falling back to Offline Intelligence.',
+          action: { label: 'Retry Connection', onClick: retryConnection },
           available: [
              'Repository analysis', 'Dependency graph', 'Architecture', 
             'Engineering health', 'Refactoring analysis', 'Code viewer'
@@ -63,6 +82,16 @@ export default function AIStatusIndicator() {
           unavailable: [
             'AI summaries', 'Natural-language Q&A', 'AI recommendations'
           ]
+        };
+      case 'connecting':
+        return {
+          label: 'Connecting...',
+          icon: <AlertTriangle className="w-3.5 h-3.5 animate-pulse" />,
+          colorClass: 'text-warning border-warning/30 bg-warning/10 opacity-70',
+          title: 'Connecting...',
+          desc: 'Attempting to reconnect to AI provider...',
+          available: [],
+          unavailable: []
         };
       case 'error':
         return {
@@ -140,6 +169,30 @@ export default function AIStatusIndicator() {
                 </div>
               )}
             </div>
+
+            {config.action && (
+              <div className="mt-4 pt-3 border-t border-border/50">
+                {config.action.link ? (
+                  <a 
+                    href={config.action.link}
+                    className="w-full py-1.5 bg-accent hover:bg-accent-hover text-white rounded text-xs font-medium transition-colors text-center block"
+                  >
+                    {config.action.label}
+                  </a>
+                ) : (
+                  <button 
+                    onClick={() => {
+                      config.action.onClick();
+                      setShowPopover(false);
+                    }}
+                    className="w-full py-1.5 bg-surface hover:bg-surface-light border border-border text-white rounded text-xs font-medium transition-colors"
+                  >
+                    {config.action.label}
+                  </button>
+                )}
+              </div>
+            )}
+
             <div className="mt-4 pt-3 border-t border-border/50 text-[10px] text-muted/80 text-center">
               Your deterministic analysis continues to work locally.
             </div>

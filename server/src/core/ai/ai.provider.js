@@ -125,12 +125,20 @@ async function ibmWatsonxProvider(prompt) {
   });
 
   const parsed = JSON.parse(data);
-  // watsonx response shape: { results: [{ generated_text: '...' }] }
-  const text = parsed?.results?.[0]?.generated_text;
+  const result = parsed?.results?.[0];
+  const text = result?.generated_text;
   if (typeof text !== 'string') {
     throw new Error(`Unexpected watsonx response shape: ${data.slice(0, 200)}`);
   }
-  return text.trim();
+  return {
+    text: text.trim(),
+    usage: {
+      input_tokens: result?.input_token_count ?? null,
+      output_tokens: result?.generated_token_count ?? null,
+      total_tokens: (result?.input_token_count ?? 0) + (result?.generated_token_count ?? 0) || null,
+      source: 'provider_reported',
+    },
+  };
 }
 
 // ── Google Gemini provider ────────────────────────────────────────────────────
@@ -153,7 +161,16 @@ async function geminiProvider(prompt) {
   const data = JSON.parse(resStr);
   
   if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
-    return data.candidates[0].content.parts[0].text.trim();
+    const usageMeta = data.usageMetadata || {};
+    return {
+      text: data.candidates[0].content.parts[0].text.trim(),
+      usage: {
+        input_tokens: usageMeta.promptTokenCount ?? null,
+        output_tokens: usageMeta.candidatesTokenCount ?? null,
+        total_tokens: usageMeta.totalTokenCount ?? null,
+        source: usageMeta.totalTokenCount != null ? 'provider_reported' : null,
+      },
+    };
   }
   throw new Error(`Unexpected Gemini response: ${resStr.slice(0, 200)}`);
 }
@@ -183,7 +200,16 @@ async function openAiCompatibleProvider(prompt) {
   const data = JSON.parse(resStr);
   
   if (data.choices && data.choices[0]?.message?.content) {
-    return data.choices[0].message.content.trim();
+    const usage = data.usage || {};
+    return {
+      text: data.choices[0].message.content.trim(),
+      usage: {
+        input_tokens: usage.prompt_tokens ?? null,
+        output_tokens: usage.completion_tokens ?? null,
+        total_tokens: usage.total_tokens ?? null,
+        source: usage.total_tokens != null ? 'provider_reported' : null,
+      },
+    };
   }
   throw new Error(`Unexpected OpenAI-compatible response: ${resStr.slice(0, 200)}`);
 }

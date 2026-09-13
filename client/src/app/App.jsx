@@ -10,6 +10,14 @@ import EngineeringHealthPage from '../features/engineering/EngineeringHealthPage
 import RefactoringPage from '../features/engineering/RefactoringPage';
 import RepositoryIntelligencePage from '../features/repository/RepositoryIntelligencePage';
 import HelpPage from '../features/help/HelpPage';
+import { AuthProvider } from '../shared/context/AuthContext';
+import SignInPage from '../features/auth/SignInPage';
+import SignUpPage from '../features/auth/SignUpPage';
+import ForgotPasswordPage from '../features/auth/ForgotPasswordPage';
+import ResetPasswordPage from '../features/auth/ResetPasswordPage';
+import AuthLayout from '../features/auth/AuthLayout';
+import AuthGuard from '../features/auth/AuthGuard';
+import AccountPage from '../features/account/AccountPage';
 import { AIProvider } from '../shared/context/AIContext';
 import { ToastProvider } from '../shared/context/ToastContext';
 import RepositoryShell from '../shared/layout/RepositoryShell';
@@ -19,27 +27,38 @@ export default function App() {
   return (
     <ErrorBoundary>
       <ToastProvider>
-        <AIProvider>
-          <Routes>
-            <Route path="/" element={<UploadPage />} />
-            
-            {/* The Canonical Repository Routes */}
-            <Route path="/explore/:repoId" element={<RepositoryShell />}>
-              <Route index element={<RepositoryIntelligencePage />} />
-              <Route path="source" element={<ExplorerPage />} />
-              <Route path="graph" element={<DependencyGraphPage />} />
-              <Route path="architecture" element={<ArchitecturePage />} />
+        <AuthProvider>
+          <AIProvider>
+            <Routes>
+              <Route path="/" element={<UploadPage />} />
+              
+              <Route element={<AuthLayout />}>
+                <Route path="/auth/signin" element={<SignInPage />} />
+                <Route path="/auth/signup" element={<SignUpPage />} />
+                <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+              </Route>
+              
+              <Route path="/account" element={<AuthGuard><AccountPage /></AuthGuard>} />
+              
+              {/* The Canonical Repository Routes */}
+              <Route path="/explore/:repoId" element={<RepositoryShell />}>
+                <Route index element={<RepositoryIntelligencePage />} />
+                <Route path="source" element={<ExplorerPage />} />
+                <Route path="graph" element={<DependencyGraphPage />} />
+                <Route path="architecture" element={<ArchitecturePage />} />
 
-              <Route path="assistant" element={<RepositoryAssistantPage />} />
-              <Route path="impact" element={<ImpactPage />} />
-              <Route path="health" element={<EngineeringHealthPage />} />
-              <Route path="refactoring" element={<RefactoringPage />} />
-            </Route>
+                <Route path="assistant" element={<RepositoryAssistantPage />} />
+                <Route path="impact" element={<ImpactPage />} />
+                <Route path="health" element={<EngineeringHealthPage />} />
+                <Route path="refactoring" element={<RefactoringPage />} />
+              </Route>
 
-            <Route path="/help" element={<HelpPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </AIProvider>
+              <Route path="/help" element={<HelpPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </AIProvider>
+        </AuthProvider>
       </ToastProvider>
     </ErrorBoundary>
   );

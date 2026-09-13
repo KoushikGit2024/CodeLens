@@ -2,6 +2,11 @@
 
 const aiProvider = require('../../core/ai/ai.provider');
 const aiService = require('../../core/ai/ai.service');
+const { recordUsage } = require('../../core/auth/usage.recorder');
+
+function isSupabaseAvailable() {
+  return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
 
 /**
  * Prepend the last N turns of conversation history to the prompt so the model
@@ -21,34 +26,65 @@ function formatWithHistory(prompt, history) {
 
 /**
  * Handle AI prompt generation (Proxy to Watsonx/Gemini)
- * Supports:
- *  - history: array of {role, content} messages for multi-turn memory
- *  - jsonMode: route through ai.service.js for JSON extraction + retries
+ * Now requires req.user (authMiddleware) and req.quota (quotaMiddleware).
+ * Every outcome — success, provider failure, or unexpected error — is logged
+ * via recordUsage() so usage_periods stays accurate even on failure paths.
  */
 async function generateChat(req, res, next) {
+  const startedAt = Date.now();
+  const { prompt, history, jsonMode, feature } = req.body;
+
+  if (!prompt) {
+    return res.status(400).json({ error: 'Missing prompt in request body.' });
+  }
+
+  const finalPrompt = Array.isArray(history) && history.length > 0
+    ? formatWithHistory(prompt, history)
+    : prompt;
+
   try {
-    const { prompt, history, jsonMode } = req.body;
-    if (!prompt) {
-      return res.status(400).json({ error: 'Missing prompt in request body.' });
-    }
-
-    const finalPrompt = Array.isArray(history) && history.length > 0
-      ? formatWithHistory(prompt, history)
-      : prompt;
-
     if (jsonMode) {
-      // Route JSON requests through ai.service.js — gets timeout, retries, and JSON extraction
       const json = await aiService.generateStructuredResponse(finalPrompt);
-      // Keep the client contract intact: return response as a JSON string
-      return res.json({ response: JSON.stringify(json) });
+      const responseText = JSON.stringify(json);
+
+      await recordUsage(req, {
+        provider: aiProvider.getProviderName(),
+        feature: feature || 'chat_json',
+        status: 'success',
+        promptChars: finalPrompt.length,
+        responseChars: responseText.length,
+        latencyMs: Date.now() - startedAt,
+      });
+
+      return res.json({ response: responseText });
     }
 
-    // Plain text — go direct to provider for lowest latency
     const responseText = await aiProvider.generateAnswer(finalPrompt);
+
+    await recordUsage(req, {
+      provider: aiProvider.getProviderName(),
+      feature: feature || 'chat',
+      status: 'success',
+      promptChars: finalPrompt.length,
+      responseChars: responseText.length,
+      latencyMs: Date.now() - startedAt,
+    });
+
     return res.json({ response: responseText });
 
   } catch (error) {
-    if (error.name === 'ProviderUnavailableError' || error.statusCode === 503) {
+    const isUnavailable = error.name === 'ProviderUnavailableError' || error.statusCode === 503;
+
+    await recordUsage(req, {
+      provider: aiProvider.getProviderName(),
+      feature: feature || 'chat',
+      status: 'failed',
+      promptChars: finalPrompt.length,
+      latencyMs: Date.now() - startedAt,
+      errorMessage: error.message,
+    });
+
+    if (isUnavailable) {
       return res.status(503).json({ error: error.message });
     }
     console.error('[AI Provider Error]', error);
@@ -57,13 +93,12 @@ async function generateChat(req, res, next) {
 }
 
 /**
- * Health check for the AI provider
+ * Health check for the AI provider (unauthenticated, server-level).
  */
 async function healthCheck(req, res, next) {
   try {
     const providerName = aiProvider.getProviderName();
     const configured = aiProvider.isProviderConfigured();
-    console.log(`[CodeLens] /ai/health → configured=${configured}, provider=${providerName}`);
     res.json({ status: 'ok', provider: providerName, configured });
   } catch (error) {
     if (error.name === 'ProviderUnavailableError') {
@@ -73,7 +108,67 @@ async function healthCheck(req, res, next) {
   }
 }
 
+/**
+ * Auth-aware status endpoint for the client AI state machine (Phase 5/6).
+ * Requires authMiddleware to have already populated req.user.
+ */
+async function statusCheck(req, res, next) {
+  try {
+    const configured = aiProvider.isProviderConfigured();
+    const userId = req.user.id;
+
+    const { getSupabaseClient } = require('../../core/db/supabase.client');
+    const supabase = getSupabaseClient();
+    const { data: userRow } = await supabase
+      .from('users')
+      .select('plan_id')
+      .eq('id', userId)
+      .single();
+
+    const planId = userRow ? userRow.plan_id : 'free';
+
+    const { data: plan } = await supabase
+      .from('plans')
+      .select('*')
+      .eq('id', planId)
+      .single();
+
+    const { data: periods } = await supabase
+      .from('usage_periods')
+      .select('*')
+      .eq('user_id', userId)
+      .order('period_start', { ascending: false })
+      .limit(1);
+
+    const period = periods && periods[0];
+
+    const requestsExceeded =
+      plan && plan.ai_requests_per_month !== -1 && period && period.ai_requests >= plan.ai_requests_per_month;
+    const tokensExceeded =
+      plan && plan.ai_tokens_per_month !== -1 && period && period.ai_tokens >= plan.ai_tokens_per_month;
+
+    const quotaStatus = requestsExceeded || tokensExceeded ? 'exhausted' : 'available';
+
+    return res.json({
+      authState: 'authenticated',
+      providerConfigured: configured,
+      quotaStatus,
+      usage: period ? {
+        requests: period.ai_requests,
+        requestLimit: plan ? plan.ai_requests_per_month : null,
+        tokens: period.ai_tokens,
+        tokenLimit: plan ? plan.ai_tokens_per_month : null,
+        periodEnd: period.period_end,
+      } : null,
+    });
+  } catch (error) {
+    console.error('[AI Status Error]', error);
+    return res.status(500).json({ error: 'Failed to fetch AI status' });
+  }
+}
+
 module.exports = {
   generateChat,
-  healthCheck
+  healthCheck,
+  statusCheck,
 };

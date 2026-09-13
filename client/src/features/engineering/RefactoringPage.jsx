@@ -126,9 +126,9 @@ const IssueGroup = ({ issueTitle, issueData, priorityLevel, selectedCandidateId,
 
       {isOpen && (
         <div className="flex flex-col gap-0.5 ml-4 mt-0.5">
-          {sorted.map(c => (
+          {sorted.map((c, index) => (
             <CandidateCard
-              key={c.id}
+              key={`${c.id}-${index}`}
               candidate={c}
               isSelected={selectedCandidateId === c.id}
               onSelect={setSelectedCandidateId}
@@ -343,6 +343,7 @@ export default function RefactoringPage() {
  * and then it applies them alongside the suggested strategies for manual or AI review.
  */
 function CandidateDetail({ candidate, repoId }) {
+  const navigate = useNavigate();
   const [impact, setImpact] = useState(null);
   const [loading, setLoading] = useState(true);
   const [fixing, setFixing] = useState(false);
@@ -397,6 +398,10 @@ function CandidateDetail({ candidate, repoId }) {
           </div>
           <button
             onClick={async () => {
+              if (aiState.authState === 'unauthenticated') {
+                navigate('/auth/signin');
+                return;
+              }
               setFixing(true);
               setFixError(null);
               try {
@@ -409,12 +414,15 @@ function CandidateDetail({ candidate, repoId }) {
               }
             }}
             
-            disabled={fixing || !!fixResult || aiState !== 'enhanced'}
-            title={aiState !== 'enhanced' ? 'AI is not configured' : ''}
+            disabled={fixing || !!fixResult || aiState.status === 'loading' || (aiState.authState !== 'unauthenticated' && (aiState.status === 'offline' || aiState.quotaStatus === 'exhausted'))}
+            title={
+              aiState.status === 'offline' ? 'No AI provider configured' :
+              aiState.quotaStatus === 'exhausted' ? 'AI quota exceeded' : ''
+            }
             className="flex items-center gap-2 px-3 py-1.5 bg-accent hover:bg-accent/80 disabled:opacity-40 text-[#CBD5E8] rounded text-sm font-medium transition-colors"
           >
             {fixing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            {fixing ? 'Auto-Fixing...' : 'Auto-Fix with AI'}
+            {fixing ? 'Auto-Fixing...' : aiState.authState === 'unauthenticated' ? 'Sign in to Auto-Fix' : 'Auto-Fix with AI'}
           </button>
         </div>
       </div>
@@ -571,6 +579,7 @@ function CandidateDetail({ candidate, repoId }) {
  * and then it applies the markdown response to the advisor panel.
  */
 function AiAdvisor({ candidate, repoId }) {
+  const navigate = useNavigate();
   const [insights, setInsights] = useState(null);
   const [loading, setLoading] = useState(false);
   const { aiState } = useAIState();
@@ -605,12 +614,21 @@ function AiAdvisor({ candidate, repoId }) {
           <div className="flex flex-col items-center justify-center h-40 gap-3 text-center">
             <p className="text-sm text-muted">Generate a customized AI refactoring strategy for this candidate.</p>
             <button
-              onClick={loadInsights}
-              disabled={aiState !== 'enhanced'}
-              title={aiState !== 'enhanced' ? 'AI is not configured' : ''}
+              onClick={() => {
+                if (aiState.authState === 'unauthenticated') {
+                  navigate('/auth/signin');
+                  return;
+                }
+                loadInsights();
+              }}
+              disabled={aiState.status === 'loading' || (aiState.authState !== 'unauthenticated' && (aiState.status === 'offline' || aiState.quotaStatus === 'exhausted'))}
+              title={
+                aiState.status === 'offline' ? 'No AI provider configured' :
+                aiState.quotaStatus === 'exhausted' ? 'AI quota exceeded' : ''
+              }
               className="px-4 py-2 border border-accent/30 text-accent hover:bg-accent/8 rounded transition-colors text-sm disabled:opacity-50"
             >
-              Generate AI Strategy
+              {aiState.authState === 'unauthenticated' ? 'Sign in to Generate Strategy' : 'Generate AI Strategy'}
             </button>
           </div>
         )}

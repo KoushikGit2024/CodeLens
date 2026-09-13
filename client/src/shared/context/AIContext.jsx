@@ -5,33 +5,78 @@
  * and then it applies local active-file bindings before sending queries to Watsonx.
  */
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { getAiHealth, repositoryApi } from '../api';
+import { getAiHealth, getAiStatus, repositoryApi } from '../api';
 import { chatStore } from '../../services/storage/chat.store';
+import { useAuth } from './AuthContext';
 
 const AIContext = createContext();
 
 export function AIProvider({ children }) {
-  const [aiState, setAiState] = useState('loading'); 
+  const { user } = useAuth();
+  const [aiState, setAiState] = useState({
+    status: 'loading', // 'loading', 'ready', 'offline', 'unavailable'
+    authState: 'unauthenticated',
+    quotaStatus: 'available',
+    usage: null,
+  });
+
+  const checkStatus = useCallback(async () => {
+    try {
+      if (!user) {
+        // If not logged in, just check health (public)
+        const { configured } = await getAiHealth();
+        setAiState(prev => ({
+          ...prev,
+          status: configured ? 'ready' : 'offline',
+          authState: 'unauthenticated',
+        }));
+        return;
+      }
+
+      // If logged in, check detailed status
+      const data = await getAiStatus();
+      setAiState({
+        status: data.providerConfigured ? 'ready' : 'offline',
+        authState: data.authState,
+        quotaStatus: data.quotaStatus,
+        usage: data.usage,
+      });
+    } catch (err) {
+      console.warn('AI status check failed, falling back:', err.message);
+      setAiState(prev => ({ ...prev, status: 'offline' }));
+    }
+  }, [user]);
 
   useEffect(() => {
-    const checkHealth = async () => {
-      try {
-        const { configured } = await getAiHealth();
-        setAiState(configured ? 'enhanced' : 'offline');
-      } catch (err) {
-        console.warn('AI health check failed, falling back to offline mode:', err.message);
-        setAiState('offline');
-      }
-    };
-    checkHealth();
+    checkStatus();
+  }, [checkStatus]);
+
+  const reportAiError = useCallback(() => {
+    setAiState(prev => ({ ...prev, status: 'unavailable' }));
   }, []);
 
-  const reportAiError = () => {
-    if (aiState === 'enhanced') setAiState('unavailable');
-  };
+  const retryConnection = useCallback(async () => {
+    setAiState(prev => ({ ...prev, status: 'connecting' }));
+    await checkStatus();
+  }, [checkStatus]);
+
+  let effectiveState = aiState.status;
+  if (aiState.status !== 'loading' && aiState.status !== 'connecting') {
+    if (aiState.authState === 'unauthenticated') {
+      effectiveState = 'unauthenticated';
+    } else if (aiState.status === 'offline') {
+      effectiveState = 'offline';
+    } else if (aiState.status === 'unavailable') {
+      effectiveState = 'unavailable';
+    } else if (aiState.quotaStatus === 'exhausted') {
+      effectiveState = 'quota_exhausted';
+    } else {
+      effectiveState = 'enhanced';
+    }
+  }
 
   return (
-    <AIContext.Provider value={{ aiState, reportAiError }}>
+    <AIContext.Provider value={{ aiState, effectiveState, reportAiError, refreshStatus: checkStatus, retryConnection }}>
       {children}
     </AIContext.Provider>
   );
@@ -41,8 +86,8 @@ export function useAIState() {
   return useContext(AIContext);
 }
 
-export function useAI({ repoId, feature, contextData }) {
-  const { aiState, reportAiError } = useAIState();
+export function useAI({ repoId, feature, contextData } = {}) {
+  const { effectiveState, aiState, reportAiError, refreshStatus } = useAIState();
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -100,7 +145,14 @@ export function useAI({ repoId, feature, contextData }) {
       setMessages(messages);
       setLastFailedPrompt(prompt.trim());
       setError(err.response?.data?.error || err.message || 'Failed to get AI response.');
-      reportAiError();
+      
+      if (err.response?.status === 429) {
+        setEffectiveState('quota_exhausted');
+        if (refreshStatus) refreshStatus();
+      } else {
+        reportAiError();
+      }
+      throw err;
     } finally {
       setIsLoading(false);
     }

@@ -133,12 +133,15 @@ export default function ModuleDocumentation({ docs, repoId, onGenerateAi, isGene
             </div>
             <button
               onClick={onGenerateAi}
-              disabled={isGeneratingAi || aiState !== 'enhanced'}
-              title={aiState !== 'enhanced' ? 'AI is not configured' : ''}
+              disabled={isGeneratingAi || aiState.status === 'offline' || aiState.status === 'loading' || aiState.quotaStatus === 'exhausted'}
+              title={
+                aiState.status === 'offline' ? 'No AI provider configured' :
+                aiState.quotaStatus === 'exhausted' ? 'AI quota exceeded' : ''
+              }
               className="flex items-center gap-2 px-4 py-2 bg-accent/10 border border-accent/30 hover:bg-accent/20 text-accent rounded font-medium transition-colors disabled:opacity-50"
             >
               {isGeneratingAi ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-              {isGeneratingAi ? 'Generating...' : 'Generate Summary'}
+              {isGeneratingAi ? 'Generating...' : aiState.authState === 'unauthenticated' ? 'Sign in to Generate' : 'Generate Summary'}
             </button>
           </div>
         )}

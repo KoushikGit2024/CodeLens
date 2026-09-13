@@ -239,8 +239,18 @@ const EngineeringHealthPage = () => {
       {!insights && !loadingInsights && (
         <div className="mb-8 rounded-lg border border-accent/30 bg-accent/5 p-6 flex flex-col items-center justify-center gap-3">
           <p className="text-muted">Generate an AI interpretation of your engineering health metrics.</p>
-          <button 
-            onClick={async () => {
+          
+          {(() => {
+            let btnText = 'Generate AI Interpretation';
+            let isDisabled = false;
+            let title = '';
+            
+            const handleGenerate = async () => {
+              if (aiState.authState === 'unauthenticated') {
+                navigate('/auth/signin');
+                return;
+              }
+              
               setLoadingInsights(true);
               try {
                 const res = await repositoryApi.getRisks(repoId, { generateAi: true });
@@ -252,13 +262,34 @@ const EngineeringHealthPage = () => {
               } finally {
                 setLoadingInsights(false);
               }
-            }}
-            disabled={loadingInsights || aiState !== 'enhanced'}
-            title={aiState !== 'enhanced' ? 'AI is not configured' : ''}
-            className="px-4 py-2 bg-accent/20 text-accent rounded hover:bg-accent/30 transition-colors disabled:opacity-50"
-          >
-            {loadingInsights ? 'Generating...' : 'Generate AI Interpretation'}
-          </button>
+            };
+
+            if (aiState.status === 'loading') {
+              btnText = 'Loading...';
+              isDisabled = true;
+            } else if (aiState.authState === 'unauthenticated') {
+              btnText = 'Sign in to use AI';
+            } else if (aiState.status === 'offline') {
+              btnText = 'AI Provider Offline';
+              isDisabled = true;
+              title = 'No AI provider configured on the server.';
+            } else if (aiState.quotaStatus === 'exhausted') {
+              btnText = 'AI Quota Exceeded';
+              isDisabled = true;
+              title = 'You have reached your AI usage limit.';
+            }
+
+            return (
+              <button 
+                onClick={handleGenerate}
+                disabled={isDisabled}
+                title={title}
+                className="px-4 py-2 bg-accent/20 text-accent rounded hover:bg-accent/30 transition-colors disabled:opacity-50"
+              >
+                {btnText}
+              </button>
+            );
+          })()}
         </div>
       )}
 

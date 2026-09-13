@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 
 const aiRouter = require('./domains/ai/ai.routes');
+const assetsRouter = require('./domains/assets/assets.routes');
+const { globalRateLimiter } = require('./core/middleware/rate-limit.middleware');
 
 const app = express();
 
@@ -9,6 +11,9 @@ const app = express();
 app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Apply global rate limiting
+app.use('/api/', globalRateLimiter);
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.get('/', (_req, res) => {
@@ -21,6 +26,7 @@ app.get('/', (_req, res) => {
 });
 
 app.use('/api/ai', aiRouter);
+app.use('/api/assets', assetsRouter);
 
 // ── 404 handler ───────────────────────────────────────────────────────────────
 app.use((_req, res) => {

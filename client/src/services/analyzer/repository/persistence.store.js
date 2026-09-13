@@ -15,7 +15,16 @@ const DB_VERSION = 3;
  * and then it applies version-safe schema upgrades.
  */
 export async function getDB() {
-  return openDB(DB_NAME, DB_VERSION, {
+  if (typeof window === 'undefined' || !window.indexedDB) {
+    throw new Error('IndexedDB is not supported or is blocked in this environment.');
+  }
+
+  // Promise race to prevent silent hangs in iframes / private mode where openDB never resolves
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('IndexedDB initialization timed out. This is usually caused by browser privacy settings or opening the app in an iframe (e.g., Vercel Preview).')), 3000);
+  });
+
+  const dbPromise = openDB(DB_NAME, DB_VERSION, {
     async upgrade(db, oldVersion, newVersion, transaction) {
       if (!db.objectStoreNames.contains('repos')) {
         db.createObjectStore('repos', { keyPath: 'id' });
@@ -46,6 +55,8 @@ export async function getDB() {
       }
     },
   });
+
+  return Promise.race([dbPromise, timeoutPromise]);
 }
 
 /**

@@ -51,13 +51,14 @@ async function generateStructuredResponse(prompt, schema = null, options = {}) {
     attempt++;
     try {
       // Execute with timeout
-      const responseText = await executeWithTimeout(
+      const result = await executeWithTimeout(
         () => generateAnswer(finalPrompt), 
         timeoutMs
       );
       
       // Parse JSON
-      const json = extractAndParseJSON(responseText);
+      const json = extractAndParseJSON(result.text);
+      json.__usage = result.usage;
       
       // Validate schema if provided
       if (schema) {
@@ -170,10 +171,11 @@ async function generateAnswerService(prompt, options = {}) {
   while (attempt <= maxRetries) {
     attempt++;
     try {
-      return await executeWithTimeout(
+      const result = await executeWithTimeout(
         () => generateAnswer(prompt), 
         timeoutMs
       );
+      return result;
     } catch (error) {
       lastError = error;
       console.warn(`[aiService] Plain answer attempt ${attempt}/${maxRetries + 1} failed: ${error.message}`);

@@ -10,6 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import * as repositoryStore from '../../services/analyzer/repository/repository.store.js';
 import * as persistenceStore from '../../services/analyzer/repository/persistence.store.js';
 import { startAnalysis } from '../../services/analyzer/analyzer.client.js';
+import { supabase } from '../lib/supabase.js';
 
 import { buildArchitectureModel } from '../../services/analyzer/advanced/architecture.analyzer.js';
 import { buildRepositoryIntelligence } from '../../services/analyzer/advanced/intelligence.analyzer.js';
@@ -24,6 +25,16 @@ import { buildOverviewContext, buildModuleContext, buildOverviewPrompt, buildMod
 const api = axios.create({
   baseURL: '/api',
   timeout: 60_000,
+});
+
+api.interceptors.request.use(async (config) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.access_token) {
+    config.headers.Authorization = `Bearer ${session.access_token}`;
+  }
+  return config;
+}, (error) => {
+  return Promise.reject(error);
 });
 
 /**
@@ -104,9 +115,21 @@ export const repositoryApi = {
       const ignorePatterns = options.ignorePatterns 
         ? options.ignorePatterns.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
         : [];
+
+      let commonRoot = '';
+      if (files.length > 0) {
+        const firstParts = files[0].split('/');
+        if (firstParts.length > 1) {
+          const possibleRoot = firstParts[0] + '/';
+          if (files.every(f => f.startsWith(possibleRoot))) {
+            commonRoot = possibleRoot;
+          }
+        }
+      }
       
       let processedCount = 0;
-      for (const filePath of files) {
+      for (const originalPath of files) {
+        const filePath = commonRoot ? originalPath.substring(commonRoot.length) : originalPath;
         const defaultIgnores = ['.git', 'node_modules', 'dist', 'build', 'coverage', '.next', 'out'];
         const pathSegments = filePath.split('/');
         const shouldIgnore = ignorePatterns.some(p => filePath.includes(p)) || 
@@ -118,10 +141,10 @@ export const repositoryApi = {
           if (extMatch) {
             const ext = extMatch[1].toLowerCase();
             const mimeType = ext === 'jpg' ? 'jpeg' : ext;
-            const base64 = await zip.files[filePath].async('base64');
+            const base64 = await zip.files[originalPath].async('base64');
             content = `data:image/${mimeType};base64,${base64}`;
           } else {
-            content = await zip.files[filePath].async('string');
+            content = await zip.files[originalPath].async('string');
           }
           await persistenceStore.saveFile(repoId, filePath, content);
         }
@@ -664,6 +687,7 @@ ${originalCode}
 };
 
 export const getAiHealth = () => api.get('/ai/health').then(res => res.data);
+export const getAiStatus = () => api.get('/ai/status').then(res => res.data);
 export const getEngineeringRisks = (id) => repositoryApi.getRisks(id).then(res => res.data);
 export const getRefactoringIntelligence = (id) => repositoryApi.getRefactoringIntelligence(id).then(res => res.data);
 export const getRefactoringCandidate = (id, candidateId) => repositoryApi.getRefactoringIntelligence(id).then(res => res.data.candidates.find(c => c.id === candidateId));

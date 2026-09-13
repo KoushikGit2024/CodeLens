@@ -3,13 +3,14 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Breadcrumbs from '../ui/Breadcrumbs';
 import AIStatusIndicator from '../../features/assistant/AIStatusIndicator';
+import UserAvatarWidget from '../../features/account/UserAvatarWidget';
 import { repositoryApi } from '../api';
 import { useRepository } from '../context/RepositoryContext';
 
 export default function RepositoryHeader() {
   const { repoId } = useParams();
   const navigate = useNavigate();
-  const { refetchRepo } = useRepository();
+  const { repo, refetchRepo } = useRepository();
   const [reanalyzing, setReanalyzing] = useState(false);
 
   const handleReanalyze = async () => {
@@ -26,8 +27,8 @@ export default function RepositoryHeader() {
   };
 
   return (
-    <header className="h-12 flex items-center px-4 border-b border-border bg-panel shrink-0 gap-4 justify-between">
-      <div className="flex items-center gap-4 min-w-0">
+    <header className="h-12 flex items-center px-4 border-b border-border bg-panel shrink-0 gap-4 justify-between relative">
+      <div className="flex items-center gap-4 min-w-0 z-10">
         <div className="flex items-center gap-1">
           <button 
             onClick={() => navigate(-1)}
@@ -48,7 +49,26 @@ export default function RepositoryHeader() {
         <Breadcrumbs />
       </div>
 
-      <div className="flex items-center gap-3">
+      {/* Center Project Name */}
+      {repo?.name && (
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden md:flex max-w-[30%] items-center justify-center">
+          <div className="group relative flex items-center gap-2 px-3 py-1 rounded-md bg-surface/90 border border-accent/20 shadow-[0_0_10px_rgba(var(--color-accent-rgb),0.1)] transition-all duration-300 ease-out hover:-translate-y-0.5 hover:scale-[1.04] hover:border-accent/60 hover:bg-accent/[0.06] hover:shadow-[0_0_20px_rgba(var(--color-accent-rgb),0.3)] cursor-default overflow-hidden">
+            <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-accent/10 to-transparent skew-x-[-20deg] transition-transform duration-700 ease-out group-hover:translate-x-[200%]" />
+            <div className="relative w-1.5 h-1.5 rounded-full bg-accent shadow-[0_0_6px_rgba(var(--color-accent-rgb),0.8)] transition-all duration-300 group-hover:scale-125 group-hover:shadow-[0_0_10px_rgba(var(--color-accent-rgb),1)]">
+              <div className="absolute inset-0 rounded-full bg-accent opacity-40" />
+            </div>
+            <span
+              className="relative text-sm font-semibold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-white to-white/70 truncate transition-all duration-300 group-hover:from-white group-hover:to-accent"
+              title={repo.name}
+            >
+              {repo.name}
+            </span>
+            <div className="relative w-0 h-px bg-accent/70 transition-all duration-300 group-hover:w-2" />
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center gap-3 z-10">
         <button
           onClick={handleReanalyze}
           disabled={reanalyzing}
@@ -61,6 +81,7 @@ export default function RepositoryHeader() {
 
         <div className="h-4 w-px bg-border"></div>
         <AIStatusIndicator />
+        <UserAvatarWidget />
       </div>
     </header>
   );
