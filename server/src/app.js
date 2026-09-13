@@ -8,7 +8,21 @@ const { globalRateLimiter } = require('./core/middleware/rate-limit.middleware')
 const app = express();
 
 // ── Middleware ────────────────────────────────────────────────────────────────
-app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
+const isProd = process.env.NODE_ENV === 'production';
+const allowedOrigins = isProd 
+  ? [process.env.FRONTEND_URL].filter(Boolean)
+  : ['http://localhost:5173'];
+
+app.use(cors({ 
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }, 
+  credentials: true 
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 

@@ -23,7 +23,7 @@ import { buildOverviewContext, buildModuleContext, buildOverviewPrompt, buildMod
 
 // It initiates the axios instance, then extracts the base configuration, and then it applies a timeout for LLM proxy calls.
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.PROD ? import.meta.env.VITE_API_URL : '/api',
   timeout: 60_000,
 });
 

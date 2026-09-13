@@ -31,11 +31,16 @@ export default function SignUpPage() {
   const [completedCrop, setCompletedCrop] = useState();
   const [showCropModal, setShowCropModal] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState('');
+  const [avatarSize, setAvatarSize] = useState(0);
   const imgRef = useRef(null);
   const fileInputRef = useRef(null);
 
+  const isAvatarTooLarge = avatarSize > 1024 * 1024;
+
   const onSelectFile = (e) => {
     if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      setError(null);
       setCrop(undefined);
       setCompletedCrop(undefined);
       const reader = new FileReader();
@@ -43,11 +48,12 @@ export default function SignUpPage() {
         setImgSrc(reader.result?.toString() || '');
         setShowCropModal(true);
       });
-      reader.readAsDataURL(e.target.files[0]);
+      reader.readAsDataURL(file);
     }
   };
 
   const onImageLoad = (e) => {
+    if (crop) return; // Keep existing crop if re-opening modal
     const { width, height } = e.currentTarget;
     setCrop(centerAspectCrop(width, height, 1));
   };
@@ -75,7 +81,14 @@ export default function SignUpPage() {
     if (completedCrop && imgRef.current) {
       try {
         const base64 = await getCroppedBase64();
-        if (base64) setAvatarPreview(base64);
+        if (base64) {
+          // Calculate approximate byte size of base64 string
+          const base64Data = base64.split(',')[1];
+          const sizeInBytes = Math.round((base64Data.length * 3) / 4);
+          
+          setAvatarSize(sizeInBytes);
+          setAvatarPreview(base64);
+        }
         setShowCropModal(false);
       } catch (err) {
         console.warn('Failed to save avatar crop:', err);
@@ -191,7 +204,10 @@ export default function SignUpPage() {
                 </div>
                 <div className="flex flex-col items-center gap-1">
                   <span className="text-sm font-medium text-white/90">Avatar Selected</span>
-                  <button type="button" onClick={() => { setImgSrc(''); setAvatarPreview(''); }} className="text-xs text-danger hover:underline">Remove</button>
+                  <span className={`text-xs font-medium ${isAvatarTooLarge ? 'text-danger' : 'text-muted'}`}>
+                    {(avatarSize / (1024 * 1024)).toFixed(2)} MB {isAvatarTooLarge && '(Max 1MB)'}
+                  </span>
+                  <button type="button" onClick={() => { setImgSrc(''); setAvatarPreview(''); setAvatarSize(0); }} className="text-xs text-danger hover:underline mt-1">Remove</button>
                 </div>
                 <input
                   type="file"
@@ -212,6 +228,7 @@ export default function SignUpPage() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
+                maxLength={100}
                 autoComplete="name"
                 className="w-full bg-panel border border-border rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all placeholder:text-muted/70"
                 placeholder="Ada Lovelace"
@@ -225,6 +242,7 @@ export default function SignUpPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                maxLength={255}
                 autoComplete="email"
                 className="w-full bg-panel border border-border rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all placeholder:text-muted/70"
                 placeholder="you@example.com"
@@ -239,6 +257,7 @@ export default function SignUpPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  maxLength={72}
                   autoComplete="new-password"
                   className="w-full bg-panel border border-border rounded-lg pl-4 pr-11 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all placeholder:text-muted/70"
                   placeholder="••••••••"
@@ -278,8 +297,8 @@ export default function SignUpPage() {
 
             <button
               type="submit"
-              disabled={loading || (password.length > 0 && strength < 2)}
-              className="w-full bg-accent hover:bg-accent-hover text-white font-medium rounded-lg py-2.5 flex items-center justify-center transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed mt-2 shadow-lg shadow-accent/20"
+              disabled={loading || (password.length > 0 && strength < 2) || isAvatarTooLarge}
+              className="w-full bg-accent hover:bg-accent-hover text-white font-medium rounded-lg py-2.5 flex items-center justify-center transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed mt-4 shadow-lg shadow-accent/20"
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Create Account'}
             </button>

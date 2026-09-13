@@ -109,6 +109,7 @@ export default function SignInPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                maxLength={255}
                 autoComplete="email"
                 className="w-full bg-panel border border-border rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all placeholder:text-muted/70"
                 placeholder="you@example.com"
@@ -123,6 +124,7 @@ export default function SignInPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  maxLength={72}
                   autoComplete="current-password"
                   className="w-full bg-panel border border-border rounded-lg pl-4 pr-11 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all placeholder:text-muted/70"
                   placeholder="••••••••"
