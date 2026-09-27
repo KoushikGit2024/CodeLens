@@ -95,6 +95,31 @@ export const removeBookmark = (repoId, filePath) => {
 };
 
 /**
+ * Remove multiple bookmarks
+ */
+export const removeBookmarks = (repoId, filePaths) => {
+  if (!repoId || !filePaths || !filePaths.length) return;
+  
+  const allBookmarks = getAllBookmarks();
+  if (!allBookmarks[repoId]) return;
+  
+  let changed = false;
+  for (const filePath of filePaths) {
+    if (allBookmarks[repoId][filePath]) {
+      delete allBookmarks[repoId][filePath];
+      changed = true;
+    }
+  }
+  
+  if (changed) {
+    saveAllBookmarks(allBookmarks);
+    window.dispatchEvent(new CustomEvent('codelens-bookmarks-updated', {
+      detail: { repoId, action: 'removeBatch' }
+    }));
+  }
+};
+
+/**
  * Update note for an existing bookmark
  */
 export const updateNote = (repoId, filePath, note) => {
@@ -112,6 +137,23 @@ export const updateNote = (repoId, filePath, note) => {
   window.dispatchEvent(new CustomEvent('codelens-bookmarks-updated', {
     detail: { repoId, filePath, action: 'update' }
   }));
+};
+
+/**
+ * Clear all bookmarks for a repository
+ */
+export const clearRepoBookmarks = (repoId) => {
+  if (!repoId) return;
+  const allBookmarks = getAllBookmarks();
+  if (allBookmarks[repoId]) {
+    delete allBookmarks[repoId];
+    saveAllBookmarks(allBookmarks);
+    
+    // Dispatch event
+    window.dispatchEvent(new CustomEvent('codelens-bookmarks-updated', {
+      detail: { repoId, action: 'clear' }
+    }));
+  }
 };
 
 import { useState, useEffect } from 'react';

@@ -21,6 +21,7 @@ import { buildQuestionContext } from '../../services/analyzer/advanced/question.
 import { buildPrompt } from '../../services/analyzer/advanced/base.context.js';
 import { buildOverviewContext, buildModuleContext, buildOverviewPrompt, buildModulePrompt } from '../../services/analyzer/advanced/documentation.context.js';
 import { aiArtifactStore, buildCacheKey } from '../../services/storage/aiArtifact.store.js';
+import { clearRepoBookmarks } from '../../services/storage/bookmark.store.js';
 
 // It initiates the axios instance, then extracts the base configuration, and then it applies a timeout for LLM proxy calls.
 const api = axios.create({
@@ -195,6 +196,7 @@ export const repositoryApi = {
       for (const id of ids) {
         await repositoryStore.remove(id);
         aiArtifactStore.invalidateRepo(id).catch(() => {});
+        clearRepoBookmarks(id);
       }
     } else if (action === 'clear_analysis') {
       for (const id of ids) {

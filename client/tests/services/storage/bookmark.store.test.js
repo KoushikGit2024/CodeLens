@@ -6,6 +6,7 @@ import {
   addBookmark, 
   removeBookmark, 
   updateNote,
+  clearRepoBookmarks,
   BOOKMARKS_STORAGE_KEY
 } from '../../../src/services/storage/bookmark.store';
 
@@ -62,6 +63,17 @@ describe('bookmark.store', () => {
     expect(Object.keys(bookmarks)).toHaveLength(2);
     expect(bookmarks['file1.js'].note).toBe('note 1');
     expect(bookmarks['file2.js'].note).toBe('note 2');
+  });
+
+  it('clears all bookmarks for a repo', () => {
+    addBookmark(mockRepoId, 'file1.js', 'note 1');
+    addBookmark(mockRepoId, 'file2.js', 'note 2');
+    addBookmark('other-repo', 'file3.js', 'note 3');
+    
+    clearRepoBookmarks(mockRepoId);
+    
+    expect(Object.keys(getBookmarks(mockRepoId))).toHaveLength(0);
+    expect(Object.keys(getBookmarks('other-repo'))).toHaveLength(1);
   });
 
   it('dispatches custom events on add, remove, and update', () => {
