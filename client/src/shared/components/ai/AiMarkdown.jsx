@@ -4,9 +4,13 @@ import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { vscDarkPlus, prism } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function AiMarkdown({ content, className = '' }) {
+  const { theme } = useTheme();
+  const isLight = theme?.id?.includes('light');
+
   if (!content) return null;
 
   let safeContent = content;
@@ -36,7 +40,7 @@ export default function AiMarkdown({ content, className = '' }) {
   }
 
   return (
-    <div className={`ai-markdown prose prose-invert prose-sm max-w-none prose-pre:p-0 prose-pre:bg-transparent ${className}`}>
+    <div className={`ai-markdown prose prose-sm max-w-none prose-pre:p-0 prose-pre:bg-transparent ${!isLight ? 'prose-invert' : ''} ${className}`}>
       <Markdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeSanitize]}
@@ -44,7 +48,7 @@ export default function AiMarkdown({ content, className = '' }) {
           code({ node, inline, className, children, ...props }) {
             const match = /language-(\w+)/.exec(className || '');
             if (!inline && match) {
-              return <CodeBlock match={match} props={props}>{children}</CodeBlock>;
+              return <CodeBlock match={match} props={props} isLight={isLight}>{children}</CodeBlock>;
             }
             return (
               <code className="bg-panel/50 text-accent font-mono text-[0.85em] px-1.5 py-0.5 rounded" {...props}>
@@ -75,19 +79,19 @@ export default function AiMarkdown({ content, className = '' }) {
             return <td className="p-3 border-b border-border/50 bg-surface/50" {...props}>{children}</td>;
           },
           p({ node, children, ...props }) {
-            return <p className="leading-relaxed text-white/90" {...props}>{children}</p>;
+            return <p className="leading-relaxed text-text/90" {...props}>{children}</p>;
           },
           li({ node, children, ...props }) {
-            return <li className="text-white/80" {...props}>{children}</li>;
+            return <li className="text-text/80" {...props}>{children}</li>;
           },
           h1({ node, children, ...props }) {
-            return <h1 className="text-white/90 font-semibold" {...props}>{children}</h1>;
+            return <h1 className="text-text/90 font-semibold" {...props}>{children}</h1>;
           },
           h2({ node, children, ...props }) {
-            return <h2 className="text-white/90 font-semibold mt-6 mb-3" {...props}>{children}</h2>;
+            return <h2 className="text-text/90 font-semibold mt-6 mb-3" {...props}>{children}</h2>;
           },
           h3({ node, children, ...props }) {
-            return <h3 className="text-white/90 font-semibold mt-4 mb-2" {...props}>{children}</h3>;
+            return <h3 className="text-text/90 font-semibold mt-4 mb-2" {...props}>{children}</h3>;
           }
         }}
       >
@@ -97,7 +101,7 @@ export default function AiMarkdown({ content, className = '' }) {
   );
 }
 
-function CodeBlock({ match, children, props }) {
+function CodeBlock({ match, children, props, isLight }) {
   const [copied, setCopied] = useState(false);
   const codeString = String(children).replace(/\n$/, '');
   
@@ -113,7 +117,7 @@ function CodeBlock({ match, children, props }) {
         <span className="uppercase tracking-wider">{match[1]}</span>
         <button 
           onClick={handleCopy}
-          className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-white flex items-center gap-1 cursor-pointer"
+          className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-text flex items-center gap-1 cursor-pointer"
           title="Copy code"
         >
           {copied ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
@@ -121,10 +125,10 @@ function CodeBlock({ match, children, props }) {
         </button>
       </div>
       <SyntaxHighlighter
-        style={vscDarkPlus}
+        style={isLight ? prism : vscDarkPlus}
         language={match[1]}
         PreTag="div"
-        customStyle={{ margin: 0, background: '#0d1117', fontSize: '0.85rem', padding: '1rem' }}
+        customStyle={{ margin: 0, background: 'var(--color-panel)', fontSize: '0.85rem', padding: '1rem' }}
         {...props}
       >
         {codeString}

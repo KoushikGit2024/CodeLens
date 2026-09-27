@@ -86,7 +86,7 @@ export default function RepositorySidebar() {
             </Link>
             <button 
               onClick={() => setCollapsed(true)} 
-              className="p-1.5 text-muted hover:text-white hover:bg-surface rounded transition-colors"
+              className="p-1.5 text-muted hover:text-text hover:bg-surface rounded transition-colors"
               title="Collapse sidebar"
             >
               <PanelLeftClose className="w-4 h-4" />
@@ -104,7 +104,7 @@ export default function RepositorySidebar() {
         <div className="flex justify-center pt-3 pb-1">
           <button 
             onClick={() => setCollapsed(false)} 
-            className="p-2 text-muted hover:text-white hover:bg-surface rounded transition-colors"
+            className="p-2 text-muted hover:text-text hover:bg-surface rounded transition-colors"
             title="Expand sidebar"
           >
             <PanelLeftClose className="w-5 h-5 rotate-180" />
@@ -121,7 +121,7 @@ export default function RepositorySidebar() {
               {!collapsed && (
                 <button 
                   onClick={() => toggleGroup(group.id)}
-                  className="flex items-center justify-between w-full text-left px-2 mb-1.5 text-muted hover:text-white transition-colors group/header"
+                  className="flex items-center justify-between w-full text-left px-2 mb-1.5 text-muted hover:text-text transition-colors group/header"
                 >
                   <span className="text-xs font-semibold uppercase tracking-wider">{group.title}</span>
                   {isGroupCollapsed ? (
@@ -145,13 +145,13 @@ export default function RepositorySidebar() {
                         "flex items-center rounded-r text-[13px] transition-all duration-200 group relative overflow-hidden border-l-2",
                         collapsed ? "justify-center w-10 h-10 mb-1" : "gap-3 px-2.5 py-1.5 w-full",
                         isActive 
-                          ? "border-accent text-white font-medium bg-accent/[0.07]" 
-                          : "border-transparent text-muted hover:bg-white/[0.04] hover:text-white"
+                          ? "border-accent text-text font-medium bg-accent/[0.07]" 
+                          : "border-transparent text-muted hover:bg-text/[0.04] hover:text-text"
                       )}
                     >
                       {({ isActive }) => (
                         <>
-                          <span className={clsx("shrink-0 transition-all duration-300", isActive ? 'text-accent' : 'text-muted group-hover:text-white')}>
+                          <span className={clsx("shrink-0 transition-all duration-300", isActive ? 'text-accent' : 'text-muted group-hover:text-text')}>
                             <Icon className={collapsed ? "w-5 h-5" : "w-[18px] h-[18px]"} />
                           </span>
                           {!collapsed && <span className="truncate" title={item.label}>{item.label}</span>}
@@ -175,13 +175,13 @@ export default function RepositorySidebar() {
             "flex items-center rounded-r text-[13px] transition-all duration-200 group min-w-0 border-l-2",
             collapsed ? "justify-center w-10 h-10" : "gap-3 px-2.5 py-2 w-full",
             isActive 
-              ? "border-accent text-white font-medium bg-accent/[0.07]" 
-              : "border-transparent text-muted hover:bg-white/[0.04] hover:text-white"
+              ? "border-accent text-text font-medium bg-accent/[0.07]" 
+              : "border-transparent text-muted hover:bg-text/[0.04] hover:text-text"
           )}
         >
           {({ isActive }) => (
             <>
-              <UploadCloud className={clsx(collapsed ? "w-5 h-5" : "w-[18px] h-[18px] shrink-0", "transition-all duration-300", isActive ? "text-accent" : "text-muted group-hover:text-white")} />
+              <UploadCloud className={clsx(collapsed ? "w-5 h-5" : "w-[18px] h-[18px] shrink-0", "transition-all duration-300", isActive ? "text-accent" : "text-muted group-hover:text-text")} />
               {!collapsed && <span className="truncate" title="Upload New Repo">Upload New Repo</span>}
             </>
           )}
@@ -196,8 +196,8 @@ export default function RepositorySidebar() {
               "flex items-center rounded-r text-[13px] transition-all duration-200 group min-w-0 border-l-2 mt-2",
               collapsed ? "justify-center w-10 h-10" : "gap-3 px-2.5 py-2 w-full",
               isActive 
-                ? "border-accent text-white font-medium bg-accent/[0.07]" 
-                : "border-transparent text-muted hover:bg-white/[0.04] hover:text-white"
+                ? "border-accent text-text font-medium bg-accent/[0.07]" 
+                : "border-transparent text-muted hover:bg-text/[0.04] hover:text-text"
             )}
           >
             {({ isActive }) => (
@@ -207,31 +207,32 @@ export default function RepositorySidebar() {
                   collapsed ? "w-6 h-6" : "w-[22px] h-[22px]",
                   isActive ? "bg-accent/20 border-accent/50" : "bg-surface group-hover:border-muted"
                 )}>
-                  <User className={clsx("w-3.5 h-3.5", isActive ? "text-accent" : "text-muted group-hover:text-white")} />
+                  <User className={clsx("w-3.5 h-3.5", isActive ? "text-accent" : "text-muted group-hover:text-text")} />
                 </div>
                 {!collapsed && <span className="truncate" title={user.user_metadata?.full_name || 'Account'}>{user.user_metadata?.full_name || user.email || 'Account'}</span>}
               </>
             )}
           </NavLink>
         ) : (
-          <NavLink
-            to="/auth/signin"
-            title={collapsed ? "Sign In" : undefined}
-            className={({ isActive }) => clsx(
-              "flex items-center rounded-r text-[13px] transition-all duration-200 group min-w-0 border-l-2 mt-2",
-              collapsed ? "justify-center w-10 h-10" : "gap-3 px-2.5 py-2 w-full",
-              isActive 
-                ? "border-accent text-white font-medium bg-accent/[0.07]" 
-                : "border-transparent text-muted hover:bg-white/[0.04] hover:text-white"
-            )}
-          >
-            {({ isActive }) => (
-              <>
-                <LogIn className={clsx(collapsed ? "w-5 h-5" : "w-[18px] h-[18px] shrink-0", "transition-all duration-300", isActive ? "text-accent" : "text-muted group-hover:text-white")} />
-                {!collapsed && <span className="truncate" title="Sign In">Sign In</span>}
-              </>
-            )}
-          </NavLink>
+          // <NavLink
+          //   to="/auth/signin"
+          //   title={collapsed ? "Sign In" : undefined}
+          //   className={({ isActive }) => clsx(
+          //     "flex items-center rounded-r text-[13px] transition-all duration-200 group min-w-0 border-l-2 mt-2",
+          //     collapsed ? "justify-center w-10 h-10" : "gap-3 px-2.5 py-2 w-full",
+          //     isActive 
+          //       ? "border-accent text-text font-medium bg-accent/[0.07]" 
+          //       : "border-transparent text-muted hover:bg-text/[0.04] hover:text-text"
+          //   )}
+          // >
+          //   {({ isActive }) => (
+          //     <>
+          //       <LogIn className={clsx(collapsed ? "w-5 h-5" : "w-[18px] h-[18px] shrink-0", "transition-all duration-300", isActive ? "text-accent" : "text-muted group-hover:text-text")} />
+          //       {!collapsed && <span className="truncate" title="Sign In">Sign In</span>}
+          //     </>
+          //   )}
+          // </NavLink>
+          <></>
         )}
       </div>
     </aside>

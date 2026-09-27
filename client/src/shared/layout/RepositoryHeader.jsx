@@ -6,6 +6,7 @@ import AIStatusIndicator from '../../features/assistant/AIStatusIndicator';
 import UserAvatarWidget from '../../features/account/UserAvatarWidget';
 import { repositoryApi } from '../api';
 import { useRepository } from '../context/RepositoryContext';
+import ThemeSwitcher from '../components/ThemeSwitcher';
 
 export default function RepositoryHeader() {
   const { repoId } = useParams();
@@ -27,19 +28,21 @@ export default function RepositoryHeader() {
   };
 
   return (
-    <header className="h-12 flex items-center px-4 border-b border-border bg-panel shrink-0 gap-4 justify-between relative">
+    <header className="h-12 flex items-center px-4 border-b border-border bg-panel shrink-0 gap-4 justify-between relative z-50">
       <div className="flex items-center gap-4 min-w-0 z-10">
         <div className="flex items-center gap-1">
           <button 
             onClick={() => navigate(-1)}
-            className="p-1.5 text-muted hover:text-[#CBD5E8] hover:bg-surface rounded transition-colors"
+            aria-label="Go back"
+            className="p-1.5 text-muted hover:text-text hover:bg-surface rounded transition-colors"
             title="Go back"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
           <button 
             onClick={() => navigate(1)}
-            className="p-1.5 text-muted hover:text-[#CBD5E8] hover:bg-surface rounded transition-colors"
+            aria-label="Go forward"
+            className="p-1.5 text-muted hover:text-text hover:bg-surface rounded transition-colors"
             title="Go forward"
           >
             <ChevronRight className="w-4 h-4" />
@@ -58,7 +61,7 @@ export default function RepositoryHeader() {
               <div className="absolute inset-0 rounded-full bg-accent opacity-40" />
             </div>
             <span
-              className="relative text-sm font-semibold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-white to-white/70 truncate transition-all duration-300 group-hover:from-white group-hover:to-accent"
+              className="relative text-sm font-semibold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-text to-text/70 truncate transition-all duration-300 group-hover:from-text group-hover:to-accent"
               title={repo.name}
             >
               {repo.name}
@@ -71,25 +74,28 @@ export default function RepositoryHeader() {
       <div className="flex items-center gap-3 z-10">
         <button
           onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', ctrlKey: true }))}
-          className="flex items-center gap-2 text-xs text-muted hover:text-white transition-colors border border-border/50 bg-surface/50 hover:bg-surface rounded-md px-2 py-1"
+          className="flex items-center gap-2 text-xs text-muted hover:text-text transition-colors border border-border/50 bg-surface/50 hover:bg-surface rounded-md px-2 py-1"
           title="Search Files (Ctrl+P)"
         >
           <Search className="w-3.5 h-3.5" />
           <span className="hidden sm:inline">Search...</span>
-          <kbd className="hidden sm:inline-block font-sans text-[10px] px-1.5 py-0 rounded-sm bg-black/20 border border-white/10 text-muted ml-1">Ctrl+P</kbd>
+          <kbd className="hidden sm:inline-block font-sans text-[10px] px-1.5 py-0 rounded-sm bg-surface/50 border border-border/50 text-muted ml-1">Ctrl+P</kbd>
         </button>
 
         <button
           onClick={handleReanalyze}
           disabled={reanalyzing}
-          className="flex items-center gap-1.5 text-xs text-accent hover:text-[#CBD5E8] transition-colors border border-accent/30 hover:border-muted/50 rounded px-2 py-1 disabled:opacity-50"
+          aria-label="Re-analyze Repository"
+          className="flex items-center gap-1.5 text-xs text-accent hover:text-text transition-colors border border-accent/30 hover:border-muted/50 rounded px-2 py-1 disabled:opacity-50"
           title="Re-analyze Repository"
         >
           {reanalyzing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
           {reanalyzing ? 'Analyzing...' : 'Re-analyze'}
         </button>
 
-        <div className="h-4 w-px bg-border"></div>
+        <div className="h-4 w-px bg-border" />
+        <ThemeSwitcher />
+        <div className="h-4 w-px bg-border" />
         <AIStatusIndicator />
         <UserAvatarWidget />
       </div>

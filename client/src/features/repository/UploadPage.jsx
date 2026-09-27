@@ -224,7 +224,7 @@ export default function UploadPage() {
   const fileSizeMB = file ? (file.size / 1024 / 1024).toFixed(1) : null;
 
   return (
-    <div className={`min-h-screen lg:h-screen bg-surface flex flex-col pt-8 pb-4 px-4 md:px-8 font-sans text-white lg:overflow-hidden transition-opacity ${(uploading || packingFolder) ? 'pointer-events-none' : ''}`}>
+    <div className={`min-h-screen lg:h-screen bg-surface flex flex-col pt-8 pb-4 px-4 md:px-8 font-sans text-text lg:overflow-hidden transition-opacity ${(uploading || packingFolder) ? 'pointer-events-none' : ''}`}>
 
       {/* ── Large-Folder Warning Modal ─────────────────────────────────────── */}
       {largeWarning && (
@@ -235,9 +235,9 @@ export default function UploadPage() {
                 <AlertTriangle className="w-5 h-5 text-warning" />
               </div>
               <div>
-                <h2 className="text-base font-semibold text-white mb-1">Large Folder Detected</h2>
+                <h2 className="text-base font-semibold text-text mb-1">Large Folder Detected</h2>
                 <p className="text-sm text-muted leading-relaxed">
-                  <span className="font-semibold text-white">{largeWarning.rootName}</span> contains{' '}
+                  <span className="font-semibold text-text">{largeWarning.rootName}</span> contains{' '}
                   <span className="text-warning font-semibold">{largeWarning.count.toLocaleString()} files</span>{' '}
                   ({largeWarning.mb.toFixed(1)} MB after filtering). Analysis of very large codebases may:
                 </p>
@@ -251,13 +251,13 @@ export default function UploadPage() {
             </ul>
 
             <div className="rounded-lg bg-surface/60 border border-border/60 p-3 text-xs text-muted">
-              <span className="font-medium text-white">Tip:</span> Add folder names to the ignore list below to skip large asset or vendor directories before proceeding.
+              <span className="font-medium text-text">Tip:</span> Add folder names to the ignore list below to skip large asset or vendor directories before proceeding.
             </div>
 
             <div className="flex gap-3 mt-1">
               <button
                 onClick={() => { setLargeWarning(null); if (folderInputRef.current) folderInputRef.current.value = ''; }}
-                className="flex-1 py-2.5 rounded-lg text-sm font-medium border border-border bg-surface hover:bg-surface/80 transition-colors text-muted hover:text-white"
+                className="flex-1 py-2.5 rounded-lg text-sm font-medium border border-border bg-surface hover:bg-surface/80 transition-colors text-muted hover:text-text"
               >
                 Cancel
               </button>
@@ -276,7 +276,7 @@ export default function UploadPage() {
       {/* ── Header ────────────────────────────────────────────────────────────── */}
       <div className="w-full max-w-7xl mx-auto mb-6 flex flex-col md:flex-row items-center justify-between gap-4 border-b border-border/50 pb-4 shrink-0">
         <div className="flex flex-col items-center md:items-start text-center md:text-left">
-          <Logo className="w-12 h-12 mb-2" textClass="text-2xl font-bold tracking-tight text-white" showText={true} />
+          <Logo className="w-12 h-12 mb-2" textClass="text-2xl font-bold tracking-tight text-text" showText={true} />
           <p className="text-muted text-sm mt-1 max-w-md leading-relaxed hidden md:block">
             Upload your codebase to extract architecture, map dependencies, and generate intelligent documentation.
           </p>
@@ -302,7 +302,7 @@ export default function UploadPage() {
                 <button
                   onClick={() => { setInputMode('zip'); setFile(null); setFolderName(null); setError(null); }}
                   className={`flex-1 py-2 font-medium flex items-center justify-center gap-2 transition-colors
-                    ${inputMode === 'zip' ? 'bg-accent/15 text-accent border-r border-accent/30' : 'text-muted hover:text-white hover:bg-surface/50 border-r border-border'}`}
+                    ${inputMode === 'zip' ? 'bg-accent/15 text-accent border-r border-accent/30' : 'text-muted hover:text-text hover:bg-surface/50 border-r border-border'}`}
                 >
                   <Upload className="w-3.5 h-3.5" />
                   ZIP Archive
@@ -310,7 +310,7 @@ export default function UploadPage() {
                 <button
                   onClick={() => { setInputMode('folder'); setFile(null); setFolderName(null); setError(null); }}
                   className={`flex-1 py-2 font-medium flex items-center justify-center gap-2 transition-colors
-                    ${inputMode === 'folder' ? 'bg-accent/15 text-accent' : 'text-muted hover:text-white hover:bg-surface/50'}`}
+                    ${inputMode === 'folder' ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text hover:bg-surface/50'}`}
                 >
                   <FolderInput className="w-3.5 h-3.5" />
                   Select Folder
@@ -397,8 +397,8 @@ export default function UploadPage() {
 
               {/* ── Upload progress ──────────────────────────────────────────── */}
               {(uploading || isSuccess) && (
-                <div className="w-full mt-4 p-4 rounded-xl border border-border/50 bg-[#161b22] flex flex-col gap-3 shadow-xl">
-                  <div className="flex justify-between items-center text-white">
+                <div className="w-full mt-4 p-4 rounded-xl border border-border/50 bg-surface flex flex-col gap-3 shadow-xl">
+                  <div className="flex justify-between items-center text-text">
                     <span className="text-sm font-medium flex items-center gap-2">
                       {isSuccess ? (
                         <span className="text-success flex items-center gap-2">
@@ -425,7 +425,7 @@ export default function UploadPage() {
 
               {/* ── Ignore Patterns ──────────────────────────────────────────── */}
               <div className="mt-4 pt-4 border-t border-border/50 shrink-0">
-                <label className="block text-sm font-medium text-white mb-1">Additional Ignore Patterns</label>
+                <label className="block text-sm font-medium text-text mb-1">Additional Ignore Patterns</label>
                 <p className="text-xs text-muted mb-2">
                   Standard directories like .git, node_modules, and dist are ignored automatically. Add any extra comma-separated folders to skip.
                 </p>
@@ -438,7 +438,7 @@ export default function UploadPage() {
                   className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm placeholder-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-colors"
                 />
                 <p className="text-[11px] text-muted mt-1.5 leading-relaxed">
-                  By default, <span className="font-mono text-white/80 bg-panel px-1 py-0.5 rounded border border-border/50">.git, node_modules, dist, build, coverage, .next, out</span> are excluded.
+                  By default, <span className="font-mono text-text/80 bg-panel px-1 py-0.5 rounded border border-border/50">.git, node_modules, dist, build, coverage, .next, out</span> are excluded.
                 </p>
               </div>
 
@@ -450,7 +450,7 @@ export default function UploadPage() {
                   className={[
                     'w-full py-3 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2',
                     file && !uploading && !packingFolder
-                      ? 'bg-accent hover:bg-accent-hover text-white'
+                      ? 'bg-accent hover:bg-accent-hover text-text'
                       : 'bg-surface border border-border text-muted cursor-not-allowed',
                   ].join(' ')}
                 >
@@ -460,7 +460,7 @@ export default function UploadPage() {
                 {lastRepoId && (
                   <button
                     onClick={() => navigate(`/explore/${lastRepoId}`)}
-                    className="w-full py-3 rounded-lg text-sm font-medium transition-colors border border-border bg-transparent hover:bg-surface text-muted hover:text-white"
+                    className="w-full py-3 rounded-lg text-sm font-medium transition-colors border border-border bg-transparent hover:bg-surface text-muted hover:text-text"
                   >
                     Return to Active Repository
                   </button>
@@ -482,10 +482,10 @@ export default function UploadPage() {
                     <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">Recent Workspaces</label>
                     <div className="relative" ref={dropdownRef}>
                       <div
-                        className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-sm font-medium text-white flex items-center justify-between cursor-pointer shadow-sm hover:bg-surface-light transition-colors"
+                        className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-sm font-medium text-text flex items-center justify-between cursor-pointer shadow-sm hover:bg-surface-light transition-colors"
                         onClick={() => { if (!loadingRepos) setIsDropdownOpen(!isDropdownOpen); }}
                       >
-                        <span className={loadingRepos ? 'text-white/50' : 'text-white'}>
+                        <span className={loadingRepos ? 'text-text/50' : 'text-text'}>
                           {loadingRepos ? 'Loading…' : 'Select repository…'}
                         </span>
                         <div className="pointer-events-none text-muted flex items-center gap-2">
@@ -500,7 +500,7 @@ export default function UploadPage() {
                           ) : recentRepos.map(repo => (
                             <div
                               key={repo.id}
-                              className="px-4 py-2.5 text-sm font-medium text-white hover:bg-surface cursor-pointer transition-colors flex items-center justify-between group"
+                              className="px-4 py-2.5 text-sm font-medium text-text hover:bg-surface cursor-pointer transition-colors flex items-center justify-between group"
                               onClick={() => { setIsDropdownOpen(false); navigate(`/explore/${repo.id}`); }}
                             >
                               <span className="truncate group-hover:text-accent transition-colors">{repo.name}</span>
@@ -564,7 +564,7 @@ export default function UploadPage() {
                     </button>
                   </div>
                 )}
-                <button onClick={() => setShowManager(false)} className="p-1.5 text-muted hover:text-white bg-surface hover:bg-surface-light rounded-lg transition-colors border border-border">
+                <button onClick={() => setShowManager(false)} className="p-1.5 text-muted hover:text-text bg-surface hover:bg-surface-light rounded-lg transition-colors border border-border">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -597,7 +597,7 @@ export default function UploadPage() {
                     <input type="checkbox" className="rounded border-border bg-surface text-accent focus:ring-accent focus:ring-offset-0 pointer-events-none" checked={isSelected} readOnly />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-medium text-white truncate">{repo.name}</h3>
+                        <h3 className="text-sm font-medium text-text truncate">{repo.name}</h3>
                         {repo.id === lastRepoId && (
                           <span className="text-[10px] font-medium bg-accent/20 text-accent px-1.5 py-0.5 rounded border border-accent/20 uppercase tracking-wider shrink-0">Active</span>
                         )}
@@ -612,7 +612,7 @@ export default function UploadPage() {
                       </span>
                       <button
                         onClick={async () => { if (!isReady) await repositoryApi.reanalyze(repo.id); setShowManager(false); navigate(`/explore/${repo.id}`); }}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${isReady ? 'bg-accent hover:bg-accent-hover text-white' : 'bg-surface border border-border text-muted hover:text-white'}`}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${isReady ? 'bg-accent hover:bg-accent-hover text-text' : 'bg-surface border border-border text-muted hover:text-text'}`}
                       >
                         {isReady ? 'Open' : 'Re-Analyze'}
                       </button>

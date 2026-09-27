@@ -59,11 +59,14 @@ describe('exportDiagram', () => {
     await exportToPng(mockElementRef, 'diagram-test.png', { includeBackground: true });
     
     expect(htmlToImage.toPng).toHaveBeenCalledTimes(1);
-    expect(htmlToImage.toPng.mock.calls[0][0]).toBe(mockElement);
+    const viewport = mockElement.querySelector('.react-flow__viewport');
+    expect(htmlToImage.toPng.mock.calls[0][0]).toBe(viewport);
     
     const options = htmlToImage.toPng.mock.calls[0][1];
+    // Background matches original hex color
+    expect(options.backgroundColor).not.toBe('transparent');
     expect(options.backgroundColor).toBe('#0C0E14');
-    expect(options.pixelRatio).toBe(2);
+    expect(options.pixelRatio).toBe(3);
     
     // Check download logic
     expect(mockLink.download).toBe('diagram-test.png');
@@ -75,6 +78,8 @@ describe('exportDiagram', () => {
     await exportToSvg(mockElementRef, 'diagram-test.svg', { includeBackground: false });
     
     expect(htmlToImage.toSvg).toHaveBeenCalledTimes(1);
+    const viewport = mockElement.querySelector('.react-flow__viewport');
+    expect(htmlToImage.toSvg.mock.calls[0][0]).toBe(viewport);
     
     const options = htmlToImage.toSvg.mock.calls[0][1];
     expect(options.backgroundColor).toBe('transparent');
@@ -111,7 +116,6 @@ describe('exportDiagram', () => {
 
     expect(filterFn(mockControls)).toBe(false); // Excluded by set
     expect(filterFn(mockButton)).toBe(false); // Always excluded
-    expect(filterFn(mockOverlay)).toBe(false); // Always excluded
     expect(filterFn(mockNormalElement)).toBe(true); // Included
   });
 });

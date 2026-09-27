@@ -1,17 +1,10 @@
 import { toPng, toSvg } from 'html-to-image';
 
-/**
- * Returns true if the node or any of its ancestors should be excluded based on selected features.
- */
 function isExcluded(node, excludedFeatures) {
   let current = node;
   while (current && current !== document.body) {
     if (current.classList) {
-      // ALWAYS exclude the export button itself and the modal overlay
       if (current.classList.contains('export-element-button')) return true;
-      if (current.classList.contains('export-modal-overlay')) return true;
-      
-      // Exclude specific features based on the Set provided
       if (excludedFeatures.has('breadcrumbs') && current.classList.contains('export-element-breadcrumbs')) return true;
       if (excludedFeatures.has('legend') && current.classList.contains('export-element-legend')) return true;
       if (excludedFeatures.has('controls') && current.classList.contains('react-flow__controls')) return true;
@@ -23,9 +16,6 @@ function isExcluded(node, excludedFeatures) {
   return false;
 }
 
-/**
- * Triggers a file download in the browser.
- */
 const downloadFile = (dataUrl, filename) => {
   const link = document.createElement('a');
   link.download = filename;
@@ -33,17 +23,11 @@ const downloadFile = (dataUrl, filename) => {
   link.click();
 };
 
-/**
- * Calculates the bounding box of all ReactFlow nodes to ensure nothing is cropped.
- */
 const getReactFlowBounds = (element) => {
   const nodes = element.querySelectorAll('.react-flow__node');
   if (!nodes.length) return null;
 
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
   nodes.forEach(node => {
     const transform = node.style.transform;
@@ -63,7 +47,6 @@ const getReactFlowBounds = (element) => {
 
   if (minX === Infinity) return null;
 
-  // Add padding
   const padding = 50;
   return {
     x: minX - padding,
@@ -73,9 +56,21 @@ const getReactFlowBounds = (element) => {
   };
 };
 
-/**
- * Common export options configuration helper
- */
+// Safe Pixel Ratio Calculation
+// We push the limit all the way up to Chrome's physical max limit (~260 Megapixels).
+// This guarantees the absolute maximum possible resolution for the PNG export.
+const MAX_CANVAS_AREA = 260_000_000; 
+
+const getSafePixelRatio = (width, height, requestedRatio) => {
+  const baseArea = width * height;
+  if (baseArea <= 0) return requestedRatio;
+
+  const areaLimitRatio = Math.sqrt(MAX_CANVAS_AREA / baseArea);
+  const safeRatio = Math.min(requestedRatio, areaLimitRatio);
+
+  return Math.max(1, Math.min(requestedRatio, safeRatio));
+};
+
 const getExportConfig = (elementRef, options) => {
   const el = elementRef.current;
   if (!el) throw new Error('Element ref is not attached');
@@ -86,44 +81,38 @@ const getExportConfig = (elementRef, options) => {
     excludedFeatures = new Set(['breadcrumbs', 'legend', 'controls', 'minimap', 'attribution'])
   } = options || {};
 
+  // We explicitly target the inner viewport to get just the graph nodes and edges
   const viewport = el.querySelector('.react-flow__viewport');
   const isReactFlow = !!viewport;
+  const targetEl = isReactFlow ? viewport : el;
   
-  // Target the top level wrapper, NOT just the viewport, so UI overlays are captured!
-  let targetEl = el;
   let width = el.offsetWidth;
   let height = el.offsetHeight;
   let customStyle = { overflow: 'visible' };
   
   const backgroundColor = includeBackground ? '#0C0E14' : 'transparent';
-  let viewportTransform = null;
 
   if (captureArea === 'full' && isReactFlow) {
     const bounds = getReactFlowBounds(el);
     if (bounds) {
       width = bounds.width;
       height = bounds.height;
-      viewportTransform = `translate(${-bounds.x}px, ${-bounds.y}px) scale(1)`;
-      
-      if (includeBackground) {
-        customStyle.backgroundColor = backgroundColor;
-      }
+      // We apply the transform to the cloned viewport so it snaps to the origin
+      customStyle.transform = `translate(${-bounds.x}px, ${-bounds.y}px) scale(1)`;
     }
   } else if (captureArea === 'full') {
     width = el.scrollWidth || el.offsetWidth;
     height = el.scrollHeight || el.offsetHeight;
   }
   
-  const onclone = (clonedDocument) => {
-    if (viewportTransform) {
-      // Find the cloned viewport and apply the transform so the full diagram fits perfectly
-      // This prevents the live DOM from jumping around during export!
-      const clonedViewport = clonedDocument.querySelector('.react-flow__viewport');
-      if (clonedViewport) {
-        clonedViewport.style.transform = viewportTransform;
-      }
-    }
-  };
+  // Request a massive pixelRatio (3) and let the safety math clamp it precisely 
+  // to the absolute highest decimal point the browser can handle without blanking out!
+  const safePixelRatio = getSafePixelRatio(width, height, 3);
+
+  // Background must be applied to customStyle so html-to-image renders it behind the transparent viewport
+  if (includeBackground) {
+    customStyle.backgroundColor = backgroundColor;
+  }
 
   return {
     targetEl,
@@ -132,27 +121,32 @@ const getExportConfig = (elementRef, options) => {
     customStyle,
     backgroundColor,
     excludedFeatures,
-    onclone
+    pixelRatio: safePixelRatio
   };
 };
 
-/**
- * Export a DOM element to a high-quality PNG image.
- */
 export const exportToPng = async (elementRef, filename = 'diagram.png', options = {}) => {
   try {
-    const { targetEl, width, height, customStyle, backgroundColor, excludedFeatures, onclone } = getExportConfig(elementRef, options);
+    const { targetEl, width, height, customStyle, backgroundColor, excludedFeatures, pixelRatio } = getExportConfig(elementRef, options);
+
+    if (pixelRatio < 2) {
+      console.warn(`[export] Reduced pixelRatio to ${pixelRatio.toFixed(2)} to prevent blank image silent failure on massive graph.`);
+    }
 
     const dataUrl = await toPng(targetEl, {
       cacheBust: true,
       backgroundColor,
-      pixelRatio: 2,
+      pixelRatio,
       width,
       height,
       style: customStyle,
-      onclone,
       filter: (node) => !isExcluded(node, excludedFeatures),
     });
+
+    if (dataUrl === 'data:,') {
+      throw new Error('Browser silently failed to generate image data (graph is too massive for canvas).');
+    }
+
     downloadFile(dataUrl, filename);
     return true;
   } catch (error) {
@@ -161,12 +155,9 @@ export const exportToPng = async (elementRef, filename = 'diagram.png', options 
   }
 };
 
-/**
- * Export a DOM element to SVG.
- */
 export const exportToSvg = async (elementRef, filename = 'diagram.svg', options = {}) => {
   try {
-    const { targetEl, width, height, customStyle, backgroundColor, excludedFeatures, onclone } = getExportConfig(elementRef, options);
+    const { targetEl, width, height, customStyle, backgroundColor, excludedFeatures } = getExportConfig(elementRef, options);
 
     const dataUrl = await toSvg(targetEl, {
       cacheBust: true,
@@ -174,9 +165,9 @@ export const exportToSvg = async (elementRef, filename = 'diagram.svg', options 
       width,
       height,
       style: customStyle,
-      onclone,
       filter: (node) => !isExcluded(node, excludedFeatures),
     });
+
     downloadFile(dataUrl, filename);
     return true;
   } catch (error) {

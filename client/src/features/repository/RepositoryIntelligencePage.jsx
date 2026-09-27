@@ -166,7 +166,7 @@ export default function RepositoryIntelligencePage() {
                 <span className="text-muted text-[11px] uppercase tracking-wider">Languages</span>
                 <div className="flex flex-wrap gap-1 mt-1">
                   {Object.entries(data.repository.languages).map(([lang, count]) => (
-                    <span key={lang} className="text-[10px] bg-surface px-1.5 py-0.5 rounded border border-white/5 text-text">
+                    <span key={lang} className="text-[10px] bg-surface px-1.5 py-0.5 rounded border border-text/5 text-text">
                       {lang} ({count})
                     </span>
                   ))}
@@ -199,7 +199,7 @@ export default function RepositoryIntelligencePage() {
             <div className="bg-panel border border-border p-4 rounded flex flex-col gap-2">
                <div className="flex justify-between items-center">
                 <h3 className="text-sm font-medium text-text flex items-center gap-2">
-                  <GitMerge className="w-4 h-4 text-[#cba6f7]" />
+                  <GitMerge className="w-4 h-4 text-accent" />
                   Dependencies
                 </h3>
                 <Link to={`/explore/${repoId}/graph`} className="text-[10px] text-accent hover:underline">View Graph</Link>
@@ -249,7 +249,7 @@ export default function RepositoryIntelligencePage() {
             </h3>
             <div className="flex flex-col gap-3">
               {data.dependencies.cycles > 0 ? (
-                <div className="flex items-start gap-3 p-3 bg-surface border border-white/5 rounded">
+                <div className="flex items-start gap-3 p-3 bg-surface border border-text/5 rounded">
                   <GitMerge className="w-4 h-4 text-warning shrink-0 mt-0.5" />
                   <div className="flex-1">
                     <h4 className="text-xs font-semibold text-text mb-1">{data.dependencies.cycles} Circular Dependencies Detected</h4>
@@ -262,7 +262,7 @@ export default function RepositoryIntelligencePage() {
               ) : null}
 
               {data.engineeringHealth.critical > 0 ? (
-                <div className="flex items-start gap-3 p-3 bg-surface border border-white/5 rounded">
+                <div className="flex items-start gap-3 p-3 bg-surface border border-text/5 rounded">
                   <ShieldAlert className="w-4 h-4 text-danger shrink-0 mt-0.5" />
                   <div className="flex-1">
                     <h4 className="text-xs font-semibold text-text mb-1">{data.engineeringHealth.critical} High-Risk Files</h4>
@@ -275,7 +275,7 @@ export default function RepositoryIntelligencePage() {
               ) : null}
 
               {data.refactoring.candidateCount > 0 ? (
-                <div className="flex items-start gap-3 p-3 bg-surface border border-white/5 rounded">
+                <div className="flex items-start gap-3 p-3 bg-surface border border-text/5 rounded">
                   <Wrench className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
                   <div className="flex-1">
                     <h4 className="text-xs font-semibold text-text mb-1">{Math.min(data.refactoring.candidateCount, 3)} High-Impact Refactoring Candidates</h4>
@@ -288,7 +288,7 @@ export default function RepositoryIntelligencePage() {
               ) : null}
 
               {data.dependencies.cycles === 0 && data.engineeringHealth.critical === 0 && data.refactoring.candidateCount === 0 ? (
-                <div className="flex items-start gap-3 p-3 bg-surface border border-white/5 rounded">
+                <div className="flex items-start gap-3 p-3 bg-surface border border-text/5 rounded">
                   <CheckCircle className="w-4 h-4 text-success shrink-0 mt-0.5" />
                   <div className="flex-1">
                     <h4 className="text-xs font-semibold text-text mb-1">Healthy Repository</h4>
@@ -297,8 +297,8 @@ export default function RepositoryIntelligencePage() {
                 </div>
               ) : null}
 
-              <div className="flex items-start gap-3 p-3 bg-surface border border-white/5 rounded">
-                <FileText className="w-4 h-4 text-[#a6e3a1] shrink-0 mt-0.5" />
+              <div className="flex items-start gap-3 p-3 bg-surface border border-text/5 rounded">
+                <FileText className="w-4 h-4 text-success shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <h4 className="text-xs font-semibold text-text mb-1">Codebase Explorer</h4>
                   <p className="text-[11px] text-muted leading-relaxed">Structural insights are automatically available for all files in the explorer.</p>
@@ -319,7 +319,7 @@ export default function RepositoryIntelligencePage() {
                {data.hotspots && data.hotspots.length > 0 ? (
                  <div className="flex flex-col gap-3">
                    {data.hotspots.slice(0, 5).map((h, i) => (
-                     <div key={i} className="flex flex-col gap-1 pb-3 border-b border-white/5 last:border-0 last:pb-0">
+                     <div key={i} className="flex flex-col gap-1 pb-3 border-b border-text/5 last:border-0 last:pb-0">
                         <div className="flex items-center justify-between min-w-0">
                           <span className="text-xs font-mono text-text truncate max-w-[80%]" title={h.filePath}>{h.filePath}</span>
                          <span className="text-xs font-bold text-warning">{h.score}</span>
@@ -354,10 +354,10 @@ export default function RepositoryIntelligencePage() {
                {data.refactoring.topCandidates && data.refactoring.topCandidates.length > 0 ? (
                  <div className="flex flex-col gap-3">
                    {data.refactoring.topCandidates.map((c, i) => (
-                     <div key={i} className="flex flex-col gap-1 pb-3 border-b border-white/5 last:border-0 last:pb-0">
+                     <div key={i} className="flex flex-col gap-1 pb-3 border-b border-text/5 last:border-0 last:pb-0">
                        <div className="flex items-center justify-between">
                          <span className="text-xs font-medium text-text">{c.title}</span>
-                         <span className="text-[10px] uppercase px-1.5 py-0.5 rounded border border-white/5 font-bold bg-surface">
+                         <span className="text-[10px] uppercase px-1.5 py-0.5 rounded border border-text/5 font-bold bg-surface">
                            <span className={c.priority === 'critical' ? 'text-danger' : 'text-warning'}>
                              {c.priority}
                            </span>
@@ -392,7 +392,7 @@ export default function RepositoryIntelligencePage() {
                   aiState.status === 'offline' ? 'No AI provider configured' :
                   aiState.quotaStatus === 'exhausted' ? 'AI quota exceeded' : ''
                 }
-                className="bg-surface/30 border border-white/5 p-4 rounded hover:border-accent hover:bg-surface transition-all flex flex-col gap-2 text-left group disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-surface/30 border border-text/5 p-4 rounded hover:border-accent hover:bg-surface transition-all flex flex-col gap-2 text-left group disabled:opacity-50 disabled:cursor-not-allowed"
               >
                  <div className="flex items-center gap-2 text-text font-medium group-hover:text-accent transition-colors">
                    <BookOpen className="w-4 h-4 text-accent" /> 
@@ -403,7 +403,7 @@ export default function RepositoryIntelligencePage() {
               
               <Link 
                 to={`/explore/${repoId}/architecture`} 
-                className="bg-surface/30 border border-white/5 p-4 rounded hover:border-warning hover:bg-surface transition-all flex flex-col gap-2 group"
+                className="bg-surface/30 border border-text/5 p-4 rounded hover:border-warning hover:bg-surface transition-all flex flex-col gap-2 group"
               >
                 <div className="flex items-center gap-2 text-text font-medium group-hover:text-warning transition-colors">
                   <Box className="w-4 h-4 text-warning" /> 
@@ -414,10 +414,10 @@ export default function RepositoryIntelligencePage() {
               
               <Link 
                 to={`/explore/${repoId}/graph`} 
-                className="bg-surface/30 border border-white/5 p-4 rounded hover:border-[#cba6f7] hover:bg-surface transition-all flex flex-col gap-2 group"
+                className="bg-surface/30 border border-text/5 p-4 rounded hover:border-[#cba6f7] hover:bg-surface transition-all flex flex-col gap-2 group"
               >
-                <div className="flex items-center gap-2 text-text font-medium group-hover:text-[#cba6f7] transition-colors">
-                  <GitMerge className="w-4 h-4 text-[#cba6f7]" /> 
+                <div className="flex items-center gap-2 text-text font-medium group-hover:text-accent transition-colors">
+                  <GitMerge className="w-4 h-4 text-accent" /> 
                   Dependency Graph
                 </div>
                 <span className="text-xs text-muted">Review {data.dependencies.cycles > 0 ? <span className="text-danger font-medium">{data.dependencies.cycles} circular cycles</span> : 'dependency connections'}.</span>
@@ -425,7 +425,7 @@ export default function RepositoryIntelligencePage() {
               
               <Link 
                 to={`/explore/${repoId}/health`} 
-                className="bg-surface/30 border border-white/5 p-4 rounded hover:border-danger hover:bg-surface transition-all flex flex-col gap-2 group"
+                className="bg-surface/30 border border-text/5 p-4 rounded hover:border-danger hover:bg-surface transition-all flex flex-col gap-2 group"
               >
                 <div className="flex items-center gap-2 text-text font-medium group-hover:text-danger transition-colors">
                   <ShieldAlert className="w-4 h-4 text-danger" /> 
@@ -436,7 +436,7 @@ export default function RepositoryIntelligencePage() {
               
               <Link 
                 to={`/explore/${repoId}/refactoring`} 
-                className="bg-surface/30 border border-white/5 p-4 rounded hover:border-blue-400 hover:bg-surface transition-all flex flex-col gap-2 group"
+                className="bg-surface/30 border border-text/5 p-4 rounded hover:border-blue-400 hover:bg-surface transition-all flex flex-col gap-2 group"
               >
                 <div className="flex items-center gap-2 text-text font-medium group-hover:text-blue-400 transition-colors">
                   <Wrench className="w-4 h-4 text-blue-400" /> 
@@ -447,7 +447,7 @@ export default function RepositoryIntelligencePage() {
               
               <Link 
                 to={`/explore/${repoId}/source`} 
-                className="bg-surface/30 border border-white/5 p-4 rounded hover:border-success hover:bg-surface transition-all flex flex-col gap-2 group"
+                className="bg-surface/30 border border-text/5 p-4 rounded hover:border-success hover:bg-surface transition-all flex flex-col gap-2 group"
               >
                  <div className="flex items-center gap-2 text-text font-medium group-hover:text-success transition-colors">
                    <FileText className="w-4 h-4 text-success" /> 
@@ -460,7 +460,7 @@ export default function RepositoryIntelligencePage() {
         </main>
 
         {/* ── Right Panel: AI Repository Summary ─────────────────────────────── */}
-        <aside className="w-96 border-l border-border bg-[#0d1117] flex flex-col shrink-0">
+        <aside className="w-96 border-l border-border bg-panel flex flex-col shrink-0">
           <div className="p-4 border-b border-border flex flex-col gap-3">
             <h2 className="text-sm font-medium text-text flex items-center gap-2">
               <BookOpen className="w-4 h-4 text-accent" />

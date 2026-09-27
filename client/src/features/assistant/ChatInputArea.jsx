@@ -399,13 +399,13 @@ const ChatInputArea = forwardRef(function ChatInputArea({
           disabled={disabled}
           rows={1}
           placeholder={disabled ? 'AI unavailable…' : 'Ask a question… type @ to attach a file'}
-          className="w-full bg-transparent resize-none pl-4 pr-3 pt-3 pb-1 text-sm text-white placeholder-muted focus:outline-none disabled:opacity-50"
+          className="w-full bg-transparent resize-none pl-4 pr-3 pt-3 pb-1 text-sm text-text placeholder-muted focus:outline-none disabled:opacity-50"
           style={{ maxHeight: 200, minHeight: 44, overflowY: 'auto' }}
         />
       </div>
 
       {/* Bottom toolbar */}
-      <div className="flex items-center gap-2 px-3 py-2 border-t border-white/5">
+      <div className="flex items-center gap-2 px-3 py-2 border-t border-text/5">
         {/* Attach button */}
         <button
           type="button"
@@ -444,7 +444,7 @@ const ChatInputArea = forwardRef(function ChatInputArea({
           title={isOverLimit ? 'Payload too large — remove some attachments' : 'Send (Enter)'}
           className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all
             ${canSend
-              ? 'bg-accent hover:bg-accent/80 text-white shadow-[0_0_10px_rgba(77,126,255,0.3)]'
+              ? 'bg-accent hover:bg-accent/80 text-text shadow-[0_0_10px_rgba(77,126,255,0.3)]'
               : isOverLimit
               ? 'bg-danger/30 text-danger cursor-not-allowed'
               : 'bg-surface text-muted/40 cursor-not-allowed'}

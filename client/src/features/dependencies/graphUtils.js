@@ -154,7 +154,7 @@ export function getClusteredLayout(fileNodes, edges, dirColorMap) {
  * It maps the raw analysis nodes to the visual schema, then extracts the coupling metrics, 
  * and then it applies fading logic and routing to the selected layout generator.
  */
-export function graphToFlow(graph, selectedId, showExternalPackages, layoutType) {
+export function graphToFlow(graph, selectedId, showExternalPackages, layoutType, edgeStyle = 'spring') {
   let fileNodes = graph.nodes.filter(n => n.type === 'fileNode' || n.type === 'file');
   let pkgNodes = showExternalPackages ? graph.nodes.filter(n => n.type === 'moduleNode' || n.type === 'package') : [];
   const renderableNodes = [...fileNodes, ...pkgNodes];
@@ -273,7 +273,7 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType)
       label: isCjs && isDirect ? 'cjs' : undefined,
       labelStyle: { fill: '#6e7681', fontSize: 8, fontFamily: 'monospace' },
       labelBgStyle: { fill: '#0d1117', fillOpacity: 0.7 },
-      data: { edgeType: e.type },
+      data: { edgeType: e.type, isStraight: edgeStyle === 'straight' },
     };
   });
 

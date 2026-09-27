@@ -21,10 +21,10 @@ export default function AuthLayout() {
         />
         <div className="relative z-10 flex flex-col items-center justify-center h-full max-w-lg mx-auto">
           <Logo className="w-12 h-12 text-accent mb-8 animate-in fade-in zoom-in-95 duration-700" style={{ animationFillMode: 'both' }} />
-          <h2 className="text-3xl font-bold text-white mb-4 tracking-tight text-center animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '100ms', animationFillMode: 'both' }}>
+          <h2 className="text-3xl font-bold text-text mb-4 tracking-tight text-center animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '100ms', animationFillMode: 'both' }}>
             Welcome to CodeLens
           </h2>
-          <p className="text-lg text-white/70 text-center mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '200ms', animationFillMode: 'both' }}>
+          <p className="text-lg text-text/70 text-center mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '200ms', animationFillMode: 'both' }}>
             Sign in or create an account to gain deep architectural insights, track engineering health, and empower your workflow with Watsonx AI.
           </p>
           
@@ -65,7 +65,7 @@ export default function AuthLayout() {
         <div className="sticky top-0 left-0 w-full p-4 z-10 flex items-center justify-between pointer-events-none">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-1.5 text-sm text-muted hover:text-white transition-colors group pointer-events-auto"
+            className="flex items-center gap-1.5 text-sm text-muted hover:text-text transition-colors group pointer-events-auto"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
             Back
@@ -73,7 +73,7 @@ export default function AuthLayout() {
           
           <button
             onClick={() => navigate('/')}
-            className="flex items-center gap-1.5 text-sm text-muted hover:text-white transition-colors group pointer-events-auto"
+            className="flex items-center gap-1.5 text-sm text-muted hover:text-text transition-colors group pointer-events-auto"
           >
             <Home className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />
             Home

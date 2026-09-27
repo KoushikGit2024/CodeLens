@@ -143,7 +143,7 @@ const FileMentionMenu = forwardRef(function FileMentionMenu({ query, filePaths, 
                   <FileCode className="w-3.5 h-3.5 text-accent shrink-0" />
                 )}
                 <div className="flex flex-col min-w-0 flex-1">
-                  <span className={`text-xs truncate ${item.isDir ? 'text-white font-medium' : 'text-text font-medium'}`}>
+                  <span className={`text-xs truncate ${item.isDir ? 'text-text font-medium' : 'text-text font-medium'}`}>
                     {item.name}{item.isDir ? '/' : ''}
                   </span>
                   {item.dirPathFallback && (

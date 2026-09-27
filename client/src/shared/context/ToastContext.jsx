@@ -34,7 +34,7 @@ export const ToastProvider = ({ children }) => {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`pointer-events-auto flex items-start gap-3 w-80 p-4 rounded-lg shadow-xl border bg-[#161b22] text-white animate-in slide-in-from-bottom-5 fade-in duration-300
+            className={`pointer-events-auto flex items-start gap-3 w-80 p-4 rounded-lg shadow-xl border bg-surface text-text animate-in slide-in-from-bottom-5 fade-in duration-300
               ${toast.type === 'success' ? 'border-success/30' : toast.type === 'error' ? 'border-danger/30' : 'border-accent/30'}
             `}
           >
@@ -49,7 +49,7 @@ export const ToastProvider = ({ children }) => {
             </div>
             <button
               onClick={() => removeToast(toast.id)}
-              className="shrink-0 text-muted hover:text-white transition-colors"
+              className="shrink-0 text-muted hover:text-text transition-colors"
             >
               <X className="w-4 h-4" />
             </button>

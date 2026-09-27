@@ -30,13 +30,13 @@ export default function AccountPage() {
     : 0;
 
   return (
-    <div className="flex h-screen bg-surface text-white">
+    <div className="flex h-screen bg-surface text-text">
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto px-6 py-12">
           
           <div className="flex items-center gap-4 mb-8">
             <Link to="/" className="p-2 hover:bg-panel rounded-full transition-colors">
-              <ArrowLeft className="w-5 h-5 text-muted hover:text-white" />
+              <ArrowLeft className="w-5 h-5 text-muted hover:text-text" />
             </Link>
             <h1 className="text-2xl font-semibold">Account Settings</h1>
           </div>
@@ -53,9 +53,9 @@ export default function AccountPage() {
                 )}
               </div>
               <div className="flex-1 text-center sm:text-left z-10">
-                <h2 className="text-xl font-bold text-white flex items-center justify-center sm:justify-start gap-3">
+                <h2 className="text-xl font-bold text-text flex items-center justify-center sm:justify-start gap-3">
                   {user.user_metadata?.full_name || 'CodeLens Developer'}
-                  <span className="text-[10px] font-bold uppercase tracking-widest bg-accent text-white px-2 py-0.5 rounded-full border border-accent-light shadow-sm">
+                  <span className="text-[10px] font-bold uppercase tracking-widest bg-accent text-text px-2 py-0.5 rounded-full border border-accent-light shadow-sm">
                     Pro
                   </span>
                 </h2>
@@ -77,7 +77,7 @@ export default function AccountPage() {
               
               <button 
                 onClick={handleSignOut}
-                className="absolute top-4 right-4 sm:top-6 sm:right-6 p-2 text-muted hover:text-white hover:bg-surface rounded-lg transition-colors flex items-center gap-2 text-sm z-10"
+                className="absolute top-4 right-4 sm:top-6 sm:right-6 p-2 text-muted hover:text-text hover:bg-surface rounded-lg transition-colors flex items-center gap-2 text-sm z-10"
                 title="Sign out"
               >
                 <LogOut className="w-4 h-4" />
@@ -148,7 +148,7 @@ export default function AccountPage() {
                       
                       <div className="pt-4 border-t border-border flex justify-between items-center">
                         <span className="text-sm text-muted">
-                          Current Plan: <strong className="text-white">Free Tier</strong>
+                          Current Plan: <strong className="text-text">Free Tier</strong>
                         </span>
                         <span className="text-sm text-muted">
                           Resets: {new Date(usage.periodEnd).toLocaleDateString()}

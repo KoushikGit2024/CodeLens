@@ -50,7 +50,7 @@ export default function ResetPasswordPage() {
       <div className="w-full max-w-[420px]">
         <div className="flex flex-col items-start mb-8">
           <Logo className="w-10 h-10 mb-6 lg:hidden animate-in fade-in zoom-in-95 duration-700" style={{ animationFillMode: 'both' }} />
-          <h1 className="text-3xl font-semibold text-white tracking-tight animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '150ms', animationFillMode: 'both' }}>New Password</h1>
+          <h1 className="text-3xl font-semibold text-text tracking-tight animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '150ms', animationFillMode: 'both' }}>New Password</h1>
           <p className="text-muted mt-2 text-sm animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '250ms', animationFillMode: 'both' }}>
             Enter your new password below.
           </p>
@@ -67,7 +67,7 @@ export default function ResetPasswordPage() {
 
           <form onSubmit={handleSubmit} className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '350ms', animationFillMode: 'both' }}>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-white/90">New Password</label>
+              <label className="text-sm font-medium text-text/90">New Password</label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
@@ -75,14 +75,14 @@ export default function ResetPasswordPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   autoComplete="new-password"
-                  className="w-full bg-panel border border-border rounded-lg pl-4 pr-11 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all placeholder:text-muted/70"
+                  className="w-full bg-panel border border-border rounded-lg pl-4 pr-11 py-2.5 text-text focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all placeholder:text-muted/70"
                   placeholder="••••••••"
                   minLength={6}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted hover:text-white transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted hover:text-text transition-colors"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -114,7 +114,7 @@ export default function ResetPasswordPage() {
             <button
               type="submit"
               disabled={loading || (password.length > 0 && strength < 2)}
-              className="w-full bg-accent hover:bg-accent-hover text-white font-medium rounded-lg py-2.5 flex items-center justify-center transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed mt-4 shadow-lg shadow-accent/20"
+              className="w-full bg-accent hover:bg-accent-hover text-text font-medium rounded-lg py-2.5 flex items-center justify-center transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed mt-4 shadow-lg shadow-accent/20"
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Save New Password'}
             </button>

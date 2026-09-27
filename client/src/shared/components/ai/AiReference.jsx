@@ -56,7 +56,7 @@ export default function AiReference({ reference, onNavigate }) {
         title={typeof reference === 'string' ? reference : `${path}${line ? `:${line}` : ''}`}
       >
         <FileText className="w-3.5 h-3.5 text-muted group-hover:text-accent transition-colors shrink-0" />
-        <span className="text-white/80 group-hover:text-white truncate min-w-0">
+        <span className="text-text/80 group-hover:text-text truncate min-w-0">
           {displayPath}
         </span>
         {line && (

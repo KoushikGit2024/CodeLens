@@ -87,7 +87,7 @@ const CandidateCard = ({ candidate, isSelected, onSelect, priorityLevel }) => {
           <OpenSourceButton
             ref={makeSourceRef({ filePath: candidate.files[0] })}
             label={candidate.files[0].split('/').pop()}
-            className="text-[12px] font-medium text-[#CBD5E8] truncate hover:text-accent"
+            className="text-[12px] font-medium text-text truncate hover:text-accent"
           />
           {candidate.files.length > 1 && (
             <span className="text-muted text-[12px] font-normal shrink-0">+{candidate.files.length - 1}</span>
@@ -115,7 +115,7 @@ const IssueGroup = ({ issueTitle, issueData, priorityLevel, selectedCandidateId,
   return (
     <div className="flex flex-col">
       <button
-        className="flex items-center gap-1.5 py-1 px-1 text-left text-[11px] text-muted hover:text-[#CBD5E8] transition-colors"
+        className="flex items-center gap-1.5 py-1 px-1 text-left text-[11px] text-muted hover:text-text transition-colors"
         onClick={() => setIsOpen(o => !o)}
         title={issueTitle}
       >
@@ -391,12 +391,12 @@ function CandidateDetail({ candidate, repoId }) {
               {priorityMeta.label}
             </span>
           </div>
-          <h1 className="text-xl font-semibold text-[#CBD5E8] mb-1.5">{candidate.title}</h1>
+          <h1 className="text-xl font-semibold text-text mb-1.5">{candidate.title}</h1>
           <p className="text-sm text-muted leading-relaxed">{candidate.summary}</p>
         </div>
         <div className="flex flex-col items-end gap-3 shrink-0">
           <div className="text-right">
-            <div className="text-2xl  font-bold text-[#CBD5E8]">{candidate.priorityScore}</div>
+            <div className="text-2xl  font-bold text-text">{candidate.priorityScore}</div>
             <div className="text-[10px] text-muted uppercase tracking-wide">Priority Score</div>
           </div>
           <button
@@ -422,7 +422,7 @@ function CandidateDetail({ candidate, repoId }) {
               aiState.status === 'offline' ? 'No AI provider configured' :
               aiState.quotaStatus === 'exhausted' ? 'AI quota exceeded' : ''
             }
-            className="flex items-center gap-2 px-3 py-1.5 bg-accent hover:bg-accent/80 disabled:opacity-40 text-[#CBD5E8] rounded text-sm font-medium transition-colors"
+            className="flex items-center gap-2 px-3 py-1.5 bg-accent hover:bg-accent/80 disabled:opacity-40 text-text rounded text-sm font-medium transition-colors"
           >
             {fixing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
             {fixing ? 'Auto-Fixing...' : aiState.authState === 'unauthenticated' ? 'Sign in to Auto-Fix' : 'Auto-Fix with AI'}
@@ -442,7 +442,7 @@ function CandidateDetail({ candidate, repoId }) {
             <div className="flex items-center gap-3">
               <GitBranch className="w-4 h-4 text-success" />
               <div>
-                <div className="text-sm font-medium text-[#CBD5E8]">Suggested Pull Request</div>
+                <div className="text-sm font-medium text-text">Suggested Pull Request</div>
                 <div className="text-xs  text-muted">{fixResult.file}</div>
               </div>
             </div>
@@ -509,11 +509,11 @@ function CandidateDetail({ candidate, repoId }) {
             <div className="space-y-2.5">
               <div className="flex justify-between items-baseline">
                 <span className="text-xs text-muted">Direct</span>
-                <span className="text-sm  font-medium text-[#CBD5E8]">{impact?.directlyAffectedFiles?.length || 0} files</span>
+                <span className="text-sm  font-medium text-text">{impact?.directlyAffectedFiles?.length || 0} files</span>
               </div>
               <div className="flex justify-between items-baseline">
                 <span className="text-xs text-muted">Transitive</span>
-                <span className="text-sm  font-medium text-[#CBD5E8]">{impact?.transitivelyAffectedFiles?.length || 0} files</span>
+                <span className="text-sm  font-medium text-text">{impact?.transitivelyAffectedFiles?.length || 0} files</span>
               </div>
               {impact?.affectedComponents?.length > 0 && (
                 <div>
@@ -539,7 +539,7 @@ function CandidateDetail({ candidate, repoId }) {
           <div className="space-y-5">
             {candidate.suggestedStrategies.map((strat, idx) => (
               <div key={idx} className="border-l-2 border-border pl-4">
-                <h4 className="text-sm font-semibold text-[#CBD5E8] mb-1">{strat.action}</h4>
+                <h4 className="text-sm font-semibold text-text mb-1">{strat.action}</h4>
                 <p className="text-sm text-muted mb-3 leading-relaxed">{strat.description}</p>
                 <div className="grid grid-cols-2 gap-4 text-xs">
                   <div>
@@ -573,8 +573,8 @@ function CandidateDetail({ candidate, repoId }) {
 
       {/* Footer meta */}
       <div className="flex items-center gap-6 text-xs text-muted pt-2 border-t border-border">
-        <span>Severity: <span className="text-[#CBD5E8] uppercase">{candidate.severity}</span></span>
-        <span>Confidence: <span className="text-[#CBD5E8] uppercase">{candidate.confidence}</span></span>
+        <span>Severity: <span className="text-text uppercase">{candidate.severity}</span></span>
+        <span>Confidence: <span className="text-text uppercase">{candidate.confidence}</span></span>
       </div>
     </div>
   );

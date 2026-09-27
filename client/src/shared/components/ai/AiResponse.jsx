@@ -61,7 +61,7 @@ function CopyableListItem({ content, className }) {
       <AiMarkdown content={content} />
       <button 
         onClick={handleCopy}
-        className="absolute top-0 right-0 opacity-0 group-hover/item:opacity-100 transition-opacity text-muted hover:text-white"
+        className="absolute top-0 right-0 opacity-0 group-hover/item:opacity-100 transition-opacity text-muted hover:text-text"
         title="Copy item"
       >
         {copied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
@@ -90,8 +90,8 @@ function CopyableChatMessage({ msg }) {
       <div className="flex flex-col gap-1 max-w-[85%] w-full">
         <div className={`text-sm px-4 py-2.5 rounded-lg w-full ${
           msg.role === 'user' 
-            ? 'bg-panel border border-border text-white' 
-            : 'bg-transparent text-white/90'
+            ? 'bg-panel border border-border text-text' 
+            : 'bg-transparent text-text/90'
         }`}>
           {msg.role === 'user' ? (
             msg.content
@@ -103,7 +103,7 @@ function CopyableChatMessage({ msg }) {
 
         <button 
           onClick={handleCopy} 
-          className={`opacity-0 group-hover/chat:opacity-100 text-muted hover:text-white transition-opacity shrink-0 flex items-center gap-1 text-[10px] ${msg.role === 'user' ? 'self-end' : 'self-start'}`} 
+          className={`opacity-0 group-hover/chat:opacity-100 text-muted hover:text-text transition-opacity shrink-0 flex items-center gap-1 text-[10px] ${msg.role === 'user' ? 'self-end' : 'self-start'}`} 
           title="Copy Message"
         >
           {copied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
@@ -199,7 +199,7 @@ export default function AiResponse({ data, title = "AI Intelligence", onNavigate
             </h3>
           )}
           {/* Replaced AiMarkdown with TypewriterMarkdown */}
-          <TypewriterMarkdown content={summary} className="text-white/90" animate={true} speed={15} />
+          <TypewriterMarkdown content={summary} className="text-text/90" animate={true} speed={15} />
         </section>
       )}
 
@@ -210,7 +210,7 @@ export default function AiResponse({ data, title = "AI Intelligence", onNavigate
             <Lightbulb className="w-4 h-4 text-accent" />
             Detailed Explanation
           </h3>
-          <AiMarkdown content={explanation} className="text-white/90" />
+          <AiMarkdown content={explanation} className="text-text/90" />
         </section>
       )}
 
@@ -223,7 +223,7 @@ export default function AiResponse({ data, title = "AI Intelligence", onNavigate
           </h4>
           <ul className="list-disc pl-4 flex flex-col gap-1.5">
             {facts.map((fact, i) => (
-              <CopyableListItem key={i} content={fact} className="text-xs text-white/80 leading-relaxed" />
+              <CopyableListItem key={i} content={fact} className="text-xs text-text/80 leading-relaxed" />
             ))}
           </ul>
         </section>
@@ -233,12 +233,12 @@ export default function AiResponse({ data, title = "AI Intelligence", onNavigate
       {inferences && inferences.length > 0 && (
         <section className="transition-all duration-700 delay-500 animate-in fade-in slide-in-from-bottom-2">
           <h4 className="text-[10px] uppercase text-muted tracking-wider mb-2 font-bold flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-[#cba6f7]" />
+            <Sparkles className="w-3.5 h-3.5 text-accent" />
             AI Inferences
           </h4>
           <ul className="list-disc pl-4 flex flex-col gap-1.5">
             {inferences.map((inf, i) => (
-              <CopyableListItem key={i} content={inf} className="text-xs text-white/80 leading-relaxed" />
+              <CopyableListItem key={i} content={inf} className="text-xs text-text/80 leading-relaxed" />
             ))}
           </ul>
         </section>
@@ -316,7 +316,7 @@ export default function AiResponse({ data, title = "AI Intelligence", onNavigate
                   <button
                     onClick={retryLast}
                     disabled={isAsking}
-                    className="flex items-center gap-1.5 text-[10px] font-semibold text-danger hover:text-white bg-danger/20 hover:bg-danger/40 border border-danger/30 rounded px-2.5 py-1 transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1.5 text-[10px] font-semibold text-danger hover:text-text bg-danger/20 hover:bg-danger/40 border border-danger/30 rounded px-2.5 py-1 transition-colors disabled:opacity-50"
                   >
                     {isAsking ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
                     {isAsking ? 'Retrying...' : 'Retry'}
@@ -334,12 +334,12 @@ export default function AiResponse({ data, title = "AI Intelligence", onNavigate
               onChange={e => setInput(e.target.value)}
               placeholder="Ask a follow-up question about this context..."
               disabled={isAsking}
-              className="w-full bg-panel border border-border rounded-lg pl-4 pr-12 py-3 text-sm text-white placeholder-muted focus:outline-none focus:border-accent/50 transition-colors disabled:opacity-50"
+              className="w-full bg-panel border border-border rounded-lg pl-4 pr-12 py-3 text-sm text-text placeholder-muted focus:outline-none focus:border-accent/50 transition-colors disabled:opacity-50"
             />
             <button
               type="submit"
               disabled={!input.trim() || isAsking}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-md hover:bg-surface text-muted hover:text-white transition-colors disabled:opacity-50"
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-md hover:bg-surface text-muted hover:text-text transition-colors disabled:opacity-50"
             >
               {isAsking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </button>

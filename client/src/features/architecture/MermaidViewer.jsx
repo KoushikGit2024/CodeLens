@@ -2,8 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
 import { Copy, Download, AlertCircle } from 'lucide-react';
 import { useToast } from '../../shared/context/ToastContext';
+import { useTheme } from '../../shared/context/ThemeContext';
 
 export default function MermaidViewer({ diagramStr, repoId }) {
+  const { theme } = useTheme();
+  const isLight = theme?.id?.includes('light');
   const containerRef = useRef(null);
   const [svgContent, setSvgContent] = useState('');
   const [error, setError] = useState(null);
@@ -12,10 +15,10 @@ export default function MermaidViewer({ diagramStr, repoId }) {
   useEffect(() => {
     mermaid.initialize({
       startOnLoad: false,
-      theme: 'dark',
+      theme: isLight ? 'default' : 'dark',
       securityLevel: 'loose',
     });
-  }, []);
+  }, [isLight]);
 
   useEffect(() => {
     let isMounted = true;

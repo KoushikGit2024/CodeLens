@@ -138,11 +138,11 @@ export default function SignUpPage() {
     return (
       <div className="w-full max-w-[420px] text-center animate-in fade-in zoom-in-95 duration-500">
             <CheckCircle2 className="w-16 h-16 text-success mx-auto mb-6 drop-shadow-[0_0_15px_rgba(34,197,94,0.4)]" />
-            <h1 className="text-3xl font-semibold text-white tracking-tight mb-3">Check your email</h1>
+            <h1 className="text-3xl font-semibold text-text tracking-tight mb-3">Check your email</h1>
             <p className="text-muted text-sm mb-8 leading-relaxed">
-              We've sent a confirmation link to <strong className="text-white">{email}</strong>. Please click it to verify your account and get started.
+              We've sent a confirmation link to <strong className="text-text">{email}</strong>. Please click it to verify your account and get started.
             </p>
-            <Link to="/auth/signin" className="inline-flex bg-panel border border-border hover:bg-surface-light text-white font-medium rounded-lg px-6 py-2.5 transition-colors">
+            <Link to="/auth/signin" className="inline-flex bg-panel border border-border hover:bg-surface-light text-text font-medium rounded-lg px-6 py-2.5 transition-colors">
               Back to Sign In
             </Link>
           </div>
@@ -154,7 +154,7 @@ export default function SignUpPage() {
       <div className="w-full max-w-[420px] py-3">
           <div className="flex flex-col items-start mb-4">
             <Logo className="w-8 h-8 mb-3 lg:hidden animate-in fade-in zoom-in-95 duration-700" style={{ animationFillMode: 'both' }} />
-            <h1 className="text-2xl font-semibold text-white tracking-tight animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '150ms', animationFillMode: 'both' }}>Create an Account</h1>
+            <h1 className="text-2xl font-semibold text-text tracking-tight animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '150ms', animationFillMode: 'both' }}>Create an Account</h1>
             <p className="text-muted mt-1 text-sm animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '250ms', animationFillMode: 'both' }}>
               Enter your details to create your CodeLens account.
             </p>
@@ -175,7 +175,7 @@ export default function SignUpPage() {
                   <Upload className="w-5 h-5 group-hover:text-accent transition-colors" />
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-sm font-medium text-white/90 group-hover:text-white transition-colors">Upload Avatar</span>
+                  <span className="text-sm font-medium text-text/90 group-hover:text-text transition-colors">Upload Avatar</span>
                   {/* <span className="text-xs text-muted transition-colors">Optional, but recommended</span> */}
                 </div>
                 <input
@@ -198,12 +198,12 @@ export default function SignUpPage() {
                 >
                   <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center gap-1.5 transition-opacity duration-200">
-                    <Upload className="w-6 h-6 text-white" />
-                    <span className="text-xs text-white font-medium">Click to Adjust</span>
+                    <Upload className="w-6 h-6 text-text" />
+                    <span className="text-xs text-text font-medium">Click to Adjust</span>
                   </div>
                 </div>
                 <div className="flex flex-col items-center gap-1">
-                  <span className="text-sm font-medium text-white/90">Avatar Selected</span>
+                  <span className="text-sm font-medium text-text/90">Avatar Selected</span>
                   <span className={`text-xs font-medium ${isAvatarTooLarge ? 'text-danger' : 'text-muted'}`}>
                     {(avatarSize / (1024 * 1024)).toFixed(2)} MB {isAvatarTooLarge && '(Max 1MB)'}
                   </span>
@@ -222,7 +222,7 @@ export default function SignUpPage() {
 
           <form onSubmit={handleSubmit} className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '450ms', animationFillMode: 'both' }}>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-white/90">Full Name</label>
+              <label className="text-sm font-medium text-text/90">Full Name</label>
               <input
                 type="text"
                 value={fullName}
@@ -230,13 +230,13 @@ export default function SignUpPage() {
                 required
                 maxLength={100}
                 autoComplete="name"
-                className="w-full bg-panel border border-border rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all placeholder:text-muted/70"
+                className="w-full bg-panel border border-border rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all placeholder:text-muted/70"
                 placeholder="Ada Lovelace"
               />
             </div>
             
             <div className="space-y-2">
-              <label className="text-sm font-medium text-white/90">Email Address</label>
+              <label className="text-sm font-medium text-text/90">Email Address</label>
               <input
                 type="email"
                 value={email}
@@ -244,13 +244,13 @@ export default function SignUpPage() {
                 required
                 maxLength={255}
                 autoComplete="email"
-                className="w-full bg-panel border border-border rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all placeholder:text-muted/70"
+                className="w-full bg-panel border border-border rounded-lg px-4 py-2.5 text-text focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all placeholder:text-muted/70"
                 placeholder="you@example.com"
               />
             </div>
             
             <div className="space-y-2">
-              <label className="text-sm font-medium text-white/90">Password</label>
+              <label className="text-sm font-medium text-text/90">Password</label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
@@ -259,14 +259,14 @@ export default function SignUpPage() {
                   required
                   maxLength={72}
                   autoComplete="new-password"
-                  className="w-full bg-panel border border-border rounded-lg pl-4 pr-11 py-2.5 text-white focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all placeholder:text-muted/70"
+                  className="w-full bg-panel border border-border rounded-lg pl-4 pr-11 py-2.5 text-text focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all placeholder:text-muted/70"
                   placeholder="••••••••"
                   minLength={6}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted hover:text-white transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted hover:text-text transition-colors"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -298,7 +298,7 @@ export default function SignUpPage() {
             <button
               type="submit"
               disabled={loading || (password.length > 0 && strength < 2) || isAvatarTooLarge}
-              className="w-full bg-accent hover:bg-accent-hover text-white font-medium rounded-lg py-2.5 flex items-center justify-center transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed mt-4 shadow-lg shadow-accent/20"
+              className="w-full bg-accent hover:bg-accent-hover text-text font-medium rounded-lg py-2.5 flex items-center justify-center transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed mt-4 shadow-lg shadow-accent/20"
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Create Account'}
             </button>
@@ -318,7 +318,7 @@ export default function SignUpPage() {
               <button 
                 type="button" 
                 onClick={() => signInWithOAuth('github')}
-                className="flex items-center justify-center gap-2 py-2 px-4 border border-border rounded-lg bg-panel hover:bg-surface-light text-white transition-colors"
+                className="flex items-center justify-center gap-2 py-2 px-4 border border-border rounded-lg bg-panel hover:bg-surface-light text-text transition-colors"
               >
                 <Github className="w-4 h-4" />
                 <span className="text-sm font-medium">GitHub</span>
@@ -326,7 +326,7 @@ export default function SignUpPage() {
               <button 
                 type="button" 
                 onClick={() => signInWithOAuth('google')}
-                className="flex items-center justify-center gap-2 py-2 px-4 border border-border rounded-lg bg-panel hover:bg-surface-light text-white transition-colors"
+                className="flex items-center justify-center gap-2 py-2 px-4 border border-border rounded-lg bg-panel hover:bg-surface-light text-text transition-colors"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24">
                   <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -350,13 +350,13 @@ export default function SignUpPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-panel border border-border rounded-xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between p-4 border-b border-border">
-              <h3 className="font-semibold text-white">Adjust Avatar</h3>
+              <h3 className="font-semibold text-text">Adjust Avatar</h3>
               <button 
                 onClick={() => { 
                   if (!avatarPreview) setImgSrc(''); // if first upload cancelled, clear it entirely
                   setShowCropModal(false); 
                 }} 
-                className="text-muted hover:text-white transition-colors"
+                className="text-muted hover:text-text transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -384,14 +384,14 @@ export default function SignUpPage() {
                   if (!avatarPreview) setImgSrc('');
                   setShowCropModal(false); 
                 }}
-                className="px-4 py-2 text-sm font-medium text-white/80 hover:text-white transition-colors"
+                className="px-4 py-2 text-sm font-medium text-text/80 hover:text-text transition-colors"
               >
                 Cancel
               </button>
               <button 
                 onClick={handleSaveCrop}
                 disabled={!completedCrop}
-                className="px-5 py-2 bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-5 py-2 bg-accent hover:bg-accent-hover text-text text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Save Avatar
               </button>

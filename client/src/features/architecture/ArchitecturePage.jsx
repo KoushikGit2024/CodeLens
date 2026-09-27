@@ -15,6 +15,7 @@ import { toMermaid } from '../../services/analyzer/advanced/mermaid.transformer'
 import OpenSourceButton from '../../shared/components/OpenSourceButton';
 import { tryMakeSourceRef } from '../../shared/navigation/sourceRef';
 import { ExportDiagramButton } from '../../shared/components/ExportDiagramButton';
+import { useTheme } from '../../shared/context/ThemeContext';
 
 // ── Layer color map ───────────────────────────────────────────────────────
 
@@ -323,6 +324,8 @@ function graphToFlow(components = [], relations = [], selectedId, violations = [
 }
 
 export default function ArchitecturePage() {
+  const { theme } = useTheme();
+  const isLight = theme?.id?.includes('light');
   const { repoId } = useParams();
   const navigate = useNavigate();
   const { addToast } = useToast();
@@ -441,7 +444,7 @@ export default function ArchitecturePage() {
           content: (
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-6 custom-scrollbar bg-panel h-full">
               <section>
-                 <div className="flex flex-col gap-2 mb-4 pb-4 border-b border-white/5">
+                 <div className="flex flex-col gap-2 mb-4 pb-4 border-b border-text/5">
                    <div className="flex items-center justify-between">
                      <span className="text-xs text-muted flex items-center gap-1.5"><AlertCircle className="w-3.5 h-3.5"/> Security & Health</span>
                      <Link to={`/explore/${repoId}/health`} className="text-[10px] text-accent hover:underline">View Health</Link>
@@ -453,14 +456,14 @@ export default function ArchitecturePage() {
                  </div>
 
                 {!selectedComponent ? (
-                  <div className="text-center p-4 border border-dashed border-white/5 rounded-lg">
+                  <div className="text-center p-4 border border-dashed border-text/5 rounded-lg">
                     <Box className="w-8 h-8 text-muted mx-auto mb-2 opacity-50" />
                     <p className="text-xs text-muted">Click a component in the graph to view its details and specific violations.</p>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-4">
                     {/* Component Info */}
-                    <div className="pb-3 border-b border-white/5">
+                    <div className="pb-3 border-b border-text/5">
                       <p className="text-xs text-muted uppercase tracking-wider mb-2">Component Details</p>
                       <div className="flex items-center gap-2 mb-2">
                         <Box className="w-4 h-4 text-accent" />
@@ -491,7 +494,7 @@ export default function ArchitecturePage() {
                             </div>
                             
                             {compHealth && (
-                              <div className="flex justify-between items-start mt-2 pt-2 border-t border-white/5">
+                              <div className="flex justify-between items-start mt-2 pt-2 border-t border-text/5">
                                 <span className="text-xs text-muted">Health</span>
                                 <div className="flex flex-col items-end gap-1">
                                   <span className={`border rounded px-1.5 py-0.5 text-[10px] font-medium capitalize flex items-center gap-1 ${getSeverityColor(compHealth.severity)}`}>
@@ -582,11 +585,11 @@ export default function ArchitecturePage() {
                           return next;
                         });
                         return (
-                          <div key={compLabel} className="rounded-md overflow-hidden border border-white/5">
+                          <div key={compLabel} className="rounded-md overflow-hidden border border-text/5">
                             {/* Header row — click to expand/collapse */}
                             <button
                               onClick={toggle}
-                              className="w-full flex items-center justify-between px-2 py-1.5 hover:bg-white/5 transition-colors text-left"
+                              className="w-full flex items-center justify-between px-2 py-1.5 hover:bg-text/5 transition-colors text-left"
                             >
                               <span className="flex items-center gap-1.5 min-w-0 flex-1">
                                 {isExpanded
@@ -610,7 +613,7 @@ export default function ArchitecturePage() {
 
                             {/* File list — shown when expanded */}
                             {isExpanded && (
-                              <div className="border-t border-white/5 flex flex-col">
+                              <div className="border-t border-text/5 flex flex-col">
                                 {compFiles.length === 0 ? (
                                   <span className="text-[10px] text-muted px-3 py-1.5 italic">No files</span>
                                 ) : compFiles.map((file, j) => {
@@ -618,7 +621,7 @@ export default function ArchitecturePage() {
                                   return (
                                     <div
                                       key={j}
-                                      className="flex items-center justify-between gap-2 px-3 py-1 hover:bg-white/5 group min-w-0"
+                                      className="flex items-center justify-between gap-2 px-3 py-1 hover:bg-text/5 group min-w-0"
                                     >
                                       {fileRef ? (
                                         <OpenSourceButton ref={fileRef} className="flex-1 truncate text-[10px]" />
@@ -713,7 +716,7 @@ export default function ArchitecturePage() {
                       const c = layerColor(n.data?.layer, n.data?.isExternal);
                       return c.bg;
                     }}
-                    maskColor="rgba(12,14,20,0.75)"
+                    maskColor={isLight ? "rgba(255,255,255,0.7)" : "rgba(12,14,20,0.75)"}
                     className="bg-panel border border-border"
                   />
 

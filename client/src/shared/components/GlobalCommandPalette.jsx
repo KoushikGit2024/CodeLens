@@ -101,13 +101,13 @@ export default function GlobalCommandPalette() {
           <input
             ref={inputRef}
             type="text"
-            className="flex-1 bg-transparent border-none text-white text-base placeholder-muted focus:outline-none"
+            className="flex-1 bg-transparent border-none text-text text-base placeholder-muted focus:outline-none"
             placeholder="Search files by name..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
           <button 
-            className="p-1 rounded hover:bg-white/5 text-muted hover:text-white transition-colors"
+            className="p-1 rounded hover:bg-text/5 text-muted hover:text-text transition-colors"
             onClick={() => setIsOpen(false)}
           >
             <X className="w-4 h-4" />
@@ -123,7 +123,7 @@ export default function GlobalCommandPalette() {
                   className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 transition-colors ${
                     idx === selectedIndex 
                       ? 'bg-accent/15 text-accent' 
-                      : 'text-text hover:bg-white/5'
+                      : 'text-text hover:bg-text/5'
                   }`}
                   onMouseEnter={() => setSelectedIndex(idx)}
                 >

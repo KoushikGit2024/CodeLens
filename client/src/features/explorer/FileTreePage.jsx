@@ -25,6 +25,7 @@ import { repositoryApi } from '../../shared/api';
 import PageHeader from '../../shared/components/PageHeader';
 import { ExportDiagramButton } from '../../shared/components/ExportDiagramButton';
 import { useRepository } from '../../shared/context/RepositoryContext';
+import { useTheme } from '../../shared/context/ThemeContext';
 
 // Maps file extensions to specific icons and colors
 const getFileIcon = (name) => {
@@ -68,7 +69,7 @@ const CustomTreeNode = ({ data }) => {
       <span 
         className={clsx(
           "font-medium tracking-wide text-sm truncate min-w-0", 
-          isActive ? "text-accent" : (isDir ? "text-white" : "text-text/80")
+          isActive ? "text-accent" : (isDir ? "text-text" : "text-text/80")
         )}
         title={data.label}
       >
@@ -186,7 +187,7 @@ const flattenTree = (treeNodes, parentId = null, urlPath = null) => {
         target: nodeId,
         type: 'default',
         animated: true,
-        style: { stroke: '#4D7EFF', strokeWidth: 1.5, opacity: 0.6 }
+        style: { stroke: `rgb(${getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim()})`, strokeWidth: 1.5, opacity: 0.6 }
       });
     }
 
@@ -234,6 +235,8 @@ const filterTree = (treeNodes, searchTerm) => {
 };
 
 export default function FileTreePage() {
+  const { theme } = useTheme();
+  const isLight = theme?.id?.includes('light');
   const { repoId } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -370,12 +373,12 @@ export default function FileTreePage() {
             nodesConnectable={false}
             proOptions={{ hideAttribution: true }}
           >
-            <Background color="#1D2130" gap={24} size={2} variant="dots" />
+            <Background color={`rgb(${getComputedStyle(document.documentElement).getPropertyValue('--color-border').trim()})`} gap={24} size={2} variant="dots" />
             <Controls className="bg-panel border-border" />
             <MiniMap 
-              maskColor="rgba(12,14,20,0.85)"
-              style={{ background: '#111318', border: '1px solid #1D2130' }}
-              nodeColor={n => n.data?.type === 'directory' ? '#facc15' : '#4D7EFF'}
+              maskColor={isLight ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)"}
+              className="bg-panel border border-border"
+              nodeColor={n => n.data?.type === 'directory' ? '#facc15' : `rgb(${getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim()})`}
             />
           </ReactFlow>
         )}

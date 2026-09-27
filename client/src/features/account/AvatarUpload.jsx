@@ -143,7 +143,7 @@ export default function AvatarUpload({ onUploadSuccess }) {
           <div className="relative border border-border rounded-lg overflow-hidden bg-surface max-w-sm mx-auto">
             <button 
               onClick={() => setImgSrc('')}
-              className="absolute top-2 right-2 z-10 p-1 bg-black/50 hover:bg-black/80 rounded-full text-white transition-colors"
+              className="absolute top-2 right-2 z-10 p-1 bg-black/50 hover:bg-black/80 rounded-full text-text transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
@@ -181,7 +181,7 @@ export default function AvatarUpload({ onUploadSuccess }) {
             <button
               onClick={handleUpload}
               disabled={uploading || !completedCrop}
-              className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+              className="px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
             >
               {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
               {uploading ? 'Uploading...' : 'Save Avatar'}

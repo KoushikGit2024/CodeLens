@@ -42,7 +42,7 @@ export class ErrorBoundary extends React.Component {
     if (this.state.hasError) {
       // You can render any custom fallback UI
       return (
-        <div className="flex-1 w-full min-h-screen overflow-y-auto flex flex-col items-center justify-center bg-surface p-6 text-white">
+        <div className="flex-1 w-full min-h-screen overflow-y-auto flex flex-col items-center justify-center bg-surface p-6 text-text">
           <div className="bg-panel border border-danger/30 rounded-lg p-6 max-w-3xl w-full shadow-lg my-auto">
             <div className="flex items-center gap-3 text-danger mb-4">
               <AlertTriangle className="w-8 h-8" />
@@ -53,7 +53,7 @@ export class ErrorBoundary extends React.Component {
             <div className="relative group mb-6">
               <button
                 onClick={this.handleCopy}
-                className="absolute top-2 right-2 p-2 bg-panel border border-border rounded-md text-muted hover:text-white hover:border-accent opacity-0 group-hover:opacity-100 transition-all duration-200 z-10 shadow-sm"
+                className="absolute top-2 right-2 p-2 bg-panel border border-border rounded-md text-muted hover:text-text hover:border-accent opacity-0 group-hover:opacity-100 transition-all duration-200 z-10 shadow-sm"
                 title="Copy error details"
               >
                 {this.state.copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
@@ -96,7 +96,7 @@ export class ErrorBoundary extends React.Component {
                   // We do not force reload here to allow client-side routing to recover state,
                   // unless it fails again, then the boundary will re-catch.
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-surface border border-border text-white rounded hover:bg-white/5 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-surface border border-border text-text rounded hover:bg-text/5 transition-colors"
               >
                 <Home className="w-4 h-4" />
                 {window.location.pathname.startsWith('/explore/') ? 'Back to Overview' : 'Return Home'}

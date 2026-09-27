@@ -40,15 +40,15 @@ function MarkdownViewer({ content }) {
 
     // Headings
     if (line.startsWith('# ')) {
-      elements.push(<h1 key={`h1-${i}`} className="text-3xl font-bold text-white mt-8 mb-4 border-b border-border/50 pb-2">{line.slice(2)}</h1>);
+      elements.push(<h1 key={`h1-${i}`} className="text-3xl font-bold text-text mt-8 mb-4 border-b border-border/50 pb-2">{line.slice(2)}</h1>);
       continue;
     }
     if (line.startsWith('## ')) {
-      elements.push(<h2 key={`h2-${i}`} className="text-2xl font-semibold text-white mt-8 mb-3">{line.slice(3)}</h2>);
+      elements.push(<h2 key={`h2-${i}`} className="text-2xl font-semibold text-text mt-8 mb-3">{line.slice(3)}</h2>);
       continue;
     }
     if (line.startsWith('### ')) {
-      elements.push(<h3 key={`h3-${i}`} className="text-xl font-medium text-white mt-6 mb-2">{line.slice(4)}</h3>);
+      elements.push(<h3 key={`h3-${i}`} className="text-xl font-medium text-text mt-6 mb-2">{line.slice(4)}</h3>);
       continue;
     }
     
@@ -142,7 +142,7 @@ function renderInline(text) {
   if (current) parts.push({ type: 'text', val: current });
 
   return parts.map((p, idx) => {
-    if (p.type === 'bold') return <strong key={idx} className="text-white font-semibold">{p.val}</strong>;
+    if (p.type === 'bold') return <strong key={idx} className="text-text font-semibold">{p.val}</strong>;
     if (p.type === 'code') return <code key={idx} className="bg-surface px-1.5 py-0.5 rounded text-sm text-[#e5c07b] font-mono border border-border/50">{p.val}</code>;
     if (p.type === 'link') {
       const isExternal = p.url.startsWith('http');
@@ -194,12 +194,12 @@ export default function HelpPage() {
   const pathParts = actualPath.split('/');
 
   return (
-    <div className="h-screen flex flex-col bg-surface text-white overflow-hidden">
+    <div className="h-screen flex flex-col bg-surface text-text overflow-hidden">
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <header className="h-12 flex items-center px-4 border-b border-border bg-panel shrink-0 gap-4">
         <button
           onClick={() => navigate(-1)}
-          className="flex items-center gap-1 text-muted hover:text-white transition-colors text-sm"
+          className="flex items-center gap-1 text-muted hover:text-text transition-colors text-sm"
         >
           <ChevronLeft className="w-4 h-4" />
           Back

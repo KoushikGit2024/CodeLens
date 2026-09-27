@@ -26,7 +26,7 @@ export default function AnalysisProgress({ currentPhase, phaseDetails }) {
   
   return (
     <div className="flex flex-col gap-3 max-w-sm w-full mx-auto p-5 bg-panel border border-border rounded-lg shadow-sm">
-      <h3 className="text-sm font-medium text-white mb-2">Analyzing Repository</h3>
+      <h3 className="text-sm font-medium text-text mb-2">Analyzing Repository</h3>
       
       {PHASES.map((phase, index) => {
         const isCompleted = currentIndex > index || currentPhase === 'ready';
@@ -43,7 +43,7 @@ export default function AnalysisProgress({ currentPhase, phaseDetails }) {
               <Circle className="w-4 h-4 text-muted" />
             )}
             <div className="flex flex-col">
-              <span className={`text-xs font-medium ${isCurrent ? 'text-white' : 'text-muted'}`}>
+              <span className={`text-xs font-medium ${isCurrent ? 'text-text' : 'text-muted'}`}>
                 {phase.label}
               </span>
               {isCurrent && phase.id === 'analyzing_ast' && phaseDetails?.total > 0 && (

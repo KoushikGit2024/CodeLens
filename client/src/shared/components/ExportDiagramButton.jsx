@@ -6,7 +6,6 @@ import { exportToPng, exportToSvg } from '../utils/exportDiagram';
  * A button that opens a dialog to export a referenced DOM element to PNG or SVG.
  * 
  * @param {Object} props
- * @param {string[]} props.availableToggles - List of toggles to show. e.g. ['breadcrumbs', 'legend', 'controls', 'minimap']
  * @param {Array} props.nodes - React Flow nodes (optional, used for native SVG worker export)
  * @param {Array} props.edges - React Flow edges (optional, used for native SVG worker export)
  */
@@ -14,7 +13,6 @@ export function ExportDiagramButton({
   elementRef, 
   filename = 'diagram', 
   className = '',
-  availableToggles = ['breadcrumbs', 'legend', 'controls', 'minimap'],
   nodes = null,
   edges = null
 }) {
@@ -24,13 +22,6 @@ export function ExportDiagramButton({
   // Settings
   const [format, setFormat] = useState('png'); // 'png' or 'svg'
   const [includeBackground, setIncludeBackground] = useState(true);
-  const [captureArea, setCaptureArea] = useState('full'); // 'full' or 'visible'
-  
-  // Detailed UI Inclusion options (checked = include it in export)
-  const [includeBreadcrumbs, setIncludeBreadcrumbs] = useState(false);
-  const [includeLegend, setIncludeLegend] = useState(false);
-  const [includeControls, setIncludeControls] = useState(false);
-  const [includeMinimap, setIncludeMinimap] = useState(false);
 
   const handleExport = async () => {
     setExporting(true);
@@ -40,13 +31,9 @@ export function ExportDiagramButton({
     await new Promise(resolve => setTimeout(resolve, 100));
 
     try {
-      // Any feature NOT included will be added to the excluded list
-      const excludedFeatures = new Set();
-      if (!includeBreadcrumbs) excludedFeatures.add('breadcrumbs');
-      if (!includeLegend) excludedFeatures.add('legend');
-      if (!includeControls) excludedFeatures.add('controls');
-      if (!includeMinimap) excludedFeatures.add('minimap');
-      excludedFeatures.add('attribution'); // Always exclude attribution watermarks
+      // For this simplified export, we always exclude UI overlays since we're capturing the inner viewport.
+      const excludedFeatures = new Set(['breadcrumbs', 'legend', 'controls', 'minimap', 'attribution']);
+      const captureArea = 'full';
 
       const options = {
         includeBackground,
@@ -114,28 +101,12 @@ export function ExportDiagramButton({
     }
   };
 
-  const CheckboxItem = ({ label, checked, onChange }) => (
-    <label className="flex items-center gap-3 cursor-pointer group">
-      <div className="relative flex items-center">
-        <input
-          type="checkbox"
-          className="sr-only"
-          checked={checked}
-          onChange={(e) => onChange(e.target.checked)}
-        />
-        <div className={`w-9 h-5 rounded-full transition-colors ${checked ? 'bg-accent' : 'bg-surface border border-border'}`}></div>
-        <div className={`absolute left-1 top-1 bg-white w-3 h-3 rounded-full transition-transform ${checked ? 'translate-x-4' : 'translate-x-0'}`}></div>
-      </div>
-      <span className="text-sm text-white group-hover:text-accent transition-colors">{label}</span>
-    </label>
-  );
-
   return (
     <>
       <button
         onClick={() => setOpen(true)}
         disabled={exporting}
-        className={`export-element-button flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-panel border border-border text-muted hover:text-white hover:border-accent/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm ${className}`}
+        className={`export-element-button flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-panel border border-border text-muted hover:text-text hover:border-accent/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm ${className}`}
         title="Export diagram"
       >
         <Download className="w-3.5 h-3.5" />
@@ -147,8 +118,8 @@ export function ExportDiagramButton({
           <div className="bg-panel border border-border rounded-xl shadow-2xl w-[450px] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto custom-scrollbar">
             {/* Header */}
             <div className="px-5 py-4 border-b border-border flex items-center justify-between bg-surface/50 shrink-0">
-              <h3 className="font-semibold text-white">Export Diagram</h3>
-              <button onClick={() => setOpen(false)} className="text-muted hover:text-white"><X className="w-4 h-4" /></button>
+              <h3 className="font-semibold text-text">Export Diagram</h3>
+              <button onClick={() => setOpen(false)} className="text-muted hover:text-text"><X className="w-4 h-4" /></button>
             </div>
 
             {/* Content */}
@@ -160,7 +131,7 @@ export function ExportDiagramButton({
                   <button
                     onClick={() => setFormat('png')}
                     className={`flex items-center justify-center gap-2 px-3 py-2 border rounded-md text-sm transition-colors ${
-                      format === 'png' ? 'bg-accent/10 border-accent text-accent' : 'bg-surface border-border text-muted hover:text-white'
+                      format === 'png' ? 'bg-accent/10 border-accent text-accent' : 'bg-surface border-border text-muted hover:text-text'
                     }`}
                   >
                     <ImageIcon className="w-4 h-4" /> PNG (Recommended)
@@ -168,7 +139,7 @@ export function ExportDiagramButton({
                   <button
                     onClick={() => setFormat('svg')}
                     className={`flex items-center justify-center gap-2 px-3 py-2 border rounded-md text-sm transition-colors ${
-                      format === 'svg' ? 'bg-accent/10 border-accent text-accent' : 'bg-surface border-border text-muted hover:text-white'
+                      format === 'svg' ? 'bg-accent/10 border-accent text-accent' : 'bg-surface border-border text-muted hover:text-text'
                     }`}
                     title="SVG may not render text correctly for some node types"
                   >
@@ -184,30 +155,7 @@ export function ExportDiagramButton({
                 )}
               </div>
 
-              {/* Area */}
-              <div>
-                <label className="block text-xs font-medium text-muted mb-2 uppercase tracking-wider">Capture Area</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => setCaptureArea('full')}
-                    className={`flex items-center justify-center gap-2 px-3 py-2 border rounded-md text-sm transition-colors ${
-                      captureArea === 'full' ? 'bg-accent/10 border-accent text-accent' : 'bg-surface border-border text-muted hover:text-white'
-                    }`}
-                  >
-                    Full Diagram
-                  </button>
-                  <button
-                    onClick={() => setCaptureArea('visible')}
-                    className={`flex items-center justify-center gap-2 px-3 py-2 border rounded-md text-sm transition-colors ${
-                      captureArea === 'visible' ? 'bg-accent/10 border-accent text-accent' : 'bg-surface border-border text-muted hover:text-white'
-                    }`}
-                  >
-                    Visible Area Only
-                  </button>
-                </div>
-              </div>
-
-              {/* Advanced UI Elements Toggles */}
+              {/* Background Toggle */}
               <div>
                 <label className="block text-xs font-medium text-muted mb-3 uppercase tracking-wider border-b border-border/50 pb-2">Export Contents</label>
                 <div className="space-y-4 pt-1">
@@ -220,38 +168,13 @@ export function ExportDiagramButton({
                         onChange={(e) => setIncludeBackground(e.target.checked)}
                       />
                       <div className={`w-9 h-5 rounded-full transition-colors ${includeBackground ? 'bg-accent' : 'bg-surface border border-border'}`}></div>
-                      <div className={`absolute left-1 top-1 bg-white w-3 h-3 rounded-full transition-transform ${includeBackground ? 'translate-x-4' : 'translate-x-0'}`}></div>
+                      <div className={`absolute left-1 top-1 bg-text w-3 h-3 rounded-full transition-transform ${includeBackground ? 'translate-x-4' : 'translate-x-0'}`}></div>
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-sm text-white group-hover:text-accent transition-colors">Include Editor Background</span>
+                      <span className="text-sm text-text group-hover:text-accent transition-colors">Include Background Color</span>
                       <span className="text-xs text-muted">If unchecked, the exported image will have a transparent background.</span>
                     </div>
                   </label>
-
-                  <div className="pt-2">
-                    <p className="text-[11px] text-muted mb-2 font-medium">Specific Overlay Elements (Check to include):</p>
-                    
-                    {captureArea === 'full' ? (
-                      <div className="p-3 bg-warning/10 border border-warning/20 rounded-md">
-                        <p className="text-xs text-warning">Overlay elements (Breadcrumbs, Minimap, etc.) are only supported when capturing the Visible Area.</p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-y-3 gap-x-4">
-                        {availableToggles.includes('breadcrumbs') && (
-                          <CheckboxItem label="Breadcrumbs & Toolbar" checked={includeBreadcrumbs} onChange={setIncludeBreadcrumbs} />
-                        )}
-                        {availableToggles.includes('legend') && (
-                          <CheckboxItem label="Legends & Details" checked={includeLegend} onChange={setIncludeLegend} />
-                        )}
-                        {availableToggles.includes('controls') && (
-                          <CheckboxItem label="Zoom Controls" checked={includeControls} onChange={setIncludeControls} />
-                        )}
-                        {availableToggles.includes('minimap') && (
-                          <CheckboxItem label="Minimap" checked={includeMinimap} onChange={setIncludeMinimap} />
-                        )}
-                      </div>
-                    )}
-                  </div>
                 </div>
               </div>
             </div>
@@ -260,7 +183,7 @@ export function ExportDiagramButton({
             <div className="px-5 py-4 border-t border-border bg-surface/30 flex justify-end gap-3 shrink-0">
               <button
                 onClick={() => setOpen(false)}
-                className="px-4 py-2 text-sm text-muted hover:text-white transition-colors"
+                className="px-4 py-2 text-sm text-muted hover:text-text transition-colors"
                 disabled={exporting}
               >
                 Cancel
@@ -268,7 +191,7 @@ export function ExportDiagramButton({
               <button
                 onClick={handleExport}
                 disabled={exporting}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-accent text-white rounded-md hover:bg-accent/90 disabled:opacity-50 transition-colors shadow-lg shadow-accent/20"
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-accent text-text rounded-md hover:bg-accent/90 disabled:opacity-50 transition-colors shadow-lg shadow-accent/20"
               >
                 {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                 {exporting ? 'Exporting...' : 'Export File'}

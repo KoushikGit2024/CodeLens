@@ -16,13 +16,13 @@ export default function RepositoryShell() {
   }, [repoId]);
 
   if (!repoId) {
-    return <div className="h-screen bg-surface flex items-center justify-center text-white">No Repository Selected</div>;
+    return <div className="h-screen bg-surface flex items-center justify-center text-text">No Repository Selected</div>;
   }
 
   return (
     <RepositoryProvider>
       <GlobalCommandPalette />
-      <div className="h-screen w-full flex bg-surface text-white overflow-hidden font-sans">
+      <div className="h-screen w-full flex bg-surface text-text overflow-hidden font-sans">
         <RepositorySidebar />
 
         <div className="flex flex-col flex-1 h-full bg-surface min-w-0">

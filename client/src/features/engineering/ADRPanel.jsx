@@ -202,7 +202,7 @@ ${adr.evidence}
           <button 
             onClick={handleDownload}
             disabled={loading || !adr}
-            className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+            className="px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-md text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
           >
             <Download className="w-4 h-4" /> Download .md
           </button>

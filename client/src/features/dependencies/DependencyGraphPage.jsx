@@ -20,6 +20,7 @@ import { graphToFlow, couplingColor, NODE_W, NODE_H } from './graphUtils';
 import { nodeTypes, edgeTypes } from './GraphNodes';
 import { StatRow, FileDetailPanel, PackageDetailPanel } from './GraphSideBar';
 import { ExportDiagramButton } from '../../shared/components/ExportDiagramButton';
+import { useTheme } from '../../shared/context/ThemeContext';
 
 const LAYOUT_OPTIONS = [
   { key: 'clustered', label: 'Clustered', icon: LayoutGrid, tip: 'Group files by directory into visual clusters' },
@@ -28,6 +29,8 @@ const LAYOUT_OPTIONS = [
 ];
 
 export default function DependencyGraphPage() {
+  const { theme } = useTheme();
+  const isLight = theme?.id?.includes('light');
   const { repoId } = useParams();
   const navigate   = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -42,6 +45,7 @@ export default function DependencyGraphPage() {
   const [visualExternal, setVisualExternal] = useState(false);
   const [isCalculatingGraph, setIsCalculatingGraph] = useState(false);
   const [showExternalWarningModal, setShowExternalWarningModal] = useState(false);
+  const [edgeStyle, setEdgeStyle] = useState('spring');
   
   const [spread, setSpread] = useState(50);
   
@@ -99,7 +103,7 @@ export default function DependencyGraphPage() {
   useEffect(() => {
     if (!graph?.nodes) return;
     
-    const { rfNodes, rfEdges, dirColorMap: dcm } = graphToFlow(graph, selected, showExternalPackages, layoutType);
+    const { rfNodes, rfEdges, dirColorMap: dcm } = graphToFlow(graph, selected, showExternalPackages, layoutType, edgeStyle);
     setDirColorMap(dcm || new Map());
     
     if (layoutType === 'force') {
@@ -155,7 +159,7 @@ export default function DependencyGraphPage() {
       setEdges(rfEdges);
     }
 
-  }, [graph, selected, showExternalPackages, layoutType]);
+  }, [graph, selected, showExternalPackages, layoutType, edgeStyle]);
 
   /**
    * It monitors the slider value, then extracts gravity and repulsion multipliers, 
@@ -281,7 +285,7 @@ export default function DependencyGraphPage() {
                 await repositoryApi.analyze(repoId);
                 navigate(`/explore/${repoId}`);
               }}
-              className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors"
+              className="px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-lg text-sm font-medium transition-colors"
             >
               Start Analysis
             </button>
@@ -339,7 +343,7 @@ export default function DependencyGraphPage() {
                       className={`flex items-center gap-2 rounded px-2 py-1.5 transition-colors text-left ${
                         layoutType === key
                           ? 'bg-accent/20 text-accent border border-accent/40'
-                          : 'text-muted hover:text-white hover:bg-[#30363d] border border-transparent'
+                          : 'text-muted hover:text-text hover:bg-[#30363d] border border-transparent'
                       }`}
                     >
                       <Icon className="w-3.5 h-3.5 shrink-0" />
@@ -352,7 +356,7 @@ export default function DependencyGraphPage() {
                   <div className="mt-4 p-2 bg-surface/50 border border-border/50 rounded flex flex-col gap-2">
                     <div className="flex justify-between items-center">
                       <span className="text-muted text-xs font-medium">Node Spread</span>
-                      <span className="text-white font-mono text-[10px]">{spread}%</span>
+                      <span className="text-text font-mono text-[10px]">{spread}%</span>
                     </div>
                     <input 
                       type="range" 
@@ -367,7 +371,20 @@ export default function DependencyGraphPage() {
 
               <section className="border-t border-border pt-3">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-white font-medium">Externals</span>
+                  <span className="text-text font-medium">Straight Edges</span>
+                  <button
+                    onClick={() => setEdgeStyle(prev => prev === 'spring' ? 'straight' : 'spring')}
+                    className={`w-8 h-4 rounded-full transition-colors ${edgeStyle === 'straight' ? 'bg-accent' : 'bg-surface border border-border'}`}
+                  >
+                    <div className={`w-4 h-4 bg-text rounded-full shadow-sm transition-transform ${edgeStyle === 'straight' ? 'translate-x-4' : 'translate-x-0'} border`} />
+                  </button>
+                </div>
+                <p className="text-muted" style={{ fontSize: 10 }}>Toggle between springy and straight lines</p>
+              </section>
+
+              <section className="border-t border-border pt-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-text font-medium">Externals</span>
                   <div className="flex items-center gap-2">
                     {isCalculatingGraph && <Loader2 className="w-3 h-3 text-muted animate-spin" />}
                     <button
@@ -383,7 +400,7 @@ export default function DependencyGraphPage() {
                       }}
                       className={`w-8 h-4 rounded-full transition-colors ${visualExternal ? 'bg-accent' : 'bg-surface border border-border'}`}
                     >
-                      <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${visualExternal ? 'translate-x-4' : 'translate-x-0'} border`} />
+                      <div className={`w-4 h-4 bg-text rounded-full shadow-sm transition-transform ${visualExternal ? 'translate-x-4' : 'translate-x-0'} border`} />
                     </button>
                   </div>
                 </div>
@@ -446,7 +463,7 @@ export default function DependencyGraphPage() {
               {nodes.length === 0 ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
                   <Database className="w-12 h-12 text-muted" />
-                  <h2 className="text-white text-lg font-medium">No dependencies detected</h2>
+                  <h2 className="text-text text-lg font-medium">No dependencies detected</h2>
                   <p className="text-muted text-sm max-w-sm text-center">No resolvable internal dependency relationships were found.</p>
                 </div>
               ) : (
@@ -477,11 +494,11 @@ export default function DependencyGraphPage() {
                   <Controls className="bg-panel border-border" />
                   <MiniMap
                     nodeColor={n => {
-                      if (n.type === 'group') return '#ffffff08';
+                      if (n.type === 'group') return isLight ? '#00000015' : '#ffffff08';
                       return n.data?.heatColor || '#4D7EFF';
                     }}
-                    maskColor="rgba(12,14,20,0.85)"
-                    style={{ background: '#111318', border: '1px solid #1D2130' }}
+                    maskColor={isLight ? "rgba(255,255,255,0.7)" : "rgba(12,14,20,0.85)"}
+                    className="bg-panel border border-border"
                   />
                 </ReactFlow>
               )}
@@ -533,11 +550,11 @@ export default function DependencyGraphPage() {
         <div className="relative bg-surface border border-warning/30 shadow-2xl rounded-xl w-full max-w-md mx-4 overflow-hidden">
           <div className="flex items-center gap-3 px-5 py-4 border-b border-border bg-warning/5">
             <AlertTriangle className="w-5 h-5 text-warning shrink-0" />
-            <h2 className="text-base font-semibold text-white">Performance Warning</h2>
+            <h2 className="text-base font-semibold text-text">Performance Warning</h2>
           </div>
           <div className="px-5 py-4 flex flex-col gap-3">
             <p className="text-sm text-text leading-relaxed">
-              Enabling external packages will include <strong className="text-white">all npm and system dependencies</strong> in the graph.
+              Enabling external packages will include <strong className="text-text">all npm and system dependencies</strong> in the graph.
             </p>
             <p className="text-sm text-text leading-relaxed">
               Depending on your codebase size, this can add <strong className="text-warning">thousands of nodes</strong>, causing severe performance slowdowns or potentially crashing your browser tab.
@@ -549,7 +566,7 @@ export default function DependencyGraphPage() {
           <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-border bg-panel">
             <button
               onClick={() => setShowExternalWarningModal(false)}
-              className="px-4 py-1.5 text-sm text-muted hover:text-white border border-border hover:border-white/20 rounded-lg transition-colors"
+              className="px-4 py-1.5 text-sm text-muted hover:text-text border border-border hover:border-text/20 rounded-lg transition-colors"
             >
               Cancel
             </button>
@@ -563,7 +580,7 @@ export default function DependencyGraphPage() {
                   setIsCalculatingGraph(false);
                 }, 50);
               }}
-              className="px-4 py-1.5 text-sm font-medium text-white bg-warning/20 border border-warning/40 hover:bg-warning/30 rounded-lg transition-colors flex items-center gap-2"
+              className="px-4 py-1.5 text-sm font-medium text-text bg-warning/20 border border-warning/40 hover:bg-warning/30 rounded-lg transition-colors flex items-center gap-2"
             >
               <AlertTriangle className="w-3.5 h-3.5" /> Enable Anyway
             </button>

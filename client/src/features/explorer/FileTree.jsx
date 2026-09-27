@@ -148,7 +148,7 @@ function FileTreeNode({
           className={`w-full text-left flex items-center gap-1.5 py-[3px] pr-2 rounded text-xs group transition-colors ${
             isSelected 
               ? 'bg-accent/15 border-l-2 border-accent text-accent font-medium' 
-              : 'text-text/60 hover:text-text hover:bg-white/5 border-l-2 border-transparent'
+              : 'text-text/60 hover:text-text hover:bg-text/5 border-l-2 border-transparent'
           }`}
           title={node.name}
         >
@@ -185,7 +185,7 @@ function FileTreeNode({
         {open && hasChildren && (
           <div className="relative overflow-hidden">
             <span
-              className="absolute top-0 bottom-0 border-l border-white/[0.06]"
+              className="absolute top-0 bottom-0 border-l border-text/[0.06]"
               style={{ left: `${indentPx + 11}px` }}
             />
             <FileTree
@@ -213,7 +213,7 @@ function FileTreeNode({
   } ${
     isSelected
       ? 'text-text bg-accent/15 border-l-2 border-accent'
-      : 'text-text/60 hover:text-text hover:bg-white/5 border-l-2 border-transparent'
+      : 'text-text/60 hover:text-text hover:bg-text/5 border-l-2 border-transparent'
   }`;
 
   const nodeContent = (

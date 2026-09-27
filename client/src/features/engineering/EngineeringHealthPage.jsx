@@ -42,7 +42,7 @@ const RiskCard = ({ risk, repoId, navigate, onDraftAdr, onExplainAi }) => {
     : null;
 
   return (
-    <div className="rounded-xl border border-border bg-[#0d1117] flex flex-col overflow-hidden hover:border-accent/40 transition-colors shadow-lg">
+    <div className="rounded-xl border border-border bg-panel flex flex-col overflow-hidden hover:border-accent/40 transition-colors shadow-lg">
       <div className="p-5 flex-1 flex flex-col bg-gradient-to-b from-surface/50 to-transparent">
         <div className="flex items-start justify-between mb-3">
           <span className={getSeverityBadge(risk.severity)}>{risk.severity}</span>
@@ -52,7 +52,7 @@ const RiskCard = ({ risk, repoId, navigate, onDraftAdr, onExplainAi }) => {
         <p className="text-xs text-muted line-clamp-3 leading-relaxed flex-1">{risk.description || risk.message}</p>
         
         {sourceRef ? (
-          <div className="mt-4 pt-4 border-t border-white/5">
+          <div className="mt-4 pt-4 border-t border-text/5">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-medium text-text/70 uppercase tracking-widest">Target File</span>
             </div>
@@ -60,7 +60,7 @@ const RiskCard = ({ risk, repoId, navigate, onDraftAdr, onExplainAi }) => {
             <OpenSourceButton ref={sourceRef} variant="button" className="w-full justify-start truncate" />
           </div>
         ) : risk.files && risk.files.length > 0 ? (
-          <div className="mt-4 pt-4 border-t border-white/5">
+          <div className="mt-4 pt-4 border-t border-text/5">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-medium text-text/70 uppercase tracking-widest">Target Files ({risk.files.length})</span>
             </div>
@@ -252,7 +252,7 @@ const EngineeringHealthPage = () => {
             </div>
             <button 
               onClick={downloadReport}
-              className="flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 hover:bg-white/10 text-white rounded text-sm font-medium transition-colors mt-2"
+              className="flex items-center gap-2 px-3 py-1.5 bg-text/5 border border-text/10 hover:bg-text/10 text-text rounded text-sm font-medium transition-colors mt-2"
             >
               <Download className="w-4 h-4" /> Download Report
             </button>

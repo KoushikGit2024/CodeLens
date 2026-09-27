@@ -101,7 +101,7 @@ export default function AttachmentPreview({ attachment, onClose }) {
         >
           <Icon className="w-4 h-4 shrink-0" style={{ color: meta.color }} />
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold text-white truncate" title={attachment.name}>
+            <div className="text-sm font-semibold text-text truncate" title={attachment.name}>
               {attachment.name}
             </div>
             <div className="text-[10px] text-muted flex items-center gap-2 mt-0.5">
@@ -128,7 +128,7 @@ export default function AttachmentPreview({ attachment, onClose }) {
             <button
               onClick={() => downloadImage(attachment.dataUrl, attachment.name)}
               title="Download image"
-              className="text-muted hover:text-white transition-colors p-1.5 rounded hover:bg-white/5"
+              className="text-muted hover:text-text transition-colors p-1.5 rounded hover:bg-text/5"
             >
               <Download className="w-4 h-4" />
             </button>
@@ -137,7 +137,7 @@ export default function AttachmentPreview({ attachment, onClose }) {
             <button
               onClick={() => downloadText(attachment.content, attachment.name)}
               title="Download as file"
-              className="text-muted hover:text-white transition-colors p-1.5 rounded hover:bg-white/5"
+              className="text-muted hover:text-text transition-colors p-1.5 rounded hover:bg-text/5"
             >
               <Download className="w-4 h-4" />
             </button>
@@ -146,7 +146,7 @@ export default function AttachmentPreview({ attachment, onClose }) {
           {/* Close */}
           <button
             onClick={onClose}
-            className="text-muted hover:text-white transition-colors p-1.5 rounded hover:bg-white/5"
+            className="text-muted hover:text-text transition-colors p-1.5 rounded hover:bg-text/5"
           >
             <X className="w-4 h-4" />
           </button>
@@ -197,7 +197,7 @@ export default function AttachmentPreview({ attachment, onClose }) {
           {attachment.type === 'snippet' && attachment.content && (
             <div className="p-5">
               <pre
-                className="text-[12px] text-white/80 font-mono whitespace-pre-wrap break-words leading-relaxed"
+                className="text-[12px] text-text/80 font-mono whitespace-pre-wrap break-words leading-relaxed"
                 style={{ fontFamily: '"JetBrains Mono","Fira Code",monospace' }}
               >
                 {attachment.content}

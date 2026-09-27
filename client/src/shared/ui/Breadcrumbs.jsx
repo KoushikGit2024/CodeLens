@@ -34,20 +34,20 @@ export default function Breadcrumbs() {
 
   return (
     <div className="flex items-center gap-1.5 text-xs text-muted min-w-0">
-      <Link to={`/explore/${repoId}`} className="hover:text-white transition-colors flex items-center gap-1 shrink-0">
+      <Link to={`/explore/${repoId}`} className="hover:text-text transition-colors flex items-center gap-1 shrink-0">
         <Home className="w-3.5 h-3.5" />
       </Link>
       
       <ChevronRight className="w-3.5 h-3.5 opacity-50" />
       
-      <span className={!filePath ? "text-white/90 font-medium" : ""}>
+      <span className={!filePath ? "text-text/90 font-medium" : ""}>
         {label}
       </span>
 
       {filePath && (
         <>
           <ChevronRight className="w-3.5 h-3.5 opacity-50" />
-          <span className="text-white/90 font-medium truncate max-w-[300px]" title={filePath}>
+          <span className="text-text/90 font-medium truncate max-w-[300px]" title={filePath}>
             {filePath.split('/').pop()}
           </span>
         </>

@@ -117,7 +117,7 @@ export function ResizableLayout({ panels, className = "h-full w-full" }) {
               {isCollapsed ? (
                 // --- COLLAPSED STATE ---
                 <div 
-                  className="flex flex-col items-center py-4 w-full h-full cursor-pointer hover:bg-white/5 transition-colors"
+                  className="flex flex-col items-center py-4 w-full h-full cursor-pointer hover:bg-text/5 transition-colors"
                   onClick={() => toggleCollapse(index)}
                   title={`Expand ${panel.title || 'Panel'}`}
                 >

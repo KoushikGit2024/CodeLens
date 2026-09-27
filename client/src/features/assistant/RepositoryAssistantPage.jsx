@@ -110,7 +110,7 @@ export default function RepositoryAssistantPage() {
   }, []);
 
   if (repoLoading) {
-    return <div className="p-8 text-white">Loading assistant...</div>;
+    return <div className="p-8 text-text">Loading assistant...</div>;
   }
 
   if (repoError) {
@@ -127,7 +127,7 @@ export default function RepositoryAssistantPage() {
                 await repositoryApi.analyze(repoId);
                 await refetchRepo();
               }}
-              className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors"
+              className="px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-lg text-sm font-medium transition-colors"
             >
               Start Analysis
             </button>
@@ -143,7 +143,7 @@ export default function RepositoryAssistantPage() {
 
   return (
     <div 
-      className="flex-1 h-full w-full flex flex-col overflow-hidden bg-surface text-white relative"
+      className="flex-1 h-full w-full flex flex-col overflow-hidden bg-surface text-text relative"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -152,7 +152,7 @@ export default function RepositoryAssistantPage() {
         <div className="absolute inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center border-4 border-dashed border-accent m-4 rounded-xl">
           <div className="text-center animate-in zoom-in duration-200">
             <Brain className="w-16 h-16 text-accent mx-auto mb-4" style={{ animation: 'bounce 2s infinite' }} />
-            <h2 className="text-2xl font-bold text-white mb-2">Drop files to attach</h2>
+            <h2 className="text-2xl font-bold text-text mb-2">Drop files to attach</h2>
             <p className="text-muted">They will be added to your current message</p>
           </div>
         </div>
@@ -162,8 +162,7 @@ export default function RepositoryAssistantPage() {
       <div 
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto p-4 flex flex-col gap-6" 
-        style={{ background: '#0d1117' }}
+        className="flex-1 overflow-y-auto p-4 flex flex-col gap-6"
       >
         <div className="max-w-4xl w-full mx-auto flex flex-col gap-6">
           
@@ -221,13 +220,13 @@ export default function RepositoryAssistantPage() {
                   <span className="text-[10px] text-danger font-medium uppercase tracking-wider">Clear history?</span>
                   <button
                     onClick={() => { clearHistory(); setShowClearConfirm(false); }}
-                    className="text-[10px] bg-danger text-white px-2 py-0.5 rounded hover:bg-danger/80 transition-colors"
+                    className="text-[10px] bg-danger text-text px-2 py-0.5 rounded hover:bg-danger/80 transition-colors"
                   >
                     Yes
                   </button>
                   <button
                     onClick={() => setShowClearConfirm(false)}
-                    className="text-[10px] bg-surface text-white px-2 py-0.5 rounded border border-border hover:bg-panel transition-colors"
+                    className="text-[10px] bg-surface text-text px-2 py-0.5 rounded border border-border hover:bg-panel transition-colors"
                   >
                     No
                   </button>
@@ -287,7 +286,7 @@ function ThinkingIndicator({ onStop }) {
         </div>
 
         {/* Phase text + dots */}
-        <span className="text-sm text-white/70 tabular-nums" style={{ minWidth: 160 }}>
+        <span className="text-sm text-text/70 tabular-nums" style={{ minWidth: 160 }}>
           {PHASES[phase]}<span className="text-accent/60" style={{ letterSpacing: 2 }}>{dotStr}</span>
         </span>
 
@@ -330,7 +329,7 @@ function SuggestionCard({ text, onClick, disabled }) {
     <button
       onClick={() => onClick(text)}
       disabled={disabled}
-      className="bg-panel border border-border hover:border-accent/50 hover:bg-surface rounded-lg p-3 text-sm text-white/90 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      className="bg-panel border border-border hover:border-accent/50 hover:bg-surface rounded-lg p-3 text-sm text-text/90 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {text}
     </button>
@@ -344,7 +343,7 @@ function SuggestionCard({ text, onClick, disabled }) {
 function ChatMessage({ msg, repoId }) {
   if (msg.role === 'user') {
     return (
-      <div className="self-end max-w-[85%] bg-accent text-white rounded-lg px-4 py-3 text-sm shadow-md">
+      <div className="self-end max-w-[85%] bg-accent text-text rounded-lg px-4 py-3 text-sm shadow-md">
         <AiMarkdown content={msg.content} />
       </div>
     );
@@ -362,7 +361,7 @@ function ChatMessage({ msg, repoId }) {
   return (
     <div className="self-start w-full max-w-4xl bg-panel border border-border rounded-lg overflow-hidden shadow-sm">
       <div className="bg-surface/50 border-b border-border px-4 py-2 flex items-center justify-between">
-        <span className="text-xs font-medium text-white/80 flex items-center gap-1.5">
+        <span className="text-xs font-medium text-text/80 flex items-center gap-1.5">
           <Brain className="w-3.5 h-3.5 text-accent" />
           AI Interpretation
         </span>

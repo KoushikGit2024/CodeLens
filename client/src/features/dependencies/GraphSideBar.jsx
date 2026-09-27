@@ -14,7 +14,7 @@ export function StatRow({ label, value, warn = false }) {
   return (
     <div className="flex justify-between items-center py-0.5">
       <span className="text-xs text-muted">{label}</span>
-      <span className={`text-xs font-mono ${warn && value > 0 ? 'text-warning' : 'text-white'}`}>{value}</span>
+      <span className={`text-xs font-mono ${warn && value > 0 ? 'text-warning' : 'text-text'}`}>{value}</span>
     </div>
   );
 }
@@ -34,9 +34,9 @@ export function DepEntry({ dep, repoId, reverse = false }) {
    * and then it applies a link to navigate the codebase explorer.
    */
   return (
-    <div className="flex items-center gap-1.5 py-1 group border-b border-white/5 last:border-0">
+    <div className="flex items-center gap-1.5 py-1 group border-b border-text/5 last:border-0">
       <Icon className={`w-3.5 h-3.5 ${color} shrink-0`} />
-      <span className="text-white text-xs font-mono truncate flex-1" title={dep.filePath || dep.package}>{name}</span>
+      <span className="text-text text-xs font-mono truncate flex-1" title={dep.filePath || dep.package}>{name}</span>
       {dep.filePath && (
         <OpenSourceButton
           ref={makeSourceRef({ filePath: dep.filePath })}
@@ -69,7 +69,7 @@ export function FileDetailPanel({ info, repoId, graph }) {
     <div className="flex flex-col gap-4">
       <div>
         <p className="text-muted uppercase tracking-wider mb-1.5 text-[10px] font-bold">File Information</p>
-        <p className="text-white font-mono whitespace-nowrap overflow-x-auto custom-scrollbar pb-2 mb-2 text-xs bg-[#0d1117] p-2 rounded border border-border">{info.filePath}</p>
+        <p className="text-text font-mono whitespace-nowrap overflow-x-auto custom-scrollbar pb-2 mb-2 text-xs bg-panel p-2 rounded border border-border">{info.filePath}</p>
         <div className="flex gap-2">
           <OpenSourceButton
             ref={makeSourceRef({ filePath: info.filePath })}
@@ -80,7 +80,7 @@ export function FileDetailPanel({ info, repoId, graph }) {
           {info.health && info.health.severity !== 'healthy' && (
             <Link
               to={`/explore/${repoId}/health?file=${encodeURIComponent(info.filePath)}`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface/50 border border-border/50 rounded text-muted hover:text-white transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface/50 border border-border/50 rounded text-muted hover:text-text transition-colors"
             >
               <Activity className="w-3.5 h-3.5" />
               View Risks
@@ -125,7 +125,7 @@ export function FileDetailPanel({ info, repoId, graph }) {
             <AlertCircle className="w-4 h-4 text-warning" />
             <span className="text-xs font-bold text-warning uppercase tracking-wider">Involved in {nodeCycles.length} cycle{nodeCycles.length > 1 ? 's' : ''}</span>
           </div>
-          <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto custom-scrollbar pr-1 bg-[#0d1117] p-2 rounded">
+          <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto custom-scrollbar pr-1 bg-panel p-2 rounded">
             {nodeCycles.map((cycle, i) => (
               <div key={i} className="text-[10px] text-muted leading-relaxed border-l-2 border-warning/40 pl-2 font-mono">
                 {cycle.map(f => f.split('/').pop()).join(' → ')}
@@ -158,9 +158,9 @@ export function FileDetailPanel({ info, repoId, graph }) {
           <p className="text-muted uppercase tracking-wider mb-2 text-[10px] font-bold">External packages</p>
           <div className="flex flex-col gap-1">
             {info.externalPackages.map(pkg => (
-              <div key={pkg} className="flex items-center gap-2 py-1 border-b border-white/5 last:border-0">
+              <div key={pkg} className="flex items-center gap-2 py-1 border-b border-text/5 last:border-0">
                 <Package className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span className="text-white text-xs font-mono truncate">{pkg}</span>
+                <span className="text-text text-xs font-mono truncate">{pkg}</span>
               </div>
             ))}
           </div>
@@ -187,9 +187,9 @@ export function PackageDetailPanel({ nodeId, graph }) {
       <div className="flex flex-col gap-4">
         <div className="bg-panel p-4 rounded-lg border border-border">
           <p className="text-muted uppercase tracking-wider mb-2 text-[10px] font-bold">External Module</p>
-          <div className="flex items-center gap-2 bg-[#0d1117] p-2.5 rounded border border-white/5">
+          <div className="flex items-center gap-2 bg-panel p-2.5 rounded border border-text/5">
             <Package className="w-5 h-5 text-amber-400 shrink-0" />
-            <p className="text-white font-mono break-all text-sm font-semibold">{node.data.label}</p>
+            <p className="text-text font-mono break-all text-sm font-semibold">{node.data.label}</p>
           </div>
         </div>
         
@@ -198,9 +198,9 @@ export function PackageDetailPanel({ nodeId, graph }) {
             <p className="text-muted uppercase tracking-wider mb-2 text-[10px] font-bold">Imported by ({users.length})</p>
             <div className="flex flex-col max-h-64 overflow-y-auto custom-scrollbar pr-1">
               {users.map((f, i) => (
-                <div key={i} className="flex items-center gap-2 py-1.5 border-b border-white/5 last:border-0">
+                <div key={i} className="flex items-center gap-2 py-1.5 border-b border-text/5 last:border-0">
                   <File className="w-3.5 h-3.5 text-accent shrink-0" />
-                  <span className="text-white text-xs font-mono truncate">{f.split('/').pop()}</span>
+                  <span className="text-text text-xs font-mono truncate">{f.split('/').pop()}</span>
                 </div>
               ))}
             </div>

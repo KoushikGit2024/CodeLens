@@ -34,7 +34,7 @@ export default function AIStatusIndicator() {
         return {
           label: 'Sign in for AI',
           icon: <Sparkles className="w-3.5 h-3.5" />,
-          colorClass: 'text-white border-accent bg-accent/20 hover:bg-accent/40 shadow-[0_0_8px_rgba(var(--color-accent),0.3)]',
+          colorClass: 'text-text border-accent bg-accent/20 hover:bg-accent/40 shadow-[0_0_8px_rgba(var(--color-accent),0.3)]',
           title: 'Sign In Required',
           desc: 'You must be signed in to access AI-enhanced features.',
           action: { label: 'Sign In', link: '/auth/signin' },
@@ -130,11 +130,11 @@ export default function AIStatusIndicator() {
           <div className="fixed inset-0 z-40" onClick={() => setShowPopover(false)} />
           <div className="absolute right-0 top-full mt-2 w-72 bg-panel border border-border rounded-lg shadow-xl z-50 p-4 animate-in fade-in slide-in-from-top-2 duration-200">
             <div className="flex justify-between items-start mb-2">
-              <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+              <h4 className="text-sm font-semibold text-text flex items-center gap-2">
                 <span className={config.colorClass.split(' ')[0]}>{config.icon}</span>
                 {config.title}
               </h4>
-              <button onClick={() => setShowPopover(false)} className="text-muted hover:text-white">
+              <button onClick={() => setShowPopover(false)} className="text-muted hover:text-text">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -147,7 +147,7 @@ export default function AIStatusIndicator() {
               {config.available.length > 0 && (
                 <div>
                   <span className="text-[10px] uppercase font-bold tracking-wider text-muted mb-1 block">Available locally</span>
-                  <ul className="text-xs text-white/90 flex flex-col gap-1">
+                  <ul className="text-xs text-text/90 flex flex-col gap-1">
                     {config.available.map(item => (
                       <li key={item} className="flex items-center gap-1.5">
                         <span className="text-success text-[10px]">✓</span> {item}
@@ -175,7 +175,7 @@ export default function AIStatusIndicator() {
                 {config.action.link ? (
                   <a 
                     href={config.action.link}
-                    className="w-full py-1.5 bg-accent hover:bg-accent-hover text-white rounded text-xs font-medium transition-colors text-center block"
+                    className="w-full py-1.5 bg-accent hover:bg-accent-hover text-text rounded text-xs font-medium transition-colors text-center block"
                   >
                     {config.action.label}
                   </a>
@@ -185,7 +185,7 @@ export default function AIStatusIndicator() {
                       config.action.onClick();
                       setShowPopover(false);
                     }}
-                    className="w-full py-1.5 bg-surface hover:bg-surface-light border border-border text-white rounded text-xs font-medium transition-colors"
+                    className="w-full py-1.5 bg-surface hover:bg-surface-light border border-border text-text rounded text-xs font-medium transition-colors"
                   >
                     {config.action.label}
                   </button>

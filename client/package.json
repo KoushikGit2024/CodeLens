@@ -19,6 +19,7 @@
     "clsx": "^2.1.1",
     "d3-force": "^3.0.0",
     "dagre": "^0.8.5",
+    "dom-to-image-more": "^3.11.0",
     "html-to-image": "^1.11.13",
     "idb": "^8.0.3",
     "jszip": "^3.10.1",

@@ -40,18 +40,18 @@ export default function ModuleDocumentation({ docs, repoId, onGenerateAi, isGene
   return (
     <div className="space-y-8 animate-fade-in max-w-4xl mx-auto w-full pb-12">
       <header className="border-b border-border pb-6 pt-2">
-        <h1 className="text-2xl font-mono text-white mb-4 break-all flex items-center gap-3">
+        <h1 className="text-2xl font-mono text-text mb-4 break-all flex items-center gap-3">
           <FileText className="w-6 h-6 text-accent shrink-0" />
           {facts.filePath}
         </h1>
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-xs bg-surface border border-border rounded-full px-3 py-1 flex items-center gap-1.5">
             <Box className="w-3.5 h-3.5 text-muted" />
-            Component: <span className="text-white font-medium">{facts.component}</span>
+            Component: <span className="text-text font-medium">{facts.component}</span>
           </span>
           <span className="text-xs bg-surface border border-border rounded-full px-3 py-1 flex items-center gap-1.5">
             <Layers className="w-3.5 h-3.5 text-muted" />
-            Layer: <span className="text-white font-medium">{facts.layer}</span>
+            Layer: <span className="text-text font-medium">{facts.layer}</span>
           </span>
           {facts.isApiBoundary && (
             <span className="text-xs bg-success/10 border border-success/30 text-success rounded-full px-3 py-1 font-medium">
@@ -64,27 +64,27 @@ export default function ModuleDocumentation({ docs, repoId, onGenerateAi, isGene
       {/* Dependencies Grid */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-surface border border-border rounded-lg p-5">
-           <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+           <h3 className="text-sm font-semibold text-text mb-3 flex items-center gap-2">
              <LinkIcon className="w-4 h-4 text-accent" />
              Outgoing Dependencies
            </h3>
            {facts.dependencies?.length > 0 ? (
              <ul className="space-y-2 max-h-48 overflow-auto custom-scrollbar pr-2">
                {facts.dependencies.map((dep, i) => (
-                 <li key={i} className="text-xs text-muted break-all bg-[#0d1117] p-2 rounded border border-border/50">{dep}</li>
+                 <li key={i} className="text-xs text-muted break-all bg-panel p-2 rounded border border-border/50">{dep}</li>
                ))}
              </ul>
            ) : <p className="text-xs text-muted italic">No internal dependencies.</p>}
         </div>
         <div className="bg-surface border border-border rounded-lg p-5">
-           <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+           <h3 className="text-sm font-semibold text-text mb-3 flex items-center gap-2">
              <LinkIcon className="w-4 h-4 text-accent" />
              Incoming Dependents
            </h3>
            {facts.dependents?.length > 0 ? (
              <ul className="space-y-2 max-h-48 overflow-auto custom-scrollbar pr-2">
                {facts.dependents.map((dep, i) => (
-                 <li key={i} className="text-xs text-muted break-all bg-[#0d1117] p-2 rounded border border-border/50">{dep}</li>
+                 <li key={i} className="text-xs text-muted break-all bg-panel p-2 rounded border border-border/50">{dep}</li>
                ))}
              </ul>
            ) : <p className="text-xs text-muted italic">No dependents.</p>}
@@ -94,14 +94,14 @@ export default function ModuleDocumentation({ docs, repoId, onGenerateAi, isGene
       {/* AI Module Interpretation */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-medium flex items-center gap-2 text-white">
+          <h2 className="text-xl font-medium flex items-center gap-2 text-text">
             <Cpu className="w-5 h-5 text-accent" />
             Architectural Role
           </h2>
           {ai && (
             <button 
               onClick={handleCopyAi}
-              className="flex items-center gap-1 text-xs text-muted hover:text-white transition-colors cursor-pointer"
+              className="flex items-center gap-1 text-xs text-muted hover:text-text transition-colors cursor-pointer"
               title="Copy Architectural Role"
             >
               {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
@@ -128,7 +128,7 @@ export default function ModuleDocumentation({ docs, repoId, onGenerateAi, isGene
           <div className="bg-surface p-6 rounded-lg border border-border flex flex-col items-center justify-center gap-3 text-center">
             <Cpu className="w-8 h-8 text-muted" />
             <div>
-              <h3 className="text-white font-medium mb-1">AI Architectural Summary</h3>
+              <h3 className="text-text font-medium mb-1">AI Architectural Summary</h3>
               <p className="text-sm text-muted mb-4 max-w-md">Generate a human-readable summary of this file's role in the architecture, backed by Watsonx.</p>
             </div>
             <button

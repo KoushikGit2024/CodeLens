@@ -25,11 +25,12 @@ import { ToastProvider } from '../shared/context/ToastContext';
 import RepositoryShell from '../shared/layout/RepositoryShell';
 import { ErrorBoundary } from '../shared/components/ErrorBoundary';
 import { EnvironmentGuard } from '../shared/components/EnvironmentGuard';
-
+import { ThemeProvider } from '../shared/context/ThemeContext';
 export default function App() {
   return (
-    <EnvironmentGuard>
-      <ErrorBoundary>
+    <ThemeProvider>
+      <EnvironmentGuard>
+        <ErrorBoundary>
       <ToastProvider>
         <AuthProvider>
           <AIProvider>
@@ -68,5 +69,6 @@ export default function App() {
       </ToastProvider>
       </ErrorBoundary>
     </EnvironmentGuard>
+    </ThemeProvider>
   );
 }

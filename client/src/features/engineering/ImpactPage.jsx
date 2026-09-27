@@ -155,7 +155,7 @@ const ImpactNode = ({ data }) => {
         background: bg,
         backdropFilter: 'blur(6px)',
         padding: '10px',
-        color: '#CBD5E8',
+        color: `rgb(${getComputedStyle(document.documentElement).getPropertyValue('--color-text').trim()})`,
         fontFamily: 'monospace',
         fontSize: '11px',
         boxShadow: shadow,
@@ -351,7 +351,7 @@ export default function ImpactPage() {
       <div className="min-h-screen flex items-center justify-center bg-surface">
         <div className="text-center bg-panel p-8 rounded-xl border border-border">
           <AlertCircle className="w-8 h-8 text-danger mx-auto mb-3" />
-          <h2 className="text-lg font-semibold text-white mb-2">Analysis Unavailable</h2>
+          <h2 className="text-lg font-semibold text-text mb-2">Analysis Unavailable</h2>
           <p className="text-muted mb-6 text-sm">{errorMsg}</p>
           {isNotReady ? (
             <button 
@@ -359,7 +359,7 @@ export default function ImpactPage() {
                 await repositoryApi.analyze(repoId);
                 navigate(`/explore/${repoId}`);
               }}
-              className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors"
+              className="px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-lg text-sm font-medium transition-colors"
             >
               Start Analysis
             </button>
@@ -422,7 +422,7 @@ export default function ImpactPage() {
                           edges={edges}
                         />
                         <div className="bg-panel/90 border border-border rounded p-3 text-xs flex flex-col gap-2 backdrop-blur-sm shadow-xl">
-                          <div className="font-semibold text-white/90 border-b border-border/50 pb-2 mb-1">Impact Legend</div>
+                          <div className="font-semibold text-text/90 border-b border-border/50 pb-2 mb-1">Impact Legend</div>
                         <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#da3633] shadow-[0_0_8px_rgba(218,54,51,0.6)]"></div> Changed Files</div>
                         <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#d29922] shadow-[0_0_8px_rgba(210,153,34,0.6)]"></div> Directly Affected</div>
                         <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#8957e5] shadow-[0_0_8px_rgba(137,87,229,0.6)]"></div> Transitively Affected</div>
@@ -435,8 +435,8 @@ export default function ImpactPage() {
                         return (
                           <div className="export-element-legend absolute bottom-4 left-4 bg-panel/95 border border-border rounded-lg p-4 shadow-2xl backdrop-blur-sm text-xs min-w-[240px] max-w-[320px]">
                             <div className="flex items-center justify-between mb-3">
-                              <span className="font-semibold text-white truncate" title={selectedNode.fullPath}>{selectedNode.label}</span>
-                              <button onClick={() => setSelectedNode(null)} className="text-muted hover:text-white ml-2 shrink-0"><X className="w-3.5 h-3.5" /></button>
+                              <span className="font-semibold text-text truncate" title={selectedNode.fullPath}>{selectedNode.label}</span>
+                              <button onClick={() => setSelectedNode(null)} className="text-muted hover:text-text ml-2 shrink-0"><X className="w-3.5 h-3.5" /></button>
                             </div>
                             <div className="mb-3">
                               {srcRef ? (
@@ -484,7 +484,7 @@ export default function ImpactPage() {
                   placeholder="Search files..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-sm text-white placeholder-muted focus:outline-none focus:border-accent mb-4 shrink-0 transition-colors"
+                  className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-sm text-text placeholder-muted focus:outline-none focus:border-accent mb-4 shrink-0 transition-colors"
                 />
                 
                 <div className="flex-1 overflow-auto custom-scrollbar border border-border rounded bg-surface py-2 mb-4">
@@ -506,7 +506,7 @@ export default function ImpactPage() {
                 
                 <div className="flex flex-col gap-3 shrink-0 pt-3 border-t border-border/50">
                   <div className="text-xs text-muted flex justify-between items-center bg-surface/50 p-2 rounded border border-border/30">
-                    <span className="font-medium text-white/80">{selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''} selected</span>
+                    <span className="font-medium text-text/80">{selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''} selected</span>
                     {selectedFiles.length > 0 && (
                       <button onClick={() => setSelectedFiles([])} className="text-danger hover:underline hover:text-danger/80 transition-colors">Clear All</button>
                     )}
@@ -514,7 +514,7 @@ export default function ImpactPage() {
                   <button 
                     onClick={analyzeImpact}
                     disabled={selectedFiles.length === 0 || loading}
-                    className="w-full bg-accent hover:bg-accent-hover text-white px-4 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-sm"
+                    className="w-full bg-accent hover:bg-accent-hover text-text px-4 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-sm"
                   >
                     {loading && <Loader2 className="w-4 h-4 animate-spin" />}
                     {loading ? 'Calculating Blast Radius...' : 'Analyze Impact'}
