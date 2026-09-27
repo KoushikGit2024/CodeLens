@@ -4,7 +4,7 @@
  * It initiates the AI tracking hooks, then extracts structured conversational payloads, 
  * and then it applies local active-file bindings before sending queries to Watsonx.
  */
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { getAiHealth, getAiStatus, repositoryApi } from '../api';
 import { chatStore } from '../../services/storage/chat.store';
 import { useAuth } from './AuthContext';
@@ -92,6 +92,14 @@ export function useAI({ repoId, feature, contextData } = {}) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [lastFailedPrompt, setLastFailedPrompt] = useState(null);
+  const abortControllerRef = useRef(null);
+
+  const stopGeneration = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -113,15 +121,47 @@ export function useAI({ repoId, feature, contextData } = {}) {
   }, [repoId, feature]);
 
   /**
-   * It evaluates the user submission, then extracts Monaco context ranges, 
-   * and then it applies the query and history to the local API processor.
+   * It evaluates the user submission (text + optional attachments), then extracts Monaco
+   * context ranges and serialises any file / image / snippet attachments into the prompt,
+   * and then it applies the combined payload to the local API processor.
+   *
+   * @param {string}   prompt       - User-visible message text
+   * @param {object[]} attachments  - Optional array of { type, name, content, dataUrl, path }
    */
-  const sendMessage = useCallback(async (prompt) => {
-    if (!prompt.trim() || !repoId || !feature) return;
-    
-    const userMessage = { role: 'user', content: prompt.trim() };
+  const sendMessage = useCallback(async (prompt, attachments = []) => {
+    if ((!prompt?.trim() && attachments.length === 0) || !repoId || !feature) return;
+
+    // ── Build the display message (what appears in the chat bubble) ────────
+    const displayParts = [prompt?.trim()].filter(Boolean);
+    if (attachments.length > 0) {
+      const labels = attachments.map(a => {
+        if (a.type === 'image') return `[Image] ${a.name}`;
+        if (a.type === 'snippet') return `[Snippet] ${a.name}`;
+        return `[File] ${a.name}`;
+      });
+      displayParts.push(`\n\n_Attachments: ${labels.join(', ')}_`);
+    }
+    const displayText = displayParts.join('');
+
+    // ── Build the actual AI prompt (text + serialised attachments) ─────────
+    const promptParts = [prompt?.trim()].filter(Boolean);
+    for (const a of attachments) {
+      if (a.type === 'image' && a.dataUrl) {
+        promptParts.push(
+          `\n\n--- Attached Image: ${a.name} ---\n[Image data: ${a.dataUrl.slice(0, 80)}…]\n---`
+        );
+      } else if (a.content) {
+        const fence = a.type === 'snippet' ? 'text' : (a.name?.split('.').pop() || 'text');
+        promptParts.push(
+          `\n\n--- Attached ${a.type === 'snippet' ? 'Text Snippet' : `File: ${a.path || a.name}`} ---\n\`\`\`${fence}\n${a.content}\n\`\`\`\n---`
+        );
+      }
+    }
+    const fullPrompt = promptParts.join('');
+
+    const userMessage = { role: 'user', content: displayText };
     const optimisticMessages = [...messages, userMessage];
-    
+
     setMessages(optimisticMessages);
     setIsLoading(true);
     setError(null);
@@ -133,21 +173,32 @@ export function useAI({ repoId, feature, contextData } = {}) {
         startLine: contextData.startLine,
         endLine: contextData.endLine
       } : null;
-      
-      const res = await repositoryApi.askQuestion(repoId, prompt.trim(), activeContext, optimisticMessages);
-      
+
+      abortControllerRef.current = new AbortController();
+      const res = await repositoryApi.askQuestion(
+        repoId, 
+        fullPrompt, 
+        activeContext, 
+        optimisticMessages, 
+        { signal: abortControllerRef.current.signal }
+      );
+
       const finalMessages = [...optimisticMessages, { role: 'assistant', content: res.data.answer || res.data.response }];
       setMessages(finalMessages);
-      
+
       await chatStore.saveChat(repoId, feature, finalMessages);
     } catch (err) {
+      if (err.name === 'CanceledError') {
+        // User aborted the request — just silently revert the optimistic message
+        setMessages(messages);
+        return;
+      }
       console.error(err);
       setMessages(messages);
-      setLastFailedPrompt(prompt.trim());
+      setLastFailedPrompt(fullPrompt);
       setError(err.response?.data?.error || err.message || 'Failed to get AI response.');
-      
+
       if (err.response?.status === 429) {
-        setEffectiveState('quota_exhausted');
         if (refreshStatus) refreshStatus();
       } else {
         reportAiError();
@@ -155,8 +206,9 @@ export function useAI({ repoId, feature, contextData } = {}) {
       throw err;
     } finally {
       setIsLoading(false);
+      abortControllerRef.current = null;
     }
-  }, [repoId, feature, messages, contextData, reportAiError]);
+  }, [repoId, feature, messages, contextData, reportAiError, refreshStatus]);
 
   const retryLast = useCallback(() => {
     if (lastFailedPrompt) {
@@ -179,6 +231,8 @@ export function useAI({ repoId, feature, contextData } = {}) {
     lastFailedPrompt,
     sendMessage,
     retryLast,
-    clearHistory
+    clearHistory,
+    stopGeneration,
+    effectiveState
   };
 }
