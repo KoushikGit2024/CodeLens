@@ -546,9 +546,14 @@ export default function ArchitecturePage() {
                       const epRef = tryMakeSourceRef({ filePath: ep });
                       return (
                         <div key={i} className="flex items-center gap-2 group min-w-0">
-                          <File className="w-4 h-4 text-accent shrink-0" />
-                          <span className="text-xs font-mono truncate flex-1 text-text" title={ep}>{ep}</span>
-                          {epRef && <OpenSourceButton ref={epRef} variant="icon" className="opacity-0 group-hover:opacity-100" />}
+                          {epRef ? (
+                            <OpenSourceButton ref={epRef} className="flex-1 truncate" />
+                          ) : (
+                            <>
+                              <File className="w-4 h-4 text-accent shrink-0" />
+                              <span className="text-xs font-mono truncate flex-1 text-text" title={ep}>{ep}</span>
+                            </>
+                          )}
                         </div>
                       );
                     })}
@@ -613,16 +618,15 @@ export default function ArchitecturePage() {
                                       key={j}
                                       className="flex items-center justify-between gap-2 px-3 py-1 hover:bg-white/5 group min-w-0"
                                     >
-                                      <File className="w-3 h-3 text-muted shrink-0" />
-                                      <span className="text-[10px] text-muted font-mono truncate flex-1" title={file}>
-                                        {file.split('/').pop()}
-                                      </span>
-                                      {fileRef && (
-                                        <OpenSourceButton
-                                          ref={fileRef}
-                                          variant="icon"
-                                          className="opacity-0 group-hover:opacity-100"
-                                        />
+                                      {fileRef ? (
+                                        <OpenSourceButton ref={fileRef} className="flex-1 truncate text-[10px]" />
+                                      ) : (
+                                        <>
+                                          <File className="w-3 h-3 text-muted shrink-0" />
+                                          <span className="text-[10px] text-muted font-mono truncate flex-1" title={file}>
+                                            {file.split('/').pop()}
+                                          </span>
+                                        </>
                                       )}
                                     </div>
                                   );

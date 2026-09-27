@@ -160,6 +160,7 @@ export function buildRefactoringIntelligence(engineeringRiskModel, analysis, gra
       confidence: priorityInfo.confidence,
       
       summary: risk.description,
+      mainFile: risk.file || null,
       files: affectedFiles,
       fileRanges: fileRanges,
       evidence: risk.evidence,

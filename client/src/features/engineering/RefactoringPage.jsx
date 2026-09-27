@@ -83,14 +83,15 @@ const CandidateCard = ({ candidate, isSelected, onSelect, priorityLevel }) => {
         </span>
       </div>
       {candidate.files?.length > 0 && (
-        <div className="flex items-center gap-1.5 mb-1">
-          <File className="w-3 h-3 shrink-0 text-muted/50" />
-          <span className="text-[12px] font-medium text-[#CBD5E8] truncate" title={candidate.files[0]}>
-            {candidate.files[0].split('/').pop()}
-            {candidate.files.length > 1 && (
-              <span className="text-muted ml-1 font-normal">+{candidate.files.length - 1}</span>
-            )}
-          </span>
+        <div className="flex items-center gap-1.5 mb-1" onClick={(e) => e.stopPropagation()}>
+          <OpenSourceButton
+            ref={makeSourceRef({ filePath: candidate.files[0] })}
+            label={candidate.files[0].split('/').pop()}
+            className="text-[12px] font-medium text-[#CBD5E8] truncate hover:text-accent"
+          />
+          {candidate.files.length > 1 && (
+            <span className="text-muted text-[12px] font-normal shrink-0">+{candidate.files.length - 1}</span>
+          )}
         </div>
       )}
       {candidate.summary && (
@@ -473,13 +474,23 @@ function CandidateDetail({ candidate, repoId }) {
         <div className="border border-border rounded p-4 min-w-0">
           <h3 className="text-[11px] font-medium text-muted uppercase tracking-wider mb-3">Affected Files</h3>
           <ul className="space-y-1.5">
-            {candidate.files?.map(f => {
+            {[...(candidate.files || [])].sort((a, b) => {
+              if (a === candidate.mainFile) return -1;
+              if (b === candidate.mainFile) return 1;
+              return a.localeCompare(b);
+            }).map(f => {
               const range = candidate.fileRanges && candidate.fileRanges[f];
+              const isMain = candidate.mainFile === f;
               return (
-                <li key={f} className="flex items-center gap-1.5 min-w-0">
+                <li key={f} className="flex items-center gap-2 min-w-0">
                   <OpenSourceButton
                     ref={makeSourceRef({ filePath: f, startLine: range?.startLine, endLine: range?.endLine })}
                   />
+                  {isMain && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent/20 text-accent font-semibold uppercase tracking-wider shrink-0">
+                      Target File
+                    </span>
+                  )}
                 </li>
               );
             })}

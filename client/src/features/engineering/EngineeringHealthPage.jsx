@@ -5,7 +5,7 @@
  * and then it applies them into visually categorized severity cards.
  */
 import React, { useState, useEffect } from 'react';
-import { Loader2, RefreshCw, ShieldAlert, Copy, Ghost, ArrowRight, Sparkles, ExternalLink } from 'lucide-react';
+import { Loader2, RefreshCw, ShieldAlert, Copy, Ghost, ArrowRight, Sparkles, ExternalLink, Download } from 'lucide-react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { repositoryApi } from '../../shared/api';
 import AiResponse from '../../shared/components/ai/AiResponse';
@@ -51,15 +51,31 @@ const RiskCard = ({ risk, repoId, navigate, onDraftAdr, onExplainAi }) => {
         <h3 className="text-base font-semibold text-text mb-2 line-clamp-2" title={risk.title}>{risk.title}</h3>
         <p className="text-xs text-muted line-clamp-3 leading-relaxed flex-1">{risk.description || risk.message}</p>
         
-        {sourceRef && (
+        {sourceRef ? (
           <div className="mt-4 pt-4 border-t border-white/5">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-medium text-text/70 uppercase tracking-widest">Target File</span>
             </div>
             {/* Canonical navigation — no hand-built URLs */}
-            <OpenSourceButton ref={sourceRef} variant="button" className="w-full justify-start" />
+            <OpenSourceButton ref={sourceRef} variant="button" className="w-full justify-start truncate" />
           </div>
-        )}
+        ) : risk.files && risk.files.length > 0 ? (
+          <div className="mt-4 pt-4 border-t border-white/5">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-medium text-text/70 uppercase tracking-widest">Target Files ({risk.files.length})</span>
+            </div>
+            <div className="space-y-1 max-h-[80px] overflow-y-auto custom-scrollbar pr-1">
+              {risk.files.map((f, i) => {
+                const r = tryMakeSourceRef({ filePath: f });
+                return r ? (
+                  <OpenSourceButton key={i} ref={r} variant="button" className="w-full justify-start truncate py-1 text-[11px]" />
+                ) : (
+                  <div key={i} className="text-xs truncate text-muted px-2 py-1">{f}</div>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
       </div>
       <div className="bg-panel border-t border-border px-4 py-3 shrink-0 flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
@@ -179,6 +195,36 @@ const EngineeringHealthPage = () => {
     );
   }
 
+  const downloadReport = () => {
+    let md = `# Engineering Health Report\n\n`;
+    md += `**Summary**: ${model.summary}\n\n`;
+    md += `## Metrics\n`;
+    md += `- **Health Score**: ${model.overallHealthScore}/100\n`;
+    md += `- **Cyclomatic Complexity**: ${model.metrics?.totalCyclomaticComplexity || 0}\n`;
+    md += `- **Dead Code**: ${model.metrics?.unreachableFilesCount || 0} files\n`;
+    md += `- **Code Clones**: ${model.metrics?.totalClones || 0} instances\n\n`;
+    
+    md += `## Top Risks\n`;
+    model.risks.forEach(r => {
+      md += `### ${r.title}\n`;
+      md += `- **Severity**: ${r.severity}\n`;
+      md += `- **Category**: ${r.category}\n`;
+      md += `- **Description**: ${r.description}\n`;
+      if (r.file) md += `- **File**: ${r.file}\n`;
+      md += `\n`;
+    });
+
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'engineering_health_report.md';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const filteredRisks = model.risks.filter(r => !fileFilter || r.file === fileFilter);
 
   // It parses the unified risk array, then extracts specific quality issues, and then it applies them to the dead code and clone lists.
@@ -199,11 +245,19 @@ const EngineeringHealthPage = () => {
       
       <div className="p-8 pt-2">
         <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-text">Engineering Health</h1>
-          <p className="mt-2 text-muted">{model.summary}</p>
-        </div>
-        <div className="text-right">
+          <div className="flex items-center gap-6">
+            <div>
+              <h1 className="text-3xl font-bold text-text">Engineering Health</h1>
+              <p className="mt-2 text-muted">{model.summary}</p>
+            </div>
+            <button 
+              onClick={downloadReport}
+              className="flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 hover:bg-white/10 text-white rounded text-sm font-medium transition-colors mt-2"
+            >
+              <Download className="w-4 h-4" /> Download Report
+            </button>
+          </div>
+          <div className="text-right">
           <div className="text-sm font-medium text-muted uppercase tracking-wider mb-1">Health Score</div>
           <div className={`text-5xl font-bold ${getScoreColor(model.score)}`}>
             {model.score}

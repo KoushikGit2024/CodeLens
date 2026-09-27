@@ -427,7 +427,13 @@ export default function ImpactPage() {
                               <span className="font-semibold text-white truncate" title={selectedNode.fullPath}>{selectedNode.label}</span>
                               <button onClick={() => setSelectedNode(null)} className="text-muted hover:text-white ml-2 shrink-0"><X className="w-3.5 h-3.5" /></button>
                             </div>
-                            <div className="text-muted mb-3">{selectedNode.fullPath}</div>
+                            <div className="mb-3">
+                              {srcRef ? (
+                                <OpenSourceButton ref={srcRef} label={selectedNode.fullPath} className="text-muted hover:text-accent font-mono text-[10px]" />
+                              ) : (
+                                <div className="text-muted text-[10px] font-mono">{selectedNode.fullPath}</div>
+                              )}
+                            </div>
                             <div className="flex flex-col gap-2">
                               {srcRef && <OpenSourceButton ref={srcRef} variant="button" label="Open in Explorer" />}
                               <Link

@@ -175,7 +175,7 @@ ${adr.evidence}
                 value={adr.evidence || ''} 
                 onChange={(e) => handleChange('evidence', e.target.value)}
                 rows={2}
-                className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm text-text focus:outline-none focus:border-accent custom-scrollbar text-muted"
+                className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-accent custom-scrollbar text-muted"
               />
             </div>
           </div>

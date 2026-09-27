@@ -8,7 +8,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import ReactFlow, { Background, Controls, MiniMap, useNodesState, useEdgesState } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Loader2, AlertCircle, Database, GitBranch, Layers, Zap, LayoutGrid, Filter, Info } from 'lucide-react';
+import { Loader2, AlertCircle, AlertTriangle, Database, GitBranch, Layers, Zap, LayoutGrid, Filter, Info } from 'lucide-react';
 import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide, forceX, forceY } from 'd3-force';
 
 import { repositoryApi } from '../../shared/api';
@@ -38,6 +38,9 @@ export default function DependencyGraphPage() {
   const [fileInfo, setFileInfo] = useState(null);
   const [infoLoading, setInfoLoading] = useState(false);
   const [showExternalPackages, setShowExternalPackages] = useState(false);
+  const [visualExternal, setVisualExternal] = useState(false);
+  const [isCalculatingGraph, setIsCalculatingGraph] = useState(false);
+  const [showExternalWarningModal, setShowExternalWarningModal] = useState(false);
   
   const [spread, setSpread] = useState(50);
   
@@ -298,7 +301,8 @@ export default function DependencyGraphPage() {
   }
 
   return (
-    <ResizableLayout
+    <>
+      <ResizableLayout
       panels={[
         {
           id: 'controls',
@@ -360,16 +364,28 @@ export default function DependencyGraphPage() {
               </section>
 
               <section className="border-t border-border pt-3">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-1">
                   <span className="text-white font-medium">Externals</span>
-                  <button
-                    onClick={() => setShowExternalPackages(p => !p)}
-                    className={`w-8 h-4 rounded-full transition-colors ${showExternalPackages ? 'bg-accent' : 'bg-surface border border-border'}`}
-                  >
-                    <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${showExternalPackages ? 'translate-x-4' : 'translate-x-0'} border`} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {isCalculatingGraph && <Loader2 className="w-3 h-3 text-muted animate-spin" />}
+                    <button
+                      onClick={() => {
+                        if (!visualExternal) {
+                          // Turning ON — show confirmation modal first
+                          setShowExternalWarningModal(true);
+                        } else {
+                          // Turning OFF — no confirmation needed
+                          setVisualExternal(false);
+                          setShowExternalPackages(false);
+                        }
+                      }}
+                      className={`w-8 h-4 rounded-full transition-colors ${visualExternal ? 'bg-accent' : 'bg-surface border border-border'}`}
+                    >
+                      <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${visualExternal ? 'translate-x-4' : 'translate-x-0'} border`} />
+                    </button>
+                  </div>
                 </div>
-                <p className="text-muted mt-1" style={{ fontSize: 10 }}>Show npm/system packages</p>
+                <p className="text-muted" style={{ fontSize: 10 }}>Show npm/system packages</p>
               </section>
 
               {/* Reverted back to Directories map */}
@@ -496,5 +512,52 @@ export default function DependencyGraphPage() {
         }
       ]}
     />
+
+    {/* External Packages Warning Modal */}
+    {showExternalWarningModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="absolute inset-0 bg-background/60 backdrop-blur-sm" onClick={() => setShowExternalWarningModal(false)} />
+        <div className="relative bg-surface border border-warning/30 shadow-2xl rounded-xl w-full max-w-md mx-4 overflow-hidden">
+          <div className="flex items-center gap-3 px-5 py-4 border-b border-border bg-warning/5">
+            <AlertTriangle className="w-5 h-5 text-warning shrink-0" />
+            <h2 className="text-base font-semibold text-white">Performance Warning</h2>
+          </div>
+          <div className="px-5 py-4 flex flex-col gap-3">
+            <p className="text-sm text-text leading-relaxed">
+              Enabling external packages will include <strong className="text-white">all npm and system dependencies</strong> in the graph.
+            </p>
+            <p className="text-sm text-text leading-relaxed">
+              Depending on your codebase size, this can add <strong className="text-warning">thousands of nodes</strong>, causing severe performance slowdowns or potentially crashing your browser tab.
+            </p>
+            <p className="text-xs text-muted">
+              Proceed only if you understand the risk. You can turn it back off at any time.
+            </p>
+          </div>
+          <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-border bg-panel">
+            <button
+              onClick={() => setShowExternalWarningModal(false)}
+              className="px-4 py-1.5 text-sm text-muted hover:text-white border border-border hover:border-white/20 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                setShowExternalWarningModal(false);
+                setVisualExternal(true);
+                setIsCalculatingGraph(true);
+                setTimeout(() => {
+                  setShowExternalPackages(true);
+                  setIsCalculatingGraph(false);
+                }, 50);
+              }}
+              className="px-4 py-1.5 text-sm font-medium text-white bg-warning/20 border border-warning/40 hover:bg-warning/30 rounded-lg transition-colors flex items-center gap-2"
+            >
+              <AlertTriangle className="w-3.5 h-3.5" /> Enable Anyway
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
