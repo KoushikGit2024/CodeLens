@@ -15,7 +15,8 @@ export const RISK_CATEGORIES = {
   COUPLING: 'COUPLING',
   DEPENDENCY: 'DEPENDENCY',
   ARCHITECTURE: 'ARCHITECTURE',
-  QUALITY: 'QUALITY'
+  QUALITY: 'QUALITY',
+  CHURN: 'CHURN'
 };
 
 export const SEVERITY = {
@@ -31,7 +32,11 @@ const THRESHOLDS = {
   FAN_IN_WARNING: 10,
   FAN_OUT_WARNING: 15,
   COMPLEXITY_HIGH: 15,
-  COMPLEXITY_WARNING: 10
+  COMPLEXITY_WARNING: 10,
+  CHURN_HIGH: 60,
+  CHURN_WARNING: 30,
+  COMPOSITE_RISK_HIGH: 70,
+  COMPOSITE_RISK_CRITICAL: 85
 };
 
 const SEVERITY_PENALTY = {
@@ -316,6 +321,57 @@ function determineHotspots(risks) {
 }
 
 /**
+ * It reads the gitChurn data from the analysis object, then extracts files
+ * exceeding churn thresholds, and then it applies composite risk scoring
+ * to surface the highest-priority files for review.
+ */
+function analyzeChurnRisks(analysis) {
+  const risks = [];
+  const gitChurn = analysis?.gitChurn;
+  if (!gitChurn || !gitChurn.churnScores) return risks;
+
+  for (const [filePath, churnScore] of Object.entries(gitChurn.churnScores)) {
+    // Skip .git files
+    if (filePath.startsWith('.git/')) continue;
+
+    // Find matching file node to get composite risk
+    const fileNode = analysis.files?.find(f => f.filePath === filePath);
+    const compositeRisk = fileNode?.metrics?.compositeRisk || churnScore;
+
+    if (compositeRisk >= THRESHOLDS.COMPOSITE_RISK_CRITICAL) {
+      risks.push(createRisk(
+        RISK_CATEGORIES.CHURN,
+        SEVERITY.CRITICAL,
+        'Critical Composite Risk (High Churn + High Complexity)',
+        `This file has a composite risk score of ${compositeRisk}/100, driven by frequent changes (churn: ${churnScore}/100) combined with high cyclomatic complexity. It is the most likely source of regressions.`,
+        filePath,
+        { churnScore, compositeRisk, commitsModified: gitChurn.fileChurn?.[filePath] || 0 }
+      ));
+    } else if (compositeRisk >= THRESHOLDS.COMPOSITE_RISK_HIGH) {
+      risks.push(createRisk(
+        RISK_CATEGORIES.CHURN,
+        SEVERITY.HIGH,
+        'High Composite Risk (Churn + Complexity)',
+        `This file has a composite risk score of ${compositeRisk}/100 (churn: ${churnScore}/100). Frequently modified complex files are hotspots for bugs.`,
+        filePath,
+        { churnScore, compositeRisk, commitsModified: gitChurn.fileChurn?.[filePath] || 0 }
+      ));
+    } else if (churnScore >= THRESHOLDS.CHURN_HIGH) {
+      risks.push(createRisk(
+        RISK_CATEGORIES.CHURN,
+        SEVERITY.WARNING,
+        'High Churn File',
+        `This file is modified very frequently (churn score: ${churnScore}/100). Frequent changes may indicate unstable design or ongoing development.`,
+        filePath,
+        { churnScore, commitsModified: gitChurn.fileChurn?.[filePath] || 0 }
+      ));
+    }
+  }
+
+  return risks;
+}
+
+/**
  * It orchestrates the sub-analyzers, then extracts all potential failures, 
  * and then it applies aggregation to build the comprehensive risk profile.
  */
@@ -325,7 +381,8 @@ export function buildEngineeringRiskModel(analysis, graph, architecture) {
     ...analyzeCouplingRisks(analysis, graph),
     ...analyzeDependencyRisks(graph),
     ...analyzeArchitectureRisks(architecture),
-    ...analyzeCodeQualityRisks(analysis, graph)
+    ...analyzeCodeQualityRisks(analysis, graph),
+    ...analyzeChurnRisks(analysis)
   ];
 
   const { score, riskLevel } = calculateScoreAndLevel(risks);
@@ -338,6 +395,23 @@ export function buildEngineeringRiskModel(analysis, graph, architecture) {
     warning:  risks.filter(r => r.severity === SEVERITY.WARNING).length,
   };
 
+  // Build a sorted top-churn table for the UI (high churn + high composite)
+  const churnTable = analysis?.gitChurn?.churnScores
+    ? Object.entries(analysis.gitChurn.churnScores)
+        .filter(([fp]) => !fp.startsWith('.git/'))
+        .map(([filePath, churnScore]) => {
+          const fileNode = analysis.files?.find(f => f.filePath === filePath);
+          return {
+            filePath,
+            churnScore,
+            compositeRisk: fileNode?.metrics?.compositeRisk || churnScore,
+            commitsModified: analysis.gitChurn.fileChurn?.[filePath] || 0,
+          };
+        })
+        .sort((a, b) => b.compositeRisk - a.compositeRisk)
+        .slice(0, 20)
+    : [];
+
   return {
     summary: `Identified ${risks.length} engineering risk(s) across the repository.`,
     score,
@@ -345,6 +419,8 @@ export function buildEngineeringRiskModel(analysis, graph, architecture) {
     metrics,
     hotspots,
     risks,
+    churnTable,
+    gitChurnAvailable: !!analysis?.gitChurn,
     recommendations: [] 
   };
 }

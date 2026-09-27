@@ -46,6 +46,7 @@ export default function DependencyGraphPage() {
   const [isCalculatingGraph, setIsCalculatingGraph] = useState(false);
   const [showExternalWarningModal, setShowExternalWarningModal] = useState(false);
   const [edgeStyle, setEdgeStyle] = useState('spring');
+  const [showChurn, setShowChurn] = useState(false);
   
   const [spread, setSpread] = useState(50);
   
@@ -103,7 +104,10 @@ export default function DependencyGraphPage() {
   useEffect(() => {
     if (!graph?.nodes) return;
     
-    const { rfNodes, rfEdges, dirColorMap: dcm } = graphToFlow(graph, selected, showExternalPackages, layoutType, edgeStyle);
+    const { rfNodes, rfEdges, dirColorMap: dcm } = graphToFlow(
+      graph, selected, showExternalPackages, layoutType, edgeStyle, 
+      { showChurn, churnData: graph.gitChurn }
+    );
     setDirColorMap(dcm || new Map());
     
     if (layoutType === 'force') {
@@ -406,6 +410,21 @@ export default function DependencyGraphPage() {
                 </div>
                 <p className="text-muted" style={{ fontSize: 10 }}>Show npm/system packages</p>
               </section>
+
+              {graph?.gitChurn && (
+                <section className="border-t border-border pt-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-medium text-orange-400">Git Churn</span>
+                    <button
+                      onClick={() => setShowChurn(!showChurn)}
+                      className={`w-8 h-4 rounded-full transition-colors ${showChurn ? 'bg-orange-500' : 'bg-surface border border-border'}`}
+                    >
+                      <div className={`w-4 h-4 bg-text rounded-full shadow-sm transition-transform ${showChurn ? 'translate-x-4' : 'translate-x-0'} border`} />
+                    </button>
+                  </div>
+                  <p className="text-muted" style={{ fontSize: 10 }}>Overlay churn risk on nodes</p>
+                </section>
+              )}
 
               {/* Reverted back to Directories map */}
               {layoutType === 'clustered' && dirColorMap.size > 0 && (

@@ -154,7 +154,9 @@ export function getClusteredLayout(fileNodes, edges, dirColorMap) {
  * It maps the raw analysis nodes to the visual schema, then extracts the coupling metrics, 
  * and then it applies fading logic and routing to the selected layout generator.
  */
-export function graphToFlow(graph, selectedId, showExternalPackages, layoutType, edgeStyle = 'spring') {
+export function graphToFlow(graph, selectedId, showExternalPackages, layoutType, edgeStyle = 'spring', options = {}) {
+  const { showChurn = false, churnData = null } = options;
+
   let fileNodes = graph.nodes.filter(n => n.type === 'fileNode' || n.type === 'file');
   let pkgNodes = showExternalPackages ? graph.nodes.filter(n => n.type === 'moduleNode' || n.type === 'package') : [];
   const renderableNodes = [...fileNodes, ...pkgNodes];
@@ -195,6 +197,10 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
     const shortDir = dir === '(root)' ? '' : dir.split('/').pop();
     const degree = degreeMap.get(n.id) || 0;
     const isFaded = selectedId ? !connectedNodes.has(n.id) : false;
+
+    // Churn data keyed by filePath (without the 'file:' prefix)
+    const churnScore = churnData?.churnScores?.[rawPath] || 0;
+    const compositeRisk = n.data?.metrics?.compositeRisk || churnScore;
     
     return {
       id: n.id,
@@ -212,7 +218,11 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
         isCycling: graph.cycles?.some(cycle => cycle.includes(n.id)) || false,
         isIsolated: graph.isolatedFiles?.includes(n.id) || false,
         findingsCount: n.data?.findingsCount || { critical: 0, warning: 0 },
-        healthScore: n.data?.healthScore || 100
+        healthScore: n.data?.healthScore || 100,
+        // Churn overlay
+        showChurn,
+        churnScore,
+        compositeRisk,
       },
       style: { width: NODE_W, height: NODE_H },
       position: { x: 0, y: 0 },

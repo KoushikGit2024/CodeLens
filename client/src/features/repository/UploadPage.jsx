@@ -18,7 +18,7 @@ const WARN_SIZE_MB    = 50;    // warn if total raw size > this many MB
 
 // ── Default paths to exclude when reading a folder ───────────────────────────
 const DEFAULT_IGNORES = new Set([
-  'node_modules', '.git', 'dist', 'build', 'coverage',
+  'node_modules', 'dist', 'build', 'coverage',
   '.next', 'out', '.cache', '__pycache__', '.venv', 'venv',
   '.DS_Store', 'Thumbs.db',
 ]);
@@ -427,7 +427,7 @@ export default function UploadPage() {
               <div className="mt-4 pt-4 border-t border-border/50 shrink-0">
                 <label className="block text-sm font-medium text-text mb-1">Additional Ignore Patterns</label>
                 <p className="text-xs text-muted mb-2">
-                  Standard directories like .git, node_modules, and dist are ignored automatically. Add any extra comma-separated folders to skip.
+                  Standard directories like node_modules and dist are ignored automatically. The .git folder is preserved for churn analysis. Add any extra comma-separated folders to skip.
                 </p>
                 <input
                   type="text"
@@ -438,7 +438,7 @@ export default function UploadPage() {
                   className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm placeholder-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-colors"
                 />
                 <p className="text-[11px] text-muted mt-1.5 leading-relaxed">
-                  By default, <span className="font-mono text-text/80 bg-panel px-1 py-0.5 rounded border border-border/50">.git, node_modules, dist, build, coverage, .next, out</span> are excluded.
+                  By default, <span className="font-mono text-text/80 bg-panel px-1 py-0.5 rounded border border-border/50">node_modules, dist, build, coverage, .next, out</span> are excluded.
                 </p>
               </div>
 

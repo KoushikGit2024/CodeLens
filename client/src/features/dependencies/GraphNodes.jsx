@@ -21,6 +21,19 @@ export const CustomNode = ({ data }) => {
   const hasCritical = data.findingsCount?.critical > 0;
   const shadowGlow = hasCritical && !data.isFaded ? '0 0 12px rgba(224, 82, 82, 0.35)' : 'none';
 
+  // Churn overlay support
+  const churnScore = data.churnScore || 0;
+  const compositeRisk = data.compositeRisk || 0;
+  const showChurn = !!data.showChurn;
+  const churnBorderThickness = showChurn && churnScore > 0
+    ? Math.max(2, Math.round((churnScore / 100) * 6))
+    : 0;
+  const churnColor =
+    compositeRisk >= 85 ? '#ef4444' :
+    compositeRisk >= 70 ? '#f97316' :
+    churnScore >= 30    ? '#eab308' :
+    null;
+
   /**
    * It evaluates the component props, then extracts the short directory strings, 
    * and then it applies the original clean layout aesthetics alongside the new risk badges.
@@ -33,15 +46,22 @@ export const CustomNode = ({ data }) => {
   const mutedColor    = cssVar('--color-muted');
   const dangerColor   = cssVar('--color-danger');
 
+    const defaultBorder = data.isFocused
+      ? `2px solid ${data.heatColor || accentColor}`
+      : `1px solid ${(data.heatColor || borderColor)}${data.isFaded ? '18' : '55'}`;
+
   return (
     <div
       className="shadow-md rounded transition-all duration-150 relative"
       style={{
         opacity: data.isFaded ? 0.10 : 1,
         width: w,
-        border: data.isFocused
-          ? `2px solid ${data.heatColor || accentColor}`
-          : `1px solid ${(data.heatColor || borderColor)}${data.isFaded ? '18' : '55'}`,
+        borderTop: defaultBorder,
+        borderLeft: defaultBorder,
+        borderRight: defaultBorder,
+        borderBottom: showChurn && churnColor
+          ? `${churnBorderThickness}px solid ${churnColor}`
+          : defaultBorder,
         background: data.isFocused ? surfaceColor : panelColor,
         boxShadow: shadowGlow,
       }}
@@ -104,6 +124,20 @@ export const CustomNode = ({ data }) => {
           style={{ position: 'absolute', top: -3, right: -3, width: 10, height: 10, borderRadius: '50%', background: mutedColor, boxShadow: `0 0 0 2px ${surfaceColor}` }} 
           title="Isolated File" 
         />
+      )}
+
+      {/* Churn flame badge for high composite risk */}
+      {showChurn && compositeRisk >= 70 && (
+        <div
+          style={{
+            position: 'absolute', top: -5, left: -5,
+            fontSize: 10, lineHeight: 1,
+            title: `Churn: ${churnScore}/100 | Composite Risk: ${compositeRisk}/100`
+          }}
+          title={`Churn: ${churnScore}/100 | Composite Risk: ${compositeRisk}/100`}
+        >
+          {compositeRisk >= 85 ? '🔴' : '🟠'}
+        </div>
       )}
     </div>
   );

@@ -132,7 +132,7 @@ export const repositoryApi = {
       let processedCount = 0;
       for (const originalPath of files) {
         const filePath = commonRoot ? originalPath.substring(commonRoot.length) : originalPath;
-        const defaultIgnores = ['.git', 'node_modules', 'dist', 'build', 'coverage', '.next', 'out'];
+        const defaultIgnores = ['node_modules', 'dist', 'build', 'coverage', '.next', 'out'];
         const pathSegments = filePath.split('/');
         const shouldIgnore = ignorePatterns.some(p => filePath.includes(p)) || 
                              defaultIgnores.some(ignoreDir => pathSegments.includes(ignoreDir));
@@ -145,6 +145,8 @@ export const repositoryApi = {
             const mimeType = ext === 'jpg' ? 'jpeg' : ext;
             const base64 = await zip.files[originalPath].async('base64');
             content = `data:image/${mimeType};base64,${base64}`;
+          } else if (filePath.startsWith('.git/')) {
+            content = await zip.files[originalPath].async('uint8array');
           } else {
             content = await zip.files[originalPath].async('string');
           }
