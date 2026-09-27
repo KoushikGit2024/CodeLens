@@ -9,6 +9,7 @@ import RepositoryAssistantPage from '../features/assistant/RepositoryAssistantPa
 import ImpactPage from '../features/engineering/ImpactPage';
 import EngineeringHealthPage from '../features/engineering/EngineeringHealthPage';
 import RefactoringPage from '../features/engineering/RefactoringPage';
+import BookmarksPage from '../features/bookmarks/BookmarksPage';
 import RepositoryIntelligencePage from '../features/repository/RepositoryIntelligencePage';
 import HelpPage from '../features/help/HelpPage';
 import { AuthProvider } from '../shared/context/AuthContext';
@@ -56,6 +57,7 @@ export default function App() {
                 <Route path="impact" element={<ImpactPage />} />
                 <Route path="health" element={<EngineeringHealthPage />} />
                 <Route path="refactoring" element={<RefactoringPage />} />
+                <Route path="bookmarks" element={<BookmarksPage />} />
               </Route>
 
               <Route path="/help" element={<HelpPage />} />

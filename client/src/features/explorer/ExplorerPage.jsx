@@ -22,7 +22,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
-import { ChevronRight, ChevronDown, File, Folder, Code2, Play, Search, Network, Brain, Database, FileText, X, MessageSquare, Send, AlertTriangle, Loader2, RefreshCw, Image as ImageIcon, Copy, Check, FolderTree, Sparkles } from 'lucide-react';
+import { ChevronRight, ChevronDown, File, Folder, Code2, Play, Search, Network, Brain, Database, FileText, X, MessageSquare, Send, AlertTriangle, Loader2, RefreshCw, Image as ImageIcon, Copy, Check, FolderTree, Sparkles, Bookmark } from 'lucide-react';
 import MonacoEditor from '@monaco-editor/react';
 import { repositoryApi } from '../../shared/api';
 import { ResizableLayout } from '../../shared/components/ResizableLayout';
@@ -33,6 +33,7 @@ import AiMarkdown from '../../shared/components/ai/AiMarkdown';
 import ModuleDocumentation from './ModuleDocumentation';
 import AnalysisProgress from '../repository/AnalysisProgress';
 import { useAIState } from '../../shared/context/AIContext';
+import { useBookmark, addBookmark, removeBookmark, updateNote } from '../../services/storage/bookmark.store';
 
 // ── Monaco language map ───────────────────────────────────────────────────────
 // Maps file extensions to Monaco language IDs.
@@ -462,6 +463,29 @@ export default function ExplorerPage() {
  */
 function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMount, viewMode, setViewMode, moduleDocs, onGenerateAi, isGeneratingAi }) {
   const [copied, setCopied] = useState(false);
+  const bookmark = useBookmark(repoId, filePath);
+  const [showNoteEditor, setShowNoteEditor] = useState(false);
+  const [editNote, setEditNote] = useState('');
+
+  useEffect(() => {
+    setShowNoteEditor(false);
+  }, [filePath]);
+
+  const handleToggleBookmark = () => {
+    if (bookmark) {
+      removeBookmark(repoId, filePath);
+      setShowNoteEditor(false);
+    } else {
+      addBookmark(repoId, filePath, '');
+      setEditNote('');
+      setShowNoteEditor(true);
+    }
+  };
+  
+  const handleSaveNote = () => {
+    updateNote(repoId, filePath, editNote);
+    setShowNoteEditor(false);
+  };
 
   const handleCopyCode = () => {
     if (fileContent?.content) {
@@ -497,7 +521,14 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
           Documentation
         </button>
       </div>
-      <div className="flex-1 flex justify-end">
+      <div className="flex-1 flex justify-end gap-2">
+        <button
+          onClick={handleToggleBookmark}
+          className={`flex items-center gap-1.5 px-2 py-1 mb-1 rounded text-xs transition-colors ${bookmark ? 'text-accent hover:bg-accent/10' : 'text-muted hover:text-white hover:bg-white/10'}`}
+          title={bookmark ? "Remove bookmark" : "Bookmark this file"}
+        >
+          <Bookmark className="w-3.5 h-3.5" fill={bookmark ? "currentColor" : "none"} />
+        </button>
         {viewMode === 'source' && fileContent?.content && (
           <button 
             onClick={handleCopyCode}
@@ -584,9 +615,43 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
     }
   }
 
+  const noteBanner = (bookmark || showNoteEditor) && (
+    <div className="bg-panel/50 border-b border-border px-4 py-2 shrink-0 text-sm">
+      {showNoteEditor ? (
+        <div className="flex gap-2">
+          <input 
+            type="text" 
+            value={editNote}
+            onChange={e => setEditNote(e.target.value)}
+            placeholder="Add a personal note about this file..."
+            className="flex-1 bg-surface border border-border rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-accent"
+            autoFocus
+            onKeyDown={e => { if (e.key === 'Enter') handleSaveNote(); if (e.key === 'Escape') setShowNoteEditor(false); }}
+          />
+          <button onClick={handleSaveNote} className="px-2 py-1 bg-accent/10 text-accent rounded hover:bg-accent/20 text-xs">Save</button>
+          <button onClick={() => setShowNoteEditor(false)} className="px-2 py-1 text-muted hover:text-white text-xs">Cancel</button>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between group/note">
+          <p className="text-muted text-xs truncate max-w-xl">
+            <span className="font-medium text-accent mr-2">Note:</span>
+            {bookmark.note || <span className="opacity-50 italic">No note added.</span>}
+          </p>
+          <button 
+            onClick={() => { setEditNote(bookmark.note || ''); setShowNoteEditor(true); }}
+            className="text-[10px] text-muted hover:text-white opacity-0 group-hover/note:opacity-100 transition-opacity"
+          >
+            Edit Note
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="flex-1 flex flex-col h-full w-full relative">
       {header}
+      {noteBanner}
       {content}
     </div>
   );

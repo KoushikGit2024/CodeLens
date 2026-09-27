@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronRight, Folder, FolderOpen, FileCode } from 'lucide-react';
+import { ChevronRight, Folder, FolderOpen, FileCode, Bookmark } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { useBookmark } from '../../services/storage/bookmark.store';
 
 // Maps file extensions to a colour class for the file icon
 const EXT_COLOR = {
@@ -81,6 +83,9 @@ function FileTreeNode({
   node, depth, selectedPath, onSelectFile, 
   mode, selectedFiles, onToggleFile, searchTerm, highlightMatch 
 }) {
+  const { repoId } = useParams();
+  const bookmark = useBookmark(repoId, node.type === 'file' ? node.path : null);
+
   const cleanSelectedPath = selectedPath ? decodeURIComponent(selectedPath).replace(/\/$/, '') : null;
   const cleanNodePath = node.path.replace(/\/$/, '');
   
@@ -229,11 +234,14 @@ function FileTreeNode({
         style={{ color: isSelected || isChecked ? iconColor : iconColor + 'aa' }}
       />
       
-      <span className={`whitespace-nowrap min-w-0 font-mono text-[11px] truncate ${
+      <span className={`whitespace-nowrap min-w-0 font-mono text-[11px] truncate flex-1 ${
         isSelected || isChecked ? 'text-text font-medium' : 'group-hover:text-text'
       }`}>
         {highlightMatch(node.name, searchTerm)}
       </span>
+      {bookmark && (
+        <Bookmark className="w-3 h-3 text-accent shrink-0 ml-1 opacity-80" fill="currentColor" />
+      )}
     </>
   );
 
