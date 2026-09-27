@@ -19,6 +19,7 @@ import ContextBreadcrumbs from '../../shared/components/ContextBreadcrumbs';
 import { graphToFlow, couplingColor, NODE_W, NODE_H } from './graphUtils';
 import { nodeTypes, edgeTypes } from './GraphNodes';
 import { StatRow, FileDetailPanel, PackageDetailPanel } from './GraphSideBar';
+import { ExportDiagramButton } from '../../shared/components/ExportDiagramButton';
 
 const LAYOUT_OPTIONS = [
   { key: 'clustered', label: 'Clustered', icon: LayoutGrid, tip: 'Group files by directory into visual clusters' },
@@ -58,6 +59,7 @@ export default function DependencyGraphPage() {
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
   const simRef = useRef(null);
+  const graphRef = useRef(null);
 
   /**
    * It requests the dependency graph, then extracts the mapped arrays from the store, 
@@ -424,12 +426,17 @@ export default function DependencyGraphPage() {
           minWidth: 300,
           collapsible: false,
           content: (
-            <div className="relative bg-surface shadow-inner flex flex-col h-full w-full">
-              <ContextBreadcrumbs 
-                domain="Dependency Graph" 
-                activeNode={selected} 
-                onClear={() => setSelected(null)} 
-              />
+            <div ref={graphRef} className="relative bg-surface shadow-inner flex flex-col h-full w-full">
+              <div className="export-element-breadcrumbs shrink-0">
+                <ContextBreadcrumbs 
+                  domain="Dependency Graph" 
+                  activeNode={selected} 
+                  onClear={() => setSelected(null)} 
+                />
+              </div>
+              <div className="export-element-breadcrumbs absolute top-3 right-3 z-30 pointer-events-auto">
+                <ExportDiagramButton elementRef={graphRef} filename="dependency-graph" />
+              </div>
               {nodes.length === 0 ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
                   <Database className="w-12 h-12 text-muted" />

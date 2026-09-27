@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { RefreshCw, AlertCircle, Loader2, File, Box, Wrench, Layers, Cpu, Sparkles, GitBranch, ChevronDown, ChevronRight } from 'lucide-react';
 import { ResizableLayout } from '../../shared/components/ResizableLayout';
@@ -14,6 +14,7 @@ import MermaidViewer from './MermaidViewer';
 import { toMermaid } from '../../services/analyzer/advanced/mermaid.transformer';
 import OpenSourceButton from '../../shared/components/OpenSourceButton';
 import { tryMakeSourceRef } from '../../shared/navigation/sourceRef';
+import { ExportDiagramButton } from '../../shared/components/ExportDiagramButton';
 
 // ── Layer color map ───────────────────────────────────────────────────────
 
@@ -335,6 +336,7 @@ export default function ArchitecturePage() {
   const [aiError, setAiError] = useState(null);
   const [expandedComponents, setExpandedComponents] = useState(new Set());
   const [viewMode, setViewMode] = useState('interactive');
+  const diagramRef = useRef(null);
 
   const loadArchitecture = async () => {
     setLoading(true);
@@ -650,27 +652,30 @@ export default function ArchitecturePage() {
           minWidth: 300,
           collapsible: false,
           content: (
-            <main className="flex-1 overflow-auto bg-surface shadow-inner relative flex justify-center custom-scrollbar h-full w-full">
-              <div className="absolute top-4 left-4 z-20 pointer-events-auto">
+            <main ref={diagramRef} className="flex-1 overflow-auto bg-surface shadow-inner relative flex justify-center custom-scrollbar h-full w-full">
+              <div className="export-element-breadcrumbs absolute top-4 left-4 z-20 pointer-events-auto">
                 <ContextBreadcrumbs 
                   domain="Architecture" 
                   activeNode={selectedComponent} 
                   onClear={() => setSelectedComponent(null)} 
                 />
               </div>
-              <div className="absolute top-4 right-4 z-20 flex bg-panel border border-border rounded-lg overflow-hidden p-0.5 shadow-sm pointer-events-auto">
-                <button 
-                  onClick={() => setViewMode('interactive')}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${viewMode === 'interactive' ? 'bg-surface text-text shadow-sm' : 'text-muted hover:text-text'}`}
-                >
-                  Interactive Graph
-                </button>
-                <button 
-                  onClick={() => setViewMode('mermaid')}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${viewMode === 'mermaid' ? 'bg-surface text-text shadow-sm' : 'text-muted hover:text-text'}`}
-                >
-                  Mermaid
-                </button>
+              <div className="export-element-breadcrumbs absolute top-4 right-4 z-20 flex items-center gap-2 pointer-events-auto">
+                <ExportDiagramButton elementRef={diagramRef} filename="architecture-diagram" />
+                <div className="flex bg-panel border border-border rounded-lg overflow-hidden p-0.5 shadow-sm">
+                  <button 
+                    onClick={() => setViewMode('interactive')}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${viewMode === 'interactive' ? 'bg-surface text-text shadow-sm' : 'text-muted hover:text-text'}`}
+                  >
+                    Interactive Graph
+                  </button>
+                  <button 
+                    onClick={() => setViewMode('mermaid')}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${viewMode === 'mermaid' ? 'bg-surface text-text shadow-sm' : 'text-muted hover:text-text'}`}
+                  >
+                    Mermaid
+                  </button>
+                </div>
               </div>
               
               {viewMode === 'mermaid' ? (
@@ -709,6 +714,7 @@ export default function ArchitecturePage() {
 
                   {/* Layer legend */}
                   <div
+                    className="export-element-legend"
                     style={{
                       position: 'absolute', bottom: 12, left: 12, zIndex: 10,
                       background: 'rgba(17,19,24,0.93)', border: '1px solid #1D2130',

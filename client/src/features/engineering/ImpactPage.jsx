@@ -4,7 +4,7 @@
  * It initiates the change impact dashboard, then extracts selected file dependencies, 
  * and then it applies the dagre layout to visualize the deterministic blast radius.
  */
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Activity, CheckSquare, Loader2, GitCommit, AlertCircle, X, ExternalLink, File } from 'lucide-react';
 import { repositoryApi } from '../../shared/api';
@@ -12,6 +12,7 @@ import { useRepository } from '../../shared/context/RepositoryContext';
 import { useToast } from '../../shared/context/ToastContext';
 import PageHeader from '../../shared/components/PageHeader';
 import { ResizableLayout } from '../../shared/components/ResizableLayout';
+import { ExportDiagramButton } from '../../shared/components/ExportDiagramButton';
 import ReactFlow, { 
   Controls, 
   MiniMap, 
@@ -195,6 +196,7 @@ export default function ImpactPage() {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   const [rfInstance, setRfInstance] = useState(null);
+  const diagramRef = useRef(null);
 
   /**
    * It maps the file paths from the analysis array, then extracts nested directory chunks, 
@@ -393,7 +395,7 @@ export default function ImpactPage() {
                       <p className="text-sm">Select files from the sidebar and click "Analyze Impact".</p>
                     </div>
                   ) : (
-                    <div className="flex-1 w-full h-full bg-surface border border-border rounded shadow-inner relative overflow-hidden">
+                    <div ref={diagramRef} className="flex-1 w-full h-full bg-surface border border-border rounded shadow-inner relative overflow-hidden">
                       <ReactFlow
                         onInit={setRfInstance}
                         nodes={nodes}
@@ -411,18 +413,21 @@ export default function ImpactPage() {
                       >
                         <Controls showInteractive={false} className="bg-panel border-border" />
                       </ReactFlow>
-                      <div className="absolute top-4 right-4 bg-panel/90 border border-border rounded p-3 text-xs flex flex-col gap-2 backdrop-blur-sm shadow-xl">
-                        <div className="font-semibold text-white/90 border-b border-border/50 pb-2 mb-1">Impact Legend</div>
+                      <div className="export-element-legend absolute top-4 right-4 flex flex-col gap-2">
+                        <ExportDiagramButton elementRef={diagramRef} filename="impact-graph" />
+                        <div className="bg-panel/90 border border-border rounded p-3 text-xs flex flex-col gap-2 backdrop-blur-sm shadow-xl">
+                          <div className="font-semibold text-white/90 border-b border-border/50 pb-2 mb-1">Impact Legend</div>
                         <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#da3633] shadow-[0_0_8px_rgba(218,54,51,0.6)]"></div> Changed Files</div>
                         <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#d29922] shadow-[0_0_8px_rgba(210,153,34,0.6)]"></div> Directly Affected</div>
                         <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#8957e5] shadow-[0_0_8px_rgba(137,87,229,0.6)]"></div> Transitively Affected</div>
+                        </div>
                       </div>
 
                       {/* Node detail panel — appears when a node is clicked */}
                       {selectedNode && (() => {
                         const srcRef = tryMakeSourceRef({ filePath: selectedNode.fullPath });
                         return (
-                          <div className="absolute bottom-4 left-4 bg-panel/95 border border-border rounded-lg p-4 shadow-2xl backdrop-blur-sm text-xs min-w-[240px] max-w-[320px]">
+                          <div className="export-element-legend absolute bottom-4 left-4 bg-panel/95 border border-border rounded-lg p-4 shadow-2xl backdrop-blur-sm text-xs min-w-[240px] max-w-[320px]">
                             <div className="flex items-center justify-between mb-3">
                               <span className="font-semibold text-white truncate" title={selectedNode.fullPath}>{selectedNode.label}</span>
                               <button onClick={() => setSelectedNode(null)} className="text-muted hover:text-white ml-2 shrink-0"><X className="w-3.5 h-3.5" /></button>

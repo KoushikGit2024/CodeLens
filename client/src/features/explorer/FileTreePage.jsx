@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { repositoryApi } from '../../shared/api';
 import PageHeader from '../../shared/components/PageHeader';
+import { ExportDiagramButton } from '../../shared/components/ExportDiagramButton';
 import { useRepository } from '../../shared/context/RepositoryContext';
 
 // Maps file extensions to specific icons and colors
@@ -242,6 +243,7 @@ export default function FileTreePage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const reactFlowInstance = useRef(null);
+  const diagramRef = useRef(null);
 
   // Debounce search input
   useEffect(() => {
@@ -305,20 +307,23 @@ export default function FileTreePage() {
           description="A visual, interactive topology of your entire codebase."
           icon={FolderTree}
         />
-        <div className="relative w-72 group">
-          <div className="absolute inset-0 bg-accent/20 rounded-lg blur opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-500"></div>
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted group-focus-within:text-accent transition-colors z-10" />
-          <input
-            type="text"
-            placeholder="Search nodes by name..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="relative w-full bg-panel/80 backdrop-blur border border-border/60 hover:border-accent/40 rounded-lg pl-10 pr-4 py-2 text-sm text-text placeholder:text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all duration-300 z-10 shadow-sm shadow-black/20"
-          />
+        <div className="flex items-center gap-4">
+          <div className="relative w-72 group">
+            <div className="absolute inset-0 bg-accent/20 rounded-lg blur opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-500"></div>
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted group-focus-within:text-accent transition-colors z-10" />
+            <input
+              type="text"
+              placeholder="Search nodes by name..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="relative w-full bg-panel/80 backdrop-blur border border-border/60 hover:border-accent/40 rounded-lg pl-10 pr-4 py-2 text-sm text-text placeholder:text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all duration-300 z-10 shadow-sm shadow-black/20"
+            />
+          </div>
+          <ExportDiagramButton elementRef={diagramRef} filename="file-tree" className="z-10" />
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden relative border-t border-border mt-4">
+      <div ref={diagramRef} className="flex-1 overflow-hidden relative border-t border-border mt-4 bg-surface">
         {repoLoading ? (
           <div className="flex h-full items-center justify-center text-muted gap-3">
             <Loader2 className="w-6 h-6 animate-spin text-accent" />
