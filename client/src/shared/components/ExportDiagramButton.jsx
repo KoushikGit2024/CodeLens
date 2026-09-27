@@ -4,8 +4,20 @@ import { exportToPng, exportToSvg } from '../utils/exportDiagram';
 
 /**
  * A button that opens a dialog to export a referenced DOM element to PNG or SVG.
+ * 
+ * @param {Object} props
+ * @param {string[]} props.availableToggles - List of toggles to show. e.g. ['breadcrumbs', 'legend', 'controls', 'minimap']
+ * @param {Array} props.nodes - React Flow nodes (optional, used for native SVG worker export)
+ * @param {Array} props.edges - React Flow edges (optional, used for native SVG worker export)
  */
-export function ExportDiagramButton({ elementRef, filename = 'diagram', className = '' }) {
+export function ExportDiagramButton({ 
+  elementRef, 
+  filename = 'diagram', 
+  className = '',
+  availableToggles = ['breadcrumbs', 'legend', 'controls', 'minimap'],
+  nodes = null,
+  edges = null
+}) {
   const [open, setOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
 
@@ -42,11 +54,57 @@ export function ExportDiagramButton({ elementRef, filename = 'diagram', classNam
         excludedFeatures,
       };
 
-      if (format === 'png') {
+      if (format === 'svg' && nodes && edges) {
+        // Use native SVG Web Worker for 0-blocking high-performance export
+        await new Promise((resolve, reject) => {
+          const worker = new Worker(new URL('../../services/export/export.worker.js', import.meta.url), { type: 'module' });
+          worker.onmessage = (e) => {
+            if (e.data.success) {
+              const blob = new Blob([e.data.svgString], { type: 'image/svg+xml;charset=utf-8' });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = `${filename}.svg`;
+              link.click();
+              URL.revokeObjectURL(url);
+              resolve();
+            } else {
+              reject(new Error(e.data.error));
+            }
+            worker.terminate();
+          };
+          
+          // Calculate bounds for worker
+          const el = elementRef.current;
+          let bounds = { x: 0, y: 0, width: 800, height: 600 };
+          const viewport = el?.querySelector('.react-flow__viewport');
+          if (viewport) {
+             const domNodes = el.querySelectorAll('.react-flow__node');
+             if (domNodes.length) {
+               let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+               domNodes.forEach(n => {
+                 const match = n.style.transform.match(/translate\(([^p]+)px,\s*([^p]+)px\)/);
+                 if (match) {
+                   const x = parseFloat(match[1]);
+                   const y = parseFloat(match[2]);
+                   minX = Math.min(minX, x);
+                   minY = Math.min(minY, y);
+                   maxX = Math.max(maxX, x + n.offsetWidth);
+                   maxY = Math.max(maxY, y + n.offsetHeight);
+                 }
+               });
+               if (minX !== Infinity) bounds = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+             }
+          }
+          
+          worker.postMessage({ nodes, edges, bounds, options });
+        });
+      } else if (format === 'png') {
         await exportToPng(elementRef, `${filename}.png`, options);
       } else {
         await exportToSvg(elementRef, `${filename}.svg`, options);
       }
+      
       setOpen(false);
     } catch (err) {
       console.error('Export failed:', err);
@@ -85,7 +143,7 @@ export function ExportDiagramButton({ elementRef, filename = 'diagram', classNam
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="export-modal-overlay fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-panel border border-border rounded-xl shadow-2xl w-[450px] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto custom-scrollbar">
             {/* Header */}
             <div className="px-5 py-4 border-b border-border flex items-center justify-between bg-surface/50 shrink-0">
@@ -118,8 +176,10 @@ export function ExportDiagramButton({ elementRef, filename = 'diagram', classNam
                   </button>
                 </div>
                 {format === 'svg' && (
-                  <p className="mt-2 text-[11px] text-warning">
-                    Note: SVG format cannot perfectly render React text nodes (due to foreignObject limitations). PNG is recommended.
+                  <p className="mt-2 text-[11px] text-accent font-medium">
+                    {nodes && edges 
+                      ? "Generates a true vector file. Visual quality of complex elements may be diminished."
+                      : "Using DOM SVG Engine (Warning: React text nodes may not render correctly in standard SVG viewers due to foreignObject limitations)."}
                   </p>
                 )}
               </div>
@@ -170,12 +230,27 @@ export function ExportDiagramButton({ elementRef, filename = 'diagram', classNam
 
                   <div className="pt-2">
                     <p className="text-[11px] text-muted mb-2 font-medium">Specific Overlay Elements (Check to include):</p>
-                    <div className="grid grid-cols-2 gap-y-3 gap-x-4">
-                      <CheckboxItem label="Breadcrumbs & Toolbar" checked={includeBreadcrumbs} onChange={setIncludeBreadcrumbs} />
-                      <CheckboxItem label="Legends & Details" checked={includeLegend} onChange={setIncludeLegend} />
-                      <CheckboxItem label="Zoom Controls" checked={includeControls} onChange={setIncludeControls} />
-                      <CheckboxItem label="Minimap" checked={includeMinimap} onChange={setIncludeMinimap} />
-                    </div>
+                    
+                    {captureArea === 'full' ? (
+                      <div className="p-3 bg-warning/10 border border-warning/20 rounded-md">
+                        <p className="text-xs text-warning">Overlay elements (Breadcrumbs, Minimap, etc.) are only supported when capturing the Visible Area.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-y-3 gap-x-4">
+                        {availableToggles.includes('breadcrumbs') && (
+                          <CheckboxItem label="Breadcrumbs & Toolbar" checked={includeBreadcrumbs} onChange={setIncludeBreadcrumbs} />
+                        )}
+                        {availableToggles.includes('legend') && (
+                          <CheckboxItem label="Legends & Details" checked={includeLegend} onChange={setIncludeLegend} />
+                        )}
+                        {availableToggles.includes('controls') && (
+                          <CheckboxItem label="Zoom Controls" checked={includeControls} onChange={setIncludeControls} />
+                        )}
+                        {availableToggles.includes('minimap') && (
+                          <CheckboxItem label="Minimap" checked={includeMinimap} onChange={setIncludeMinimap} />
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

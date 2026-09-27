@@ -435,7 +435,13 @@ export default function DependencyGraphPage() {
                 />
               </div>
               <div className="export-element-breadcrumbs absolute top-3 right-3 z-30 pointer-events-auto">
-                <ExportDiagramButton elementRef={graphRef} filename="dependency-graph" />
+                <ExportDiagramButton 
+                  elementRef={graphRef} 
+                  filename="dependency-graph" 
+                  availableToggles={['breadcrumbs', 'controls', 'minimap']}
+                  nodes={nodes}
+                  edges={edges}
+                />
               </div>
               {nodes.length === 0 ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">

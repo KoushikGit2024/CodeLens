@@ -319,7 +319,14 @@ export default function FileTreePage() {
               className="relative w-full bg-panel/80 backdrop-blur border border-border/60 hover:border-accent/40 rounded-lg pl-10 pr-4 py-2 text-sm text-text placeholder:text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all duration-300 z-10 shadow-sm shadow-black/20"
             />
           </div>
-          <ExportDiagramButton elementRef={diagramRef} filename="file-tree" className="z-10" />
+          <ExportDiagramButton 
+            elementRef={diagramRef} 
+            filename="file-tree" 
+            className="z-10" 
+            availableToggles={['controls', 'minimap']}
+            nodes={nodes}
+            edges={edges}
+          />
         </div>
       </div>
 

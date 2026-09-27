@@ -414,7 +414,13 @@ export default function ImpactPage() {
                         <Controls showInteractive={false} className="bg-panel border-border" />
                       </ReactFlow>
                       <div className="export-element-legend absolute top-4 right-4 flex flex-col gap-2">
-                        <ExportDiagramButton elementRef={diagramRef} filename="impact-graph" />
+                        <ExportDiagramButton 
+                          elementRef={diagramRef} 
+                          filename="impact-graph" 
+                          availableToggles={['legend', 'controls']}
+                          nodes={nodes}
+                          edges={edges}
+                        />
                         <div className="bg-panel/90 border border-border rounded p-3 text-xs flex flex-col gap-2 backdrop-blur-sm shadow-xl">
                           <div className="font-semibold text-white/90 border-b border-border/50 pb-2 mb-1">Impact Legend</div>
                         <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#da3633] shadow-[0_0_8px_rgba(218,54,51,0.6)]"></div> Changed Files</div>

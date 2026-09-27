@@ -7,8 +7,9 @@ function isExcluded(node, excludedFeatures) {
   let current = node;
   while (current && current !== document.body) {
     if (current.classList) {
-      // ALWAYS exclude the export button itself
+      // ALWAYS exclude the export button itself and the modal overlay
       if (current.classList.contains('export-element-button')) return true;
+      if (current.classList.contains('export-modal-overlay')) return true;
       
       // Exclude specific features based on the Set provided
       if (excludedFeatures.has('breadcrumbs') && current.classList.contains('export-element-breadcrumbs')) return true;
@@ -87,20 +88,22 @@ const getExportConfig = (elementRef, options) => {
 
   const viewport = el.querySelector('.react-flow__viewport');
   const isReactFlow = !!viewport;
-  let targetEl = isReactFlow ? viewport : el;
   
+  // Target the top level wrapper, NOT just the viewport, so UI overlays are captured!
+  let targetEl = el;
   let width = el.offsetWidth;
   let height = el.offsetHeight;
   let customStyle = { overflow: 'visible' };
   
   const backgroundColor = includeBackground ? '#0C0E14' : 'transparent';
+  let viewportTransform = null;
 
   if (captureArea === 'full' && isReactFlow) {
     const bounds = getReactFlowBounds(el);
     if (bounds) {
       width = bounds.width;
       height = bounds.height;
-      customStyle.transform = `translate(${-bounds.x}px, ${-bounds.y}px) scale(1)`;
+      viewportTransform = `translate(${-bounds.x}px, ${-bounds.y}px) scale(1)`;
       
       if (includeBackground) {
         customStyle.backgroundColor = backgroundColor;
@@ -111,13 +114,25 @@ const getExportConfig = (elementRef, options) => {
     height = el.scrollHeight || el.offsetHeight;
   }
   
+  const onclone = (clonedDocument) => {
+    if (viewportTransform) {
+      // Find the cloned viewport and apply the transform so the full diagram fits perfectly
+      // This prevents the live DOM from jumping around during export!
+      const clonedViewport = clonedDocument.querySelector('.react-flow__viewport');
+      if (clonedViewport) {
+        clonedViewport.style.transform = viewportTransform;
+      }
+    }
+  };
+
   return {
     targetEl,
     width,
     height,
     customStyle,
     backgroundColor,
-    excludedFeatures
+    excludedFeatures,
+    onclone
   };
 };
 
@@ -126,7 +141,7 @@ const getExportConfig = (elementRef, options) => {
  */
 export const exportToPng = async (elementRef, filename = 'diagram.png', options = {}) => {
   try {
-    const { targetEl, width, height, customStyle, backgroundColor, excludedFeatures } = getExportConfig(elementRef, options);
+    const { targetEl, width, height, customStyle, backgroundColor, excludedFeatures, onclone } = getExportConfig(elementRef, options);
 
     const dataUrl = await toPng(targetEl, {
       cacheBust: true,
@@ -135,6 +150,7 @@ export const exportToPng = async (elementRef, filename = 'diagram.png', options 
       width,
       height,
       style: customStyle,
+      onclone,
       filter: (node) => !isExcluded(node, excludedFeatures),
     });
     downloadFile(dataUrl, filename);
@@ -150,7 +166,7 @@ export const exportToPng = async (elementRef, filename = 'diagram.png', options 
  */
 export const exportToSvg = async (elementRef, filename = 'diagram.svg', options = {}) => {
   try {
-    const { targetEl, width, height, customStyle, backgroundColor, excludedFeatures } = getExportConfig(elementRef, options);
+    const { targetEl, width, height, customStyle, backgroundColor, excludedFeatures, onclone } = getExportConfig(elementRef, options);
 
     const dataUrl = await toSvg(targetEl, {
       cacheBust: true,
@@ -158,6 +174,7 @@ export const exportToSvg = async (elementRef, filename = 'diagram.svg', options 
       width,
       height,
       style: customStyle,
+      onclone,
       filter: (node) => !isExcluded(node, excludedFeatures),
     });
     downloadFile(dataUrl, filename);

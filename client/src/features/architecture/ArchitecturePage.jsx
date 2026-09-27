@@ -661,7 +661,12 @@ export default function ArchitecturePage() {
                 />
               </div>
               <div className="export-element-breadcrumbs absolute top-4 right-4 z-20 flex items-center gap-2 pointer-events-auto">
-                <ExportDiagramButton elementRef={diagramRef} filename="architecture-diagram" />
+                <ExportDiagramButton 
+                  elementRef={diagramRef} 
+                  filename="architecture-diagram" 
+                  nodes={rfNodes}
+                  edges={rfEdges}
+                />
                 <div className="flex bg-panel border border-border rounded-lg overflow-hidden p-0.5 shadow-sm">
                   <button 
                     onClick={() => setViewMode('interactive')}
