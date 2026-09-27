@@ -12,7 +12,7 @@ describe('parser.registry (Frontend)', () => {
     expect(langs).toContain('python');
     
     expect(isSupported('javascript')).toBe(true);
-    expect(isSupported('rust')).toBe(false);
+    expect(isSupported('cobol')).toBe(false);
   });
 
   // Full parsing test might require mocking fetch or using a Web Worker.

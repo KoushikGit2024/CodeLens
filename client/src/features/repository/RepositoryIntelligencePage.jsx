@@ -15,6 +15,8 @@ import { useAIState, useAI } from '../../shared/context/AIContext';
 import { useRepository } from '../../shared/context/RepositoryContext';
 import { useToast } from '../../shared/context/ToastContext';
 import AnalysisProgress from './AnalysisProgress';
+import OpenSourceButton from '../../shared/components/OpenSourceButton';
+import { makeSourceRef } from '../../shared/navigation/sourceRef';
 
 export default function RepositoryIntelligencePage() {
   const { repoId } = useParams();
@@ -81,6 +83,10 @@ export default function RepositoryIntelligencePage() {
    * and then it applies the generated overview to the IndexedDB store.
    */
   const handleUnderstandRepository = async () => {
+    if (aiState.authState === 'unauthenticated') {
+      navigate('/auth/signin');
+      return;
+    }
     try {
       await sendMessage("Provide a comprehensive executive summary of this repository, including its architecture, tech stack, and overall engineering health.");
       addToast({ title: 'AI Synthesis Complete', description: 'Repository intelligence has been successfully generated.', type: 'success' });
@@ -322,9 +328,11 @@ export default function RepositoryIntelligencePage() {
                          <span className="text-[10px] text-muted leading-tight max-w-[80%]">
                            {h.reasons.join(' • ')}
                          </span>
-                         <Link to={`/explore/${repoId}/source?path=${encodeURIComponent(h.filePath)}`} className="text-[10px] text-accent hover:underline shrink-0">
-                           View File
-                         </Link>
+                         <OpenSourceButton 
+                           ref={makeSourceRef({ filePath: h.filePath })} 
+                           label="View File" 
+                           className="!text-[10px] shrink-0" 
+                         />
                        </div>
                      </div>
                    ))}
@@ -463,17 +471,16 @@ export default function RepositoryIntelligencePage() {
             </p>
             <button
               onClick={handleUnderstandRepository}
-              disabled={aiLoading || aiState === 'offline' || aiState === 'unavailable' || aiState === 'error'}
+              disabled={aiLoading || aiState.status === 'loading' || (aiState.authState !== 'unauthenticated' && (aiState.status === 'offline' || aiState.quotaStatus === 'exhausted'))}
+              title={
+                aiState.status === 'offline' ? 'No AI provider configured' :
+                aiState.quotaStatus === 'exhausted' ? 'AI quota exceeded' : ''
+              }
               className="bg-accent text-text text-xs py-2 px-4 rounded hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex justify-center items-center gap-2"
             >
               {aiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-              {aiLoading ? 'Synthesizing...' : 'Understand Repository'}
+              {aiLoading ? 'Synthesizing...' : aiState.authState === 'unauthenticated' ? 'Sign in to Synthesize' : 'Understand Repository'}
             </button>
-            {(aiState === 'offline' || aiState === 'unavailable') ? (
-               <p className="text-[10px] text-muted text-center mt-1">
-                 No AI provider configured — running in deterministic mode.
-               </p>
-            ) : null}
           </div>
 
           <div className="flex-1 overflow-y-auto p-5">

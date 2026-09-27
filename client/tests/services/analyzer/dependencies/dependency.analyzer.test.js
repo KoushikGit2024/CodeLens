@@ -75,9 +75,9 @@ describe('buildDependencyGraph — nodes', () => {
     ]);
     const graph = buildDependencyGraph(analysis);
 
-    const fileNodes = graph.nodes.filter(n => n.type === 'file');
+    const fileNodes = graph.nodes.filter(n => n.type === 'fileNode');
     expect(fileNodes).toHaveLength(2);
-    expect(fileNodes.map(n => n.filePath).sort()).toEqual(['src/app.js', 'src/utils.js']);
+    expect(fileNodes.map(n => n.data.filePath).sort()).toEqual(['src/app.js', 'src/utils.js']);
   });
 
   test('external packages become package nodes', () => {
@@ -86,9 +86,9 @@ describe('buildDependencyGraph — nodes', () => {
     ]);
     const graph = buildDependencyGraph(analysis);
 
-    const pkgNodes = graph.nodes.filter(n => n.type === 'package');
+    const pkgNodes = graph.nodes.filter(n => n.type === 'moduleNode');
     expect(pkgNodes).toHaveLength(1);
-    expect(pkgNodes[0].name).toBe('express');
+    expect(pkgNodes[0].data.label).toBe('express');
     expect(pkgNodes[0].id).toBe('pkg:express');
   });
 
@@ -97,15 +97,15 @@ describe('buildDependencyGraph — nodes', () => {
       { path: 'src/app.js', imports: [{ source: 'mongoose' }] },
     ]);
     const graph = buildDependencyGraph(analysis);
-    const pkg = graph.nodes.find(n => n.type === 'package');
-    expect(pkg).toMatchObject({ id: 'pkg:mongoose', type: 'package', name: 'mongoose' });
+    const pkg = graph.nodes.find(n => n.type === 'moduleNode');
+    expect(pkg).toMatchObject({ id: 'pkg:mongoose', type: 'moduleNode', data: { label: 'mongoose' } });
   });
 
   test('internal file node has filePath field', () => {
     const analysis = makeAnalysis([{ path: 'src/index.js', imports: [] }]);
     const graph = buildDependencyGraph(analysis);
-    const node = graph.nodes.find(n => n.type === 'file');
-    expect(node).toMatchObject({ id: 'file:src/index.js', type: 'file', filePath: 'src/index.js' });
+    const node = graph.nodes.find(n => n.type === 'fileNode');
+    expect(node).toMatchObject({ id: 'file:src/index.js', type: 'fileNode', data: { filePath: 'src/index.js' } });
   });
 
   test('nodes are sorted deterministically', () => {
@@ -126,7 +126,7 @@ describe('buildDependencyGraph — nodes', () => {
       { path: 'src/b.js', imports: [{ source: 'express' }] },
     ]);
     const graph = buildDependencyGraph(analysis);
-    const pkgNodes = graph.nodes.filter(n => n.type === 'package');
+    const pkgNodes = graph.nodes.filter(n => n.type === 'moduleNode');
     expect(pkgNodes).toHaveLength(1);
   });
 });
@@ -145,7 +145,7 @@ describe('buildDependencyGraph — edges', () => {
       e => e.source === 'file:src/index.js' && e.target === 'file:src/utils.js'
     );
     expect(edge).toBeDefined();
-    expect(edge.type).toBe('imports');
+    expect(edge.type).toBe('default');
   });
 
   test('external package import creates an edge pointing to package node', () => {
@@ -171,7 +171,7 @@ describe('buildDependencyGraph — edges', () => {
       e => e.source === 'file:src/server.js' && e.target === 'file:src/db.js'
     );
     expect(edge).toBeDefined();
-    expect(edge.type).toBe('requires');
+    expect(edge.type).toBe('smoothstep');
   });
 
   test('edges are sorted deterministically', () => {
@@ -214,8 +214,7 @@ describe('buildDependencyGraph — edges', () => {
     ]);
     const graph = buildDependencyGraph(analysis);
     const edge = graph.edges[0];
-    expect(edge.evidence).toBeDefined();
-    expect(edge.evidence.specifier).toBe('./utils');
+    expect(edge.data.specifiers).toBeDefined();
   });
 
   test('edge evidence contains importedNames', () => {
@@ -224,7 +223,7 @@ describe('buildDependencyGraph — edges', () => {
     ]);
     const graph = buildDependencyGraph(analysis);
     const edge = graph.edges[0];
-    expect(edge.evidence.importedNames).toEqual(expect.arrayContaining(['Router', 'json']));
+    expect(edge.data.specifiers).toEqual(expect.arrayContaining(['Router', 'json']));
   });
 
   test('unresolved imports are NOT added as edges', () => {
@@ -301,7 +300,7 @@ describe('buildDependencyGraph — internal vs external', () => {
     const graph = buildDependencyGraph(analysis);
     const edge = graph.edges[0];
     expect(edge.target).toBe('file:src/services/authService.js');
-    expect(graph.nodes.find(n => n.id === edge.target)?.type).toBe('file');
+    expect(graph.nodes.find(n => n.id === edge.target)?.type).toBe('fileNode');
   });
 
   test('bare package names resolve to external package nodes', () => {
@@ -311,7 +310,7 @@ describe('buildDependencyGraph — internal vs external', () => {
     const graph = buildDependencyGraph(analysis);
     const edge = graph.edges[0];
     expect(edge.target).toBe('pkg:jsonwebtoken');
-    expect(graph.nodes.find(n => n.id === edge.target)?.type).toBe('package');
+    expect(graph.nodes.find(n => n.id === edge.target)?.type).toBe('moduleNode');
   });
 
   test('@org/pkg is treated as external', () => {

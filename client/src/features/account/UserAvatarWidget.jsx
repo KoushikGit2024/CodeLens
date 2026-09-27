@@ -9,7 +9,19 @@ export default function UserAvatarWidget() {
   const usage = aiState?.usage;
   const navigate = useNavigate();
 
-  if (!user) return null;
+  if (!user) {
+    return (
+      <div 
+        className="relative rounded-full p-0.5 cursor-pointer border-2 border-border/50 hover:border-accent transition-colors"
+        onClick={() => navigate('/auth/signin')}
+        title="Sign In"
+      >
+        <div className="w-8 h-8 rounded-full overflow-hidden bg-surface flex items-center justify-center">
+          <User className="w-5 h-5 text-muted hover:text-accent transition-colors" />
+        </div>
+      </div>
+    );
+  }
 
   // Calculate the highest usage percentage between requests and tokens
   let highestUsagePercent = 0;

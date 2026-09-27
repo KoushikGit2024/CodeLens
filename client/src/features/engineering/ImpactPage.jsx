@@ -6,7 +6,7 @@
  */
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Activity, CheckSquare, Loader2, GitCommit, AlertCircle } from 'lucide-react';
+import { Activity, CheckSquare, Loader2, GitCommit, AlertCircle, X, ExternalLink, File } from 'lucide-react';
 import { repositoryApi } from '../../shared/api';
 import { useRepository } from '../../shared/context/RepositoryContext';
 import { useToast } from '../../shared/context/ToastContext';
@@ -23,6 +23,8 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import dagre from 'dagre';
 import { FileTree } from '../explorer/FileTree';
+import OpenSourceButton from '../../shared/components/OpenSourceButton';
+import { tryMakeSourceRef } from '../../shared/navigation/sourceRef';
 
 // ── Dagre Layout & Smart Packing Helper ───────────────────────────
 const dagreGraph = new dagre.graphlib.Graph();
@@ -187,6 +189,8 @@ export default function ImpactPage() {
 
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  // Node selected inside the ReactFlow graph
+  const [selectedNode, setSelectedNode] = useState(null);
   
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
@@ -396,6 +400,8 @@ export default function ImpactPage() {
                         edges={edges}
                         nodeTypes={impactNodeTypes}
                         onNodesChange={(changes) => setNodes((nds) => applyNodeChanges(changes, nds))}
+                        onNodeClick={(_, node) => setSelectedNode(node.data)}
+                        onPaneClick={() => setSelectedNode(null)}
                         fitView
                         minZoom={0.01} 
                         maxZoom={2}
@@ -411,8 +417,37 @@ export default function ImpactPage() {
                         <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#d29922] shadow-[0_0_8px_rgba(210,153,34,0.6)]"></div> Directly Affected</div>
                         <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#8957e5] shadow-[0_0_8px_rgba(137,87,229,0.6)]"></div> Transitively Affected</div>
                       </div>
+
+                      {/* Node detail panel — appears when a node is clicked */}
+                      {selectedNode && (() => {
+                        const srcRef = tryMakeSourceRef({ filePath: selectedNode.fullPath });
+                        return (
+                          <div className="absolute bottom-4 left-4 bg-panel/95 border border-border rounded-lg p-4 shadow-2xl backdrop-blur-sm text-xs min-w-[240px] max-w-[320px]">
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="font-semibold text-white truncate" title={selectedNode.fullPath}>{selectedNode.label}</span>
+                              <button onClick={() => setSelectedNode(null)} className="text-muted hover:text-white ml-2 shrink-0"><X className="w-3.5 h-3.5" /></button>
+                            </div>
+                            <div className="text-muted mb-3">{selectedNode.fullPath}</div>
+                            <div className="flex flex-col gap-2">
+                              {srcRef && <OpenSourceButton ref={srcRef} variant="button" label="Open in Explorer" />}
+                              <Link
+                                to={`/explore/${repoId}/architecture`}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-surface border border-border hover:border-accent hover:text-accent transition-colors"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" /> View Architecture
+                              </Link>
+                              <Link
+                                to={`/explore/${repoId}/health?file=${encodeURIComponent(selectedNode.fullPath)}`}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-surface border border-border hover:border-accent hover:text-accent transition-colors"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" /> View Health Risks
+                              </Link>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
-                )}
+                  )}
                 </div>
               </main>
             )

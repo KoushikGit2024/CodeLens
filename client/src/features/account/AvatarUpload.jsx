@@ -88,7 +88,7 @@ export default function AvatarUpload({ onUploadSuccess }) {
       formData.append('signature', signature);
       formData.append('expire', expire);
       formData.append('token', token);
-      formData.append('folder', '/avatars');
+      formData.append('folder', '/MyProjects/CodeLens');
       formData.append('fileName', `user_${user.id}.jpg`);
 
       const uploadRes = await fetch('https://upload.imagekit.io/api/v1/files/upload', {

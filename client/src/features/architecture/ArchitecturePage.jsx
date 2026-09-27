@@ -10,6 +10,10 @@ import { useAIState } from '../../shared/context/AIContext';
 import ReactFlow, { Background, Controls, MiniMap, MarkerType, Handle, Position } from 'reactflow';
 import 'reactflow/dist/style.css';
 import * as d3Force from 'd3-force';
+import MermaidViewer from './MermaidViewer';
+import { toMermaid } from '../../services/analyzer/advanced/mermaid.transformer';
+import OpenSourceButton from '../../shared/components/OpenSourceButton';
+import { tryMakeSourceRef } from '../../shared/navigation/sourceRef';
 
 // ── Layer color map ───────────────────────────────────────────────────────
 
@@ -330,6 +334,7 @@ export default function ArchitecturePage() {
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [aiError, setAiError] = useState(null);
   const [expandedComponents, setExpandedComponents] = useState(new Set());
+  const [viewMode, setViewMode] = useState('interactive');
 
   const loadArchitecture = async () => {
     setLoading(true);
@@ -345,6 +350,10 @@ export default function ArchitecturePage() {
   };
 
   const handleGenerateAi = async () => {
+    if (aiState.authState === 'unauthenticated') {
+      navigate('/auth/signin');
+      return;
+    }
     setIsGeneratingAi(true);
     setAiError(null);
     try {
@@ -363,15 +372,19 @@ export default function ArchitecturePage() {
     loadArchitecture();
   }, [repoId]);
 
-  const { rfNodes, rfEdges } = useMemo(() => {
-    if (!data?.model) return { rfNodes: [], rfEdges: [] };
+  const { rfNodes, rfEdges, mermaidStr } = useMemo(() => {
+    if (!data?.model) return { rfNodes: [], rfEdges: [], mermaidStr: '' };
     
-    return graphToFlow(
+    const flow = graphToFlow(
       data.model.components || [], 
       data.model.relations || [], 
       selectedComponent, 
       data.model.violations || []
     );
+    
+    const mStr = toMermaid(data.model);
+    
+    return { ...flow, mermaidStr: mStr };
   }, [data, selectedComponent]);
 
   const onNodeClick = useCallback((_, node) => {
@@ -529,18 +542,16 @@ export default function ArchitecturePage() {
                 <p className="text-xs text-muted uppercase tracking-wider mb-3">Entry Points</p>
                 {data?.model?.entryPoints?.length > 0 ? (
                   <div className="flex flex-col gap-2">
-                    {data.model.entryPoints.map((ep, i) => (
-                      <div key={i} className="flex items-center gap-2 group min-w-0">
-                        <File className="w-4 h-4 text-accent shrink-0" />
-                        <span className="text-xs font-mono truncate flex-1 text-text" title={ep}>{ep}</span>
-                        <Link 
-                          to={`/explore/${repoId}/source?path=${encodeURIComponent(ep)}`}
-                          className="opacity-0 group-hover:opacity-100 text-xs text-accent hover:underline"
-                        >
-                          View
-                        </Link>
-                      </div>
-                    ))}
+                    {data.model.entryPoints.map((ep, i) => {
+                      const epRef = tryMakeSourceRef({ filePath: ep });
+                      return (
+                        <div key={i} className="flex items-center gap-2 group min-w-0">
+                          <File className="w-4 h-4 text-accent shrink-0" />
+                          <span className="text-xs font-mono truncate flex-1 text-text" title={ep}>{ep}</span>
+                          {epRef && <OpenSourceButton ref={epRef} variant="icon" className="opacity-0 group-hover:opacity-100" />}
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <span className="text-xs text-muted">No explicit entry points found.</span>
@@ -595,23 +606,27 @@ export default function ArchitecturePage() {
                               <div className="border-t border-white/5 flex flex-col">
                                 {compFiles.length === 0 ? (
                                   <span className="text-[10px] text-muted px-3 py-1.5 italic">No files</span>
-                                ) : compFiles.map((file, j) => (
-                                  <div
-                                    key={j}
-                                    className="flex items-center justify-between gap-2 px-3 py-1 hover:bg-white/5 group min-w-0"
-                                  >
-                                    <File className="w-3 h-3 text-muted shrink-0" />
-                                    <span className="text-[10px] text-muted font-mono truncate flex-1" title={file}>
-                                      {file.split('/').pop()}
-                                    </span>
-                                    <Link
-                                      to={`/explore/${repoId}/source?path=${encodeURIComponent(file)}`}
-                                      className="opacity-0 group-hover:opacity-100 text-[9px] text-accent hover:underline shrink-0 transition-opacity"
+                                ) : compFiles.map((file, j) => {
+                                  const fileRef = tryMakeSourceRef({ filePath: file });
+                                  return (
+                                    <div
+                                      key={j}
+                                      className="flex items-center justify-between gap-2 px-3 py-1 hover:bg-white/5 group min-w-0"
                                     >
-                                      View
-                                    </Link>
-                                  </div>
-                                ))}
+                                      <File className="w-3 h-3 text-muted shrink-0" />
+                                      <span className="text-[10px] text-muted font-mono truncate flex-1" title={file}>
+                                        {file.split('/').pop()}
+                                      </span>
+                                      {fileRef && (
+                                        <OpenSourceButton
+                                          ref={fileRef}
+                                          variant="icon"
+                                          className="opacity-0 group-hover:opacity-100"
+                                        />
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
@@ -632,12 +647,34 @@ export default function ArchitecturePage() {
           collapsible: false,
           content: (
             <main className="flex-1 overflow-auto bg-surface shadow-inner relative flex justify-center custom-scrollbar h-full w-full">
-              <ContextBreadcrumbs 
-                domain="Architecture" 
-                activeNode={selectedComponent} 
-                onClear={() => setSelectedComponent(null)} 
-              />
-              {rfNodes.length > 0 ? (
+              <div className="absolute top-4 left-4 z-20 pointer-events-auto">
+                <ContextBreadcrumbs 
+                  domain="Architecture" 
+                  activeNode={selectedComponent} 
+                  onClear={() => setSelectedComponent(null)} 
+                />
+              </div>
+              <div className="absolute top-4 right-4 z-20 flex bg-panel border border-border rounded-lg overflow-hidden p-0.5 shadow-sm pointer-events-auto">
+                <button 
+                  onClick={() => setViewMode('interactive')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${viewMode === 'interactive' ? 'bg-surface text-text shadow-sm' : 'text-muted hover:text-text'}`}
+                >
+                  Interactive Graph
+                </button>
+                <button 
+                  onClick={() => setViewMode('mermaid')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${viewMode === 'mermaid' ? 'bg-surface text-text shadow-sm' : 'text-muted hover:text-text'}`}
+                >
+                  Mermaid
+                </button>
+              </div>
+              
+              {viewMode === 'mermaid' ? (
+                <div className="w-full h-full pt-16">
+                  <MermaidViewer diagramStr={mermaidStr} repoId={repoId} />
+                </div>
+              ) : (
+                rfNodes.length > 0 ? (
                 <ReactFlow
                   nodes={rfNodes}
                   edges={rfEdges}
@@ -687,7 +724,7 @@ export default function ArchitecturePage() {
                 <div className="flex items-center justify-center h-full text-muted text-sm">
                   No architecture components detected.
                 </div>
-              )}
+              ))}
             </main>
           )
         },

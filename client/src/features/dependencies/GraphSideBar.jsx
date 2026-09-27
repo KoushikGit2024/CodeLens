@@ -7,6 +7,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { AlertCircle, GitBranch, ExternalLink, Package, File, Info, Activity } from 'lucide-react';
+import OpenSourceButton from '../../shared/components/OpenSourceButton';
+import { makeSourceRef } from '../../shared/navigation/sourceRef';
 
 export function StatRow({ label, value, warn = false }) {
   return (
@@ -36,13 +38,11 @@ export function DepEntry({ dep, repoId, reverse = false }) {
       <Icon className={`w-3.5 h-3.5 ${color} shrink-0`} />
       <span className="text-white text-xs font-mono truncate flex-1" title={dep.filePath || dep.package}>{name}</span>
       {dep.filePath && (
-        <Link
-          to={`/explore/${repoId}/source?path=${encodeURIComponent(dep.filePath)}`}
-          className="opacity-0 group-hover:opacity-100 text-accent hover:underline shrink-0 bg-surface px-1.5 py-0.5 rounded border border-border"
-          title="View in Explorer"
-        >
-          <ExternalLink className="w-3 h-3" />
-        </Link>
+        <OpenSourceButton
+          ref={makeSourceRef({ filePath: dep.filePath })}
+          variant="icon"
+          className="opacity-0 group-hover:opacity-100 bg-surface border-border"
+        />
       )}
     </div>
   );
@@ -71,13 +71,12 @@ export function FileDetailPanel({ info, repoId, graph }) {
         <p className="text-muted uppercase tracking-wider mb-1.5 text-[10px] font-bold">File Information</p>
         <p className="text-white font-mono whitespace-nowrap overflow-x-auto custom-scrollbar pb-2 mb-2 text-xs bg-[#0d1117] p-2 rounded border border-border">{info.filePath}</p>
         <div className="flex gap-2">
-          <Link
-            to={`/explore/${repoId}/source?path=${encodeURIComponent(info.filePath)}`}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-accent/10 border border-accent/40 rounded text-accent hover:bg-accent/20 transition-colors"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            View Source
-          </Link>
+          <OpenSourceButton
+            ref={makeSourceRef({ filePath: info.filePath })}
+            variant="button"
+            label="View Source"
+            className="!bg-accent/10 !border-accent/40 !text-accent hover:!bg-accent/20"
+          />
           {info.health && info.health.severity !== 'healthy' && (
             <Link
               to={`/explore/${repoId}/health?file=${encodeURIComponent(info.filePath)}`}

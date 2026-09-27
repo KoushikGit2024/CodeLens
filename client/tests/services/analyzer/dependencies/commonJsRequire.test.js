@@ -238,7 +238,7 @@ describe('CommonJS require — integration with dependency graph', () => {
       e => e.source === 'file:src/server.js' && e.target === 'file:src/app.js'
     );
     expect(edge).toBeDefined();
-    expect(edge.type).toBe('requires');
+    expect(edge.type).toBe('smoothstep');
   });
 
   test('ES import becomes an "imports" edge in the graph', async () => {
@@ -266,6 +266,6 @@ describe('CommonJS require — integration with dependency graph', () => {
       e => e.source === 'file:src/index.js' && e.target === 'file:src/app.js'
     );
     expect(edge).toBeDefined();
-    expect(edge.type).toBe('imports');
+    expect(edge.type).toBe('default');
   });
 });

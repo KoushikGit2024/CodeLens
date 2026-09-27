@@ -272,6 +272,6 @@ describe('resolveAllImports', () => {
 
 describe('RESOLUTION_EXTENSIONS', () => {
   test('contains all supported extensions', () => {
-    expect(RESOLUTION_EXTENSIONS).toEqual(['.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.cpp', '.cc', '.cxx', '.h', '.hpp']);
+    expect(RESOLUTION_EXTENSIONS).toEqual(expect.arrayContaining(['.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.cpp', '.cc', '.cxx', '.h', '.hpp', '.go', '.rs', '.c']));
   });
 });

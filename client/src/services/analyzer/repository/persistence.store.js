@@ -8,7 +8,7 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'CodeLensDB';
-const DB_VERSION = 3; 
+const DB_VERSION = 4; // bumped: adds aiArtifacts store
 
 /**
  * It requests an IndexedDB connection, then extracts object store requirements, 
@@ -38,6 +38,10 @@ export async function getDB() {
       }
       if (!db.objectStoreNames.contains('chatSessions')) {
         db.createObjectStore('chatSessions', { keyPath: ['repoId', 'feature'] });
+      }
+      // v4: deterministic AI artifact cache
+      if (!db.objectStoreNames.contains('aiArtifacts')) {
+        db.createObjectStore('aiArtifacts', { keyPath: 'cacheKey' });
       }
       
       if (oldVersion < 2 && db.objectStoreNames.contains('repos')) {

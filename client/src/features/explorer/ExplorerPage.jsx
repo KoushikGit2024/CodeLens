@@ -32,6 +32,7 @@ import AiResponse from '../../shared/components/ai/AiResponse';
 import AiMarkdown from '../../shared/components/ai/AiMarkdown';
 import ModuleDocumentation from './ModuleDocumentation';
 import AnalysisProgress from '../repository/AnalysisProgress';
+import { useAIState } from '../../shared/context/AIContext';
 
 // ── Monaco language map ───────────────────────────────────────────────────────
 // Maps file extensions to Monaco language IDs.
@@ -110,6 +111,7 @@ export default function ExplorerPage() {
 
   const [moduleDocs,   setModuleDocs]    = useState(null);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+  const { aiState } = useAIState();
 
   // Monaco editor instance ref — used for revealLine / decorations
   const editorRef = useRef(null);
@@ -136,6 +138,10 @@ export default function ExplorerPage() {
   };
 
   const handleGenerateAi = async () => {
+    if (aiState.authState === 'unauthenticated') {
+      navigate('/auth/signin');
+      return;
+    }
     if (!selectedPath) return;
     setIsGeneratingAi(true);
     try {

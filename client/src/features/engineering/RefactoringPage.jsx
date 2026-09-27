@@ -18,6 +18,8 @@ import { useAIState } from '../../shared/context/AIContext';
 import { repositoryApi } from '../../shared/api';
 import AiResponse from '../../shared/components/ai/AiResponse';
 import PageHeader from '../../shared/components/PageHeader';
+import OpenSourceButton from '../../shared/components/OpenSourceButton';
+import { makeSourceRef } from '../../shared/navigation/sourceRef';
 
 // Palette constants — all in sync with CSS variables
 const PRIORITY_META = {
@@ -473,17 +475,11 @@ function CandidateDetail({ candidate, repoId }) {
           <ul className="space-y-1.5">
             {candidate.files?.map(f => {
               const range = candidate.fileRanges && candidate.fileRanges[f];
-              let url = `/explore/${repoId}/source?path=${encodeURIComponent(f)}`;
-              if (range?.startLine && range?.endLine) url += `&line=${range.startLine}-${range.endLine}`;
               return (
                 <li key={f} className="flex items-center gap-1.5 min-w-0">
-                  <File className="w-3 h-3 shrink-0 text-muted/50" />
-                  <Link to={url} className="text-xs  text-accent hover:underline truncate" title={f}>
-                    {f}
-                    {range?.startLine && (
-                      <span className="text-muted/50 ml-1.5">L{range.startLine}–{range.endLine}</span>
-                    )}
-                  </Link>
+                  <OpenSourceButton
+                    ref={makeSourceRef({ filePath: f, startLine: range?.startLine, endLine: range?.endLine })}
+                  />
                 </li>
               );
             })}

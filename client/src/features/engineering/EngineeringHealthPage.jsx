@@ -5,15 +5,19 @@
  * and then it applies them into visually categorized severity cards.
  */
 import React, { useState, useEffect } from 'react';
-import { Loader2, RefreshCw, ShieldAlert, Copy, Ghost, ArrowRight } from 'lucide-react';
+import { Loader2, RefreshCw, ShieldAlert, Copy, Ghost, ArrowRight, Sparkles, ExternalLink } from 'lucide-react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { repositoryApi } from '../../shared/api';
 import AiResponse from '../../shared/components/ai/AiResponse';
 import PageHeader from '../../shared/components/PageHeader';
 import { useToast } from '../../shared/context/ToastContext';
 import { useAIState } from '../../shared/context/AIContext';
+import ADRPanel from './ADRPanel';
+import OpenSourceButton from '../../shared/components/OpenSourceButton';
+import { FileText } from 'lucide-react';
+import { tryMakeSourceRef } from '../../shared/navigation/sourceRef';
 
-const RiskCard = ({ risk, repoId, navigate }) => {
+const RiskCard = ({ risk, repoId, navigate, onDraftAdr, onExplainAi }) => {
   /**
    * It evaluates the risk severity string, then extracts the specific priority level, 
    * and then it applies the corresponding Tailwind color badge.
@@ -27,8 +31,18 @@ const RiskCard = ({ risk, repoId, navigate }) => {
     return `px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-widest ${map[severity] || ''}`;
   };
 
+  // Build a canonical source reference when the risk points to a specific file
+  const sourceRef = risk.file
+    ? tryMakeSourceRef({
+        filePath: risk.file,
+        startLine: risk.evidence?.startLine ?? risk.location?.startLine,
+        endLine:   risk.evidence?.endLine   ?? risk.location?.endLine,
+        meta: { category: risk.category, severity: risk.severity },
+      })
+    : null;
+
   return (
-    <div className="rounded-xl border border-border bg-[#0d1117] flex flex-col overflow-hidden hover:border-accent/40 transition-colors shadow-lg h-72">
+    <div className="rounded-xl border border-border bg-[#0d1117] flex flex-col overflow-hidden hover:border-accent/40 transition-colors shadow-lg">
       <div className="p-5 flex-1 flex flex-col bg-gradient-to-b from-surface/50 to-transparent">
         <div className="flex items-start justify-between mb-3">
           <span className={getSeverityBadge(risk.severity)}>{risk.severity}</span>
@@ -37,27 +51,38 @@ const RiskCard = ({ risk, repoId, navigate }) => {
         <h3 className="text-base font-semibold text-text mb-2 line-clamp-2" title={risk.title}>{risk.title}</h3>
         <p className="text-xs text-muted line-clamp-3 leading-relaxed flex-1">{risk.description || risk.message}</p>
         
-        {risk.file && (
+        {sourceRef && (
           <div className="mt-4 pt-4 border-t border-white/5">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-medium text-text/70 uppercase tracking-widest">Target File</span>
             </div>
-            <Link
-              to={`/explore/${repoId}/source?path=${encodeURIComponent(risk.file)}`}
-              className="text-xs font-mono text-accent bg-accent/10 px-2 py-1.5 rounded truncate block hover:underline"
-              title={risk.file}
-            >
-              {risk.file.split('/').pop()}
-            </Link>
+            {/* Canonical navigation — no hand-built URLs */}
+            <OpenSourceButton ref={sourceRef} variant="button" className="w-full justify-start" />
           </div>
         )}
       </div>
-      <div className="bg-panel border-t border-border px-4 py-3 shrink-0 flex justify-end">
+      <div className="bg-panel border-t border-border px-4 py-3 shrink-0 flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => onDraftAdr(risk)}
+            className="text-xs font-medium text-text/80 hover:text-accent flex items-center gap-1 transition-colors"
+          >
+            <FileText className="w-3 h-3" /> Draft ADR
+          </button>
+          {onExplainAi && (
+            <button 
+              onClick={() => onExplainAi(risk)}
+              className="text-xs font-medium text-text/80 hover:text-accent flex items-center gap-1 transition-colors"
+            >
+              <Sparkles className="w-3 h-3" /> Explain
+            </button>
+          )}
+        </div>
         <button 
           onClick={() => navigate(`/explore/${repoId}/refactoring`)}
           className="text-xs font-medium text-text/80 hover:text-text flex items-center gap-1 transition-colors"
         >
-          Send to Triage <ArrowRight className="w-3 h-3" />
+          Triage <ArrowRight className="w-3 h-3" />
         </button>
       </div>
     </div>
@@ -77,6 +102,33 @@ const EngineeringHealthPage = () => {
   const [insights, setInsights] = useState(null);
   const [error, setError] = useState(null);
   const [loadingInsights, setLoadingInsights] = useState(false);
+  const [activeAdrRisk, setActiveAdrRisk] = useState(null);
+  // Risk selected for AI explanation — shown inline below the grid
+  const [explainRisk, setExplainRisk] = useState(null);
+  const [explainLoading, setExplainLoading] = useState(false);
+  const [explainResult, setExplainResult] = useState(null);
+
+  const handleExplainAi = async (risk) => {
+    if (aiState.authState === 'unauthenticated') { navigate('/auth/signin'); return; }
+    if (aiState.quotaStatus === 'exhausted') {
+      addToast({ title: 'Quota Exceeded', description: 'AI usage limit reached.', type: 'error' }); return;
+    }
+    if (aiState.status === 'offline') {
+      addToast({ title: 'AI Offline', description: 'No AI provider configured.', type: 'error' }); return;
+    }
+    setExplainRisk(risk);
+    setExplainResult(null);
+    setExplainLoading(true);
+    try {
+      const res = await repositoryApi.getRisks(repoId, { generateAi: true, singleRisk: risk });
+      setExplainResult(res.data?.insights || null);
+    } catch (err) {
+      addToast({ title: 'Explanation Failed', description: err.message, type: 'error' });
+      setExplainRisk(null);
+    } finally {
+      setExplainLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchData();
@@ -189,9 +241,12 @@ const EngineeringHealthPage = () => {
               </div>
               <p className="text-sm text-muted mb-3">These files are never imported or called from any entry point.</p>
               <div className="max-h-40 overflow-y-auto space-y-1 custom-scrollbar">
-                {deadCodeFiles.map(f => (
-                  <div key={f} className="text-xs font-mono text-muted bg-surface px-2 py-1 rounded truncate">{f}</div>
-                ))}
+                {deadCodeFiles.map(f => {
+                  const ref = tryMakeSourceRef({ filePath: f });
+                  return ref
+                    ? <div key={f} className="text-xs bg-surface px-2 py-1 rounded"><OpenSourceButton ref={ref} /></div>
+                    : <div key={f} className="text-xs font-mono text-muted bg-surface px-2 py-1 rounded truncate">{f}</div>;
+                })}
               </div>
             </div>
           )}
@@ -207,11 +262,17 @@ const EngineeringHealthPage = () => {
                 {clonesList.slice(0, 5).map((c, i) => (
                   <div key={i} className="text-sm bg-surface p-2 rounded">
                     <div className="text-text font-medium mb-1">Clone Group {i + 1} (Copied {c.count} times)</div>
-                    {c.instances.map((inst, idx) => (
-                      <div key={idx} className="text-xs font-mono text-muted truncate">
-                        • {inst.name || 'anonymous'} {inst.location?.startLine ? `(Line ${inst.location.startLine})` : ''}
-                      </div>
-                    ))}
+                    {c.instances.map((inst, idx) => {
+                      const iRef = inst.location?.file
+                        ? tryMakeSourceRef({ filePath: inst.location.file, startLine: inst.location.startLine })
+                        : null;
+                      return (
+                        <div key={idx} className="text-xs font-mono text-muted truncate flex items-center gap-1">
+                          • {inst.name || 'anonymous'}
+                          {iRef && <OpenSourceButton ref={iRef} variant="icon" />}
+                        </div>
+                      );
+                    })}
                   </div>
                 ))}
               </div>
@@ -321,13 +382,47 @@ const EngineeringHealthPage = () => {
           {fileFilter ? 'No engineering risks found for this specific file.' : 'No engineering risks identified. The codebase appears structurally healthy.'}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredRisks.map((risk) => (
-            <RiskCard key={risk.id} risk={risk} repoId={repoId} navigate={navigate} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {filteredRisks.map((risk) => (
+              <RiskCard
+                key={risk.id}
+                risk={risk}
+                repoId={repoId}
+                navigate={navigate}
+                onDraftAdr={setActiveAdrRisk}
+                onExplainAi={handleExplainAi}
+              />
+            ))}
+          </div>
+
+          {/* Inline AI explanation panel */}
+          {explainRisk && (
+            <div className="mt-6 rounded-lg border border-accent/30 bg-accent/5 p-5">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-semibold text-accent flex items-center gap-2"><Sparkles className="w-4 h-4" /> AI Explanation — {explainRisk.title}</span>
+                <button onClick={() => { setExplainRisk(null); setExplainResult(null); }} className="text-muted hover:text-text text-xs">Dismiss</button>
+              </div>
+              {explainLoading && <div className="flex items-center gap-2 text-muted text-sm"><Loader2 className="w-4 h-4 animate-spin" /> Generating explanation...</div>}
+              {explainResult && (
+                <AiResponse
+                  repoId={repoId}
+                  chatId={`health-explain-${explainRisk.id}`}
+                  data={{
+                    summary: explainResult.summary,
+                    recommendations: explainResult.recommendations,
+                    inferences: explainResult.observations,
+                  }}
+                  title="AI Explanation"
+                />
+              )}
+            </div>
+          )}
+        </>
       )}
       </div>
+      
+      <ADRPanel repoId={repoId} risk={activeAdrRisk} onClose={() => setActiveAdrRisk(null)} />
     </div>
   );
 };

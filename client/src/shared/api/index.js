@@ -20,13 +20,14 @@ import { analyzeChangeImpact } from '../../services/analyzer/advanced/change.imp
 import { buildQuestionContext } from '../../services/analyzer/advanced/question.context.js';
 import { buildPrompt } from '../../services/analyzer/advanced/base.context.js';
 import { buildOverviewContext, buildModuleContext, buildOverviewPrompt, buildModulePrompt } from '../../services/analyzer/advanced/documentation.context.js';
+import { aiArtifactStore, buildCacheKey } from '../../services/storage/aiArtifact.store.js';
 
 // It initiates the axios instance, then extracts the base configuration, and then it applies a timeout for LLM proxy calls.
 const api = axios.create({
   baseURL: import.meta.env.PROD ? import.meta.env.VITE_API_URL : '/api',
   timeout: 60_000,
 });
-
+console.log(import.meta.env.PROD ? import.meta.env.VITE_API_URL : '/api')
 api.interceptors.request.use(async (config) => {
   const { data: { session } } = await supabase.auth.getSession();
   if (session?.access_token) {
@@ -179,6 +180,8 @@ export const repositoryApi = {
     
     await repositoryStore.clearAnalysis(id);
     await repositoryStore.update(id, { status: 'analyzing', phase: 'uploading' });
+    // Bust stale AI artifact cache so docs/ADRs are re-generated against the new analysis
+    aiArtifactStore.invalidateRepo(id).catch(() => {});
     
     startAnalysis(id, options).catch(err => {
       console.error('Background analysis failed:', err);
@@ -191,10 +194,12 @@ export const repositoryApi = {
     if (action === 'delete') {
       for (const id of ids) {
         await repositoryStore.remove(id);
+        aiArtifactStore.invalidateRepo(id).catch(() => {});
       }
     } else if (action === 'clear_analysis') {
       for (const id of ids) {
         await repositoryStore.clearAnalysis(id);
+        aiArtifactStore.invalidateRepo(id).catch(() => {});
       }
     }
     return { data: { success: true } };
@@ -648,6 +653,52 @@ ${originalCode}
     
     return { data: { facts: context, aiInterpretation: null } };
   },
+
+  async generateADR(repoId, findingContext) {
+    // ── Cache check (before calling the AI proxy) ────────────────────────
+    const record = await repositoryStore.get(repoId).catch(() => null);
+    const cacheKey = buildCacheKey(repoId, 'adr', findingContext.id || findingContext.title || '');
+    const analysisVersion = record?.analysisVersion;
+    const cached = await aiArtifactStore.get(cacheKey, analysisVersion);
+    if (cached) return { data: cached };
+
+    const prompt = `You are a Principal Software Architect. Given the following engineering/architecture finding, draft an Architecture Decision Record (ADR) that addresses this issue.
+
+Context:
+Title: ${findingContext.title}
+Category: ${findingContext.category}
+Severity: ${findingContext.severity}
+Description: ${findingContext.description}
+File/Evidence: ${findingContext.file || findingContext.evidence || 'N/A'}
+
+Produce a structured JSON response matching this exact schema:
+{
+  "title": "A short, concise title for the ADR",
+  "status": "Proposed",
+  "context": "Background and description of the current situation and the finding.",
+  "decision": "The proposed change or decision to resolve the issue.",
+  "consequences": "Positive and negative consequences of this decision.",
+  "alternatives": "Other options that were considered and why they were rejected.",
+  "evidence": "References to the specific finding, file, or architectural rule."
+}`;
+
+    const aiResponse = await api.post('/ai/chat', { prompt, jsonMode: true });
+    let adr = null;
+    try {
+      const raw = (aiResponse.data.response || '').trim().replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+      adr = JSON.parse(raw);
+    } catch (e) {
+      throw new Error('Failed to generate ADR: Invalid AI response format');
+    }
+    
+    adr.id = uuidv4();
+    adr.date = new Date().toISOString().split('T')[0];
+
+    // ── Store result in cache ────────────────────────────────────────────
+    await aiArtifactStore.set(cacheKey, adr, { analysisVersion });
+    
+    return { data: adr };
+  },
   
   async getModuleDocumentation(id, path, options = {}) {
     const record = await repositoryStore.get(id);
@@ -657,6 +708,13 @@ ${originalCode}
     const context = buildModuleContext(record.analysis, record.analysis.graph, architecture, path);
 
     if (options.generateAi) {
+      // ── Cache check (before calling the AI proxy) ────────────────────────
+      const cacheKey = buildCacheKey(id, 'module_doc', path);
+      const cached = await aiArtifactStore.get(cacheKey, record.analysisVersion);
+      if (cached) {
+        return { data: { facts: context, aiInterpretation: cached, fromCache: true } };
+      }
+
       const prompt = buildModulePrompt(context);
       const aiResponse = await api.post(`/ai/chat`, { prompt, jsonMode: true });
       let aiInterpretation = null;
@@ -667,6 +725,12 @@ ${originalCode}
       } catch (e) {
         console.warn('[getModuleDocumentation] Failed to parse AI JSON:', e.message);
       }
+
+      // ── Store result in cache ────────────────────────────────────────────
+      if (aiInterpretation) {
+        await aiArtifactStore.set(cacheKey, aiInterpretation, { analysisVersion: record.analysisVersion });
+      }
+
       return { data: { facts: context, aiInterpretation } };
     }
     

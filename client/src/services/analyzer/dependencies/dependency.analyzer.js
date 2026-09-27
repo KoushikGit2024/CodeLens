@@ -15,11 +15,11 @@ import { createAnalysisNode, createAnalysisEdge } from '../parsing/symbols.js';
 
 // ── Node/edge ID helpers ──────────────────────────────────────────────────────
 
-function fileNodeId(filePath) {
+export function fileNodeId(filePath) {
   return `file:${filePath}`;
 }
 
-function packageNodeId(name) {
+export function packageNodeId(name) {
   return `pkg:${name}`;
 }
 

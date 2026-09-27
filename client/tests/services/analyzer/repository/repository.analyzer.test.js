@@ -91,7 +91,7 @@ describe('repository.analyzer.js', () => {
 
   test('skips unsupported languages', async () => {
     const { cleanup } = await setupFakeRepo(repoId, {
-      'unknown.go': 'package main',
+      'unknown.cobol': 'IDENTIFICATION DIVISION.',
       'index.js': 'let x = 1;',
     });
 

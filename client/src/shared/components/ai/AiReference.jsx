@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { FileText, MapPin } from 'lucide-react';
+import { buildSourceUrl, makeSourceRef } from '../../navigation/sourceRef';
 
 /**
  * Parses a reference string like "[src/app.js:10-20]" or "src/app.js"
@@ -44,7 +45,7 @@ export default function AiReference({ reference, onNavigate }) {
     }
   };
 
-  const toUrl = `/explore/${repoId}/source?path=${encodeURIComponent(path)}${line ? `&line=${line}` : ''}`;
+  const toUrl = buildSourceUrl(repoId, makeSourceRef({ filePath: path, startLine: line }));
 
   return (
     <div className="flex flex-col gap-1 w-full max-w-sm min-w-0">
