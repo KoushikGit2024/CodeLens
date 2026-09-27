@@ -1,4 +1,4 @@
-import { RefreshCw, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { RefreshCw, Loader2, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Breadcrumbs from '../ui/Breadcrumbs';
@@ -69,6 +69,16 @@ export default function RepositoryHeader() {
       )}
 
       <div className="flex items-center gap-3 z-10">
+        <button
+          onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', ctrlKey: true }))}
+          className="flex items-center gap-2 text-xs text-muted hover:text-white transition-colors border border-border/50 bg-surface/50 hover:bg-surface rounded-md px-2 py-1"
+          title="Search Files (Ctrl+P)"
+        >
+          <Search className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Search...</span>
+          <kbd className="hidden sm:inline-block font-sans text-[10px] px-1.5 py-0 rounded-sm bg-black/20 border border-white/10 text-muted ml-1">Ctrl+P</kbd>
+        </button>
+
         <button
           onClick={handleReanalyze}
           disabled={reanalyzing}

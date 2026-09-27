@@ -4,6 +4,7 @@ import RepositorySidebar from './RepositorySidebar';
 import RepositoryHeader from './RepositoryHeader';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { RepositoryProvider } from '../context/RepositoryContext';
+import GlobalCommandPalette from '../components/GlobalCommandPalette';
 
 export default function RepositoryShell() {
   const { repoId } = useParams();
@@ -20,6 +21,7 @@ export default function RepositoryShell() {
 
   return (
     <RepositoryProvider>
+      <GlobalCommandPalette />
       <div className="h-screen w-full flex bg-surface text-white overflow-hidden font-sans">
         <RepositorySidebar />
 

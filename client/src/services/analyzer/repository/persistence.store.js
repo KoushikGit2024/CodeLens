@@ -59,6 +59,33 @@ export async function getDB() {
         }
       }
     },
+
+    /**
+     * It detects that another tab is blocking the version upgrade, then extracts
+     * the stale tab scenario, and then it applies a hard reload to unblock the upgrade.
+     * This fires in the NEW tab when an OLD tab still holds an older DB connection open.
+     */
+    blocked(currentVersion, blockedVersion, event) {
+      console.warn(
+        `[CodeLens] IndexedDB upgrade from v${currentVersion} to v${blockedVersion} is blocked by another tab. ` +
+        'Reloading to apply the latest schema...'
+      );
+      // Give the user a moment to see any pending work, then reload
+      setTimeout(() => window.location.reload(), 1500);
+    },
+
+    /**
+     * It detects that this tab is the stale one holding an older connection open,
+     * then extracts the blocking scenario, and then it closes this connection so
+     * the newer tab can upgrade successfully.
+     */
+    blocking(currentVersion, blockedVersion, event) {
+      console.warn(
+        `[CodeLens] This tab is blocking a DB upgrade to v${blockedVersion}. Closing connection.`
+      );
+      // Close our connection — the IDB upgrade in the other tab will then proceed
+      event.target.close();
+    },
   });
 
   return Promise.race([dbPromise, timeoutPromise]);

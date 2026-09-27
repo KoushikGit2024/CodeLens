@@ -16,7 +16,7 @@ import { Link, useParams } from 'react-router-dom';
 import { FileText, MapPin, ExternalLink } from 'lucide-react';
 import { buildSourceUrl } from '../navigation/sourceRef';
 
-export default function OpenSourceButton({ ref: sourceRef, label, className = '', variant = 'link' }) {
+const OpenSourceButton = React.forwardRef(({ label, className = '', variant = 'link' }, sourceRef) => {
   const { repoId } = useParams();
 
   // Nothing to navigate to
@@ -67,4 +67,6 @@ export default function OpenSourceButton({ ref: sourceRef, label, className = ''
       {displayLabel}
     </Link>
   );
-}
+});
+
+export default OpenSourceButton;

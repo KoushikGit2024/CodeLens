@@ -596,7 +596,7 @@ ${originalCode}
    * It maps the active file context, then extracts local database loaders, 
    * and then it applies the context builder to proxy structured prompts to the LLM.
    */
-  async askQuestion(id, question, activeContext, history = []) {
+  async askQuestion(id, question, activeContext, history = [], options = {}) {
     const record = await repositoryStore.get(id);
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Analysis not available');
 
@@ -604,9 +604,10 @@ ${originalCode}
     // The server-side formatWithHistory() will prepend prior turns so the model
     // already has grounding — re-scoring every file on each message is pure waste.
     const isFirstTurn = !history || history.length === 0;
+    const reqOptions = options.signal ? { signal: options.signal } : {};
 
     if (!isFirstTurn) {
-      return api.post(`/ai/chat`, { prompt: question, history });
+      return api.post(`/ai/chat`, { prompt: question, history }, reqOptions);
     }
 
     // First turn only: build full deterministic context and attach it to the prompt.
@@ -625,7 +626,7 @@ ${originalCode}
       ? `Facts:\n${contextData.facts.join('\n')}\n\n${rawPrompt}` 
       : rawPrompt;
 
-    return api.post(`/ai/chat`, { prompt: fullPrompt, history });
+    return api.post(`/ai/chat`, { prompt: fullPrompt, history }, reqOptions);
   },
 
   async getOverviewDocumentation(id, options = {}) {

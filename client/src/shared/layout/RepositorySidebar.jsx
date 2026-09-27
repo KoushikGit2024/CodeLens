@@ -15,7 +15,8 @@ import {
   ChevronDown,
   ChevronRight,
   User,
-  LogIn
+  LogIn,
+  FolderTree
 } from 'lucide-react';
 import { Logo } from '../components/Logo';
 import { useAuth } from '../context/AuthContext';
@@ -27,7 +28,8 @@ const NAV_GROUPS = [
     title: 'Repository',
     items: [
       { id: 'overview', label: 'Overview', icon: LayoutDashboard, to: '' },
-      { id: 'source', label: 'Files', icon: FileCode2, to: 'source' },
+      { id: 'tree', label: 'File Tree', icon: FolderTree, to: 'tree' },
+      { id: 'source', label: 'Source Explorer', icon: FileCode2, to: 'source' },
       { id: 'architecture', label: 'Architecture', icon: Box, to: 'architecture' },
       { id: 'graph', label: 'Dependencies', icon: GitMerge, to: 'graph' },
     ]

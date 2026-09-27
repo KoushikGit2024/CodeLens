@@ -160,11 +160,11 @@ export function ResizableLayout({ panels, className = "h-full w-full" }) {
 
                 {/* Collapse Buttons on Resizer */}
                 {!(collapsed[index] || collapsed[index + 1]) && (
-                  <div className="absolute top-6 flex flex-col gap-2 z-50">
+                  <div className="absolute top-6 left-1/2 flex flex-col gap-2 z-50">
                     {panels[index].collapsible && panels[index].collapseDirection === 'left' && (
                       <button
                         onClick={(e) => { e.stopPropagation(); toggleCollapse(index); }}
-                        className="w-4 h-8 flex items-center justify-center bg-surface border border-border rounded-l shadow-sm text-muted hover:text-accent hover:border-accent transition-colors -translate-x-[15px] cursor-pointer"
+                        className="w-4 h-8 flex items-center justify-center bg-surface border border-border border-r-0 rounded-l shadow-sm text-muted hover:text-accent hover:border-accent transition-colors -translate-x-full cursor-pointer"
                         title={`Collapse ${panels[index].title || 'Panel'}`}
                       >
                         <ChevronLeft className="w-3 h-3" />
@@ -173,7 +173,7 @@ export function ResizableLayout({ panels, className = "h-full w-full" }) {
                     {panels[index + 1].collapsible && panels[index + 1].collapseDirection === 'right' && (
                       <button
                         onClick={(e) => { e.stopPropagation(); toggleCollapse(index + 1); }}
-                        className="w-4 h-8 flex items-center justify-center bg-surface border border-border rounded-r shadow-sm text-muted hover:text-accent hover:border-accent transition-colors translate-x-[1px] cursor-pointer"
+                        className="w-4 h-8 flex items-center justify-center bg-surface border border-border border-l-0 rounded-r shadow-sm text-muted hover:text-accent hover:border-accent transition-colors cursor-pointer"
                         title={`Collapse ${panels[index + 1].title || 'Panel'}`}
                       >
                         <ChevronRight className="w-3 h-3" />

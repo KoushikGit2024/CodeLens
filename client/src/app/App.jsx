@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import UploadPage from '../features/repository/UploadPage';
 import ExplorerPage from '../features/explorer/ExplorerPage';
+import FileTreePage from '../features/explorer/FileTreePage';
 import DependencyGraphPage from '../features/dependencies/DependencyGraphPage';
 import ArchitecturePage from '../features/architecture/ArchitecturePage';
 
@@ -46,6 +47,7 @@ export default function App() {
               {/* The Canonical Repository Routes */}
               <Route path="/explore/:repoId" element={<RepositoryShell />}>
                 <Route index element={<RepositoryIntelligencePage />} />
+                <Route path="tree" element={<FileTreePage />} />
                 <Route path="source" element={<ExplorerPage />} />
                 <Route path="graph" element={<DependencyGraphPage />} />
                 <Route path="architecture" element={<ArchitecturePage />} />
