@@ -89,6 +89,18 @@ const MONACO_OPTIONS = {
   fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace",
 };
 
+function isDirectory(tree, path) {
+  if (!tree || !path) return false;
+  for (const node of tree) {
+    if (node.path === path) return node.type === 'directory';
+    if (node.children) {
+      const found = isDirectory(node.children, path);
+      if (found) return true;
+    }
+  }
+  return false;
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function ExplorerPage() {
@@ -182,6 +194,12 @@ export default function ExplorerPage() {
       setFileLoading(true);
       setFileContent(null);
 
+      if (fileTree && isDirectory(fileTree, selectedPath)) {
+        setFileError('DIRECTORY');
+        setFileLoading(false);
+        return;
+      }
+
       try {
         const [fileRes, docsRes] = await Promise.allSettled([
           repositoryApi.getFile(repoId, selectedPath),
@@ -213,7 +231,7 @@ export default function ExplorerPage() {
     fetchFile();
 
     return () => { active = false; };
-  }, [repoId, selectedPath]);
+  }, [repoId, selectedPath, fileTree]);
 
   // ── Line highlighting Effect ───────────────────────────────────────────────
   useEffect(() => {
@@ -443,6 +461,16 @@ export default function ExplorerPage() {
  *   editor  — Monaco
  */
 function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMount, viewMode, setViewMode, moduleDocs, onGenerateAi, isGeneratingAi }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyCode = () => {
+    if (fileContent?.content) {
+      navigator.clipboard.writeText(fileContent.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   if (!filePath) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-muted gap-2">
@@ -453,19 +481,34 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
   }
 
   const header = (
-    <div className="flex items-center justify-center px-4 pt-2 bg-panel border-b border-border shadow-sm shrink-0 z-10 gap-6">
-      <button 
-        onClick={() => setViewMode('source')} 
-        className={`px-4 py-2 text-xs font-medium border-b-2 transition-all ${viewMode === 'source' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-white hover:border-border'}`}
-      >
-        Source Code
-      </button>
-      <button 
-        onClick={() => setViewMode('docs')} 
-        className={`px-4 py-2 text-xs font-medium border-b-2 transition-all ${viewMode === 'docs' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-white hover:border-border'}`}
-      >
-        Documentation
-      </button>
+    <div className="flex items-center justify-between px-4 pt-2 bg-panel border-b border-border shadow-sm shrink-0 z-10">
+      <div className="flex-1"></div>
+      <div className="flex items-center gap-6">
+        <button 
+          onClick={() => setViewMode('source')} 
+          className={`px-4 py-2 text-xs font-medium border-b-2 transition-all ${viewMode === 'source' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-white hover:border-border'}`}
+        >
+          Source Code
+        </button>
+        <button 
+          onClick={() => setViewMode('docs')} 
+          className={`px-4 py-2 text-xs font-medium border-b-2 transition-all ${viewMode === 'docs' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-white hover:border-border'}`}
+        >
+          Documentation
+        </button>
+      </div>
+      <div className="flex-1 flex justify-end">
+        {viewMode === 'source' && fileContent?.content && (
+          <button 
+            onClick={handleCopyCode}
+            className="flex items-center gap-1.5 px-2 py-1 mb-1 rounded text-xs text-muted hover:text-white hover:bg-white/10 transition-colors"
+            title="Copy source code"
+          >
+            {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+            {copied ? <span className="text-green-400">Copied!</span> : <span>Copy</span>}
+          </button>
+        )}
+      </div>
     </div>
   );
 
@@ -483,6 +526,16 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
         <div className="flex-1 flex items-center justify-center gap-3">
           <Loader2 className="w-5 h-5 text-accent animate-spin" />
           <span className="text-muted text-sm">Loading {filePath.split('/').pop()}…</span>
+        </div>
+      );
+    } else if (error === 'DIRECTORY') {
+      content = (
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 text-muted bg-surface/50">
+          <Folder className="w-16 h-16 text-yellow-400 opacity-80" />
+          <div className="text-center">
+            <p className="text-sm font-medium text-white mb-1">Folder Selected</p>
+            <p className="text-xs max-w-sm">Select a file within this directory from the tree to view its source code.</p>
+          </div>
         </div>
       );
     } else if (error) {

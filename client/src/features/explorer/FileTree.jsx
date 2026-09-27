@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ChevronRight, Folder, FolderOpen, FileCode } from 'lucide-react';
 
 // Maps file extensions to a colour class for the file icon
@@ -81,32 +81,74 @@ function FileTreeNode({
   node, depth, selectedPath, onSelectFile, 
   mode, selectedFiles, onToggleFile, searchTerm, highlightMatch 
 }) {
-  // Sets all folders to be open by default
-  const [open, setOpen] = useState(true);
+  const cleanSelectedPath = selectedPath ? decodeURIComponent(selectedPath).replace(/\/$/, '') : null;
+  const cleanNodePath = node.path.replace(/\/$/, '');
   
-  const isSelected = mode === 'navigate' ? node.path === selectedPath : false;
+  const isSelected = mode === 'navigate' ? cleanNodePath === cleanSelectedPath : false;
   const isChecked = mode === 'select' ? selectedFiles.includes(node.path) : false;
-  const isAncestor = selectedPath?.startsWith(node.path + '/');
+  const isAncestor = cleanSelectedPath?.startsWith(cleanNodePath + '/');
+  const isSelectedFileAncestor = mode === 'select' && selectedFiles?.some(f => f.startsWith(cleanNodePath + '/'));
+  
+  const [open, setOpen] = useState(true);
   const indentPx = depth * 14;
 
+  const nodeRef = useRef(null);
+
   useEffect(() => {
-    if (isAncestor || Boolean(searchTerm)) {
+    if (isAncestor || isSelected || isSelectedFileAncestor || Boolean(searchTerm)) {
       setOpen(true);
     }
-  }, [isAncestor, searchTerm]);
+  }, [isAncestor, isSelected, isSelectedFileAncestor, searchTerm]);
+
+  useEffect(() => {
+    if (isSelected && nodeRef.current) {
+      // Small delay to ensure parents have expanded first
+      setTimeout(() => {
+        const node = nodeRef.current;
+        if (!node) return;
+        
+        // Find the specific sidebar scrolling container to avoid scrolling the whole page or code pane
+        const container = node.closest('.overflow-y-auto') || node.closest('.custom-scrollbar');
+        if (container) {
+          const containerRect = container.getBoundingClientRect();
+          const nodeRect = node.getBoundingClientRect();
+          
+          // Calculate how far the node is from the top of the container
+          const relativeTop = nodeRect.top - containerRect.top;
+          
+          // Calculate the target scroll position to place the node in the upper-middle (~33% from top)
+          const targetScroll = container.scrollTop + relativeTop - (containerRect.height * 0.33);
+          
+          container.scrollTo({ top: targetScroll, behavior: 'smooth' });
+        } else {
+          // Fallback if no container is found
+          node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+    }
+  }, [isSelected]);
 
   if (node.type === 'directory') {
     const hasChildren = node.children?.length > 0;
     return (
-      <li>
+      <li ref={isSelected ? nodeRef : null}>
         <button
-          onClick={() => setOpen((o) => !o)}
+          onClick={() => {
+            setOpen((o) => !o);
+            if (mode === 'navigate' && onSelectFile) {
+              onSelectFile(node.path);
+            }
+          }}
           style={{ paddingLeft: `${indentPx + 4}px` }}
-          className="w-full text-left flex items-center gap-1.5 py-[3px] pr-2 rounded text-xs group text-text/60 hover:text-text hover:bg-white/5 transition-colors"
+          className={`w-full text-left flex items-center gap-1.5 py-[3px] pr-2 rounded text-xs group transition-colors ${
+            isSelected 
+              ? 'bg-accent/15 border-l-2 border-accent text-accent font-medium' 
+              : 'text-text/60 hover:text-text hover:bg-white/5 border-l-2 border-transparent'
+          }`}
           title={node.name}
         >
           {/* chevron */}
-          <span className="shrink-0 w-3 h-3 flex items-center justify-center text-text/30 group-hover:text-text/60">
+          <span className={`shrink-0 w-3 h-3 flex items-center justify-center ${isSelected ? 'text-accent' : 'text-text/30 group-hover:text-text/60'}`}>
             <ChevronRight
               className={`w-3 h-3 transition-transform duration-150 ${
                 open && hasChildren ? 'rotate-90' : ''
@@ -116,8 +158,8 @@ function FileTreeNode({
           {/* folder icon */}
           <span className="shrink-0">
             {open && hasChildren
-              ? <FolderOpen className="w-3.5 h-3.5 text-yellow-400/80" />
-              : <Folder className="w-3.5 h-3.5 text-yellow-400/60" />
+              ? <FolderOpen className={`w-3.5 h-3.5 ${isSelected ? 'text-accent' : 'text-yellow-400/80'}`} />
+              : <Folder className={`w-3.5 h-3.5 ${isSelected ? 'text-accent' : 'text-yellow-400/60'}`} />
             }
           </span>
           {/* label */}
@@ -126,7 +168,7 @@ function FileTreeNode({
           </span>
           {/* child count badge */}
           {hasChildren && (
-            <span className="ml-auto shrink-0 text-[9px] text-text/20 group-hover:text-text/40 tabular-nums">
+            <span className={`ml-auto shrink-0 text-[9px] tabular-nums ${isSelected ? 'text-accent/60' : 'text-text/20 group-hover:text-text/40'}`}>
               {node.children.filter(c => c.type === 'file').length > 0
                 ? node.children.filter(c => c.type === 'file').length
                 : ''}
@@ -196,7 +238,7 @@ function FileTreeNode({
   );
 
   return (
-    <li>
+    <li ref={isSelected ? nodeRef : null}>
       {mode === 'select' ? (
         <label 
           style={{ paddingLeft: `${indentPx + 4}px` }} 
