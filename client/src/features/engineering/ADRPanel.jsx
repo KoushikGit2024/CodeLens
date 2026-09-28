@@ -78,13 +78,13 @@ ${adr.evidence}
 
   return (
     <div className="fixed inset-y-0 right-0 w-[600px] max-w-[90vw] bg-surface border-l border-border shadow-2xl z-50 flex flex-col transform transition-transform duration-300">
-      <div className="px-6 py-4 border-b border-border flex items-center justify-between shrink-0 bg-panel">
-        <div className="flex items-center gap-3">
-          <FileText className="w-5 h-5 text-accent" />
-          <h2 className="text-lg font-semibold text-text">Draft Architecture Decision Record</h2>
+      <div className="h-12 px-4 border-b border-border flex items-center justify-between shrink-0 bg-panel">
+        <div className="flex items-center gap-2.5">
+          <FileText className="w-4 h-4 text-accent" />
+          <h2 className="text-sm font-semibold text-text">Draft Architecture Decision Record</h2>
         </div>
-        <button onClick={onClose} className="p-2 text-muted hover:text-text rounded-md hover:bg-surface transition-colors">
-          <X className="w-5 h-5" />
+        <button onClick={onClose} className="p-1.5 text-muted hover:text-text rounded hover:bg-surface transition-colors">
+          <X className="w-4 h-4" />
         </button>
       </div>
 

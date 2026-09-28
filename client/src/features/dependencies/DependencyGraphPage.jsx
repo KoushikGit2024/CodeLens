@@ -411,7 +411,7 @@ export default function DependencyGraphPage() {
                 <p className="text-muted" style={{ fontSize: 10 }}>Show npm/system packages</p>
               </section>
 
-              {graph?.gitChurn && (
+              {/* graph?.gitChurn && (
                 <section className="border-t border-border pt-3">
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-medium text-text">Git Churn</span>
@@ -424,7 +424,7 @@ export default function DependencyGraphPage() {
                   </div>
                   <p className="text-muted" style={{ fontSize: 10 }}>Overlay churn risk on nodes</p>
                 </section>
-              )}
+              ) */}
 
               {/* Reverted back to Directories map */}
               {layoutType === 'clustered' && dirColorMap.size > 0 && (

@@ -18,7 +18,8 @@ import {
   LogIn,
   FolderTree,
   Bookmark,
-  GitCommit
+  GitCommit,
+  Info
 } from 'lucide-react';
 import { Logo } from '../components/Logo';
 import { useAuth } from '../context/AuthContext';
@@ -48,7 +49,7 @@ const NAV_GROUPS = [
     items: [
       { id: 'architecture', label: 'Architecture', icon: Box, to: 'architecture' },
       { id: 'graph', label: 'Dependencies', icon: GitMerge, to: 'graph' },
-      { id: 'git', label: 'Git History', icon: GitCommit, to: 'git' },
+      // { id: 'git', label: 'Git History', icon: GitCommit, to: 'git' },
     ]
   },
   {
@@ -58,6 +59,13 @@ const NAV_GROUPS = [
       { id: 'health', label: 'Security & Health', icon: ShieldAlert, to: 'health' },
       { id: 'refactoring', label: 'Refactoring', icon: Wrench, to: 'refactoring' },
       { id: 'impact', label: 'Impact Analysis', icon: Activity, to: 'impact' },
+    ]
+  },
+  {
+    id: 'system',
+    title: 'System',
+    items: [
+      { id: 'about', label: 'About CodeLens', icon: Info, to: 'about' },
     ]
   }
 ];

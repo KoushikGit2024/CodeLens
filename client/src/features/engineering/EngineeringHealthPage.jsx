@@ -270,7 +270,7 @@ const EngineeringHealthPage = () => {
         </div>
       </div>
 
-      <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className="rounded border border-border bg-panel p-4">
           <div className="text-sm text-muted">Total Risks</div>
           <div className="mt-1 text-2xl font-semibold">{model.metrics?.totalRisks || 0}</div>
@@ -287,7 +287,7 @@ const EngineeringHealthPage = () => {
           <div className="text-sm text-amber-400">Warnings</div>
           <div className="mt-1 text-2xl font-semibold">{model.metrics?.warning || 0}</div>
         </div>
-        <div className={`rounded border p-4 ${
+        {/* <div className={`rounded border p-4 ${
           model.gitChurnAvailable
             ? 'border-orange-500/30 bg-orange-500/10'
             : 'border-border bg-panel'
@@ -301,7 +301,7 @@ const EngineeringHealthPage = () => {
           {!model.gitChurnAvailable && (
             <div className="text-[10px] text-muted mt-1">Upload with .git folder</div>
           )}
-        </div>
+        </div> */}
       </div>
 
       {(deadCodeFiles.length > 0 || clonesList.length > 0) && (
@@ -355,7 +355,7 @@ const EngineeringHealthPage = () => {
       )}
 
       {/* Git Churn Table */}
-      {model.gitChurnAvailable && model.churnTable && model.churnTable.length > 0 && (
+      {/* {model.gitChurnAvailable && model.churnTable && model.churnTable.length > 0 && (
         <div className="mb-8 rounded-xl border border-orange-500/20 bg-orange-500/5 overflow-hidden">
           <div className="flex items-center gap-2 px-5 py-4 border-b border-orange-500/20">
             <TrendingUp className="w-5 h-5 text-orange-400" />
@@ -398,7 +398,7 @@ const EngineeringHealthPage = () => {
             </table>
           </div>
         </div>
-      )}
+      )} */}
 
       {insights && (
         <div className="mb-8 rounded-lg border border-accent/30 bg-accent/10 p-6">
