@@ -153,7 +153,6 @@ const ImpactNode = ({ data }) => {
         borderRadius: 8,
         border: `2px solid ${border}`,
         background: bg,
-        backdropFilter: 'blur(6px)',
         padding: '10px',
         color: `rgb(${getComputedStyle(document.documentElement).getPropertyValue('--color-text').trim()})`,
         fontFamily: 'monospace',
@@ -265,7 +264,14 @@ export default function ImpactPage() {
       rfNodes.push({
         id: `file:${file}`,
         type: 'impactNode',
-        data: { label, fullPath: file, impactLevel },
+        data: { 
+          label, 
+          fullPath: file, 
+          impactLevel,
+          exportBg: impactLevel === 'changed' ? '#da3633cc' : impactLevel === 'direct' ? '#d29922cc' : '#8957e5cc',
+          exportBorder: impactLevel === 'changed' ? '#ff7b72' : impactLevel === 'direct' ? '#e3b341' : '#a371f7',
+          exportText: '#FFFFFF'
+        },
         position: { x: 0, y: 0 } 
       });
     });

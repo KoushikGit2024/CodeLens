@@ -46,7 +46,6 @@ const ArchNode = ({ data }) => {
         borderRadius: data.isExternal ? 16 : 8,
         border: isViolating ? '2px solid #ff7b72' : isFocused ? `2px solid ${colors.border}` : `1px solid ${colors.border}66`,
         background: isViolating ? '#3d1a1acc' : isFocused ? `${colors.bg}dd` : `${colors.bg}55`,
-        backdropFilter: 'blur(6px)',
         boxShadow: isFocused ? `0 0 16px ${colors.border}66` : 'none',
         opacity: data.isFaded ? 0.15 : 1,
         overflow: 'hidden',
@@ -254,17 +253,23 @@ function graphToFlow(components = [], relations = [], selectedId, violations = [
 
   let rfNodes = components.map(c => {
     const label = c.data?.label ?? c.id;
+    const layer = c.data?.layer ?? c.layer;
+    const isViolating = violatingNames.has(label);
+    const colors = layerColor(layer, false);
     return {
       id: label,
       type: 'archNode',
       data: {
         label,
-        layer: c.data?.layer ?? c.layer,
+        layer,
         isExternal: false,
-        isViolating: violatingNames.has(label),
+        isViolating,
         isFocused: label === selectedId,
         isFaded: selectedId ? !connectedNodes.has(label) : false,
         health: c.health,
+        exportBg: isViolating ? '#3d1a1a' : `${colors.bg}dd`,
+        exportBorder: isViolating ? '#ff7b72' : colors.border,
+        exportText: '#CBD5E8'
       },
       position: { x: 0, y: 0 },
       zIndex: 2,
@@ -274,6 +279,7 @@ function graphToFlow(components = [], relations = [], selectedId, violations = [
   // External targets
   relations.forEach(r => {
     if (r.targetType === 'external' && !rfNodes.find(n => n.id === r.target)) {
+      const colors = layerColor(null, true);
       rfNodes.push({
         id: r.target,
         type: 'archNode',
@@ -284,6 +290,9 @@ function graphToFlow(components = [], relations = [], selectedId, violations = [
           isViolating: false,
           isFocused: r.target === selectedId,
           isFaded: selectedId ? !connectedNodes.has(r.target) : false,
+          exportBg: `${colors.bg}dd`,
+          exportBorder: colors.border,
+          exportText: '#CBD5E8'
         },
         position: { x: 0, y: 0 },
         zIndex: 2,
@@ -655,7 +664,7 @@ export default function ArchitecturePage() {
           minWidth: 300,
           collapsible: false,
           content: (
-            <main ref={diagramRef} className="flex-1 overflow-auto bg-surface shadow-inner relative flex justify-center custom-scrollbar h-full w-full">
+            <main ref={diagramRef} className="flex-1 bg-surface shadow-inner relative flex flex-col justify-center h-full w-full">
               <div className="export-element-breadcrumbs absolute top-4 left-4 z-20 pointer-events-auto">
                 <ContextBreadcrumbs 
                   domain="Architecture" 
@@ -687,7 +696,7 @@ export default function ArchitecturePage() {
               </div>
               
               {viewMode === 'mermaid' ? (
-                <div className="w-full h-full pt-16">
+                <div className="w-full h-full pt-16 overflow-auto custom-scrollbar">
                   <MermaidViewer diagramStr={mermaidStr} repoId={repoId} />
                 </div>
               ) : (

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Download, ImageIcon, FileCode2, Loader2, X } from 'lucide-react';
 import { exportToPng, exportToSvg } from '../utils/exportDiagram';
 
@@ -113,8 +114,8 @@ export function ExportDiagramButton({
         Export
       </button>
 
-      {open && (
-        <div className="export-modal-overlay fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      {open && createPortal(
+        <div className="export-modal-overlay fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-panel border border-border rounded-xl shadow-2xl w-[450px] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto custom-scrollbar">
             {/* Header */}
             <div className="px-5 py-4 border-b border-border flex items-center justify-between bg-surface/50 shrink-0">
@@ -198,7 +199,8 @@ export function ExportDiagramButton({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

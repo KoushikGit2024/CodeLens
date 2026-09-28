@@ -72,19 +72,12 @@ function generateNativeSVG(nodes, edges, bounds, options) {
     const h = node.height || 40;
     
     // Determine colors based on node type or data
-    let bgColor = '#1E2335';
-    let borderColor = '#343B54';
-    let textColor = '#FFFFFF';
-    
-    if (node.type === 'impactNode') {
-      if (node.data?.impactLevel === 'changed') { bgColor = '#3a1d1d'; borderColor = '#da3633'; }
-      else if (node.data?.impactLevel === 'direct') { bgColor = '#362a15'; borderColor = '#d29922'; }
-      else if (node.data?.impactLevel === 'transitive') { bgColor = '#291e45'; borderColor = '#8957e5'; }
-    } else if (node.type === 'componentNode') {
-      bgColor = '#111318';
-      borderColor = '#1D2130';
-    }
+    let bgColor = node.data?.exportBg || '#1E2335';
+    let borderColor = node.data?.exportBorder || '#343B54';
+    let textColor = node.data?.exportText || '#FFFFFF';
 
+    // Base opaque plate to block edges from showing through transparent nodes
+    svg += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" ry="6" fill="${backgroundColor}" />`;
     // Node Box
     svg += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" ry="6" fill="${bgColor}" stroke="${borderColor}" stroke-width="1" />`;
     

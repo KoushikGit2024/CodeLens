@@ -176,7 +176,10 @@ const flattenTree = (treeNodes, parentId = null, urlPath = null) => {
         label: node.name, 
         type: node.type, 
         path: node.path,
-        isActive: urlPath && (urlPath === node.path)
+        isActive: urlPath && (urlPath === node.path),
+        exportBg: '#1E2335',
+        exportBorder: node.type === 'directory' ? '#d29922' : '#343B54',
+        exportText: node.type === 'directory' ? '#e3b341' : '#CBD5E8'
       },
     });
     
