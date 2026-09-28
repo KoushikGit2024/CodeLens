@@ -107,7 +107,7 @@ function isDirectory(tree, path) {
 
 export default function ExplorerPage() {
   const { repoId }        = useParams();
-  const { repo, fileTree, loading: repoLoading, error: repoError, refetchRepo } = useRepository();
+  const { repo, fileTree, loading: repoLoading, error: repoError, refetchRepo, livePhase } = useRepository();
   const [reanalyzing, setReanalyzing] = useState(false);
   const navigate          = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -386,7 +386,7 @@ export default function ExplorerPage() {
   if (repo?.status === 'analyzing') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface text-text">
-        <AnalysisProgress currentPhase={repo.phase} phaseDetails={repo.phaseDetails} />
+        <AnalysisProgress currentPhase={livePhase?.phase ?? repo.phase} phaseDetails={livePhase?.details ?? repo.phaseDetails} />
       </div>
     );
   }

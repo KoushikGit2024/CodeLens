@@ -21,14 +21,16 @@ async function ensureDir(dirPath) {
   }
 }
 
-export async function analyzeGitChurn(repoId) {
+export async function analyzeGitChurn(repoId, postMessage = () => {}) {
   const allFiles = await persistenceStore.listFilePaths(repoId);
-  const gitFiles = allFiles.filter(f => f.startsWith('.git/'));
+  const gitFiles = allFiles.filter(f => f.match(/(^|\/)\.git\//) );
 
   if (gitFiles.length === 0) return null;
 
   const repoDir = `/${repoId}`;
   await ensureDir(repoDir);
+
+  postMessage({ type: 'PROGRESS', repoId, phase: 'analyzing_git_churn', details: 'Hydrating Git filesystem…' });
 
   for (const filePath of gitFiles) {
     const content = await persistenceStore.loadFile(repoId, filePath);
@@ -45,6 +47,8 @@ export async function analyzeGitChurn(repoId) {
     }
     await pfs.writeFile(repoDir + '/' + filePath, encoded);
   }
+
+  postMessage({ type: 'PROGRESS', repoId, phase: 'analyzing_git_churn', details: 'Reading commit history…' });
 
   let commits = [];
   try {
@@ -79,7 +83,7 @@ export async function analyzeGitChurn(repoId) {
   }
 
   if (commits.length < 2) {
-    return { fileChurn: {}, churnScores: {} };
+    return { fileChurn: {}, churnScores: {}, commits: [] };
   }
 
   const fileChurn = {};
@@ -112,6 +116,8 @@ export async function analyzeGitChurn(repoId) {
         if (!fileChurn[filepath]) fileChurn[filepath] = 0;
         fileChurn[filepath]++;
       }
+
+      postMessage({ type: 'PROGRESS', repoId, phase: 'analyzing_git_churn', details: `Diffing commit ${i + 1} of ${commits.length - 1}…` });
     } catch (err) {
       console.warn(`[Git Analyzer] Failed to diff commit ${commit.oid}`, err);
     }
@@ -124,5 +130,16 @@ export async function analyzeGitChurn(repoId) {
     // Multiplied by 3 to spread the score out a bit, since 100% of commits touching a file is rare
   }
 
-  return { totalCommitsAnalyzed, churnScores, fileChurn };
+  // Strip non-serializable fields if any exist
+  const serializedCommits = commits.map(c => ({
+    oid: c.oid,
+    commit: {
+      message: c.commit.message,
+      author: c.commit.author,
+      committer: c.commit.committer,
+      parent: c.commit.parent
+    }
+  }));
+
+  return { totalCommitsAnalyzed, churnScores, fileChurn, commits: serializedCommits };
 }

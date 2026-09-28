@@ -21,11 +21,9 @@ export function initWorker() {
   worker.onmessage = (event) => {
     const { type, repoId, phase, details, result, error } = event.data;
     
-    // It filters for progress events, then extracts phase details, and then it applies them to all active UI listeners.
-    if (type === 'PROGRESS') {
-      for (const cb of subscribers) {
-        cb(repoId, phase, details);
-      }
+    // Broadcast ALL events (PROGRESS, COMPLETE, ERROR) to subscribers
+    for (const cb of subscribers) {
+      cb(event.data);
     }
     
     // It captures terminal events, then extracts the mapped promise resolvers, and then it applies resolve or reject logic.

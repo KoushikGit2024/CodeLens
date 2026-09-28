@@ -175,18 +175,9 @@ export default function UploadPage() {
     const rootName = (fileList[0]?.webkitRelativePath || '').split('/')[0] || 'Selected Folder';
 
     const doPackage = async () => {
-      setPackingFolder(true);
+      setFile(fileList);
+      setFolderName(`${rootName} (${count.toLocaleString()} files, ${mb.toFixed(1)} MB)`);
       setLargeWarning(null);
-      try {
-        const blob = await folderToZip(fileList, ignorePatterns);
-        const zipFile = new File([blob], `${rootName}.zip`, { type: 'application/zip' });
-        setFile(zipFile);
-        setFolderName(`${rootName} (${count.toLocaleString()} files, ${mb.toFixed(1)} MB)`);
-      } catch (err) {
-        setError('Failed to package folder: ' + err.message);
-      } finally {
-        setPackingFolder(false);
-      }
     };
 
     if (count > WARN_FILE_COUNT || mb > WARN_SIZE_MB) {
@@ -205,9 +196,19 @@ export default function UploadPage() {
     setProgress(0);
     setIsSuccess(false);
     try {
-      const { data } = await repositoryApi.upload(file, { ignorePatterns }, (evt) => {
-        if (evt.total) setProgress(Math.round((evt.loaded / evt.total) * 100));
-      });
+      let data;
+      if (file instanceof FileList) {
+        const rootName = (file[0]?.webkitRelativePath || '').split('/')[0] || 'Selected Folder';
+        const res = await repositoryApi.uploadDirectory(file, rootName, { ignorePatterns }, (evt) => {
+          if (evt.total) setProgress(Math.round((evt.loaded / evt.total) * 100));
+        });
+        data = res.data;
+      } else {
+        const res = await repositoryApi.upload(file, { ignorePatterns }, (evt) => {
+          if (evt.total) setProgress(Math.round((evt.loaded / evt.total) * 100));
+        });
+        data = res.data;
+      }
       setIsSuccess(true);
       setProgress(100);
       await new Promise(resolve => setTimeout(resolve, 1500));
@@ -380,14 +381,18 @@ export default function UploadPage() {
                   <div className="flex items-center gap-3 overflow-hidden">
                     <FileArchiveIcon />
                     <div className="flex flex-col min-w-0">
-                      <span className="text-sm font-medium truncate" title={file.name}>{file.name}</span>
+                      <span className="text-sm font-medium truncate" title={file instanceof FileList ? folderName.split(' ')[0] : file.name}>
+                        {file instanceof FileList ? folderName.split(' ')[0] : file.name}
+                      </span>
                       {folderName && (
                         <span className="text-[11px] text-muted truncate">{folderName}</span>
                       )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-xs text-muted font-mono bg-panel px-2 py-1 rounded border border-border/50">{fileSizeMB} MB</span>
+                    <span className="text-xs text-muted font-mono bg-panel px-2 py-1 rounded border border-border/50">
+                      {file instanceof FileList ? folderName.match(/([\d.]+) MB/)[1] : fileSizeMB} MB
+                    </span>
                     <button onClick={() => { setFile(null); setFolderName(null); }} title="Remove" className="text-muted hover:text-danger transition-colors">
                       <X className="w-4 h-4" />
                     </button>

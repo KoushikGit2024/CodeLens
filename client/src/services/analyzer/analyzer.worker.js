@@ -50,7 +50,7 @@ export async function executeAnalysisPipeline(repoId, options = {}, postMessage 
   analysis.architecture = architecture;
 
   await onProgress('analyzing_git_churn');
-  const gitChurnResult = await analyzeGitChurn(repoId);
+  const gitChurnResult = await analyzeGitChurn(repoId, postMessage);
   if (gitChurnResult) {
     analysis.gitChurn = gitChurnResult;
     graph.gitChurn = gitChurnResult;

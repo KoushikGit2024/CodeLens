@@ -14,10 +14,16 @@ const DB_VERSION = 4; // bumped: adds aiArtifacts store
  * It requests an IndexedDB connection, then extracts object store requirements, 
  * and then it applies version-safe schema upgrades.
  */
+let cachedDBPromise = null;
+
 export async function getDB() {
   const env = typeof window !== 'undefined' ? window : (typeof self !== 'undefined' ? self : null);
   if (!env || !env.indexedDB) {
     throw new Error('IndexedDB is not supported or is blocked in this environment.');
+  }
+
+  if (cachedDBPromise) {
+    return cachedDBPromise;
   }
 
   // Promise race to prevent silent hangs in iframes / private mode where openDB never resolves
@@ -85,10 +91,12 @@ export async function getDB() {
       );
       // Close our connection — the IDB upgrade in the other tab will then proceed
       event.target.close();
+      cachedDBPromise = null;
     },
   });
 
-  return Promise.race([dbPromise, timeoutPromise]);
+  cachedDBPromise = Promise.race([dbPromise, timeoutPromise]);
+  return cachedDBPromise;
 }
 
 /**

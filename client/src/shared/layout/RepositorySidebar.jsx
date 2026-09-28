@@ -17,7 +17,8 @@ import {
   User,
   LogIn,
   FolderTree,
-  Bookmark
+  Bookmark,
+  GitCommit
 } from 'lucide-react';
 import { Logo } from '../components/Logo';
 import { useAuth } from '../context/AuthContext';
@@ -25,15 +26,29 @@ import clsx from 'clsx';
 
 const NAV_GROUPS = [
   {
-    id: 'repo',
-    title: 'Repository',
+    id: 'dashboard',
+    title: 'Dashboard',
     items: [
       { id: 'overview', label: 'Overview', icon: LayoutDashboard, to: '' },
-      { id: 'tree', label: 'File Tree', icon: FolderTree, to: 'tree' },
+      { id: 'assistant', label: 'AI Assistant', icon: Bot, to: 'assistant' },
+    ]
+  },
+  {
+    id: 'exploration',
+    title: 'Exploration',
+    items: [
       { id: 'source', label: 'Source Explorer', icon: FileCode2, to: 'source' },
+      { id: 'tree', label: 'File Tree', icon: FolderTree, to: 'tree' },
       { id: 'bookmarks', label: 'Bookmarks & Notes', icon: Bookmark, to: 'bookmarks' },
+    ]
+  },
+  {
+    id: 'architecture_git',
+    title: 'Architecture & Git',
+    items: [
       { id: 'architecture', label: 'Architecture', icon: Box, to: 'architecture' },
       { id: 'graph', label: 'Dependencies', icon: GitMerge, to: 'graph' },
+      { id: 'git', label: 'Git History', icon: GitCommit, to: 'git' },
     ]
   },
   {
@@ -43,13 +58,6 @@ const NAV_GROUPS = [
       { id: 'health', label: 'Security & Health', icon: ShieldAlert, to: 'health' },
       { id: 'refactoring', label: 'Refactoring', icon: Wrench, to: 'refactoring' },
       { id: 'impact', label: 'Impact Analysis', icon: Activity, to: 'impact' },
-    ]
-  },
-  {
-    id: 'ai',
-    title: 'AI',
-    items: [
-      { id: 'assistant', label: 'AI Assistant', icon: Bot, to: 'assistant' },
     ]
   }
 ];

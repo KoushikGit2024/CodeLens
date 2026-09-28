@@ -4,6 +4,7 @@ import ExplorerPage from '../features/explorer/ExplorerPage';
 import FileTreePage from '../features/explorer/FileTreePage';
 import DependencyGraphPage from '../features/dependencies/DependencyGraphPage';
 import ArchitecturePage from '../features/architecture/ArchitecturePage';
+import GitHistoryPage from '../features/git/GitHistoryPage';
 
 import RepositoryAssistantPage from '../features/assistant/RepositoryAssistantPage';
 import ImpactPage from '../features/engineering/ImpactPage';
@@ -53,6 +54,7 @@ export default function App() {
                 <Route path="source" element={<ExplorerPage />} />
                 <Route path="graph" element={<DependencyGraphPage />} />
                 <Route path="architecture" element={<ArchitecturePage />} />
+                <Route path="git" element={<GitHistoryPage />} />
 
                 <Route path="assistant" element={<RepositoryAssistantPage />} />
                 <Route path="impact" element={<ImpactPage />} />

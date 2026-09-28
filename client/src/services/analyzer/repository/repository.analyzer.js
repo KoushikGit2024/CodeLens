@@ -84,6 +84,13 @@ export async function analyzeRepository(repoId, previousAnalysis = null, onProgr
     
     const relPath  = fileRecord.filePath;
     const content  = fileRecord.content;
+
+    // Skip .git/ internals and binary/non-source files — they must never enter the AST pipeline
+    if (relPath.match(/(^|\/)\.git\//) || content instanceof Uint8Array) {
+      result.skippedFiles++;
+      continue;
+    }
+
     const language = detectLanguage(relPath);
 
     if (!language || !PARSER_FACTORIES[language]) {

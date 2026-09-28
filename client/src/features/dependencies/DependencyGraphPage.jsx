@@ -414,7 +414,7 @@ export default function DependencyGraphPage() {
               {graph?.gitChurn && (
                 <section className="border-t border-border pt-3">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium text-orange-400">Git Churn</span>
+                    <span className="font-medium text-text">Git Churn</span>
                     <button
                       onClick={() => setShowChurn(!showChurn)}
                       className={`w-8 h-4 rounded-full transition-colors ${showChurn ? 'bg-orange-500' : 'bg-surface border border-border'}`}

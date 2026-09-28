@@ -20,7 +20,7 @@ import { makeSourceRef } from '../../shared/navigation/sourceRef';
 
 export default function RepositoryIntelligencePage() {
   const { repoId } = useParams();
-  const { repo, loading: repoLoading, error: repoError, refetchRepo } = useRepository();
+  const { repo, loading: repoLoading, error: repoError, refetchRepo, livePhase } = useRepository();
   const navigate = useNavigate();
   const { addToast } = useToast();
 
@@ -99,8 +99,8 @@ export default function RepositoryIntelligencePage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface text-text">
         <AnalysisProgress 
-          currentPhase={repo?.phase} 
-          phaseDetails={repo?.phaseDetails} 
+          currentPhase={livePhase?.phase ?? repo?.phase} 
+          phaseDetails={livePhase?.details ?? repo?.phaseDetails} 
         />
       </div>
     );

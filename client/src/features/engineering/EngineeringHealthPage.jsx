@@ -493,21 +493,40 @@ const EngineeringHealthPage = () => {
           )}
         </div>
         <div className="flex flex-wrap gap-2">
-          {['QUALITY', 'COUPLING', 'DEPENDENCY', 'ARCHITECTURE', 'SIZE', 'CHURN'].map(cat => (
-            <button
-              key={cat}
-              onClick={() => setCategoryFilter(categoryFilter === cat ? null : cat)}
-              className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                categoryFilter === cat
-                  ? cat === 'CHURN'
-                    ? 'bg-orange-500/20 border-orange-500/40 text-orange-300'
-                    : 'bg-accent/20 border-accent/40 text-accent'
-                  : 'bg-surface border-border text-muted hover:text-text hover:border-text/30'
-              }`}
-            >
-              {cat === 'CHURN' ? '🔥 High Churn' : cat}
-            </button>
-          ))}
+          {['ALL', 'QUALITY', 'COUPLING', 'DEPENDENCY', 'ARCHITECTURE', 'SIZE', 'CHURN'].map(cat => {
+            const isActive = cat === 'ALL' ? categoryFilter === null : categoryFilter === cat;
+            const count = cat === 'ALL' 
+              ? model.risks.filter(r => !fileFilter || r.file === fileFilter).length
+              : model.risks.filter(r => r.category === cat && (!fileFilter || r.file === fileFilter)).length;
+            
+            return (
+              <button
+                key={cat}
+                onClick={() => setCategoryFilter(cat === 'ALL' ? null : cat)}
+                className={`text-xs pl-3 pr-2 py-1.5 rounded-full border transition-all flex items-center gap-2 ${
+                  isActive
+                    ? cat === 'CHURN'
+                      ? 'bg-orange-500/20 border-orange-500/40 text-orange-300 font-medium'
+                      : 'bg-accent/20 border-accent/40 text-accent font-medium'
+                    : 'bg-surface border-border text-muted hover:text-text hover:border-text/30'
+                }`}
+              >
+                {cat === 'CHURN' ? (
+                  <span className="flex items-center gap-1.5">
+                    <Flame className="w-3.5 h-3.5" /> High Churn
+                  </span>
+                ) : cat === 'ALL' ? 'All Risks' : cat}
+                
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] leading-none ${
+                  isActive 
+                    ? cat === 'CHURN' ? 'bg-orange-500/30 text-orange-200' : 'bg-accent/30 text-accent'
+                    : 'bg-panel border border-border text-muted'
+                }`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
         {fileFilter && (
           <p className="text-xs text-muted mt-2">Filtered to file: <code className="text-text">{fileFilter}</code></p>

@@ -5,7 +5,7 @@
  * and then it applies deterministic fallback UI configurations when offline.
  */
 import React, { useState } from 'react';
-import { Sparkles, CloudOff, AlertTriangle, AlertCircle, X } from 'lucide-react';
+import { Sparkles, CloudOff, AlertTriangle, AlertCircle, X, Check, Circle } from 'lucide-react';
 import { useAIState } from '../../shared/context/AIContext';
 
 export default function AIStatusIndicator() {
@@ -150,7 +150,7 @@ export default function AIStatusIndicator() {
                   <ul className="text-xs text-text/90 flex flex-col gap-1">
                     {config.available.map(item => (
                       <li key={item} className="flex items-center gap-1.5">
-                        <span className="text-success text-[10px]">✓</span> {item}
+                        <Check className="w-3 h-3 text-success shrink-0" /> {item}
                       </li>
                     ))}
                   </ul>
@@ -162,7 +162,7 @@ export default function AIStatusIndicator() {
                   <ul className="text-xs text-muted flex flex-col gap-1">
                     {config.unavailable.map(item => (
                       <li key={item} className="flex items-center gap-1.5">
-                        <span className="text-[10px]">○</span> {item}
+                        <Circle className="w-2.5 h-2.5 shrink-0" /> {item}
                       </li>
                     ))}
                   </ul>

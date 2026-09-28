@@ -145,7 +145,7 @@ export const repositoryApi = {
             const mimeType = ext === 'jpg' ? 'jpeg' : ext;
             const base64 = await zip.files[originalPath].async('base64');
             content = `data:image/${mimeType};base64,${base64}`;
-          } else if (filePath.startsWith('.git/')) {
+          } else if (filePath.match(/(^|\/)\.git\//)) {
             content = await zip.files[originalPath].async('uint8array');
           } else {
             content = await zip.files[originalPath].async('string');
@@ -166,6 +166,88 @@ export const repositoryApi = {
       
     } catch (err) {
       console.error('Upload/Extraction failed:', err);
+      await repositoryStore.update(repoId, { status: 'error', error: err.message });
+      throw err;
+    }
+  },
+
+  /**
+   * Directly processes a FileList from a folder upload, skipping JSZip.
+   */
+  async uploadDirectory(fileList, rootName, options = {}, onProgress = () => {}) {
+    const repoId = uuidv4();
+    
+    onProgress({ loaded: 10, total: 100 });
+    
+    const record = {
+      id: repoId,
+      name: rootName,
+      uploadedAt: new Date().toISOString(),
+      status: 'analyzing',
+      phase: 'extracting',
+      analysisVersion: 2
+    };
+    await repositoryStore.set(repoId, record);
+    
+    try {
+      const files = Array.from(fileList);
+      
+      const ignorePatterns = options.ignorePatterns 
+        ? options.ignorePatterns.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
+        : [];
+
+      let commonRoot = '';
+      if (files.length > 0) {
+        const firstParts = (files[0].webkitRelativePath || files[0].name).split('/');
+        if (firstParts.length > 1) {
+          const possibleRoot = firstParts[0] + '/';
+          if (files.every(f => (f.webkitRelativePath || f.name).startsWith(possibleRoot))) {
+            commonRoot = possibleRoot;
+          }
+        }
+      }
+      
+      let processedCount = 0;
+      for (const file of files) {
+        const originalPath = file.webkitRelativePath || file.name;
+        const filePath = commonRoot ? originalPath.substring(commonRoot.length) : originalPath;
+        const defaultIgnores = ['node_modules', 'dist', 'build', 'coverage', '.next', 'out'];
+        const pathSegments = filePath.split('/');
+        const shouldIgnore = ignorePatterns.some(p => filePath.includes(p)) || 
+                             defaultIgnores.some(ignoreDir => pathSegments.includes(ignoreDir));
+        
+        if (!shouldIgnore) {
+          const extMatch = filePath.match(/\.(png|jpe?g|gif|webp|ico|bmp)$/i);
+          let content;
+          if (extMatch) {
+            content = await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result);
+              reader.onerror = reject;
+              reader.readAsDataURL(file);
+            });
+          } else if (filePath.match(/(^|\/)\.git\//)) {
+            const buffer = await file.arrayBuffer();
+            content = new Uint8Array(buffer);
+          } else {
+            content = await file.text();
+          }
+          await persistenceStore.saveFile(repoId, filePath, content);
+        }
+        processedCount++;
+        if (processedCount % 10 === 0) {
+          onProgress({ loaded: 10 + (processedCount / files.length) * 20, total: 100 });
+        }
+      }
+      
+      startAnalysis(repoId, options).catch(err => {
+        console.error('Background analysis failed:', err);
+      });
+      
+      return { data: { id: repoId, name: rootName, status: 'analyzing' } };
+      
+    } catch (err) {
+      console.error('Folder Upload failed:', err);
       await repositoryStore.update(repoId, { status: 'error', error: err.message });
       throw err;
     }

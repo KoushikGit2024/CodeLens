@@ -17,6 +17,7 @@ export function RepositoryProvider({ children }) {
   const [fileTree, setFileTree] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [livePhase, setLivePhase] = useState(null);
 
   /**
    * It calls the local API, then extracts the IndexedDB repository record, 
@@ -54,15 +55,22 @@ export function RepositoryProvider({ children }) {
 
   // It intercepts the active worker status, then extracts specific progress callbacks, and then it applies them to refresh the repository data in real-time.
   useEffect(() => {
-    if (repo && repo.status === 'analyzing') {
-      const unsubscribe = onProgress((progressRepoId, phase, details) => {
-        if (progressRepoId === repoId) {
-          fetchRepo();
-        }
-      });
-      return () => unsubscribe();
-    }
-  }, [repo?.status, repoId, fetchRepo]);
+    const unsubscribe = onProgress((msg) => {
+      if (msg.repoId !== repoId) return;
+
+      // Update live phase label instantly without a DB round-trip
+      if (msg.type === 'PROGRESS' && msg.phase) {
+        setLivePhase({ phase: msg.phase, details: msg.details });
+      }
+
+      // Only refresh the full repo record when analysis finishes or errors out
+      if (msg.type === 'COMPLETE' || msg.type === 'ERROR') {
+        setLivePhase(null);
+        fetchRepo();
+      }
+    });
+    return () => unsubscribe();
+  }, [repoId, fetchRepo]);
 
   const value = {
     repoId,
@@ -70,6 +78,7 @@ export function RepositoryProvider({ children }) {
     fileTree,
     loading,
     error,
+    livePhase,
     refetchRepo: fetchRepo,
   };
 

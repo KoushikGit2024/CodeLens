@@ -53,23 +53,39 @@ export default function RepositoryHeader() {
       </div>
 
       {/* Center Project Name */}
-      {repo?.name && (
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden md:flex max-w-[30%] items-center justify-center">
-          <div className="group relative flex items-center gap-2 px-3 py-1 rounded-md bg-surface/90 border border-accent/20 shadow-[0_0_10px_rgba(var(--color-accent-rgb),0.1)] transition-all duration-300 ease-out hover:-translate-y-0.5 hover:scale-[1.04] hover:border-accent/60 hover:bg-accent/[0.06] hover:shadow-[0_0_20px_rgba(var(--color-accent-rgb),0.3)] cursor-default overflow-hidden">
-            <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-accent/10 to-transparent skew-x-[-20deg] transition-transform duration-700 ease-out group-hover:translate-x-[200%]" />
-            <div className="relative w-1.5 h-1.5 rounded-full bg-accent shadow-[0_0_6px_rgba(var(--color-accent-rgb),0.8)] transition-all duration-300 group-hover:scale-125 group-hover:shadow-[0_0_10px_rgba(var(--color-accent-rgb),1)]">
-              <div className="absolute inset-0 rounded-full bg-accent opacity-40" />
+      <div className="flex-1 flex justify-center min-w-0 px-2 md:flex">
+        {repo?.name && (
+          <div className="group relative flex items-center justify-center cursor-default">
+            <div className="relative flex items-center justify-center px-5 py-1.5 rounded-md overflow-hidden bg-surface/80 border border-accent/15 transition-all duration-500 ease-out group-hover:border-accent/50 group-hover:bg-accent/[0.035] group-hover:shadow-[0_0_25px_rgba(var(--color-accent-rgb),0.18)] group-hover:-translate-y-px">
+              {/* Left reveal rail */}
+              <span className="absolute left-0 top-1/2 -translate-y-1/2 h-[1px] w-0 bg-accent/70 shadow-[0_0_8px_rgba(var(--color-accent-rgb),0.7)] transition-all duration-500 ease-out group-hover:w-3" />
+              {/* Right reveal rail */}
+              <span className="absolute right-0 top-1/2 -translate-y-1/2 h-[1px] w-0 bg-accent/70 shadow-[0_0_8px_rgba(var(--color-accent-rgb),0.7)] transition-all duration-500 ease-out group-hover:w-3" />
+              {/* Left bracket */}
+              <span className="relative z-10 w-0 overflow-hidden opacity-0 -translate-x-2 text-accent font-mono font-bold text-sm transition-all duration-400 ease-out group-hover:w-4 group-hover:opacity-100 group-hover:translate-x-0">
+                &lt;
+              </span>
+              {/* Project name */}
+              <span
+                className="relative z-10 mx-1 text-sm font-semibold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-text via-text to-text/70 truncate transition-all duration-500 ease-out group-hover:from-text group-hover:via-accent group-hover:to-text"
+                title={repo.name}
+              >
+                {repo.name}
+              </span>
+              {/* Right bracket */}
+              <span className="relative z-10 w-0 overflow-hidden opacity-0 translate-x-2 text-accent font-mono font-bold text-sm transition-all duration-400 ease-out group-hover:w-4 group-hover:opacity-100 group-hover:translate-x-0">
+                &gt;
+              </span>
+              {/* Symmetric sweep */}
+              <span className="pointer-events-none absolute inset-y-0 left-1/2 w-0 -translate-x-1/2 bg-accent/[0.035] transition-all duration-500 ease-out group-hover:w-full" />
+              {/* Top highlight */}
+              <span className="pointer-events-none absolute left-1/2 top-0 h-px w-0 -translate-x-1/2 bg-gradient-to-r from-transparent via-accent/60 to-transparent transition-all duration-500 ease-out group-hover:w-[70%]" />
+              {/* Bottom highlight */}
+              <span className="pointer-events-none absolute left-1/2 bottom-0 h-px w-0 -translate-x-1/2 bg-gradient-to-r from-transparent via-accent/30 to-transparent transition-all duration-700 ease-out group-hover:w-[55%]" />
             </div>
-            <span
-              className="relative text-sm font-semibold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-text to-text/70 truncate transition-all duration-300 group-hover:from-text group-hover:to-accent"
-              title={repo.name}
-            >
-              {repo.name}
-            </span>
-            <div className="relative w-0 h-px bg-accent/70 transition-all duration-300 group-hover:w-2" />
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="flex items-center gap-3 z-10">
         <button
