@@ -62,9 +62,10 @@ export default function App() {
                 <Route path="health" element={<EngineeringHealthPage />} />
                 <Route path="refactoring" element={<RefactoringPage />} />
                 <Route path="bookmarks" element={<BookmarksPage />} />
+                <Route path="about" element={<AboutPage />} />
               </Route>
               
-              <Route path="/explore/:repoId/about" element={<AboutPage />} />
+              <Route path="/about" element={<AboutPage />} />
 
               <Route path="/help" element={<HelpPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />

@@ -57,7 +57,7 @@ export default function AboutPage() {
       
       {/* Back Button */}
       <Link 
-        to={`/explore/${repoId}`}
+        to={repoId ? `/explore/${repoId}` : `/`}
         className="fixed top-4 left-6 z-[100] flex items-center gap-2 px-4 py-2 bg-panel/80 backdrop-blur border border-border rounded-full text-sm font-medium text-muted hover:text-text hover:border-accent/50 transition-all shadow-lg"
       >
         <ChevronLeft className="w-4 h-4" /> Back

@@ -5,8 +5,8 @@
  * and then it applies the files to IndexedDB before launching the Web Worker analysis.
  */
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Upload, Loader2, AlertCircle, Code, Box, Network, Bot, FolderOpen, Eraser, Trash2, Database, Inbox, FolderInput, AlertTriangle, X, Clock, Brain, Activity } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Upload, Loader2, AlertCircle, Code, Box, Network, Bot, FolderOpen, Eraser, Trash2, Database, Inbox, FolderInput, AlertTriangle, X, Clock, Brain, Activity, Info } from 'lucide-react';
 import { repositoryApi } from '../../shared/api';
 import { Logo } from '../../shared/components/Logo';
 import UserAvatarWidget from '../account/UserAvatarWidget';
@@ -283,6 +283,12 @@ export default function UploadPage() {
           </p>
         </div>
         <div className="flex items-center gap-4">
+          <Link 
+            to="/about"
+            className="text-sm font-medium text-muted hover:text-text transition-colors flex items-center gap-2 px-3 py-1.5 rounded-lg border border-transparent hover:border-border hover:bg-surface"
+          >
+            <Info className="w-4 h-4" /> About
+          </Link>
           <UserAvatarWidget />
         </div>
       </div>
