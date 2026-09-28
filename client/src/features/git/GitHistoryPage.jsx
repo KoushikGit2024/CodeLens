@@ -24,7 +24,7 @@ function GitLoader({ phase }) {
       <div className="relative flex flex-col items-center gap-0">
         {/* Pulsing main branch line */}
         <div className="w-0.5 h-16 bg-gradient-to-b from-accent/0 via-accent to-accent/0 animate-pulse" />
-        <div className="relative w-3 h-3 rounded-full bg-accent ring-4 ring-accent/20 animate-ping absolute" style={{top: '50%', transform: 'translateY(-50%)'}}/>
+        <div className="absolute w-3 h-3 rounded-full bg-accent ring-4 ring-accent/20 animate-ping" style={{top: '50%', transform: 'translateY(-50%)'}}/>
         <div className="w-3 h-3 rounded-full bg-accent ring-4 ring-accent/20 z-10" />
         <div className="w-0.5 h-16 bg-gradient-to-b from-accent via-accent/40 to-accent/0" />
       </div>
