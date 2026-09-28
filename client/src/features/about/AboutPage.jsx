@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Layers, Zap, Network, Globe } from 'lucide-react';
 
 import AboutPillNav from './components/AboutPillNav';
 import ArchitectureShowcase from './tabs/ArchitectureShowcase';
@@ -50,21 +50,31 @@ export default function AboutPage() {
   };
 
   return (
-    <div className="h-screen w-full overflow-y-auto bg-surface text-text custom-scrollbar relative">
+    <div className="h-screen w-full bg-surface text-text relative flex flex-col overflow-hidden">
       
-      {/* Semicircular Nav */}
+      {/* Semicircular Nav - Still fixed to bottom right */}
       <AboutPillNav activeTab={activeTab} setActiveTab={setActiveTab} />
       
       {/* Back Button */}
       <Link 
         to={`/explore/${repoId}`}
-        className="fixed top-8 left-8 z-[100] flex items-center gap-2 px-4 py-2 bg-panel/80 backdrop-blur border border-border rounded-full text-sm font-medium text-muted hover:text-text hover:border-accent/50 transition-all shadow-lg"
+        className="fixed top-4 left-6 z-[100] flex items-center gap-2 px-4 py-2 bg-panel/80 backdrop-blur border border-border rounded-full text-sm font-medium text-muted hover:text-text hover:border-accent/50 transition-all shadow-lg"
       >
         <ChevronLeft className="w-4 h-4" /> Back
       </Link>
 
-      <div className="max-w-6xl mx-auto px-8 pt-32 pb-20">
-        {renderTab()}
+      {/* Main Scrollable Content */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar pt-6 pb-6 relative z-10">
+        <div className="max-w-6xl mx-auto px-8">
+          {renderTab()}
+        </div>
+      </div>
+
+      {/* Global Fixed Footer */}
+      <div className="shrink-0 py-3 text-center relative z-40">
+        <p className="text-xs text-muted/60">
+          &copy; {new Date().getFullYear()} CodeLens. All rights reserved. Designed to streamline repository exploration and architectural analysis. All data remains entirely local to ensure absolute privacy and security.
+        </p>
       </div>
     </div>
   );

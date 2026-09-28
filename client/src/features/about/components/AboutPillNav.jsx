@@ -127,8 +127,8 @@ export default function AboutPillNav({ activeTab, setActiveTab }) {
   };
 
   const handleKey = (e) => {
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') goTo(activeIndex + 1);
-    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') goTo(activeIndex - 1);
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') goTo(activeIndex + 1);
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') goTo(activeIndex - 1);
     else if (e.key === 'Home') goTo(0);
     else if (e.key === 'End') goTo(TABS.length - 1);
     else return;
@@ -138,7 +138,7 @@ export default function AboutPillNav({ activeTab, setActiveTab }) {
   const ticks = Array.from({ length: 60 }, (_, i) => i * 6);
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 origin-bottom-right scale-[0.6] sm:scale-[0.7] md:scale-[0.75] lg:scale-[0.8] xl:scale-[0.85] transition-transform duration-300">
+    <div className="fixed bottom-6 right-6 z-50 origin-bottom-right scale-[0.6] sm:scale-[0.7] md:scale-[0.75] lg:scale-[0.8] xl:scale-[0.85] transition-transform duration-300 bg-transparent">
       <div
         ref={rootRef}
         role="slider"
@@ -156,10 +156,8 @@ export default function AboutPillNav({ activeTab, setActiveTab }) {
         onWheel={handleWheel}
         onKeyDown={handleKey}
         className={clsx(
-          'relative select-none touch-none rounded-full outline-none transition-all duration-700',
-          'focus-visible:ring-2 focus-visible:ring-accent/70',
-          dragging ? 'cursor-grabbing' : 'cursor-grab',
-          showCompletionAnim ? 'shadow-[0_0_80px_rgba(74,222,128,0.4)]' : ''
+          'relative select-none touch-none rounded-full outline-none focus:outline-none focus:ring-0 bg-transparent [-webkit-tap-highlight-color:transparent] transition-all duration-700',
+          dragging ? 'cursor-grabbing' : 'cursor-grab'
         )}
         style={{ width: SIZE, height: SIZE }}
       >
@@ -168,6 +166,7 @@ export default function AboutPillNav({ activeTab, setActiveTab }) {
           className="absolute rounded-full border backdrop-blur-xl shadow-2xl transition-all duration-700"
           style={{
             inset: 6,
+            clipPath: 'circle(50% at 50% 50%)',
             background: `rgba(var(--color-surface), 0.8)`,
             borderColor: showCompletionAnim ? `rgba(74,222,128, 0.8)` : `rgb(var(--color-border))`,
             boxShadow: showCompletionAnim 
@@ -176,10 +175,11 @@ export default function AboutPillNav({ activeTab, setActiveTab }) {
           }}
         />
 
-        {/* Completion Ripple Effect Removed */}
-
         <svg
-          className="absolute inset-0"
+          className={clsx(
+            "absolute inset-0 bg-transparent rounded-full transition-shadow duration-700",
+            showCompletionAnim ? "shadow-[0_0_80px_rgba(74,222,128,0.4)]" : ""
+          )}
           width={SIZE}
           height={SIZE}
           viewBox={`0 0 ${SIZE} ${SIZE}`}

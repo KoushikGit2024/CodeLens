@@ -1,53 +1,104 @@
 import React from 'react';
-import { Wrench } from 'lucide-react';
+import { Hammer, SplitSquareHorizontal, Layers } from 'lucide-react';
+import { clsx } from 'clsx';
 
 export default function RefactoringEngineTab() {
   return (
-    <div className="flex flex-col gap-12 w-full h-full pb-32">
-      <div className="max-w-3xl">
-        <h2 className="text-4xl font-extrabold text-text mb-6">AI Refactoring Engine</h2>
-        <p className="text-lg text-muted leading-relaxed mb-8">
-          Coupled with deterministic AST analysis, the refactoring engine doesn't just guess—it acts with precision. It parses isolated fragments of code, identifies smell patterns, and generates solutions powered by IBM watsonx.
+    <div className="w-full flex flex-col gap-6 animate-in fade-in zoom-in duration-500">
+      
+      {/* Header section */}
+      <div className="flex flex-col items-center text-center space-y-4 max-w-3xl mx-auto mb-8">
+        <h1 className="flex items-center justify-center gap-4 text-4xl md:text-6xl font-light tracking-tight text-text">
+          <Hammer className="w-10 h-10 md:w-14 md:h-14 text-accent" strokeWidth={1.5} />
+          <span>Refactoring <span className="font-semibold text-accent">Engine</span></span>
+        </h1>
+        <p className="text-xl text-muted mt-6 leading-relaxed">
+          Evaluate AI-suggested code improvements via a side-by-side diff viewer and review prioritized refactoring candidates across your codebase.
         </p>
       </div>
 
-      <div className="relative p-8 rounded-2xl border border-border bg-panel overflow-hidden group">
-        <div className="absolute inset-0 bg-[radial-gradient(#ffffff0a_1px,transparent_1px)] [background-size:16px_16px]"></div>
+      {/* Bento Grid Showcase */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 w-full">
         
-        <div className="relative grid grid-cols-1 md:grid-cols-2 gap-12 items-center z-10">
-          <div className="space-y-6">
-            <div className="p-4 bg-surface border border-border rounded-lg border-l-4 border-l-warning">
-              <h4 className="text-sm font-bold text-warning mb-1">Code Smell Detected</h4>
-              <p className="text-xs text-muted">Function `executeCompute` has a cyclomatic complexity of 42. Consider extracting early returns.</p>
-            </div>
-            
-            <div className="flex justify-center">
-              <div className="h-8 w-0.5 bg-border"></div>
-            </div>
-            
-            <div className="p-4 bg-surface border border-accent/30 rounded-lg border-l-4 border-l-accent">
-              <h4 className="text-sm font-bold text-accent mb-1">AI Context Assembly</h4>
-              <p className="text-xs text-muted">Injecting local graph nodes and exact AST slices to the prompt...</p>
-            </div>
-          </div>
+        {/* Row 1: Prioritized Debt (Col Span 5) */}
+        <div className="md:col-span-5 group relative overflow-hidden rounded-3xl border border-border bg-panel p-8 hover:border-accent/50 transition-colors flex flex-col justify-between">
           
-          <div className="bg-[#1e1e1e] rounded-xl border border-border overflow-hidden p-4 font-mono text-sm shadow-xl">
-            <div className="flex items-center gap-2 mb-4 border-b border-white/10 pb-2">
-              <div className="w-3 h-3 rounded-full bg-red-500"></div>
-              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-              <div className="w-3 h-3 rounded-full bg-green-500"></div>
-              <span className="ml-2 text-xs text-muted">SystemCore.js</span>
+          <div className="relative z-10 mb-6 flex flex-col h-full">
+            <div className="flex items-center gap-3 mb-4">
+              <Layers className="w-6 h-6 text-accent" />
+              <h3 className="text-2xl font-medium text-text">Prioritized Debt</h3>
             </div>
-            <pre className="text-gray-300">
-              <span className="text-blue-400">export function</span> <span className="text-yellow-300">executeCompute</span>(data) {'{\n'}
-              <span className="text-green-400">  // Refactored by AI</span>{'\n'}
-              <span className="text-purple-400">  if</span> (!data) <span className="text-blue-400">return</span> [];{'\n'}
-              {'\n'}
-              <span className="text-blue-400">  return</span> data.<span className="text-yellow-300">map</span>(i {'=>'} i.value);{'\n'}
-              {'}'}
-            </pre>
+            <p className="text-muted leading-relaxed mb-6 text-lg">
+              CodeLens organizes architectural issues into an actionable list of refactoring candidates.
+            </p>
+            <p className="text-muted leading-relaxed mb-6">
+              Candidates are strictly prioritized by severity—Critical, High Priority, and General Suggestions—ensuring you tackle the most dangerous architectural flaws first.
+            </p>
+            
+            <div className="mt-auto flex flex-col gap-2 p-3 border border-border bg-surface rounded-xl">
+               <div className="flex flex-col gap-1 p-2 bg-panel border border-border rounded">
+                 <div className="flex justify-between items-center text-[10px] text-muted"><span>Score 85</span> <span className="uppercase text-accent">Critical</span></div>
+                 <div className="text-sm font-mono text-text">auth_service.js</div>
+               </div>
+               <div className="flex flex-col gap-1 p-2 bg-panel border border-border rounded">
+                 <div className="flex justify-between items-center text-[10px] text-muted"><span>Score 62</span> <span className="uppercase text-accent">High Priority</span></div>
+                 <div className="text-sm font-mono text-text">database.config.js</div>
+               </div>
+            </div>
           </div>
         </div>
+
+        {/* Row 1: Diff Viewer (Col Span 7) */}
+        <div className="md:col-span-7 group relative overflow-hidden rounded-3xl border border-border bg-panel p-8 hover:border-accent/50 transition-colors flex flex-col justify-between">
+          
+          <div className="relative z-10 mb-6">
+            <div className="flex items-center gap-3 mb-4">
+              <SplitSquareHorizontal className="w-6 h-6 text-accent" />
+              <h3 className="text-2xl font-medium text-text">Side-by-Side Diff Viewer</h3>
+            </div>
+            <p className="text-muted leading-relaxed mb-6">
+              When reviewing a suggested refactoring, CodeLens provides a Side-by-Side Diff Viewer powered by Monaco Editor.
+            </p>
+            <p className="text-muted leading-relaxed">
+              This allows you to visually compare the exact character changes between your original problematic code and the cleaner code generated by the analysis engine.
+            </p>
+          </div>
+          
+          {/* Mock UI Element: Diff Viewer */}
+          <div className="relative z-10 mt-auto border border-border rounded-xl bg-surface flex flex-col font-mono text-[10px] sm:text-xs overflow-hidden">
+             <div className="flex">
+               {/* Original */}
+               <div className="flex-1 p-4 border-r border-border/50 bg-panel relative">
+                 <div className="absolute top-0 right-0 px-2 py-0.5 bg-surface border-b border-l border-border text-muted rounded-bl font-bold">Original</div>
+                 <div className="text-muted mt-2">
+                   <span className="text-accent">function</span> <span className="text-text">process</span>(data) {'{\n'}
+                 </div>
+                 <div className="text-muted">
+                   {'  '}return data.map(x =&gt; x * 2).filter(x =&gt; x &gt; 10);
+                 </div>
+                 <div className="text-muted">
+                   {'}'}
+                 </div>
+               </div>
+               
+               {/* Refactored */}
+               <div className="flex-1 p-4 bg-panel relative">
+                 <div className="absolute top-0 right-0 px-2 py-0.5 bg-surface border-b border-l border-border text-muted rounded-bl font-bold">Refactored</div>
+                 <div className="text-muted mt-2">
+                   <span className="text-accent">const</span> <span className="text-text">process</span> = (data) =&gt; {'{\n'}
+                 </div>
+                 <div className="text-muted">
+                   {'  '}const doubled = data.map(x =&gt; x * 2);{'\n'}
+                   {'  '}return doubled.filter(x =&gt; x &gt; 10);
+                 </div>
+                 <div className="text-muted">
+                   {'}'}
+                 </div>
+               </div>
+             </div>
+          </div>
+        </div>
+
       </div>
     </div>
   );

@@ -1,41 +1,90 @@
 import React from 'react';
-import InteractiveMiniGraph from '../components/InteractiveMiniGraph';
-
-const nodes = [
-  { id: 'module-a', type: 'default', data: { label: 'AuthService' }, position: { x: 100, y: 100 }, style: { background: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px' } },
-  { id: 'module-b', type: 'default', data: { label: 'UserRepository' }, position: { x: 100, y: 200 }, style: { background: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px' } },
-  { id: 'module-c', type: 'default', data: { label: 'PaymentGateway' }, position: { x: 300, y: 150 }, style: { background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px' } },
-  { id: 'group-1', type: 'group', data: { label: 'Core Auth Domain' }, position: { x: 80, y: 50 }, style: { width: 140, height: 210, backgroundColor: 'rgba(37, 99, 235, 0.1)', border: '2px dashed #2563eb' } }
-];
-
-const edges = [
-  { id: 'e1-2', source: 'module-a', target: 'module-b', animated: true, style: { stroke: '#3b82f6' } },
-  { id: 'e1-3', source: 'module-a', target: 'module-c', animated: false, style: { stroke: '#64748b' } },
-];
+import { Network, Download, FileText, Share2, ZoomIn, Search } from 'lucide-react';
+import { clsx } from 'clsx';
 
 export default function ArchitectureShowcase() {
   return (
-    <div className="flex flex-col gap-12 w-full h-full pb-32">
-      <div className="max-w-3xl">
-        <h2 className="text-4xl font-extrabold text-text mb-6">Macro-Architecture Map</h2>
-        <p className="text-lg text-muted leading-relaxed mb-8">
-          Navigating a new codebase is like landing in a foreign city without a map. CodeLens auto-detects structural boundaries, grouping thousands of files into distinct domains and bounded contexts.
+    <div className="w-full flex flex-col gap-6 animate-in fade-in zoom-in duration-500">
+      
+      {/* Header section */}
+      <div className="flex flex-col items-center text-center space-y-4 max-w-3xl mx-auto mb-8">
+        <h1 className="flex items-center justify-center gap-4 text-4xl md:text-6xl font-light tracking-tight text-text">
+          <Network className="w-10 h-10 md:w-14 md:h-14 text-accent" strokeWidth={1.5} />
+          <span>System <span className="font-semibold text-accent">Architecture</span></span>
+        </h1>
+        <p className="text-xl text-muted mt-6 leading-relaxed">
+          See the invisible forces binding your codebase together. A visual canvas that maps system boundaries using AI-generated Mermaid flowcharts, and exports diagrams instantly.
         </p>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <div className="p-6 bg-panel border border-border rounded-xl">
-            <h4 className="font-bold text-text mb-2 text-lg">Deterministic Clustering</h4>
-            <p className="text-sm text-muted">Groups files based on folder structures and import affinities to form physical bounded contexts.</p>
-          </div>
-          <div className="p-6 bg-panel border border-border rounded-xl">
-            <h4 className="font-bold text-text mb-2 text-lg">Infinite Canvas</h4>
-            <p className="text-sm text-muted">Pan, zoom, and physically interact with the layout of your macro domains.</p>
-          </div>
-        </div>
       </div>
 
-      <div className="w-full h-[500px]">
-        <InteractiveMiniGraph nodes={nodes} edges={edges} />
+      {/* Bento Grid Showcase */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 w-full">
+        
+        {/* Row 1: AI Mermaid Flowcharts (Col Span 8) */}
+        <div className="md:col-span-8 group relative overflow-hidden rounded-3xl border border-border bg-panel p-8 hover:border-accent/50 transition-colors flex flex-col justify-between">
+          
+          <div className="relative z-10 grid md:grid-cols-2 gap-8 h-full">
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <FileText className="w-6 h-6 text-accent" />
+                <h3 className="text-2xl font-medium text-text">AI Diagram Generation</h3>
+              </div>
+              <p className="text-muted leading-relaxed mb-6">
+                Instead of manually drawing boxes and arrows, let the AI do it for you. 
+              </p>
+              <p className="text-muted leading-relaxed mb-6 text-sm">
+                CodeLens analyzes your repository context and synthesizes complex structural relationships into industry-standard Mermaid flowcharts, instantly rendering them into beautiful interactive diagrams.
+              </p>
+              <div className="flex flex-col gap-2 mt-4 text-sm text-text bg-surface border border-border p-4 rounded-xl">
+                 <div className="flex items-center gap-2"><ZoomIn className="w-4 h-4 text-accent" /> <span className="font-medium">Scroll to Zoom & Pan</span></div>
+                 <div className="flex items-center gap-2"><Search className="w-4 h-4 text-accent" /> <span className="font-medium">Interactive SVG Rendering</span></div>
+              </div>
+            </div>
+            
+            {/* Mock Graph Element */}
+            <div className="flex flex-col border-l border-border/50 pl-8 justify-center">
+              <div className="w-full h-48 border border-border rounded-xl bg-surface overflow-hidden relative flex flex-col items-center justify-center">
+                 <div className="px-4 py-2 bg-panel border border-border rounded shadow-sm text-sm text-text font-mono z-10">Client</div>
+                 <div className="h-6 w-px bg-accent my-1"></div>
+                 <div className="px-4 py-2 bg-panel border border-border rounded shadow-sm text-sm text-text font-mono z-10">API Gateway</div>
+                 <div className="flex w-full justify-center gap-4 mt-2">
+                   <div className="flex flex-col items-center">
+                     <div className="h-6 w-px bg-accent mb-1 -rotate-[30deg] translate-x-3"></div>
+                     <div className="px-3 py-1 bg-panel border border-border rounded text-xs text-muted">Auth Service</div>
+                   </div>
+                   <div className="flex flex-col items-center">
+                     <div className="h-6 w-px bg-accent mb-1 rotate-[30deg] -translate-x-3"></div>
+                     <div className="px-3 py-1 bg-panel border border-border rounded text-xs text-muted">DB Schema</div>
+                   </div>
+                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Row 1: Exports (Col Span 4) */}
+        <div className="md:col-span-4 group relative overflow-hidden rounded-3xl border border-border bg-panel p-8 hover:border-accent/50 transition-colors flex flex-col justify-between">
+          <div className="relative z-10 h-full flex flex-col">
+            <Share2 className="w-6 h-6 text-accent mb-4" />
+            <h3 className="text-2xl font-medium text-text mb-4">Export Diagrams</h3>
+            <p className="text-muted leading-relaxed mb-6">
+              A beautiful graph isn't useful unless you can share it with your team.
+            </p>
+            <p className="text-muted leading-relaxed mb-6">
+              Use the dedicated export buttons to instantly convert the rendered Mermaid graph into crisp, high-resolution PNG or scalable SVG diagrams.
+            </p>
+
+            <div className="mt-auto flex flex-col gap-3">
+               <button className="w-full px-6 py-3 rounded-xl bg-surface border border-border text-text font-medium flex items-center justify-center gap-2 hover:bg-panel transition-all">
+                 <Download className="w-4 h-4 text-accent" /> Export SVG
+               </button>
+               <button className="w-full px-6 py-3 rounded-xl bg-surface border border-border text-text font-medium flex items-center justify-center gap-2 hover:bg-panel transition-all">
+                 <Download className="w-4 h-4 text-accent" /> Export PNG
+               </button>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   );
