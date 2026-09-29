@@ -44,11 +44,11 @@ const NAV_GROUPS = [
     ]
   },
   {
-    id: 'architecture_git',
-    title: 'Architecture & Git',
+    id: 'system_maps',
+    title: 'System Maps',
     items: [
       { id: 'architecture', label: 'Architecture', icon: Box, to: 'architecture' },
-      { id: 'graph', label: 'Dependencies', icon: GitMerge, to: 'graph' },
+      { id: 'dependencies', label: 'Dependencies', icon: GitMerge, to: 'dependencies' },
       // { id: 'git', label: 'Git History', icon: GitCommit, to: 'git' },
     ]
   },
@@ -232,7 +232,7 @@ export default function RepositorySidebar() {
         ) : (
           // <NavLink
           //   to="/auth/signin"
-          //   title={collapsed ? "Sign In" : undefined}
+          //7   title={collapsed ? "Sign In" : undefined}
           //   className={({ isActive }) => clsx(
           //     "flex items-center rounded-r text-[13px] transition-all duration-200 group min-w-0 border-l-2 mt-2",
           //     collapsed ? "justify-center w-10 h-10" : "gap-3 px-2.5 py-2 w-full",

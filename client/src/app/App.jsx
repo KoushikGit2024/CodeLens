@@ -4,7 +4,7 @@ import ExplorerPage from '../features/explorer/ExplorerPage';
 import FileTreePage from '../features/explorer/FileTreePage';
 import DependencyGraphPage from '../features/dependencies/DependencyGraphPage';
 import ArchitecturePage from '../features/architecture/ArchitecturePage';
-import GitHistoryPage from '../features/git/GitHistoryPage';
+// import GitHistoryPage from '../features/git/GitHistoryPage';
 
 import RepositoryAssistantPage from '../features/assistant/RepositoryAssistantPage';
 import ImpactPage from '../features/engineering/ImpactPage';
@@ -53,18 +53,18 @@ export default function App() {
                 <Route index element={<RepositoryIntelligencePage />} />
                 <Route path="tree" element={<FileTreePage />} />
                 <Route path="source" element={<ExplorerPage />} />
-                <Route path="graph" element={<DependencyGraphPage />} />
+                <Route path="dependencies" element={<DependencyGraphPage />} />
                 <Route path="architecture" element={<ArchitecturePage />} />
-                <Route path="git" element={<GitHistoryPage />} />
+                {/* <Route path="git" element={<GitHistoryPage />} /> */}
 
                 <Route path="assistant" element={<RepositoryAssistantPage />} />
                 <Route path="impact" element={<ImpactPage />} />
                 <Route path="health" element={<EngineeringHealthPage />} />
                 <Route path="refactoring" element={<RefactoringPage />} />
                 <Route path="bookmarks" element={<BookmarksPage />} />
-                <Route path="about" element={<AboutPage />} />
+                
               </Route>
-              
+              <Route path="/explore/:repoId/about" element={<AboutPage />} />
               <Route path="/about" element={<AboutPage />} />
 
               <Route path="/help" element={<HelpPage />} />
