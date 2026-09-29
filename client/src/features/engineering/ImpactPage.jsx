@@ -6,7 +6,7 @@
  */
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Activity, CheckSquare, Loader2, GitCommit, AlertCircle, X, ExternalLink, File } from 'lucide-react';
+import { Activity, CheckSquare, Loader2, GitCommit, AlertCircle, X, ExternalLink, File, RefreshCw } from 'lucide-react';
 import { repositoryApi } from '../../shared/api';
 import { useRepository } from '../../shared/context/RepositoryContext';
 import { useToast } from '../../shared/context/ToastContext';
@@ -186,6 +186,7 @@ export default function ImpactPage() {
   const [impact, setImpact] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [isReanalyzing, setIsReanalyzing] = useState(false);
 
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -353,25 +354,56 @@ export default function ImpactPage() {
     const errorMsg = repoError || error;
     const isNotReady = errorMsg.toLowerCase().includes('not ready') || errorMsg.toLowerCase().includes('pending');
     
+    const handleReanalyze = async () => {
+      setIsReanalyzing(true);
+      try {
+        await repositoryApi.reanalyze(repoId);
+        navigate(`/explore/${repoId}`);
+      } catch (err) {
+        addToast({ title: 'Reanalysis Failed', description: err.message || 'An error occurred while trying to reanalyze.', type: 'error' });
+        setIsReanalyzing(false);
+      }
+    };
+
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface">
-        <div className="text-center bg-panel p-8 rounded-xl border border-border">
-          <AlertCircle className="w-8 h-8 text-danger mx-auto mb-3" />
-          <h2 className="text-lg font-semibold text-text mb-2">Analysis Unavailable</h2>
-          <p className="text-muted mb-6 text-sm">{errorMsg}</p>
-          {isNotReady ? (
+        <div className="text-center bg-panel p-8 rounded-lg shadow border border-border">
+          <AlertCircle className="w-10 h-10 text-danger mx-auto mb-4 opacity-80" />
+          <h2 className="text-lg font-medium text-text mb-2">Analysis Error</h2>
+          <p className="text-muted mb-6 text-sm leading-relaxed">{errorMsg}</p>
+          
+          <div className="flex items-center justify-center gap-3">
             <button 
-              onClick={async () => {
-                await repositoryApi.analyze(repoId);
-                navigate(`/explore/${repoId}`);
-              }}
-              className="px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-lg text-sm font-medium transition-colors"
+              onClick={() => navigate(-1)} 
+              className="px-4 py-2 text-sm text-text bg-panel hover:bg-text/5 border border-border rounded-lg transition-colors"
             >
-              Start Analysis
+              Go Back
             </button>
-          ) : (
-            <button onClick={() => navigate(-1)} className="text-sm text-accent hover:underline">← Go back</button>
-          )}
+            {!isNotReady && (
+              <button 
+                onClick={handleReanalyze}
+                disabled={isReanalyzing}
+                className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isReanalyzing ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Starting...</>
+                ) : (
+                  <><RefreshCw className="w-4 h-4" /> Re-analyze Repo</>
+                )}
+              </button>
+            )}
+            {isNotReady && (
+              <button 
+                onClick={async () => {
+                  await repositoryApi.analyze(repoId);
+                  navigate(`/explore/${repoId}`);
+                }}
+                className="px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-lg text-sm font-medium transition-colors"
+              >
+                Start Analysis
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );

@@ -19,7 +19,8 @@ import {
   FolderTree,
   Bookmark,
   GitCommit,
-  Info
+  Info,
+  Brain
 } from 'lucide-react';
 import { Logo } from '../components/Logo';
 import { useAuth } from '../context/AuthContext';
@@ -59,6 +60,13 @@ const NAV_GROUPS = [
       { id: 'health', label: 'Security & Health', icon: ShieldAlert, to: 'health' },
       { id: 'refactoring', label: 'Refactoring', icon: Wrench, to: 'refactoring' },
       { id: 'impact', label: 'Impact Analysis', icon: Activity, to: 'impact' },
+    ]
+  },
+  {
+    id: 'pro_features',
+    title: 'Advanced',
+    items: [
+      { id: 'semantic', label: 'Semantic Search', icon: Brain, to: 'semantic', isPro: true },
     ]
   },
   {
@@ -170,7 +178,16 @@ export default function RepositorySidebar() {
                           <span className={clsx("shrink-0 transition-all duration-300", isActive ? 'text-accent' : 'text-muted group-hover:text-text')}>
                             <Icon className={collapsed ? "w-5 h-5" : "w-[18px] h-[18px]"} />
                           </span>
-                          {!collapsed && <span className="truncate" title={item.label}>{item.label}</span>}
+                          {!collapsed && (
+                            <div className="flex items-center justify-between w-full truncate">
+                              <span className="truncate" title={item.label}>{item.label}</span>
+                              {item.isPro && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 bg-accent/20 text-accent rounded flex items-center uppercase tracking-wider ml-2">
+                                  Pro
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </>
                       )}
                     </NavLink>

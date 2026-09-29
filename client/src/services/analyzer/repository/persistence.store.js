@@ -8,7 +8,7 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'CodeLensDB';
-const DB_VERSION = 4; // bumped: adds aiArtifacts store
+const DB_VERSION = 5; // bumped: adds embeddings store
 
 /**
  * It requests an IndexedDB connection, then extracts object store requirements, 
@@ -48,6 +48,10 @@ export async function getDB() {
       // v4: deterministic AI artifact cache
       if (!db.objectStoreNames.contains('aiArtifacts')) {
         db.createObjectStore('aiArtifacts', { keyPath: 'cacheKey' });
+      }
+      // v5: Semantic search embeddings
+      if (!db.objectStoreNames.contains('embeddings')) {
+        db.createObjectStore('embeddings', { keyPath: ['repoId', 'filePath'] });
       }
       
       if (oldVersion < 2 && db.objectStoreNames.contains('repos')) {
@@ -195,6 +199,17 @@ export async function remove(id) {
     cursor = await cursor.continue();
   }
   await txFiles.done;
+
+  const txEmbeddings = db.transaction('embeddings', 'readwrite');
+  const embedStore = txEmbeddings.objectStore('embeddings');
+  let embedCursor = await embedStore.openCursor();
+  while (embedCursor) {
+    if (embedCursor.key[0] === id) {
+      await embedCursor.delete();
+    }
+    embedCursor = await embedCursor.continue();
+  }
+  await txEmbeddings.done;
 }
 
 /**
@@ -266,4 +281,40 @@ export async function listFilePaths(repoId) {
     cursor = await cursor.continue();
   }
   return paths;
+}
+
+// ── Embeddings API ────────────────────────────────────────────────────────────
+
+export async function saveEmbedding(repoId, filePath, embedding) {
+  const db = await getDB();
+  await db.put('embeddings', { repoId, filePath, embedding: Array.from(embedding) });
+}
+
+export async function loadAllEmbeddings(repoId) {
+  const db = await getDB();
+  const tx = db.transaction('embeddings', 'readonly');
+  const store = tx.objectStore('embeddings');
+  const embeddings = [];
+  let cursor = await store.openCursor();
+  while (cursor) {
+    if (cursor.key[0] === repoId) {
+      embeddings.push(cursor.value);
+    }
+    cursor = await cursor.continue();
+  }
+  return embeddings;
+}
+
+export async function clearEmbeddings(repoId) {
+  const db = await getDB();
+  const tx = db.transaction('embeddings', 'readwrite');
+  const store = tx.objectStore('embeddings');
+  let cursor = await store.openCursor();
+  while (cursor) {
+    if (cursor.key[0] === repoId) {
+      await cursor.delete();
+    }
+    cursor = await cursor.continue();
+  }
+  await tx.done;
 }

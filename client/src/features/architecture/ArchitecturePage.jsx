@@ -345,6 +345,7 @@ export default function ArchitecturePage() {
   const [data, setData] = useState(null);
   const [selectedComponent, setSelectedComponent] = useState(null);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+  const [isReanalyzing, setIsReanalyzing] = useState(false);
   const [aiError, setAiError] = useState(null);
   const [expandedComponents, setExpandedComponents] = useState(new Set());
   const [viewMode, setViewMode] = useState('interactive');
@@ -416,24 +417,44 @@ export default function ArchitecturePage() {
 
   if (error) {
     const isNotReady = error.toLowerCase().includes('not ready') || error.toLowerCase().includes('pending');
+    
+    const handleReanalyze = async () => {
+      setIsReanalyzing(true);
+      try {
+        await repositoryApi.reanalyze(repoId);
+        navigate(`/explore/${repoId}`);
+      } catch (err) {
+        addToast({ title: 'Reanalysis Failed', description: err.message || 'An error occurred while trying to reanalyze.', type: 'error' });
+        setIsReanalyzing(false);
+      }
+    };
+
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <AlertCircle className="w-6 h-6 text-danger mx-auto mb-3" />
-          <p className="text-danger mb-4 text-sm">{error}</p>
-          {isNotReady ? (
+        <div className="text-center p-8 bg-surface rounded-lg shadow border border-text/10 max-w-md w-full">
+          <AlertCircle className="w-10 h-10 text-danger mx-auto mb-4 opacity-80" />
+          <h2 className="text-lg font-medium text-text mb-2">Analysis Error</h2>
+          <p className="text-muted mb-6 text-sm leading-relaxed">{error}</p>
+          
+          <div className="flex items-center justify-center gap-3">
             <button 
-              onClick={async () => {
-                await repositoryApi.analyze(repoId);
-                navigate(`/explore/${repoId}`);
-              }}
-              className="px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-lg text-sm font-medium transition-colors"
+              onClick={() => navigate(-1)} 
+              className="px-4 py-2 text-sm text-text bg-panel hover:bg-text/5 border border-border rounded-lg transition-colors"
             >
-              Start Analysis
+              Go Back
             </button>
-          ) : (
-            <button onClick={() => navigate(-1)} className="text-sm text-accent hover:underline">← Go back</button>
-          )}
+            <button 
+              onClick={handleReanalyze}
+              disabled={isReanalyzing}
+              className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isReanalyzing ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Starting...</>
+              ) : (
+                <><RefreshCw className="w-4 h-4" /> Re-analyze Repo</>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     );

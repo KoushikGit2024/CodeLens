@@ -35,6 +35,7 @@ import ModuleDocumentation from './ModuleDocumentation';
 import AnalysisProgress from '../repository/AnalysisProgress';
 import { useAIState } from '../../shared/context/AIContext';
 import { useBookmark, addBookmark, removeBookmark, updateNote } from '../../services/storage/bookmark.store';
+import { useToast } from '../../shared/context/ToastContext';
 
 // ── Monaco language map ───────────────────────────────────────────────────────
 // Maps file extensions to Monaco language IDs.
@@ -114,6 +115,7 @@ export default function ExplorerPage() {
 
   const [pageError, setPageError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const { addToast } = useToast();
 
   // URL is the single source of truth
   const selectedPath = searchParams.get('path');
@@ -146,6 +148,11 @@ export default function ExplorerPage() {
       refetchRepo(); // Soft reload to fetch everything again
     } catch (err) {
       console.error(err);
+      addToast({
+        title: 'Analysis Failed',
+        description: err.message || 'Failed to analyze incrementally.',
+        type: 'error'
+      });
     } finally {
       setReanalyzing(false);
     }
@@ -163,6 +170,11 @@ export default function ExplorerPage() {
       setModuleDocs(docsRes.data);
     } catch (err) {
       console.error('Failed to generate AI docs', err);
+      addToast({
+        title: 'Generation Failed',
+        description: err.message || 'Failed to generate AI documentation.',
+        type: 'error'
+      });
     } finally {
       setIsGeneratingAi(false);
     }
@@ -194,7 +206,8 @@ export default function ExplorerPage() {
     const fetchFile = async () => {
       setFileError(null);
       setFileLoading(true);
-      setFileContent(null);
+      // We intentionally do NOT clear fileContent here to prevent Monaco from unmounting 
+      // and causing a flicker/lag while fetching the next file.
 
       if (fileTree && isDirectory(fileTree, selectedPath)) {
         setFileError('DIRECTORY');
@@ -542,9 +555,11 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
   const bookmark = useBookmark(repoId, filePath);
   const [showNoteEditor, setShowNoteEditor] = useState(false);
   const [editNote, setEditNote] = useState('');
+  const [forceText, setForceText] = useState(false);
 
   useEffect(() => {
     setShowNoteEditor(false);
+    setForceText(false);
   }, [filePath]);
 
   const handleToggleBookmark = () => {
@@ -581,7 +596,10 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
   }
 
   const header = (
-    <div className="flex items-center justify-between px-4 pt-2 bg-panel border-b border-border shadow-sm shrink-0 z-10">
+    <div className="flex items-center justify-between px-4 pt-2 bg-panel border-b border-border shadow-sm shrink-0 z-10 relative">
+      {loading && fileContent && (
+        <div className="absolute bottom-0 left-0 h-0.5 bg-accent animate-pulse w-full z-20"></div>
+      )}
       <div className="flex-1"></div>
       <div className="flex items-center gap-6">
         <button 
@@ -628,7 +646,7 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
     );
   } else {
     // Source Code Mode
-    if (loading) {
+    if (loading && !fileContent) {
       content = (
         <div className="flex-1 flex items-center justify-center gap-3">
           <Loader2 className="w-5 h-5 text-accent animate-spin" />
@@ -669,6 +687,22 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
           <div className="flex-1 flex items-center justify-center min-h-[40vh]">
             <img src={svgUrl} alt={filePath} className="max-w-full max-h-[70vh] object-contain rounded drop-shadow-2xl border border-border" />
           </div>
+        </div>
+      );
+    } else if (!forceText && /\.(wasm|pdf|zip|tar|gz|dll|exe|bin|class|jar|woff|woff2|ttf|eot)$/i.test(filePath)) {
+      content = (
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 text-muted bg-surface/50 p-6 text-center">
+          <File className="w-16 h-16 opacity-30 mb-2" />
+          <p className="text-base font-medium text-text mb-1">Unsupported File Format</p>
+          <p className="text-sm max-w-sm opacity-80">
+            This file appears to be a binary format that cannot be safely displayed in the code editor.
+          </p>
+          <button 
+            onClick={() => setForceText(true)} 
+            className="mt-4 px-4 py-2 bg-accent/10 text-accent rounded hover:bg-accent/20 text-xs font-medium transition-colors"
+          >
+            Load as Text Anyway
+          </button>
         </div>
       );
     } else {

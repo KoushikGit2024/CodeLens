@@ -9,7 +9,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   AlertTriangle, Layers, GitBranch, 
   Database, Brain, Loader2, CheckCircle, Sparkles, Wrench,
-  ChevronDown, ChevronRight, File
+  ChevronDown, ChevronRight, File, RefreshCw, AlertCircle
 } from 'lucide-react';
 import { DiffEditor } from '@monaco-editor/react';
 import { ResizableLayout } from '../../shared/components/ResizableLayout';
@@ -210,6 +210,7 @@ export default function RefactoringPage() {
   const [intel, setIntel] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isReanalyzing, setIsReanalyzing] = useState(false);
   const [selectedCandidateId, setSelectedCandidateId] = useState(null);
 
   useEffect(() => {
@@ -239,13 +240,59 @@ export default function RefactoringPage() {
   }
 
   if (error) {
+    const isNotReady = error.toLowerCase().includes('not ready') || error.toLowerCase().includes('pending');
+    
+    const handleReanalyze = async () => {
+      setIsReanalyzing(true);
+      try {
+        await repositoryApi.reanalyze(repoId);
+        navigate(`/explore/${repoId}`);
+      } catch (err) {
+        addToast({ title: 'Reanalysis Failed', description: err.message || 'An error occurred while trying to reanalyze.', type: 'error' });
+        setIsReanalyzing(false);
+      }
+    };
+
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-2 bg-surface">
-        <AlertTriangle className="w-6 h-6 text-danger" />
-        <p className="text-sm text-danger">{error}</p>
-        <button onClick={() => navigate(`/explore/${repoId}`)} className="text-xs text-accent hover:underline mt-4">
-          ← Back to Explorer
-        </button>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center p-8 bg-surface rounded-lg shadow border border-text/10 max-w-md w-full">
+          <AlertCircle className="w-10 h-10 text-danger mx-auto mb-4 opacity-80" />
+          <h2 className="text-lg font-medium text-text mb-2">Analysis Error</h2>
+          <p className="text-muted mb-6 text-sm leading-relaxed">{error}</p>
+          
+          <div className="flex items-center justify-center gap-3">
+            <button 
+              onClick={() => navigate(-1)} 
+              className="px-4 py-2 text-sm text-text bg-panel hover:bg-text/5 border border-border rounded-lg transition-colors"
+            >
+              Go Back
+            </button>
+            {!isNotReady && (
+              <button 
+                onClick={handleReanalyze}
+                disabled={isReanalyzing}
+                className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isReanalyzing ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Starting...</>
+                ) : (
+                  <><RefreshCw className="w-4 h-4" /> Re-analyze Repo</>
+                )}
+              </button>
+            )}
+            {isNotReady && (
+              <button 
+                onClick={async () => {
+                  await repositoryApi.analyze(repoId);
+                  navigate(`/explore/${repoId}`);
+                }}
+                className="px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-lg text-sm font-medium transition-colors"
+              >
+                Start Analysis
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     );
   }

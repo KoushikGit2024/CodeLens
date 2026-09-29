@@ -7,12 +7,14 @@ import UserAvatarWidget from '../../features/account/UserAvatarWidget';
 import { repositoryApi } from '../api';
 import { useRepository } from '../context/RepositoryContext';
 import ThemeSwitcher from '../components/ThemeSwitcher';
+import { useToast } from '../context/ToastContext';
 
 export default function RepositoryHeader() {
   const { repoId } = useParams();
   const navigate = useNavigate();
   const { repo, refetchRepo } = useRepository();
   const [reanalyzing, setReanalyzing] = useState(false);
+  const { addToast } = useToast();
 
   const handleReanalyze = async () => {
     setReanalyzing(true);
@@ -22,6 +24,11 @@ export default function RepositoryHeader() {
       navigate(`/explore/${repoId}`);
     } catch (err) {
       console.error('Failed to re-analyze', err);
+      addToast({
+        title: 'Re-analysis Failed',
+        description: err.message || 'An unexpected error occurred.',
+        type: 'error'
+      });
     } finally {
       setReanalyzing(false);
     }

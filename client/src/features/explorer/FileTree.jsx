@@ -94,7 +94,15 @@ function FileTreeNode({
   const isAncestor = cleanSelectedPath?.startsWith(cleanNodePath + '/');
   const isSelectedFileAncestor = mode === 'select' && selectedFiles?.some(f => f.startsWith(cleanNodePath + '/'));
   
-  const [open, setOpen] = useState(true);
+  const autoCloseFolders = [
+    '.git', 'node_modules', 'dist', 'build', 'coverage', 'out', 'target', 
+    'vendor', '.idea', '.vscode', '.next', '.nuxt', '.svelte-kit', 
+    '__pycache__', '.pytest_cache', 'venv', 'env', '.venv', '.tox', 
+    'obj', 'bin', '.settings', 'tmp', 'temp', 'logs'
+  ];
+  const shouldBeClosedByDefault = node.type === 'directory' && autoCloseFolders.includes(node.name);
+  
+  const [open, setOpen] = useState(!shouldBeClosedByDefault);
   const indentPx = depth * 14;
 
   const nodeRef = useRef(null);
@@ -140,9 +148,6 @@ function FileTreeNode({
         <button
           onClick={() => {
             setOpen((o) => !o);
-            if (mode === 'navigate' && onSelectFile) {
-              onSelectFile(node.path);
-            }
           }}
           style={{ paddingLeft: `${indentPx + 4}px` }}
           className={`w-full text-left flex items-center gap-1.5 py-[3px] pr-2 rounded text-xs group transition-colors ${

@@ -4,7 +4,7 @@
  * It initiates the intelligence dashboard, then extracts local repository schemas, 
  * and then it applies offline metrics to render the structural UI.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { repositoryApi } from '../../shared/api';
 import AiResponse from '../../shared/components/ai/AiResponse';
@@ -68,13 +68,15 @@ export default function RepositoryIntelligencePage() {
     }
   };
 
+  const wasAnalyzingRef = useRef(repo?.status === 'analyzing');
+
   /**
    * It observes the global repository state, then extracts the ready flag, 
    * and then it applies the data loader automatically when the background worker finishes.
    */
   useEffect(() => {
     if (repo?.status === 'ready') {
-      loadIntelligence(repo.phase === 'ready' && loading);
+      loadIntelligence(wasAnalyzingRef.current);
     }
   }, [repo?.status, repoId]);
 
@@ -95,7 +97,11 @@ export default function RepositoryIntelligencePage() {
     }
   };
 
-  if (repo?.status === 'analyzing') {
+  // Determine if we should show the analysis progress UI.
+  // This includes when it's actively analyzing OR when it just finished ('ready') but we are still in the 1.5s visual hold.
+  const isAnalyzing = repo?.status === 'analyzing' || (wasAnalyzingRef.current && repo?.status === 'ready' && loading);
+
+  if (isAnalyzing) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface text-text">
         <AnalysisProgress 
@@ -108,6 +114,7 @@ export default function RepositoryIntelligencePage() {
 
   const isInitialLoad = loading && !data;
 
+  // If we are just refreshing the repo metadata (repoLoading) but not analyzing, show spinner.
   if (repoLoading || (isInitialLoad && !error)) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-surface text-text">

@@ -8,6 +8,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useParams } from 'react-router-dom';
 import { repositoryApi } from '../api';
 import { onProgress } from '../../services/analyzer/analyzer.client.js';
+import { useToast } from './ToastContext';
 
 const RepositoryContext = createContext(null);
 
@@ -18,6 +19,7 @@ export function RepositoryProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [livePhase, setLivePhase] = useState(null);
+  const { addToast } = useToast();
 
   /**
    * It calls the local API, then extracts the IndexedDB repository record, 
@@ -65,12 +67,18 @@ export function RepositoryProvider({ children }) {
 
       // Only refresh the full repo record when analysis finishes or errors out
       if (msg.type === 'COMPLETE' || msg.type === 'ERROR') {
-        setLivePhase(null);
-        fetchRepo();
+        if (msg.type === 'ERROR') {
+          addToast({
+            title: 'Analysis Failed',
+            description: msg.error || 'An unexpected error occurred during repository analysis.',
+            type: 'error'
+          });
+        }
+        fetchRepo().then(() => setLivePhase(null));
       }
     });
     return () => unsubscribe();
-  }, [repoId, fetchRepo]);
+  }, [repoId, fetchRepo, addToast]);
 
   const value = {
     repoId,

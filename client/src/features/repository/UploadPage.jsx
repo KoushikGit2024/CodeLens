@@ -11,6 +11,7 @@ import { repositoryApi } from '../../shared/api';
 import { Logo } from '../../shared/components/Logo';
 import UserAvatarWidget from '../account/UserAvatarWidget';
 import JSZip from 'jszip';
+import { useToast } from '../../shared/context/ToastContext';
 
 // ── Size / count thresholds for large-folder warning ──────────────────────────
 const WARN_FILE_COUNT = 500;   // warn if more than this many files
@@ -75,6 +76,7 @@ export default function UploadPage() {
   const [largeWarning, setLargeWarning]       = useState(null);           // { count, mb, proceed }
   const dropdownRef  = useRef(null);
   const folderInputRef = useRef(null);
+  const { addToast } = useToast();
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -93,6 +95,16 @@ export default function UploadPage() {
       setRecentRepos(data);
       setSelectedRepos(new Set());
       setHasLoadedRepos(true);
+
+      const savedRepoId = localStorage.getItem('lastRepoId');
+      if (savedRepoId) {
+        if (data.some(r => r.id === savedRepoId)) {
+          setLastRepoId(savedRepoId);
+        } else {
+          localStorage.removeItem('lastRepoId');
+          setLastRepoId(null);
+        }
+      }
     } catch (err) {
       console.error('Failed to load repositories', err);
     } finally {
@@ -105,8 +117,8 @@ export default function UploadPage() {
   };
 
   useEffect(() => {
-    const savedRepoId = localStorage.getItem('lastRepoId');
-    if (savedRepoId) setLastRepoId(savedRepoId);
+    // We don't set lastRepoId immediately from localStorage anymore.
+    // It will be set after refreshRepos confirms it still exists in the database.
     handleLoadRepos();
   }, [navigate]);
 
@@ -126,9 +138,20 @@ export default function UploadPage() {
         localStorage.removeItem('lastRepoId');
         setLastRepoId(null);
       }
+      
+      addToast({
+        title: 'Success',
+        description: `Successfully performed ${action.replace('_', ' ')} on ${selectedRepos.size} workspace(s).`,
+        type: 'success'
+      });
+      
       await refreshRepos();
     } catch (err) {
-      alert(`Failed to perform batch action: ${err.message}`);
+      addToast({
+        title: 'Batch Action Failed',
+        description: err.message || 'An unexpected error occurred.',
+        type: 'error'
+      });
     } finally {
       setBatchActionRunning(false);
     }

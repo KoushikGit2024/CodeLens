@@ -14,6 +14,7 @@ import BookmarksPage from '../features/bookmarks/BookmarksPage';
 import RepositoryIntelligencePage from '../features/repository/RepositoryIntelligencePage';
 import HelpPage from '../features/help/HelpPage';
 import AboutPage from '../features/about/AboutPage';
+import SemanticSearchPage from '../features/semantic/SemanticSearchPage';
 import { AuthProvider } from '../shared/context/AuthContext';
 import SignInPage from '../features/auth/SignInPage';
 import SignUpPage from '../features/auth/SignUpPage';
@@ -62,6 +63,7 @@ export default function App() {
                 <Route path="health" element={<EngineeringHealthPage />} />
                 <Route path="refactoring" element={<RefactoringPage />} />
                 <Route path="bookmarks" element={<BookmarksPage />} />
+                <Route path="semantic" element={<SemanticSearchPage />} />
                 
               </Route>
               <Route path="/explore/:repoId/about" element={<AboutPage />} />

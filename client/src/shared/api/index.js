@@ -403,7 +403,7 @@ export const repositoryApi = {
   async getArchitecture(id, options = {}) {
     const record = await repositoryStore.get(id);
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
-    const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
+    const architecture = record.analysis.architecture || buildArchitectureModel(record.analysis, record.analysis.graph);
     const health = buildEngineeringRiskModel(record.analysis, record.analysis.graph, architecture);
 
     architecture.layers.forEach(comp => {
@@ -459,7 +459,7 @@ Evaluate the modularity, coupling, and any apparent risks based on the violation
     const record = await repositoryStore.get(repoId);
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
     
-    const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
+    const architecture = record.analysis.architecture || buildArchitectureModel(record.analysis, record.analysis.graph);
     const intelligence = buildRepositoryIntelligence(record.analysis, record.analysis.graph, architecture);
 
     if (options.generateAi) {

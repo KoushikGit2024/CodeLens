@@ -118,6 +118,7 @@ const EngineeringHealthPage = () => {
   const [insights, setInsights] = useState(null);
   const [error, setError] = useState(null);
   const [loadingInsights, setLoadingInsights] = useState(false);
+  const [isReanalyzing, setIsReanalyzing] = useState(false);
   const [activeAdrRisk, setActiveAdrRisk] = useState(null);
   const [explainRisk, setExplainRisk] = useState(null);
   const [explainLoading, setExplainLoading] = useState(false);
@@ -185,11 +186,58 @@ const EngineeringHealthPage = () => {
   }
 
   if (error) {
+    const isNotReady = error.toLowerCase().includes('not ready') || error.toLowerCase().includes('pending');
+    
+    const handleReanalyze = async () => {
+      setIsReanalyzing(true);
+      try {
+        await repositoryApi.reanalyze(repoId);
+        navigate(`/explore/${repoId}`);
+      } catch (err) {
+        addToast({ title: 'Reanalysis Failed', description: err.message || 'An error occurred while trying to reanalyze.', type: 'error' });
+        setIsReanalyzing(false);
+      }
+    };
+
     return (
-      <div className="p-8">
-        <div className="rounded border border-red-500/30 bg-red-500/10 p-4 text-red-400">
-          <h2 className="mb-2 font-semibold">Error Loading Engineering Health</h2>
-          <p>{error}</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center p-8 bg-surface rounded-lg shadow border border-text/10 max-w-md w-full">
+          <ShieldAlert className="w-10 h-10 text-danger mx-auto mb-4 opacity-80" />
+          <h2 className="text-lg font-medium text-text mb-2">Analysis Error</h2>
+          <p className="text-muted mb-6 text-sm leading-relaxed">{error}</p>
+          
+          <div className="flex items-center justify-center gap-3">
+            <button 
+              onClick={() => navigate(-1)} 
+              className="px-4 py-2 text-sm text-text bg-panel hover:bg-text/5 border border-border rounded-lg transition-colors"
+            >
+              Go Back
+            </button>
+            {!isNotReady && (
+              <button 
+                onClick={handleReanalyze}
+                disabled={isReanalyzing}
+                className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isReanalyzing ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Starting...</>
+                ) : (
+                  <><RefreshCw className="w-4 h-4" /> Re-analyze Repo</>
+                )}
+              </button>
+            )}
+            {isNotReady && (
+              <button 
+                onClick={async () => {
+                  await repositoryApi.analyze(repoId);
+                  navigate(`/explore/${repoId}`);
+                }}
+                className="px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-lg text-sm font-medium transition-colors"
+              >
+                Start Analysis
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -493,7 +541,7 @@ const EngineeringHealthPage = () => {
           )}
         </div>
         <div className="flex flex-wrap gap-2">
-          {['ALL', 'QUALITY', 'COUPLING', 'DEPENDENCY', 'ARCHITECTURE', 'SIZE', 'CHURN'].map(cat => {
+          {['ALL', 'QUALITY', 'COUPLING', 'DEPENDENCY', 'ARCHITECTURE', 'SIZE'].map(cat => {
             const isActive = cat === 'ALL' ? categoryFilter === null : categoryFilter === cat;
             const count = cat === 'ALL' 
               ? model.risks.filter(r => !fileFilter || r.file === fileFilter).length
