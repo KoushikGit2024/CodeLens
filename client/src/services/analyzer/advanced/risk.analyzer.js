@@ -5,7 +5,6 @@
  * and then it applies threshold heuristic rules to surface engineering risks.
  */
 
-import { v4 as uuidv4 } from 'uuid';
 import { getFileDependencies, detectCycles, getIsolatedFiles } from '../dependencies/dependency.analyzer.js';
 import { detectClones } from './clone.analyzer.js';
 import { analyzeReachability } from './reachability.analyzer.js';
@@ -46,12 +45,40 @@ const SEVERITY_PENALTY = {
 };
 
 /**
- * It receives risk parameters, then extracts structured metadata, 
- * and then it applies a UUID to generate a consistent risk object.
+ * It hashes a string using djb2, then applies bit mixing, 
+ * and then it returns a compact hex string for use as a stable ID.
+ * The hash is based on semantic identity (file + category + name), NOT line numbers,
+ * so the ID survives minor code edits that shift line numbers.
  */
-function createRisk(category, severity, title, description, file, evidence = {}) {
-  // Using native browser crypto if available, falling back to uuidv4 for safety
-  const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : uuidv4();
+function stableHash(str) {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) + h) ^ str.charCodeAt(i);
+    h = h >>> 0; // Keep unsigned 32-bit
+  }
+  return h.toString(16).padStart(8, '0');
+}
+
+/**
+ * It receives semantic identifiers, then extracts a deterministic hash, 
+ * and then it applies a prefixed format to guarantee stable risk IDs across re-analyses.
+ * 
+ * @param {string} category  - The risk category (e.g., 'QUALITY')
+ * @param {string} title     - The risk title (e.g., 'High Cyclomatic Complexity')
+ * @param {string} file      - The primary file path
+ * @param {string} [name]    - Optional structural name (e.g., function name) for extra specificity
+ */
+function generateStableId(category, title, file, name = '') {
+  const key = `${category}|${title}|${file || ''}|${name}`;
+  return `risk_${stableHash(key)}`;
+}
+
+/**
+ * It receives risk parameters, then extracts structured metadata, 
+ * and then it applies a stable deterministic ID to generate a consistent risk object.
+ */
+function createRisk(category, severity, title, description, file, evidence = {}, stableIdName = '') {
+  const id = generateStableId(category, title, file, stableIdName);
   return { id, category, severity, title, description, file, evidence };
 }
 
@@ -154,7 +181,8 @@ function analyzeDependencyRisks(graph) {
       'Circular Dependency Detected',
       `Cycle path: ${cycle.join(' → ')}`,
       cycle[0], 
-      { cyclePath: cycle }
+      { cyclePath: cycle },
+      cycle.join('>')
     ));
   }
 
@@ -199,7 +227,13 @@ function analyzeArchitectureRisks(architecture) {
       'Cross-Layer Violation',
       violation.message || violation.description,
       violation.filePath,
-      { sourceComp: violation.filePath, ruleId: violation.ruleId }
+      {
+        sourceComp: violation.filePath,
+        ruleId: violation.ruleId,
+        // Pass the import location if available from the architecture analyzer
+        location: violation.importLocation || null
+      },
+      `${violation.filePath}>${violation.ruleId || ''}`
     ));
   }
 
@@ -207,65 +241,134 @@ function analyzeArchitectureRisks(architecture) {
 }
 
 /**
- * It aggregates function ASTs, then extracts structural clones and dead code, 
- * and then it applies the findings as quality maintenance warnings.
+ * It aggregates function ASTs per file, then groups discontinuous complexity issues,
+ * and then it applies a single grouped risk card per file with an instances array
+ * so the UI can render each individual block separately.
+ * 
+ * For Code Clones, each clone group becomes one risk card containing all sibling
+ * file locations so the user can navigate to any copy.
  */
 function analyzeCodeQualityRisks(analysis, graph) {
   const risks = [];
   const allFunctions = [];
-  
+
+  // ── Complexity: accumulate per file then group ─────────────────────────────
+  // Map: filePath -> { high: Instance[], warning: Instance[] }
+  const complexityByFile = new Map();
+
   if (analysis?.files) {
     for (const file of analysis.files) {
       if (file.hasErrors || file.error) continue;
-      
+
       for (const sym of (file.symbols || [])) {
         if (['function', 'method', 'arrow'].includes(sym.kind)) {
           allFunctions.push({ ...sym, filePath: file.filePath });
-          
-          if (sym.complexity > THRESHOLDS.COMPLEXITY_HIGH) {
-            risks.push(createRisk(
-              RISK_CATEGORIES.QUALITY,
-              SEVERITY.HIGH,
-              'High Cyclomatic Complexity',
-              `${sym.kind} '${sym.name}' has a high complexity score of ${sym.complexity}. Consider refactoring.`,
-              file.filePath,
-              { name: sym.name, complexity: sym.complexity, location: sym.location }
-            ));
-          } else if (sym.complexity > THRESHOLDS.COMPLEXITY_WARNING) {
-            risks.push(createRisk(
-              RISK_CATEGORIES.QUALITY,
-              SEVERITY.WARNING,
-              'Elevated Complexity',
-              `${sym.kind} '${sym.name}' has a complexity score of ${sym.complexity}.`,
-              file.filePath,
-              { name: sym.name, complexity: sym.complexity, location: sym.location }
-            ));
+
+          const isHigh = sym.complexity > THRESHOLDS.COMPLEXITY_HIGH;
+          const isWarn = !isHigh && sym.complexity > THRESHOLDS.COMPLEXITY_WARNING;
+
+          if (isHigh || isWarn) {
+            if (!complexityByFile.has(file.filePath)) {
+              complexityByFile.set(file.filePath, { high: [], warning: [] });
+            }
+            const bucket = complexityByFile.get(file.filePath);
+            const instance = {
+              name: sym.name,
+              kind: sym.kind,
+              complexity: sym.complexity,
+              // location comes directly from the AST parser (startLine / endLine)
+              location: sym.location || null
+            };
+            if (isHigh) bucket.high.push(instance);
+            else bucket.warning.push(instance);
           }
         }
       }
     }
   }
 
-  const { cloneGroups } = detectClones(allFunctions, "repository");
-  if (cloneGroups) {
-    for (const clone of cloneGroups) {
-      const filePaths = clone.instances.map(i => i.filePath);
+  // Emit one risk card per file per severity level
+  for (const [filePath, { high, warning }] of complexityByFile.entries()) {
+    if (high.length > 0) {
+      // Sort worst-first inside the grouped card
+      high.sort((a, b) => b.complexity - a.complexity);
+      const worst = high[0];
+      risks.push(createRisk(
+        RISK_CATEGORIES.QUALITY,
+        SEVERITY.HIGH,
+        'High Cyclomatic Complexity',
+        high.length === 1
+          ? `${worst.kind} '${worst.name}' has a high complexity score of ${worst.complexity}. Consider refactoring.`
+          : `${high.length} blocks in this file have high complexity (worst: '${worst.name}' at ${worst.complexity}). Consider breaking them apart.`,
+        filePath,
+        {
+          // Primary location for the single-instance case — the worst offender's block
+          location: worst.location,
+          // Full instances list for the UI to render each block independently
+          instances: high
+        },
+        // Stable name: all names joined so that if the set of bad functions changes the ID changes too
+        high.map(i => i.name).sort().join('+')
+      ));
+    }
+
+    if (warning.length > 0) {
+      warning.sort((a, b) => b.complexity - a.complexity);
+      const worst = warning[0];
       risks.push(createRisk(
         RISK_CATEGORIES.QUALITY,
         SEVERITY.WARNING,
-        'Structural Code Clone',
-        `Found ${clone.count} instances of structurally identical code.`,
-        filePaths[0],
-        { count: clone.count, instances: clone.instances }
+        'Elevated Complexity',
+        warning.length === 1
+          ? `${worst.kind} '${worst.name}' has a complexity score of ${worst.complexity}.`
+          : `${warning.length} blocks in this file have elevated complexity (worst: '${worst.name}' at ${worst.complexity}).`,
+        filePath,
+        {
+          location: worst.location,
+          instances: warning
+        },
+        warning.map(i => i.name).sort().join('+')
       ));
     }
   }
 
+  // ── Code Clones ────────────────────────────────────────────────────────────
+  const { cloneGroups } = detectClones(allFunctions, 'repository');
+  if (cloneGroups) {
+    for (const clone of cloneGroups) {
+      // Each instance carries filePath + location from the clone analyzer
+      const instances = clone.instances.map(inst => ({
+        filePath: inst.filePath,
+        name: inst.name,
+        kind: inst.kind,
+        location: inst.location || null
+      }));
+
+      const filePaths = [...new Set(instances.map(i => i.filePath))];
+
+      risks.push(createRisk(
+        RISK_CATEGORIES.QUALITY,
+        SEVERITY.WARNING,
+        'Structural Code Clone',
+        `Found ${clone.count} structurally identical blocks across ${filePaths.length} file(s). Extract to a shared utility to reduce duplication.`,
+        instances[0]?.filePath || null,
+        {
+          count: clone.count,
+          // Full sibling list with locations so the UI can link to each one
+          instances
+        },
+        // Stable: hash of sorted file paths
+        filePaths.sort().join('+')
+      ));
+    }
+  }
+
+  // ── Dead / Unreachable Files ───────────────────────────────────────────────
   const reachability = analyzeReachability(graph);
   if (reachability?.unreachableFiles) {
     for (const deadFile of reachability.unreachableFiles) {
       if (deadFile.startsWith('pkg:') || deadFile.startsWith('moduleNode')) continue;
-      
+
       const rawPath = deadFile.replace(/^file:/, '');
       risks.push(createRisk(
         RISK_CATEGORIES.QUALITY,
@@ -315,8 +418,8 @@ function determineHotspots(risks) {
   }
 
   return Array.from(fileScores.entries())
-    .sort((a, b) => b[1] - a[1]) 
-    .slice(0, 5) 
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
     .map(entry => entry[0]);
 }
 
@@ -331,10 +434,8 @@ function analyzeChurnRisks(analysis) {
   if (!gitChurn || !gitChurn.churnScores) return risks;
 
   for (const [filePath, churnScore] of Object.entries(gitChurn.churnScores)) {
-    // Skip .git files
     if (filePath.startsWith('.git/')) continue;
 
-    // Find matching file node to get composite risk
     const fileNode = analysis.files?.find(f => f.filePath === filePath);
     const compositeRisk = fileNode?.metrics?.compositeRisk || churnScore;
 
@@ -374,9 +475,13 @@ function analyzeChurnRisks(analysis) {
 /**
  * It orchestrates the sub-analyzers, then extracts all potential failures, 
  * and then it applies aggregation to build the comprehensive risk profile.
+ * 
+ * @param {string[]} [ignoredRiskIds=[]]  — IDs the user has chosen to suppress.
+ *   These are still returned in the `ignoredRisks` array so the UI can show them
+ *   in a separate tab, but they are excluded from the score calculation.
  */
-export function buildEngineeringRiskModel(analysis, graph, architecture) {
-  const risks = [
+export function buildEngineeringRiskModel(analysis, graph, architecture, ignoredRiskIds = []) {
+  const allRisks = [
     ...analyzeSizeRisks(analysis),
     ...analyzeCouplingRisks(analysis, graph),
     ...analyzeDependencyRisks(graph),
@@ -384,6 +489,10 @@ export function buildEngineeringRiskModel(analysis, graph, architecture) {
     ...analyzeCodeQualityRisks(analysis, graph),
     ...analyzeChurnRisks(analysis)
   ];
+
+  const ignoredSet = new Set(ignoredRiskIds);
+  const risks = allRisks.filter(r => !ignoredSet.has(r.id));
+  const ignoredRisks = allRisks.filter(r => ignoredSet.has(r.id));
 
   const { score, riskLevel } = calculateScoreAndLevel(risks);
   const hotspots = determineHotspots(risks);
@@ -395,7 +504,6 @@ export function buildEngineeringRiskModel(analysis, graph, architecture) {
     warning:  risks.filter(r => r.severity === SEVERITY.WARNING).length,
   };
 
-  // Build a sorted top-churn table for the UI (high churn + high composite)
   const churnTable = analysis?.gitChurn?.churnScores
     ? Object.entries(analysis.gitChurn.churnScores)
         .filter(([fp]) => !fp.startsWith('.git/'))
@@ -413,14 +521,29 @@ export function buildEngineeringRiskModel(analysis, graph, architecture) {
     : [];
 
   return {
-    summary: `Identified ${risks.length} engineering risk(s) across the repository.`,
+    summary: `Identified ${risks.length} active engineering risk(s) across the repository.`,
     score,
     riskLevel,
     metrics,
     hotspots,
     risks,
+    ignoredRisks,
     churnTable,
     gitChurnAvailable: !!analysis?.gitChurn,
-    recommendations: [] 
+    recommendations: []
   };
 }
+
+/**
+ * It takes a set of ignored risk IDs, then recalculates the health score, 
+ * and then it returns the new score without rebuilding the full model.
+ * Useful for instant UI updates when a user ignores/restores a single risk.
+ */
+export function recalculateScoreWithIgnored(allRisks, ignoredRiskIds) {
+  const ignoredSet = new Set(ignoredRiskIds);
+  const activeRisks = allRisks.filter(r => !ignoredSet.has(r.id));
+  const { score } = calculateScoreAndLevel(activeRisks);
+  return score;
+}
+
+export { SEVERITY_PENALTY };

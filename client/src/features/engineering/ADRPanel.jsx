@@ -65,11 +65,12 @@ ${adr.evidence}
   };
 
   const handleDownload = () => {
+    const dateStamp = new Date().toISOString().replace(/[:.]/g, '-').split('T').join('_');
     const blob = new Blob([getMarkdown()], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `adr-${adr.id.substring(0,8)}.md`;
+    a.download = `adr-${adr.id.substring(0,8)}_${dateStamp}.md`;
     a.click();
     URL.revokeObjectURL(url);
   };

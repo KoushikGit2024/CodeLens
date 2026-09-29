@@ -454,7 +454,7 @@ export default function ImpactPage() {
                       <div className="export-element-legend absolute top-4 right-4 flex flex-col gap-2">
                         <ExportDiagramButton 
                           elementRef={diagramRef} 
-                          filename="impact-graph" 
+                          filename={`impact-graph-${repoId.replace(/[^a-zA-Z0-9-]/g, '_')}`} 
                           availableToggles={['legend', 'controls']}
                           nodes={nodes}
                           edges={edges}

@@ -116,8 +116,9 @@ export default function DependencyGraphPage() {
     if (layoutType === 'force') {
       if (simRef.current) {
         setNodes(currentNodes => {
+           const updatedMap = new Map(rfNodes.map(n => [n.id, n]));
            return currentNodes.map(cn => {
-             const updated = rfNodes.find(n => n.id === cn.id);
+             const updated = updatedMap.get(cn.id);
              return updated ? { ...updated, position: cn.position, fx: cn.fx, fy: cn.fy } : cn;
            });
         });
@@ -134,6 +135,7 @@ export default function DependencyGraphPage() {
         .filter(e => nodeIndex.has(e.source) && nodeIndex.has(e.target))
         .map(e => ({ source: nodeIndex.get(e.source), target: nodeIndex.get(e.target) }));
 
+      let frameId = null;
       simRef.current = forceSimulation(simNodes)
         .force('charge', forceManyBody())
         .force('link', forceLink(simEdges))
@@ -144,16 +146,21 @@ export default function DependencyGraphPage() {
         .velocityDecay(0.6)
         .alpha(1)
         .on('tick', () => {
-          setNodes(currentNodes => {
-            return currentNodes.map(node => {
-              const simNode = simNodes.find(sn => sn.id === node.id);
-              if (!simNode) return node;
-              const w = parseInt(node.style?.width ?? NODE_W, 10);
-              const h = parseInt(node.style?.height ?? NODE_H, 10);
-              return {
-                ...node,
-                position: { x: simNode.x - w / 2, y: simNode.y - h / 2 }
-              };
+          if (frameId) return;
+          frameId = requestAnimationFrame(() => {
+            frameId = null;
+            setNodes(currentNodes => {
+              return currentNodes.map(node => {
+                const idx = nodeIndex.get(node.id);
+                if (idx === undefined) return node;
+                const simNode = simNodes[idx];
+                const w = parseInt(node.style?.width ?? NODE_W, 10);
+                const h = parseInt(node.style?.height ?? NODE_H, 10);
+                return {
+                  ...node,
+                  position: { x: simNode.x - w / 2, y: simNode.y - h / 2 }
+                };
+              });
             });
           });
         });
@@ -166,7 +173,7 @@ export default function DependencyGraphPage() {
       setEdges(rfEdges);
     }
 
-  }, [graph, selected, showExternalPackages, layoutType, edgeStyle]);
+  }, [graph, selected, showExternalPackages, layoutType, edgeStyle, showChurn]);
 
   /**
    * It monitors the slider value, then extracts gravity and repulsion multipliers, 
@@ -509,7 +516,7 @@ export default function DependencyGraphPage() {
               <div className="export-element-breadcrumbs absolute top-3 right-3 z-30 pointer-events-auto">
                 <ExportDiagramButton 
                   elementRef={graphRef} 
-                  filename="dependency-graph" 
+                  filename={`dependency-graph-${repoId.replace(/[^a-zA-Z0-9-]/g, '_')}`} 
                   availableToggles={['breadcrumbs', 'controls', 'minimap']}
                   nodes={nodes}
                   edges={edges}

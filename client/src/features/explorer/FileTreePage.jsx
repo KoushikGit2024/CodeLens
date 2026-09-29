@@ -327,7 +327,7 @@ export default function FileTreePage() {
           </div>
           <ExportDiagramButton 
             elementRef={diagramRef} 
-            filename="file-tree" 
+            filename={`file-tree-${repoId.replace(/[^a-zA-Z0-9-]/g, '_')}`} 
             className="z-10" 
             availableToggles={['controls', 'minimap']}
             nodes={nodes}

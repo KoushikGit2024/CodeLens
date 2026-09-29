@@ -42,6 +42,7 @@ export function ExportDiagramButton({
         excludedFeatures,
       };
 
+      const dateStamp = new Date().toISOString().replace(/[:.]/g, '-').split('T').join('_');
       if (format === 'svg' && nodes && edges) {
         // Use native SVG Web Worker for 0-blocking high-performance export
         await new Promise((resolve, reject) => {
@@ -52,7 +53,7 @@ export function ExportDiagramButton({
               const url = URL.createObjectURL(blob);
               const link = document.createElement('a');
               link.href = url;
-              link.download = `${filename}.svg`;
+              link.download = `${filename}_${dateStamp}.svg`;
               link.click();
               URL.revokeObjectURL(url);
               resolve();
@@ -88,9 +89,9 @@ export function ExportDiagramButton({
           worker.postMessage({ nodes, edges, bounds, options });
         });
       } else if (format === 'png') {
-        await exportToPng(elementRef, `${filename}.png`, options);
+        await exportToPng(elementRef, `${filename}_${dateStamp}.png`, options);
       } else {
-        await exportToSvg(elementRef, `${filename}.svg`, options);
+        await exportToSvg(elementRef, `${filename}_${dateStamp}.svg`, options);
       }
       
       setOpen(false);

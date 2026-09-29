@@ -131,6 +131,7 @@ export default function ExplorerPage() {
 
   // Monaco editor instance ref — used for revealLine / decorations
   const editorRef = useRef(null);
+  const decorationsRef = useRef(null); // Holds the active highlight decoration collection
   const [isEditorMounted, setIsEditorMounted] = useState(false);
 
   const handleSetViewMode = (mode) => {
@@ -206,8 +207,14 @@ export default function ExplorerPage() {
     const fetchFile = async () => {
       setFileError(null);
       setFileLoading(true);
+      // Clear any risk-block highlight decorations from the previous file
+      if (decorationsRef.current) {
+        decorationsRef.current.clear();
+        decorationsRef.current = null;
+      }
       // We intentionally do NOT clear fileContent here to prevent Monaco from unmounting 
       // and causing a flicker/lag while fetching the next file.
+
 
       if (fileTree && isDirectory(fileTree, selectedPath)) {
         setFileError('DIRECTORY');
@@ -350,23 +357,62 @@ export default function ExplorerPage() {
   function revealLine(line) {
     const editor = editorRef.current;
     if (!editor || !line) return;
+    // Clear any existing highlight decorations
+    if (decorationsRef.current) {
+      decorationsRef.current.clear();
+      decorationsRef.current = null;
+    }
     editor.revealLineInCenter(line);
     editor.setPosition({ lineNumber: line, column: 1 });
   }
 
+  /**
+   * It receives a line range, then scrolls Monaco to center on the block,
+   * and then it applies a persistent amber background decoration so the exact
+   * discontinuous block is visually distinct from the rest of the file.
+   * The decoration auto-clears when the user navigates to a new file.
+   */
   function highlightRange(startLine, endLine) {
     const editor = editorRef.current;
     if (!editor || !startLine) return;
     const model = editor.getModel();
     if (!model) return;
     const end = endLine || startLine;
-    editor.revealLineInCenter(startLine);
-    editor.setSelection({
-      startLineNumber: startLine,
-      startColumn:     1,
-      endLineNumber:   end,
-      endColumn:       model.getLineLength(end) + 1,
-    });
+
+    // Clear previous decorations
+    if (decorationsRef.current) {
+      decorationsRef.current.clear();
+      decorationsRef.current = null;
+    }
+
+    editor.revealLinesInCenter(startLine, end);
+
+    // Apply decoration: highlighted background + gutter icon
+    decorationsRef.current = editor.createDecorationsCollection([
+      {
+        range: {
+          startLineNumber: startLine,
+          startColumn:     1,
+          endLineNumber:   end,
+          endColumn:       model.getLineMaxColumn(end),
+        },
+        options: {
+          isWholeLine:        true,
+          className:          'codelens-risk-highlight',
+          overviewRuler: {
+            color:    '#f59e0b',  // amber-500
+            position: 4           // OverviewRulerLane.Full
+          },
+          minimap: {
+            color:    '#f59e0b',
+            position: 1           // MinimapPosition.Inline
+          },
+        },
+      },
+    ]);
+
+    // Also set cursor to the start of the block so keyboard navigation starts there
+    editor.setPosition({ lineNumber: startLine, column: 1 });
   }
 
   const getActiveContext = useCallback(() => {

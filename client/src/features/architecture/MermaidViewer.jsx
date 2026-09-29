@@ -49,22 +49,26 @@ export default function MermaidViewer({ diagramStr, repoId }) {
   };
 
   const handleDownloadSource = () => {
+    const dateStamp = new Date().toISOString().replace(/[:.]/g, '-').split('T').join('_');
+    const safeRepo = repoId.replace(/[^a-zA-Z0-9-]/g, '_');
     const blob = new Blob([diagramStr], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `architecture-${repoId}.mmd`;
+    a.download = `architecture-${safeRepo}_${dateStamp}.mmd`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   const handleDownloadSvg = () => {
     if (!svgContent) return;
+    const dateStamp = new Date().toISOString().replace(/[:.]/g, '-').split('T').join('_');
+    const safeRepo = repoId.replace(/[^a-zA-Z0-9-]/g, '_');
     const blob = new Blob([svgContent], { type: 'image/svg+xml' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `architecture-${repoId}.svg`;
+    a.download = `architecture-${safeRepo}_${dateStamp}.svg`;
     a.click();
     URL.revokeObjectURL(url);
   };

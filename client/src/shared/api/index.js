@@ -14,7 +14,7 @@ import { supabase } from '../lib/supabase.js';
 
 import { buildArchitectureModel } from '../../services/analyzer/advanced/architecture.analyzer.js';
 import { buildRepositoryIntelligence } from '../../services/analyzer/advanced/intelligence.analyzer.js';
-import { buildEngineeringRiskModel } from '../../services/analyzer/advanced/risk.analyzer.js';
+import { buildEngineeringRiskModel, recalculateScoreWithIgnored, SEVERITY_PENALTY } from '../../services/analyzer/advanced/risk.analyzer.js';
 import { buildRefactoringIntelligence } from '../../services/analyzer/advanced/refactoring.analyzer.js';
 import { analyzeChangeImpact } from '../../services/analyzer/advanced/change.impact.js';
 import { buildQuestionContext } from '../../services/analyzer/advanced/question.context.js';
@@ -528,7 +528,9 @@ Provide a 3-5 paragraph technical summary covering: overall codebase health, mai
     const record = await repositoryStore.get(repoId);
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
     const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
-    const risks = buildEngineeringRiskModel(record.analysis, record.analysis.graph, architecture);
+    // Load the user's persistent ignore list so the score and active risks exclude them
+    const ignoredRiskIds = await persistenceStore.getIgnoredRiskIds(repoId);
+    const risks = buildEngineeringRiskModel(record.analysis, record.analysis.graph, architecture, ignoredRiskIds);
 
     if (options.generateAi) {
       const prompt = `You are a senior technical lead reviewing engineering health metrics.
@@ -834,6 +836,20 @@ Produce a structured JSON response matching this exact schema:
     await repositoryStore.update(id, { status: 'analyzing', phase: 'extracting', error: null });
     startAnalysis(id, {}).catch(err => console.error('Background analysis failed:', err));
     return { data: { success: true } };
+  },
+
+  // ── Risk Ignore / Restore API ──────────────────────────────────────────────
+  async ignoreRisk(repoId, riskId) {
+    await persistenceStore.ignoreRisk(repoId, riskId);
+    return { data: { success: true } };
+  },
+  async restoreRisk(repoId, riskId) {
+    await persistenceStore.restoreRisk(repoId, riskId);
+    return { data: { success: true } };
+  },
+  async getIgnoredRiskIds(repoId) {
+    const ids = await persistenceStore.getIgnoredRiskIds(repoId);
+    return { data: { ids } };
   },
 };
 

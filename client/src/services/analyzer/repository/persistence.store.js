@@ -8,7 +8,7 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'CodeLensDB';
-const DB_VERSION = 5; // bumped: adds embeddings store
+const DB_VERSION = 6; // bumped: adds ignored_risks store
 
 /**
  * It requests an IndexedDB connection, then extracts object store requirements, 
@@ -52,6 +52,10 @@ export async function getDB() {
       // v5: Semantic search embeddings
       if (!db.objectStoreNames.contains('embeddings')) {
         db.createObjectStore('embeddings', { keyPath: ['repoId', 'filePath'] });
+      }
+      // v6: Persistent risk ignore list
+      if (!db.objectStoreNames.contains('ignored_risks')) {
+        db.createObjectStore('ignored_risks', { keyPath: ['repoId', 'riskId'] });
       }
       
       if (oldVersion < 2 && db.objectStoreNames.contains('repos')) {
@@ -317,4 +321,43 @@ export async function clearEmbeddings(repoId) {
     cursor = await cursor.continue();
   }
   await tx.done;
+}
+
+// ── Ignored Risks API ──────────────────────────────────────────────────────────
+
+/**
+ * It receives a repository ID and a risk ID, then extracts the ignored_risks store,
+ * and then it persists the ignore record so it survives re-analyses.
+ */
+export async function ignoreRisk(repoId, riskId) {
+  const db = await getDB();
+  await db.put('ignored_risks', { repoId, riskId, ignoredAt: Date.now() });
+}
+
+/**
+ * It receives a repository ID and a risk ID, then extracts the matching record, 
+ * and then it applies deletion so the risk is treated as active again.
+ */
+export async function restoreRisk(repoId, riskId) {
+  const db = await getDB();
+  await db.delete('ignored_risks', [repoId, riskId]);
+}
+
+/**
+ * It queries the ignored_risks store for the given repo, then extracts all records,
+ * and then it returns a plain array of risk ID strings.
+ */
+export async function getIgnoredRiskIds(repoId) {
+  const db = await getDB();
+  const tx = db.transaction('ignored_risks', 'readonly');
+  const store = tx.objectStore('ignored_risks');
+  const results = [];
+  let cursor = await store.openCursor();
+  while (cursor) {
+    if (cursor.key[0] === repoId) {
+      results.push(cursor.value.riskId);
+    }
+    cursor = await cursor.continue();
+  }
+  return results;
 }

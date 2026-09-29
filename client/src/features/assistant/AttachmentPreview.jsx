@@ -33,17 +33,25 @@ function detectLanguage(name) {
 
 // ── Download helper ────────────────────────────────────────────────────────────
 function downloadText(content, filename) {
+  const dateStamp = new Date().toISOString().replace(/[:.]/g, '-').split('T').join('_');
+  const uniqueName = filename.includes('.') 
+    ? filename.replace(/(\.[^.]+)$/, `_${dateStamp}$1`) 
+    : `${filename}_${dateStamp}`;
   const blob = new Blob([content], { type: 'text/plain' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = filename;
+  a.href = url; a.download = uniqueName;
   a.click();
   URL.revokeObjectURL(url);
 }
 
 function downloadImage(dataUrl, filename) {
+  const dateStamp = new Date().toISOString().replace(/[:.]/g, '-').split('T').join('_');
+  const uniqueName = filename.includes('.') 
+    ? filename.replace(/(\.[^.]+)$/, `_${dateStamp}$1`) 
+    : `${filename}_${dateStamp}`;
   const a = document.createElement('a');
-  a.href = dataUrl; a.download = filename;
+  a.href = dataUrl; a.download = uniqueName;
   a.click();
 }
 

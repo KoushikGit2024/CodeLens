@@ -185,13 +185,13 @@ export const SpringEdge = ({ id, sourceX, sourceY, targetX, targetY, style = {},
 
   const pathD = `M ${pts.join(' L ')}`;
   
-  // Smoothly animate the path vertices
-  const transitionStyle = { ...style, fill: 'none', transition: 'd 0.4s cubic-bezier(0.4, 0, 0.2, 1)' };
+  // Remove the CSS transition on 'd' so edges don't lag behind nodes during force simulation
+  const transitionStyle = { ...style, fill: 'none' };
 
   return (
     <>
       <path id={id} className="react-flow__edge-path" d={pathD} style={transitionStyle} markerEnd={markerEnd} />
-      <path d={pathD} style={{ fill: 'none', stroke: 'transparent', strokeWidth: 12, transition: 'd 0.4s cubic-bezier(0.4, 0, 0.2, 1)' }} />
+      <path d={pathD} style={{ fill: 'none', stroke: 'transparent', strokeWidth: 12 }} />
     </>
   );
 };

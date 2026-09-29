@@ -199,3 +199,12 @@ svg *, canvas, .react-flow__viewport *, img {
 .react-flow__controls-button:hover svg {
   fill: rgb(var(--color-text)) !important;
 }
+
+/* ── Monaco risk-block highlight decoration ──────────────────────────────────
+   Applied by ExplorerPage when navigating from a health or refactoring risk card.
+   Uses an amber background so the exact discontinuous block stands out clearly.
+   The class is injected via editor.createDecorationsCollection(). */
+.codelens-risk-highlight {
+  background-color: rgba(245, 158, 11, 0.15) !important; /* amber-500 @ 15% */
+  border-left: 3px solid rgba(245, 158, 11, 0.8) !important;
+}

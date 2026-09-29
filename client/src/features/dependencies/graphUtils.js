@@ -177,18 +177,32 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
   const connectedNodes = new Set();
   if (selectedId) {
     connectedNodes.add(selectedId);
-    let changed = true;
-    while (changed) {
-      changed = false;
-      for (const e of edgesToRender) {
-        if (connectedNodes.has(e.source) && !connectedNodes.has(e.target)) {
-          connectedNodes.add(e.target); changed = true;
-        }
-        if (connectedNodes.has(e.target) && !connectedNodes.has(e.source)) {
-          connectedNodes.add(e.source); changed = true;
+    const adj = new Map();
+    for (const e of edgesToRender) {
+      if (!adj.has(e.source)) adj.set(e.source, []);
+      if (!adj.has(e.target)) adj.set(e.target, []);
+      adj.get(e.source).push(e.target);
+      adj.get(e.target).push(e.source);
+    }
+    const queue = [selectedId];
+    let head = 0;
+    while (head < queue.length) {
+      const node = queue[head++];
+      const neighbors = adj.get(node);
+      if (neighbors) {
+        for (const neighbor of neighbors) {
+          if (!connectedNodes.has(neighbor)) {
+            connectedNodes.add(neighbor);
+            queue.push(neighbor);
+          }
         }
       }
     }
+  }
+
+  const dirMap = new Map();
+  for (const n of fileNodes) {
+    dirMap.set(n.id, getDir(n.data?.filePath || n.filePath));
   }
 
   const rfFileNodes = fileNodes.map(n => {
@@ -263,11 +277,9 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
     const isDirect = selectedId && (e.source === selectedId || e.target === selectedId);
     const isCjs = e.type === 'requires' || e.type === 'smoothstep';
     
-    const sameDir = (() => {
-      const sn = fileNodes.find(n => n.id === e.source);
-      const tn = fileNodes.find(n => n.id === e.target);
-      return sn && tn && getDir(sn.data?.filePath || sn.filePath) === getDir(tn.data?.filePath || tn.filePath);
-    })();
+    const sourceDir = dirMap.get(e.source);
+    const targetDir = dirMap.get(e.target);
+    const sameDir = sourceDir && targetDir && sourceDir === targetDir;
 
     const strokeColor = isFaded ? '#ffffff08' : isDirect ? '#58a6ff' : sameDir ? '#7d8590' : '#58a6ff55';
     const strokeWidth = isFaded ? 0.5 : isDirect ? 2 : 0.8;

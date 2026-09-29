@@ -4,12 +4,12 @@
  * It initiates the technical debt dashboard, then extracts deterministic refactoring candidates, 
  * and then it applies them to a prioritized triage interface.
  */
-import { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useEffect, useState, useMemo } from 'react';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { 
-  AlertTriangle, Layers, GitBranch, 
+  AlertTriangle, Layers, GitBranch, Search,
   Database, Brain, Loader2, CheckCircle, Sparkles, Wrench,
-  ChevronDown, ChevronRight, File, RefreshCw, AlertCircle
+  ChevronDown, ChevronRight, File, RefreshCw, AlertCircle, X
 } from 'lucide-react';
 import { DiffEditor } from '@monaco-editor/react';
 import { ResizableLayout } from '../../shared/components/ResizableLayout';
@@ -19,7 +19,7 @@ import { repositoryApi } from '../../shared/api';
 import AiResponse from '../../shared/components/ai/AiResponse';
 import PageHeader from '../../shared/components/PageHeader';
 import OpenSourceButton from '../../shared/components/OpenSourceButton';
-import { makeSourceRef } from '../../shared/navigation/sourceRef';
+import { makeSourceRef, tryMakeSourceRef } from '../../shared/navigation/sourceRef';
 
 // Palette constants — all in sync with CSS variables
 const PRIORITY_META = {
@@ -211,15 +211,41 @@ export default function RefactoringPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isReanalyzing, setIsReanalyzing] = useState(false);
-  const [selectedCandidateId, setSelectedCandidateId] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // ── URL-synced UI State ──
+  const selectedCandidateId = searchParams.get('candidate');
+  const setSelectedCandidateId = (val) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      if (val) next.set('candidate', val);
+      else next.delete('candidate');
+      return next;
+    });
+  };
+
+  const searchQuery = searchParams.get('search') || '';
+  const setSearchQuery = (val) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      if (val) next.set('search', val);
+      else next.delete('search');
+      return next;
+    }, { replace: true });
+  };
 
   useEffect(() => {
     async function load() {
       try {
         const data = await repositoryApi.getRefactoringIntelligence(repoId);
         setIntel(data.data);
-        if (data.data?.candidates?.length > 0) {
-          setSelectedCandidateId(data.data.candidates[0].id);
+        const currentCandidate = new URLSearchParams(window.location.search).get('candidate');
+        if (data.data?.candidates?.length > 0 && !currentCandidate) {
+          setSearchParams(prev => {
+            const next = new URLSearchParams(prev);
+            next.set('candidate', data.data.candidates[0].id);
+            return next;
+          }, { replace: true });
         }
       } catch (err) {
         setError(err?.response?.data?.error || err.message);
@@ -229,6 +255,20 @@ export default function RefactoringPage() {
     }
     load();
   }, [repoId]);
+
+  // ── Derived data — MUST stay above early returns to satisfy Rules of Hooks ──
+  const selectedCandidate = intel?.candidates?.find(c => c.id === selectedCandidateId);
+
+  const filteredCandidates = useMemo(() => {
+    if (!intel?.candidates) return [];
+    if (!searchQuery.trim()) return intel.candidates;
+    const q = searchQuery.toLowerCase();
+    return intel.candidates.filter(c =>
+      c.title?.toLowerCase().includes(q) ||
+      c.summary?.toLowerCase().includes(q) ||
+      c.files?.some(f => f.toLowerCase().includes(q))
+    );
+  }, [intel?.candidates, searchQuery]);
 
   if (loading) {
     return (
@@ -297,7 +337,7 @@ export default function RefactoringPage() {
     );
   }
 
-  const selectedCandidate = intel?.candidates?.find(c => c.id === selectedCandidateId);
+
 
   return (
     <div className="flex flex-col h-full bg-surface">
@@ -313,15 +353,37 @@ export default function RefactoringPage() {
             icon: <Wrench />,
             content: (
               <aside className="flex-1 overflow-y-auto p-3 flex flex-col custom-scrollbar bg-panel h-full">
-                {(!intel?.candidates || intel.candidates.length === 0) ? (
+                {/* Search bar */}
+                <div className="relative mb-3">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    placeholder="Search candidates..."
+                    className="w-full bg-surface border border-border rounded pl-8 pr-7 py-1.5 text-xs text-text placeholder-muted/60 focus:outline-none focus:border-accent/50 transition-colors"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-text"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+
+                {filteredCandidates.length === 0 ? (
                   <div className="flex flex-col items-center justify-center p-6 mt-10 text-center gap-3">
-                    <CheckCircle className="w-8 h-8 text-success/30 opacity-80" />
-                    <p className="text-sm text-muted">No refactoring candidates found.</p>
+                    {searchQuery
+                      ? <><Search className="w-8 h-8 text-muted/30" /><p className="text-sm text-muted">No candidates match "{searchQuery}"</p></>
+                      : <><CheckCircle className="w-8 h-8 text-success/30 opacity-80" /><p className="text-sm text-muted">No refactoring candidates found.</p></>
+                    }
                   </div>
                 ) : (
                   <div className="flex flex-col divide-y divide-border/30">
                     {['critical', 'high', 'warning'].map(level => {
-                      const group = intel.candidates.filter(c => c.priority === level);
+                      const group = filteredCandidates.filter(c => c.priority === level);
                       if (group.length === 0) return null;
                       return (
                         <div key={level} className="py-2">
@@ -520,7 +582,7 @@ function CandidateDetail({ candidate, repoId }) {
       <div className="grid grid-cols-2 gap-3">
         <div className="border border-border rounded p-4 min-w-0">
           <h3 className="text-[11px] font-medium text-muted uppercase tracking-wider mb-3">Affected Files</h3>
-          <ul className="space-y-1.5">
+          <ul className="space-y-2">
             {[...(candidate.files || [])].sort((a, b) => {
               if (a === candidate.mainFile) return -1;
               if (b === candidate.mainFile) return 1;
@@ -528,14 +590,23 @@ function CandidateDetail({ candidate, repoId }) {
             }).map(f => {
               const range = candidate.fileRanges && candidate.fileRanges[f];
               const isMain = candidate.mainFile === f;
+              const ref = tryMakeSourceRef({ filePath: f, startLine: range?.startLine, endLine: range?.endLine });
               return (
-                <li key={f} className="flex items-center gap-2 min-w-0">
-                  <OpenSourceButton
-                    ref={makeSourceRef({ filePath: f, startLine: range?.startLine, endLine: range?.endLine })}
-                  />
-                  {isMain && (
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent/20 text-accent font-semibold uppercase tracking-wider shrink-0">
-                      Target File
+                <li key={f} className="flex flex-col gap-0.5 min-w-0 pb-2 border-b border-border/30 last:border-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {ref
+                      ? <OpenSourceButton ref={ref} variant="button" className="flex-1 truncate text-[11px] justify-start" />
+                      : <span className="text-[11px] font-mono text-muted truncate flex-1">{f}</span>
+                    }
+                    {isMain && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent/20 text-accent font-semibold uppercase tracking-wider shrink-0">
+                        Target
+                      </span>
+                    )}
+                  </div>
+                  {range?.startLine && (
+                    <span className="text-[10px] font-mono text-muted/60 pl-1">
+                      Lines {range.startLine}{range.endLine && range.endLine !== range.startLine ? `–${range.endLine}` : ''}
                     </span>
                   )}
                 </li>
