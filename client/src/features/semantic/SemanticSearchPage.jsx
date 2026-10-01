@@ -1,9 +1,54 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Brain, Search, Database, Loader2, Sparkles, FileCode2, Info } from 'lucide-react';
+import { Brain, Network, Search, Database, Loader2, Sparkles, FileCode2, Info, Cpu } from 'lucide-react';
 import { initializeSemanticEngine, indexRepository, search } from '../../services/semantic/semantic.service.js';
-import { loadAllEmbeddings } from '../../services/analyzer/repository/persistence.store.js';
+import { loadAllEmbeddings, removeEmbeddings } from '../../services/analyzer/repository/persistence.store.js';
 import { useToast } from '../../shared/context/ToastContext';
+
+const MODEL_DETAILS = {
+  'Xenova/all-MiniLM-L6-v2': {
+    size: '~22MB',
+    arch: 'MiniLM',
+    features: 'Extremely fast execution with minimal memory footprint.',
+    bestFor: 'General purpose embedding on low-end devices.'
+  },
+  'Xenova/paraphrase-albert-small-v2': {
+    size: '~46MB',
+    arch: 'ALBERT',
+    features: 'Highly compressed via parameter sharing. Excellent memory efficiency.',
+    bestFor: 'Paraphrase identification and semantic similarity.'
+  },
+  'Supabase/gte-small': {
+    size: '~67MB',
+    arch: 'BERT',
+    features: 'Outstanding retrieval performance for its size.',
+    bestFor: 'Balanced performance, outperforming many larger models.'
+  },
+  'Xenova/paraphrase-MiniLM-L3-v2': {
+    size: '~69MB',
+    arch: 'MiniLM-L3',
+    features: 'Heavily compressed (L3) architecture for maximum speed.',
+    bestFor: 'Extremely fast paraphrase and similarity matching.'
+  },
+  'Xenova/multi-qa-MiniLM-L6-cos-v1': {
+    size: '~91MB',
+    arch: 'MiniLM',
+    features: 'Trained specifically on conversational and Q&A datasets.',
+    bestFor: 'Matching natural language queries to specific code snippets.'
+  },
+  'Xenova/bge-small-en-v1.5': {
+    size: '~133MB',
+    arch: 'BERT',
+    features: 'Top-tier performance on the MTEB leaderboard for small models.',
+    bestFor: 'High accuracy retrieval tasks.'
+  },
+  'Xenova/nomic-embed-text-v1.5': {
+    size: '~550MB',
+    arch: 'Nomic BERT',
+    features: 'Massive 8192-token context window. Requires high system RAM.',
+    bestFor: 'Deep semantic understanding and large document chunking.'
+  }
+};
 
 export default function SemanticSearchPage() {
   const { repoId } = useParams();
@@ -13,6 +58,9 @@ export default function SemanticSearchPage() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
   const [initStatus, setInitStatus] = useState('');
+  
+  const [selectedModel, setSelectedModel] = useState('Xenova/all-MiniLM-L6-v2');
+  const [useBrowserCache, setUseBrowserCache] = useState(true);
   
   const [isIndexing, setIsIndexing] = useState(false);
   const [indexProgress, setIndexProgress] = useState({ current: 0, total: 0 });
@@ -40,9 +88,9 @@ export default function SemanticSearchPage() {
   const handleInitialize = async () => {
     try {
       setIsInitializing(true);
-      setInitStatus('Downloading ML Model (approx 25MB)...');
+      setInitStatus('Downloading ML Model...');
       
-      await initializeSemanticEngine((progress) => {
+      await initializeSemanticEngine(selectedModel, useBrowserCache, (progress) => {
         if (progress.status === 'initiate') {
           setInitStatus(`Initiating download: ${progress.file}`);
         } else if (progress.status === 'progress') {
@@ -99,30 +147,96 @@ export default function SemanticSearchPage() {
     }
   };
 
+  const handleClearCache = async () => {
+    if (window.confirm('Are you sure you want to delete the downloaded models and embeddings? This frees up storage but requires re-downloading next time.')) {
+      try {
+        await removeEmbeddings(repoId);
+        await caches.delete('transformers-cache');
+        setIsInitialized(false);
+        setResults([]);
+        sessionStorage.removeItem(`semantic_query_${repoId}`);
+        sessionStorage.removeItem(`semantic_results_${repoId}`);
+        addToast({ title: 'Cache Cleared', description: 'Models and embeddings successfully removed.', type: 'success' });
+      } catch (error) {
+        addToast({ title: 'Error', description: 'Failed to clear cache.', type: 'error' });
+      }
+    }
+  };
+
   if (!isInitialized) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-8 max-w-2xl mx-auto text-center animate-in fade-in zoom-in duration-500">
-        <div className="w-20 h-20 bg-accent/10 border border-accent/20 rounded-lg flex items-center justify-center mb-6">
-          <Brain className="w-10 h-10 text-accent" />
+      <div className="flex flex-col items-center justify-center h-full p-4 max-w-4xl mx-auto animate-in fade-in zoom-in duration-500">
+        
+        <div className="flex items-start gap-5 mb-6 bg-surface/30 p-5 rounded-xl border border-border/50">
+          <div className="w-16 h-16 shrink-0 bg-accent/10 border border-accent/20 rounded-xl flex items-center justify-center shadow-inner shadow-accent/5">
+            <Network className="w-8 h-8 text-accent" />
+          </div>
+          <div className="text-left">
+            <h2 className="text-2xl font-medium tracking-tight text-text mb-2 flex items-center gap-3">
+              Semantic Search <span className="text-[10px] font-bold px-2 py-0.5 bg-accent/20 text-accent rounded border border-accent/30 uppercase tracking-wider">Pro</span>
+            </h2>
+            <p className="text-muted text-base leading-relaxed">
+              Upgrade your search from exact keywords to natural language. Find where "user authentication happens" or "database connections are pooled" using a highly-optimized local AI model.
+            </p>
+          </div>
         </div>
-        
-        <h2 className="text-3xl font-light tracking-tight text-text mb-4 flex items-center gap-3">
-          Semantic Search <span className="text-xs font-semibold px-2 py-0.5 bg-accent/20 text-accent rounded-full border border-accent/30 uppercase tracking-wider">Pro</span>
-        </h2>
-        
-        <p className="text-muted text-lg leading-relaxed mb-8">
-          Upgrade your search from exact keywords to natural language. Find where "user authentication happens" or "database connections are pooled" using a local machine learning model.
-        </p>
 
-        <div className="bg-surface border border-text/10 shadow rounded-lg p-6 text-left mb-8 w-full">
-          <h4 className="text-sm font-semibold flex items-center gap-2 mb-3 text-text">
-            <Info className="w-4 h-4 text-accent" /> Before you activate:
-          </h4>
-          <ul className="text-sm text-muted space-y-2">
-            <li className="flex items-center gap-2">• <Database className="w-4 h-4" /> Downloads a 25MB embedding model to your browser.</li>
-            <li className="flex items-center gap-2">• <Brain className="w-4 h-4" /> Processing large repositories will heavily use your CPU temporarily.</li>
-            <li className="flex items-center gap-2">• <Sparkles className="w-4 h-4" /> 100% Private: All inference happens locally. No data leaves your machine.</li>
-          </ul>
+        <div className="bg-surface border border-border shadow-lg rounded-xl p-6 text-left mb-6 w-full grid grid-cols-2 gap-8">
+          <div>
+            <h4 className="text-sm font-semibold flex items-center gap-2 mb-4 text-text">
+              <Info className="w-4 h-4 text-accent" /> Before you activate:
+            </h4>
+            <ul className="text-sm text-muted space-y-4">
+              <li className="flex items-start gap-3"><Database className="w-4 h-4 mt-0.5 shrink-0 text-accent/70" /> <span>Downloads a local embedding model directly to your browser cache.</span></li>
+              <li className="flex items-start gap-3"><Cpu className="w-4 h-4 mt-0.5 shrink-0 text-accent/70" /> <span>The initial indexing process is CPU-intensive. Your browser may slow down momentarily.</span></li>
+              <li className="flex items-start gap-3"><Sparkles className="w-4 h-4 mt-0.5 shrink-0 text-accent/70" /> <span>100% Private: All inference happens locally. No source code ever leaves your machine.</span></li>
+            </ul>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium text-text mb-1.5 block">Select Embedding Model</label>
+              <div className="relative group">
+                <select 
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                  className="w-full appearance-none bg-panel border-2 border-border hover:border-accent/50 rounded-lg pl-3 pr-10 py-2.5 text-sm focus:outline-none focus:border-accent focus:ring-4 focus:ring-accent/10 transition-all text-text font-medium cursor-pointer shadow-sm"
+                >
+                  <option value="Xenova/all-MiniLM-L6-v2">all-MiniLM-L6-v2 (Ultra Light, ~22MB)</option>
+                  <option value="Xenova/paraphrase-albert-small-v2">paraphrase-albert-small-v2 (Super Light, ~46MB)</option>
+                  <option value="Supabase/gte-small">gte-small (Balanced, ~67MB)</option>
+                  <option value="Xenova/paraphrase-MiniLM-L3-v2">paraphrase-MiniLM-L3-v2 (Light & Fast, ~69MB)</option>
+                  <option value="Xenova/multi-qa-MiniLM-L6-cos-v1">multi-qa-MiniLM-L6 (Q&A Optimized, ~91MB)</option>
+                  <option value="Xenova/bge-small-en-v1.5">bge-small-en-v1.5 (High Accuracy, ~133MB)</option>
+                  <option value="Xenova/nomic-embed-text-v1.5">nomic-embed-text-v1.5 (Deep Context, ~550MB)</option>
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted group-hover:text-accent transition-colors">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                  </svg>
+                </div>
+              </div>
+              
+              {MODEL_DETAILS[selectedModel] && (
+                <div className="mt-2.5 p-2.5 bg-panel border border-border rounded text-[13px] grid grid-cols-2 gap-y-1.5 gap-x-3">
+                  <div><span className="font-medium text-muted">Size:</span> <span className="text-text">{MODEL_DETAILS[selectedModel].size}</span></div>
+                  <div><span className="font-medium text-muted">Arch:</span> <span className="text-text">{MODEL_DETAILS[selectedModel].arch}</span></div>
+                  <div className="col-span-2"><span className="font-medium text-muted">Features:</span> <span className="text-text">{MODEL_DETAILS[selectedModel].features}</span></div>
+                  <div className="col-span-2"><span className="font-medium text-muted">Best For:</span> <span className="text-accent">{MODEL_DETAILS[selectedModel].bestFor}</span></div>
+                </div>
+              )}
+            </div>
+            
+            <label className="flex items-center gap-2 cursor-pointer pt-1">
+              <input 
+                type="checkbox" 
+                checked={useBrowserCache} 
+                onChange={(e) => setUseBrowserCache(e.target.checked)}
+                className="w-4 h-4 rounded border-border bg-panel text-accent focus:ring-accent"
+              />
+              <span className="text-[13px] text-text">Cache model in browser storage for future use</span>
+            </label>
+          </div>
         </div>
 
         {isInitializing || isIndexing ? (
@@ -158,9 +272,9 @@ export default function SemanticSearchPage() {
 
   return (
     <div className="h-full flex flex-col p-6 max-w-4xl mx-auto w-full animate-in fade-in duration-500">
-      <div className="flex items-center gap-3 mb-8">
+      <div className="flex items-center gap-3 mb-6">
         <div className="p-2 bg-accent/10 rounded-lg">
-          <Brain className="w-6 h-6 text-accent" />
+          <Network className="w-6 h-6 text-accent" />
         </div>
         <div>
           <h2 className="text-xl font-semibold flex items-center gap-2">
@@ -168,6 +282,12 @@ export default function SemanticSearchPage() {
           </h2>
           <p className="text-xs text-muted">Ask what the code does, not just what it says.</p>
         </div>
+        <button 
+          onClick={handleClearCache}
+          className="ml-auto px-4 py-2 text-xs border border-red-500/50 text-red-500 rounded hover:bg-red-500/10 transition-colors"
+        >
+          Clear Cache & Models
+        </button>
       </div>
 
       <form onSubmit={handleSearch} className="relative mb-8 group">

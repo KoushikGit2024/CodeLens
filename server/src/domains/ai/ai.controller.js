@@ -25,7 +25,7 @@ function formatWithHistory(prompt, history) {
 }
 
 /**
- * Handle AI prompt generation (Proxy to Watsonx/Gemini)
+ * Handle AI prompt generation (Proxy to AI Provider)
  * Now requires req.user (authMiddleware) and req.quota (quotaMiddleware).
  * Every outcome — success, provider failure, or unexpected error — is logged
  * via recordUsage() so usage_periods stays accurate even on failure paths.

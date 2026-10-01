@@ -2,7 +2,7 @@
  * index.js (API Bridge)
  *
  * It intercepts frontend data requests, then extracts local IndexedDB payloads, 
- * and then it applies them to the UI or proxies prompts to the Watsonx backend.
+ * and then it applies them to the UI or proxies prompts to the configured AI provider.
  */
 import axios from 'axios';
 import JSZip from 'jszip';

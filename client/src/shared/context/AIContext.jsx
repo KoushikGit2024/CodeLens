@@ -2,7 +2,7 @@
  * AIContext.jsx
  *
  * It initiates the AI tracking hooks, then extracts structured conversational payloads, 
- * and then it applies local active-file bindings before sending queries to Watsonx.
+ * and then it applies local active-file bindings before sending queries to LLM.
  */
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { getAiHealth, getAiStatus, repositoryApi } from '../api';

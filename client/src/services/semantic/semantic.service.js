@@ -1,4 +1,4 @@
-import { loadAllFiles, loadAllEmbeddings, saveEmbedding } from '../analyzer/repository/persistence.store.js';
+import { loadAllFiles, loadAllEmbeddings, saveEmbedding, load } from '../analyzer/repository/persistence.store.js';
 
 let worker = null;
 
@@ -27,7 +27,7 @@ export function cosineSimilarity(vecA, vecB) {
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-export function initializeSemanticEngine(onProgress) {
+export function initializeSemanticEngine(model, useBrowserCache, onProgress) {
   return new Promise((resolve, reject) => {
     const w = getWorker();
     
@@ -45,7 +45,7 @@ export function initializeSemanticEngine(onProgress) {
     };
     
     w.addEventListener('message', handler);
-    w.postMessage({ type: 'init' });
+    w.postMessage({ type: 'init', model, useBrowserCache });
   });
 }
 
@@ -56,6 +56,9 @@ export async function indexRepository(repoId, onProgress) {
     if (!files || files.length === 0) {
       return resolve(0);
     }
+
+    const repoMeta = await load(repoId);
+    const analysis = repoMeta?.analysis || null;
 
     const w = getWorker();
 
@@ -68,7 +71,7 @@ export async function indexRepository(repoId, onProgress) {
         
         // 2. Save all generated embeddings to IndexedDB
         for (const emp of embeddings) {
-          await saveEmbedding(emp.repoId, emp.filePath, emp.embedding);
+          await saveEmbedding(emp.repoId, emp.filePath, emp.chunks || emp.embedding);
         }
         
         resolve(embeddings.length);
@@ -79,7 +82,7 @@ export async function indexRepository(repoId, onProgress) {
     };
 
     w.addEventListener('message', handler);
-    w.postMessage({ type: 'index_repo', repoId, files });
+    w.postMessage({ type: 'index_repo', repoId, files, analysis });
   });
 }
 
@@ -95,14 +98,29 @@ export async function search(repoId, query) {
         // Load all embeddings for repo
         const allEmbeddings = await loadAllEmbeddings(repoId);
         
-        // Calculate similarity
-        const results = allEmbeddings.map(emp => {
-          const score = cosineSimilarity(embedding, emp.embedding);
-          return {
-            filePath: emp.filePath,
-            score
-          };
-        });
+        // Calculate similarity for each chunk
+        const results = [];
+        for (const emp of allEmbeddings) {
+          if (emp.chunks) {
+            // New AST-based chunking format
+            for (const chunk of emp.chunks) {
+              const score = cosineSimilarity(embedding, chunk.embedding);
+              results.push({
+                filePath: emp.filePath,
+                symbolName: chunk.symbolName,
+                startLine: chunk.startLine,
+                score
+              });
+            }
+          } else if (emp.embedding) {
+            // Legacy whole-file format
+            const score = cosineSimilarity(embedding, emp.embedding);
+            results.push({
+              filePath: emp.filePath,
+              score
+            });
+          }
+        }
 
         // Sort descending
         results.sort((a, b) => b.score - a.score);

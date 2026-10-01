@@ -7,7 +7,7 @@ Accepted
 As CodeLens expands its deterministic static analysis capabilities, users need actionable insights regarding the structural health, maintainability, and engineering risk of their repositories. Existing generic tools (like SonarQube) often rely on broad heuristics, but CodeLens already possesses a precise, deterministically generated `DependencyGraph` and `ArchitectureModel`. We need to surface these risks to the user and integrate them into the AI capabilities without rebuilding existing logic or implementing a second dependency scanner.
 
 ## Decision
-We will implement an **Engineering Risk Model** that derives deterministic risks from the existing `RepositoryAnalysis`, `DependencyGraph`, and `ArchitectureModel`. This model will act as the source of truth for engineering health and will feed both the frontend UI and the IBM watsonx AI context.
+We will implement an **Engineering Risk Model** that derives deterministic risks from the existing `RepositoryAnalysis`, `DependencyGraph`, and `ArchitectureModel`. This model will act as the source of truth for engineering health and will feed both the frontend UI and the AI context.
 
 The rules for this model are:
 1. **Deterministic First**: AI must only interpret risks that are explicitly found in the deterministic risk model.

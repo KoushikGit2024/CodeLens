@@ -2,15 +2,16 @@ import { pipeline, env } from '@xenova/transformers';
 
 // Tell transformers.js not to load local models but from HF
 env.allowLocalModels = false;
-env.useBrowserCache = true;
 
 class SemanticPipeline {
   static task = 'feature-extraction';
   static model = 'Xenova/all-MiniLM-L6-v2';
   static instance = null;
 
-  static async getInstance(progress_callback = null) {
-    if (this.instance === null) {
+  static async getInstance(model = 'Xenova/all-MiniLM-L6-v2', useCache = true, progress_callback = null) {
+    if (this.instance === null || this.model !== model) {
+      this.model = model;
+      env.useBrowserCache = useCache;
       this.instance = await pipeline(this.task, this.model, {
         progress_callback,
       });
@@ -20,11 +21,11 @@ class SemanticPipeline {
 }
 
 self.addEventListener('message', async (event) => {
-  const { type, repoId, files, query } = event.data;
+  const { type, repoId, files, query, analysis } = event.data;
 
   try {
     if (type === 'init') {
-      await SemanticPipeline.getInstance((progress) => {
+      await SemanticPipeline.getInstance(event.data.model, event.data.useBrowserCache, (progress) => {
         self.postMessage({ type: 'progress', payload: progress });
       });
       self.postMessage({ type: 'init_done' });
@@ -46,16 +47,55 @@ self.addEventListener('message', async (event) => {
           continue;
         }
 
-        // Truncate file content to first 1000 characters to avoid huge vectors/OOM
-        const textToEmbed = `File: ${file.filePath}\n\n${file.content.substring(0, 1000)}`;
+        // If we have AST analysis for this file, use Smart Chunking
+        const fileAnalysis = analysis ? analysis[file.filePath] : null;
+        const symbols = fileAnalysis?.symbols || [];
         
-        // Generate embedding
-        const output = await extractor(textToEmbed, { pooling: 'mean', normalize: true });
+        const chunksToEmbed = [];
+        const indexableTypes = ['Function', 'Method', 'Class', 'Component'];
+        
+        const semanticSymbols = symbols.filter(sym => indexableTypes.includes(sym.type));
+        
+        if (semanticSymbols.length > 0) {
+          // Embed each relevant symbol individually
+          for (const sym of semanticSymbols) {
+            // Reconstruct the symbol text from source if possible, or just embed metadata
+            // Since we have startLine and endLine, we can extract the exact source lines
+            const lines = file.content.split('\\n');
+            const startIdx = Math.max(0, sym.startLine - 1);
+            const endIdx = Math.min(lines.length, sym.endLine);
+            const symbolCode = lines.slice(startIdx, endIdx).join('\\n');
+            
+            // Limit each symbol chunk to 2000 chars to avoid OOM, but it's much better scoped
+            chunksToEmbed.push({
+              text: `File: ${file.filePath}\\nSymbol: ${sym.name} (${sym.type})\\n\\n${symbolCode.substring(0, 2000)}`,
+              symbolName: sym.name,
+              startLine: sym.startLine
+            });
+          }
+        } else {
+          // Fallback to top-level file chunking for simple files
+          chunksToEmbed.push({
+            text: `File: ${file.filePath}\\n\\n${file.content.substring(0, 1500)}`,
+            symbolName: null,
+            startLine: 1
+          });
+        }
+        
+        const fileChunks = [];
+        for (const chunk of chunksToEmbed) {
+          const output = await extractor(chunk.text, { pooling: 'mean', normalize: true });
+          fileChunks.push({
+            symbolName: chunk.symbolName,
+            startLine: chunk.startLine,
+            embedding: Array.from(output.data)
+          });
+        }
         
         embeddings.push({
           repoId,
           filePath: file.filePath,
-          embedding: Array.from(output.data)
+          chunks: fileChunks
         });
 
         // Report progress every 5 files or on last file

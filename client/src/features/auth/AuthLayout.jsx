@@ -25,14 +25,14 @@ export default function AuthLayout() {
             Welcome to CodeLens
           </h2>
           <p className="text-lg text-text/70 text-center mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '200ms', animationFillMode: 'both' }}>
-            Sign in or create an account to gain deep architectural insights, track engineering health, and empower your workflow with Watsonx AI.
+            Sign in or create an account to gain deep architectural insights, track engineering health, and empower your workflow with AI.
           </p>
           
           <div className="space-y-4 w-full relative">
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '300ms', animationFillMode: 'both' }}>
               <InteractiveFeatureCard 
                 title="AI Code Intelligence"
-                description="Interact with IBM Watsonx to explain complex architecture and debug issues."
+                description="Interact with AI to explain complex architecture and debug issues."
                 icon={Brain}
                 colorClass="text-accent group-hover:bg-accent/20 bg-accent/10 border-accent/20"
               />

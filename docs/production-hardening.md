@@ -17,7 +17,7 @@ CodeLens enforces the principle that **Deterministic analysis establishes facts,
 To prevent AI hallucinations from poisoning the system:
 - **Reference Validation**: File paths extracted from AI responses are cross-checked against the `RepositoryAnalysis` cache. Hallucinated file paths are silently stripped.
 - **Line Boundary Validation**: AI-suggested line ranges are bounds-checked against the actual file's `lineCount` computed during the AST phase. Out-of-bounds line pointers are removed before reaching the UI.
-- **Fallback Gracefulness**: If the IBM watsonx AI provider times out or returns malformed JSON, the `askController` and `documentationGenerator` controllers gracefully downgrade, returning raw deterministic facts or raw string output without 500ing the application.
+- **Fallback Gracefulness**: If the AI provider times out or returns malformed JSON, the `askController` and `documentationGenerator` controllers gracefully downgrade, returning raw deterministic facts or raw string output without 500ing the application.
 
 ## 3. Architecture Integrity
 

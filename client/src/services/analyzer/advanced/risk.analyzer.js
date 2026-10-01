@@ -92,23 +92,25 @@ function analyzeSizeRisks(analysis) {
   if (!analysis?.files) return risks;
 
   for (const file of analysis.files) {
-    if (file.lineCount > THRESHOLDS.FILE_LINES_HIGH) {
+    const fileComplexity = (file.symbols || []).reduce((sum, sym) => sum + (sym.complexity || 0), 0);
+
+    if (file.lineCount > THRESHOLDS.FILE_LINES_HIGH && fileComplexity > THRESHOLDS.COMPLEXITY_HIGH) {
       risks.push(createRisk(
         RISK_CATEGORIES.SIZE,
         SEVERITY.HIGH,
         'Very large file',
-        `File is unusually large (${file.lineCount} lines), suggesting multiple responsibilities.`,
+        `File is unusually large (${file.lineCount} lines) and complex (score: ${fileComplexity}), suggesting multiple responsibilities.`,
         file.filePath,
-        { lineCount: file.lineCount, threshold: THRESHOLDS.FILE_LINES_HIGH }
+        { lineCount: file.lineCount, complexity: fileComplexity, threshold: THRESHOLDS.FILE_LINES_HIGH }
       ));
-    } else if (file.lineCount > THRESHOLDS.FILE_LINES_WARNING) {
+    } else if (file.lineCount > THRESHOLDS.FILE_LINES_WARNING && fileComplexity > THRESHOLDS.COMPLEXITY_WARNING) {
       risks.push(createRisk(
         RISK_CATEGORIES.SIZE,
         SEVERITY.WARNING,
         'Large file',
-        `File is large (${file.lineCount} lines).`,
+        `File is large (${file.lineCount} lines) with elevated complexity (score: ${fileComplexity}).`,
         file.filePath,
-        { lineCount: file.lineCount, threshold: THRESHOLDS.FILE_LINES_WARNING }
+        { lineCount: file.lineCount, complexity: fileComplexity, threshold: THRESHOLDS.FILE_LINES_WARNING }
       ));
     }
 

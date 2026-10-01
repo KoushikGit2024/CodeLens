@@ -25,11 +25,11 @@
  *       OPENAI_API_URL   — Endpoint (optional, defaults to https://api.openai.com/v1/chat/completions)
  *       OPENAI_MODEL     — model ID (optional, defaults to gpt-3.5-turbo)
  *
- *     IBM watsonx (default when IBM_API_KEY + IBM_PROJECT_ID are set)
- *       IBM_API_KEY      — IBM Cloud IAM API key
- *       IBM_PROJECT_ID   — watsonx.ai project ID
- *       IBM_API_URL      — watsonx.ai inference endpoint (optional, has default)
- *       IBM_MODEL_ID     — model ID to use (optional, has default)
+ *     Generic LLM (default when LLM_API_KEY + LLM_PROJECT_ID are set)
+ *       LLM_API_KEY      — Generic API key
+ *       LLM_PROJECT_ID   — Generic project ID
+ *       LLM_API_URL      — Generic inference endpoint (optional, has default)
+ *       LLM_MODEL_ID     — model ID to use (optional, has default)
  *
  *   If no provider is configured, generateAnswer() throws ProviderUnavailableError
  *   so callers can return a clean 503 to the client.
@@ -61,51 +61,50 @@ class ProviderUnavailableError extends Error {
   }
 }
 
-// ── IBM watsonx provider ──────────────────────────────────────────────────────
-
-const IBM_DEFAULT_URL      = 'https://us-south.ml.cloud.ibm.com';
-const IBM_DEFAULT_MODEL    = 'ibm/granite-13b-instruct-v2';
-const IAM_TOKEN_URL        = 'https://iam.cloud.ibm.com/identity/token';
+// ── Generic LLM provider ──────────────────────────────────────────────────────
+const LLM_DEFAULT_URL      = 'https://api.your-provider.com';
+const LLM_DEFAULT_MODEL    = 'generic-llm-instruct-v2';
+const IAM_TOKEN_URL        = 'https://auth.your-provider.com/token';
 
 /**
- * Obtain an IBM Cloud IAM access token using the API key.
+ * Obtain a Generic access token using the API key.
  * Tokens are valid for ~1 hour; for this MVP we fetch a fresh token per
  * request rather than caching (acceptable at low request rates).
  *
  * @param {string} apiKey
  * @returns {Promise<string>} bearer token
  */
-async function getIbmAccessToken(apiKey) {
-  const body = `grant_type=urn%3Aibm%3Aparams%3Aoauth%3Agrant-type%3Aapikey&apikey=${encodeURIComponent(apiKey)}`;
+async function getLlmAccessToken(apiKey) {
+  const body = `grant_type=apikey&apikey=${encodeURIComponent(apiKey)}`;
   const data = await httpPost(IAM_TOKEN_URL, body, {
     'Content-Type': 'application/x-www-form-urlencoded',
   });
   const parsed = JSON.parse(data);
   if (!parsed.access_token) {
-    throw new Error(`IBM IAM token exchange failed: ${data}`);
+    throw new Error(`Generic token exchange failed: ${data}`);
   }
   return parsed.access_token;
 }
 
 /**
- * Generate text using IBM watsonx.ai.
+ * Generate text using Generic LLM.
  *
  * @param {string} prompt
  * @returns {Promise<string>}
  */
-async function ibmWatsonxProvider(prompt) {
-  const apiKey    = process.env.IBM_API_KEY;
-  const projectId = process.env.IBM_PROJECT_ID;
-  const apiUrl    = (process.env.IBM_API_URL || IBM_DEFAULT_URL).replace(/\/$/, '');
-  const modelId   = process.env.IBM_MODEL_ID || IBM_DEFAULT_MODEL;
+async function genericLlmProvider(prompt) {
+  const apiKey    = process.env.LLM_API_KEY;
+  const projectId = process.env.LLM_PROJECT_ID;
+  const apiUrl    = (process.env.LLM_API_URL || LLM_DEFAULT_URL).replace(/\/$/, '');
+  const modelId   = process.env.LLM_MODEL_ID || LLM_DEFAULT_MODEL;
 
   if (!apiKey || !projectId) {
     throw new ProviderUnavailableError(
-      'IBM watsonx provider is not configured. Set IBM_API_KEY and IBM_PROJECT_ID.'
+      'Generic LLM provider is not configured. Set LLM_API_KEY and LLM_PROJECT_ID.'
     );
   }
 
-  const accessToken = await getIbmAccessToken(apiKey);
+  const accessToken = await getLlmAccessToken(apiKey);
 
   const endpoint = `${apiUrl}/ml/v1/text/generation?version=2023-05-29`;
   const payload = JSON.stringify({
@@ -128,7 +127,7 @@ async function ibmWatsonxProvider(prompt) {
   const result = parsed?.results?.[0];
   const text = result?.generated_text;
   if (typeof text !== 'string') {
-    throw new Error(`Unexpected watsonx response shape: ${data.slice(0, 200)}`);
+    throw new Error(`Unexpected LLM response shape: ${data.slice(0, 200)}`);
   }
   return {
     text: text.trim(),
@@ -218,14 +217,14 @@ async function openAiCompatibleProvider(prompt) {
 
 /**
  * Build an ordered list of all currently configured providers.
- * Priority: IBM watsonx → Google Gemini → OpenAI-Compatible
+ * Priority: Generic LLM → Google Gemini → OpenAI-Compatible
  *
  * @returns {Array<{name: string, fn: function}>}
  */
 function getConfiguredProviders() {
   const providers = [];
-  if (process.env.IBM_API_KEY && process.env.IBM_PROJECT_ID) {
-    providers.push({ name: 'IBM watsonx', fn: ibmWatsonxProvider });
+  if (process.env.LLM_API_KEY && process.env.LLM_PROJECT_ID) {
+    providers.push({ name: 'Generic LLM', fn: genericLlmProvider });
   }
   if (process.env.GEMINI_API_KEY) {
     providers.push({ name: 'Google Gemini', fn: geminiProvider });
@@ -272,7 +271,7 @@ async function generateAnswer(prompt) {
   const providers = getConfiguredProviders();
   if (providers.length === 0) {
     throw new ProviderUnavailableError(
-      'No AI provider is configured. Set IBM_API_KEY + IBM_PROJECT_ID, GEMINI_API_KEY, or OPENAI_API_KEY in your .env file.'
+      'No AI provider is configured. Set LLM_API_KEY + LLM_PROJECT_ID, GEMINI_API_KEY, or OPENAI_API_KEY in your .env file.'
     );
   }
 

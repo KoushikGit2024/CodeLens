@@ -6,7 +6,7 @@ Welcome to CodeLens! This guide will help you set up the project locally.
 
 - **Node.js**: version 18 or higher (LTS recommended)
 - **npm**: version 9 or higher
-- **IBM watsonx credentials**: If you want to use the AI capabilities, you need an API key, project ID, and URL. CodeLens falls back gracefully to deterministic visualizations if these are omitted.
+- **AI Provider credentials**: If you want to use the AI capabilities, you need an API key and project settings for your chosen LLM provider. CodeLens falls back gracefully to deterministic visualizations if these are omitted.
 
 ## Installation
 
@@ -33,10 +33,10 @@ CodeLens requires environment variables for AI services.
 
 2. Add the following credentials to `.env`:
    ```env
-   WATSONX_URL="https://us-south.ml.cloud.ibm.com"
-   WATSONX_API_KEY="your-ibm-cloud-api-key"
-   WATSONX_PROJECT_ID="your-watsonx-project-id"
-   WATSONX_MODEL="meta-llama/llama-3-70b-instruct"
+   LLM_API_URL="https://api.your-provider.com"
+   LLM_API_KEY="your-llm-api-key"
+   LLM_PROJECT_ID="your-project-id"
+   LLM_MODEL="meta-llama/llama-3-70b-instruct"
    ```
 
 > [!WARNING]

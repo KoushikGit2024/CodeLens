@@ -129,7 +129,7 @@ export default function ModuleDocumentation({ docs, repoId, onGenerateAi, isGene
             <Cpu className="w-8 h-8 text-muted" />
             <div>
               <h3 className="text-text font-medium mb-1">AI Architectural Summary</h3>
-              <p className="text-sm text-muted mb-4 max-w-md">Generate a human-readable summary of this file's role in the architecture, backed by Watsonx.</p>
+              <p className="text-sm text-muted mb-4 max-w-md">Generate a human-readable summary of this file's role in the architecture, backed by AI.</p>
             </div>
             <button
               onClick={onGenerateAi}

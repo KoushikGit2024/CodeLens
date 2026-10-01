@@ -59,7 +59,7 @@ create table if not exists ai_requests (
   id              uuid primary key default gen_random_uuid(),
   user_id         uuid not null references users(id),
   created_at      timestamptz default now(),
-  provider        text not null,        -- 'gemini', 'ibm-watsonx', 'openai'
+  provider        text not null,        -- 'gemini', 'generic', 'openai'
   feature         text,                 -- 'chat', 'documentation', 'refactoring', etc.
   status          text not null,        -- 'success', 'failed', 'quota_exceeded'
   -- Token accounting (provider-reported where available, estimated otherwise)

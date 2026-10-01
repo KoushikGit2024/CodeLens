@@ -11,4 +11,4 @@ The Engineering Risk Analyzer (`server/src/analyzers/engineeringRiskAnalyzer.js`
 
 ## Integration
 
-The deterministic risk model is surfaced in the Engineering Health dashboard and is provided to IBM watsonx to generate AI insights on how these structural issues might affect long-term maintainability.
+The deterministic risk model is surfaced in the Engineering Health dashboard and is provided to the AI provider to generate AI insights on how these structural issues might affect long-term maintainability.

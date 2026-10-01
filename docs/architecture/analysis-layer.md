@@ -40,7 +40,7 @@ flowchart TD
     Z1 --> Z2[AI Context Object]
     Z2 --> Z3[POST /api/repository/:id/ask]
     Z3 --> Z4[Server AI Proxy]
-    Z4 --> Z5[watsonx API]
+    Z4 --> Z5[AI Provider API]
 ```
 
 ## Module Responsibilities

@@ -14,7 +14,7 @@ We decided to adopt a **deterministic-first, AI-augmented** approach for documen
 
 1. **Deterministic Foundation:** We rely on the `RepositoryAnalysis` (Tree-sitter), `DependencyGraph`, and `ArchitectureModel` (Step 6) to gather 100% accurate, factual data about the repository.
 2. **Context Assembly:** Instead of sending source code to the LLM, we send the structured *facts* (e.g., "This module is in the Service layer, exports 'login', and depends on 'authUtils'").
-3. **Targeted AI Interpretation:** We prompt IBM watsonx to interpret these facts and generate high-level architectural insights and responsibility summaries in structured JSON.
+3. **Targeted AI Interpretation:** We prompt the AI provider to interpret these facts and generate high-level architectural insights and responsibility summaries in structured JSON.
 4. **Lazy Generation:** Documentation is generated on-demand when a user visits a specific documentation page (Overview or Module), rather than upfront during repository analysis. This distributes API calls over time.
 
 ## Consequences

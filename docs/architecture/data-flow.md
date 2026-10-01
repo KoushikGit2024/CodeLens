@@ -27,7 +27,7 @@ flowchart TD
     I & J & K & L --> M(RepositoryIntelligence)
     
     M --> N[Context Builders]
-    N --> O(IBM watsonx)
+    N --> O(AI Provider)
     
     O --> P[Frontend Visualization]
 ```
@@ -46,5 +46,5 @@ flowchart TD
 10. **Refactoring Intelligence (`refactoringAnalyzer.js`)**: Concrete refactoring strategies are generated for high-risk files.
 11. **Unified Repository Intelligence (`repositoryIntelligence.js`)**: Data across all previous stages is aggregated into a final dashboard summary, and hotspots are calculated.
 12. **AI Context Building (`contextBuilder.js`)**: The deterministic models are serialized into a bounded JSON context.
-13. **IBM watsonx**: The context is sent to the LLM to generate an explanation or answer a user's question.
+13. **AI Provider**: The context is sent to the LLM to generate an explanation or answer a user's question.
 14. **Frontend**: The structured response and data are rendered using React Flow, Mermaid, Monaco, and custom UI components.

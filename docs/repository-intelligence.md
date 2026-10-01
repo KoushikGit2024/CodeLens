@@ -11,7 +11,7 @@ flowchart TD
     Router -->|Determines Intent| Builder[Context Builder]
     
     Builder -->|Metrics / Dependency| DetEngine[Deterministic Engine]
-    Builder -->|File / Architecture| AILayer[IBM watsonx AI]
+    Builder -->|File / Architecture| AILayer[AI Provider]
     
     DetEngine -->|Structured Output| Answer[Answer + Evidence]
     AILayer -->|Structured Output| Answer
@@ -24,10 +24,10 @@ Questions are categorized into intents (`METRICS`, `DEPENDENCY`, `ARCHITECTURE`,
 
 ## Deterministic vs. AI-Assisted Answers
 - **Deterministic-First:** Questions like "What depends on `auth.js`?" or "How many files in the repo?" are answered by querying the existing `DependencyGraph` and `RepositoryAnalysis` directly. This bypasses the AI provider, saving time, cost, and ensuring 100% accuracy.
-- **AI-Assisted:** Questions like "How does authentication work?" are sent to IBM watsonx. However, instead of a raw code dump, the AI is provided with a curated context of relevant files, their exports/imports, and dependency connections, minimizing token usage and reducing hallucinations.
+- **AI-Assisted:** Questions like "How does authentication work?" are sent to the AI provider. However, instead of a raw code dump, the AI is provided with a curated context of relevant files, their exports/imports, and dependency connections, minimizing token usage and reducing hallucinations.
 
 ## Graceful AI Fallback
-If watsonx is unavailable, the AI provider gracefully falls back to returning the deterministic facts gathered during context extraction, ensuring the Assistant is always somewhat useful.
+If the AI provider is unavailable, it gracefully falls back to returning the deterministic facts gathered during context extraction, ensuring the Assistant is always somewhat useful.
 
 ## Strict Source Referencing
 The backend enforces that the AI structures its response as a specific JSON object. This structure guarantees a clear separation between:

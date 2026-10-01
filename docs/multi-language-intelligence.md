@@ -20,7 +20,7 @@ The multi-language expansion preserves the unified pipeline established in earli
 2. **Language Detector**: Determines the file's language based on extension.
 3. **Base Parser & Factories**: Each language has a dedicated parser class (e.g., `PythonParser.js`) that extends `BaseParser`. It traverses the Tree-sitter AST and extracts symbols into the canonical symbol model defined in `symbols.js`.
 4. **Language-Aware Module Resolution**: The dependency graph delegates cross-file linkages to `moduleResolver.js`, which handles language-specific import syntax (e.g. Python's dotted imports or C++'s relative `#include`).
-5. **AI Context Builder**: Feeds the exact parsed syntax and relationships to the AI, ensuring watsonx gets accurately grounded data, regardless of the language.
+5. **AI Context Builder**: Feeds the exact parsed syntax and relationships to the AI, ensuring the provider gets accurately grounded data, regardless of the language.
 
 ## Limitations
 

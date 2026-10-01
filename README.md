@@ -15,7 +15,7 @@ Instead of treating source code as plain text and dumping it blindly into an LLM
 - 🛠️ **Refactoring Intelligence**: Translates structural risks into prioritized, actionable refactoring strategies.
 - ⚡ **Incremental Analysis**: Caches file ASTs using SHA-256 fingerprinting to ensure rapid re-analysis of large repositories.
 - 💥 **Change Impact**: Predicts the blast radius of modifying specific files (useful for CI/CD).
-- 🧠 **AI Repository Intelligence**: Integrates securely with **IBM watsonx** to answer questions, explain architectures, and generate automated documentation grounded *only* in deterministic facts.
+- 🧠 **AI Repository Intelligence**: Integrates securely with **any compatible LLM provider** to answer questions, explain architectures, and generate automated documentation grounded *only* in deterministic facts.
 - 🖥️ **Interactive Code Viewer**: A Monaco-powered frontend that highlights code and embeds AI references directly onto the relevant lines.
 
 ## Architecture Overview
@@ -36,9 +36,9 @@ graph TD
     Analysis & Graph & Architecture & Risk & Refactoring --> Dashboard[Unified Repository Intelligence]
     
     Dashboard --> Context[AI Context Builder]
-    Context --> Watsonx[IBM watsonx]
+    Context --> LLM[AI Provider]
     
-    Watsonx & Dashboard --> UI[Developer Frontend]
+    LLM & Dashboard --> UI[Developer Frontend]
 ```
 
 ## Technology Stack
@@ -46,7 +46,7 @@ graph TD
 - **Frontend**: React 18, Vite, Tailwind CSS, React Router, React Flow, Mermaid, Monaco Editor.
 - **Backend**: Node.js 18+, Express, Multer.
 - **Parsers**: `web-tree-sitter` v0.24.7, `tree-sitter-wasms` v0.1.13.
-- **AI**: IBM watsonx SDK.
+- **AI**: Configurable AI Provider (Proxy Backend).
 - **Testing**: Jest, Supertest.
 
 ## Repository Structure

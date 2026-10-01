@@ -474,7 +474,7 @@ export default function RepositoryIntelligencePage() {
               Repository Assistant
             </h2>
             <p className="text-xs text-muted leading-relaxed">
-              Use IBM watsonx to synthesize these deterministic facts into a high-level overview.
+              Use AI to synthesize these deterministic facts into a high-level overview.
             </p>
             <button
               onClick={handleUnderstandRepository}

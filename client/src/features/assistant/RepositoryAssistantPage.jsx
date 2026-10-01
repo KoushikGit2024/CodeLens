@@ -2,7 +2,7 @@
  * RepositoryAssistantPage.jsx
  *
  * It loads the conversational interface, then extracts user queries, 
- * and then it applies the local AI context hook to proxy grounded requests to Watsonx.
+ * and then it applies the local AI context hook to proxy grounded requests to LLM.
  */
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';

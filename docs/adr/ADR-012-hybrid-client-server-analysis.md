@@ -34,7 +34,7 @@ The server is intentionally minimal and strictly stateless. It has exactly one r
 
 | Responsibility | What It Means |
 |---|---|
-| AI proxy | Receive a pre-built prompt from the client → forward to watsonx → return response. Does not build the prompt. |
+| AI proxy | Receive a pre-built prompt from the client → forward to AI provider → return response. Does not build the prompt. |
 
 ### Client Responsibilities (everything else)
 

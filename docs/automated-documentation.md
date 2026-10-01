@@ -1,6 +1,6 @@
 # Automated Documentation Intelligence
 
-CodeLens Step 7 introduces the Automated Documentation Intelligence layer. This feature synthesizes the deterministic intelligence from the AST analyzer (Step 2), Dependency Graph (Step 3), and Architecture Analyzer (Step 6) and merges it with AI insights from IBM watsonx to produce accurate, structured, and developer-friendly documentation.
+CodeLens Step 7 introduces the Automated Documentation Intelligence layer. This feature synthesizes the deterministic intelligence from the AST analyzer (Step 2), Dependency Graph (Step 3), and Architecture Analyzer (Step 6) and merges it with insights from the configured AI provider to produce accurate, structured, and developer-friendly documentation.
 
 ## Purpose
 
@@ -16,7 +16,7 @@ Instead of dumping raw source code into an LLM and hoping for an accurate summar
 
 1. **Deterministic Facts:** The backend extracts structural facts using Tree-sitter (imports, exports, layers, entry points).
 2. **Context Builder:** `documentationContextBuilder.js` extracts a targeted subset of these facts based on the documentation requested (Overview vs Module).
-3. **AI Generation:** `documentationGenerator.js` prompts IBM watsonx with the deterministic facts, asking for specific interpretations (e.g. responsibilities, inferences).
+3. **AI Generation:** `documentationGenerator.js` prompts the AI provider with the deterministic facts, asking for specific interpretations (e.g. responsibilities, inferences).
 4. **Validation:** The AI response is parsed as structured JSON.
 5. **Presentation:** The frontend `DocumentationPage.jsx` renders the combined facts and AI interpretations in a clean, readable format.
 
@@ -54,7 +54,7 @@ The JSON structure returned by the documentation API strictly separates facts fr
 
 ## AI Failure Fallback
 
-A core requirement is that documentation remains available even if the IBM watsonx provider is unconfigured, unreachable, or returns malformed output.
+A core requirement is that documentation remains available even if the AI provider is unconfigured, unreachable, or returns malformed output.
 If the AI fails, the `aiInterpretation` field is set to `null`, and the frontend continues to render the structural facts seamlessly with a notice indicating the AI is unavailable.
 
 ## Security & Privacy

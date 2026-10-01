@@ -27,7 +27,7 @@ Shared utilities (high fan-in but low complexity) are bounded to prevent them fr
 
 ## AI Repository Assistant
 
-The dashboard includes an **"Understand Repository"** action. When clicked, CodeLens feeds the *deterministic repository summary* into IBM watsonx. The AI is instructed to synthesize these facts into a cohesive explanation, highlighting the main architecture patterns, critical risks, and recommended first steps.
+The dashboard includes an **"Understand Repository"** action. When clicked, CodeLens feeds the *deterministic repository summary* into the AI provider. The AI is instructed to synthesize these facts into a cohesive explanation, highlighting the main architecture patterns, critical risks, and recommended first steps.
 
 Because the AI only sees the aggregated facts and not the entire raw source tree, hallucination is minimized, and performance is maximized.
 

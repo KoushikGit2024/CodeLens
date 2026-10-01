@@ -24,7 +24,7 @@ The system detects the following risks out-of-the-box:
 
 ## AI Integration
 
-The risk model is passed to the AI (IBM watsonx) to generate:
+The risk model is passed to the configured AI provider to generate:
 - Priority action items and recommendations
 - Architectural observations
 - Explanations of complex couplings

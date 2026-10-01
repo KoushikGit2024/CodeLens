@@ -2,7 +2,7 @@
  * repository.intelligence.context.js
  * 
  * It receives the aggregated repository intelligence JSON, then extracts the key metrics, 
- * and then it applies structured formatting to build a deterministic text context for IBM watsonx.
+ * and then it applies structured formatting to build a deterministic text context for LLM.
  */
 
 /**

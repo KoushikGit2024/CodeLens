@@ -289,9 +289,14 @@ export async function listFilePaths(repoId) {
 
 // ── Embeddings API ────────────────────────────────────────────────────────────
 
-export async function saveEmbedding(repoId, filePath, embedding) {
+export async function saveEmbedding(repoId, filePath, chunksOrEmbedding) {
   const db = await getDB();
-  await db.put('embeddings', { repoId, filePath, embedding: Array.from(embedding) });
+  // Support both old flat embedding array and new chunks array
+  if (Array.isArray(chunksOrEmbedding) && chunksOrEmbedding[0]?.embedding) {
+    await db.put('embeddings', { repoId, filePath, chunks: chunksOrEmbedding });
+  } else {
+    await db.put('embeddings', { repoId, filePath, embedding: Array.from(chunksOrEmbedding) });
+  }
 }
 
 export async function loadAllEmbeddings(repoId) {
@@ -307,6 +312,20 @@ export async function loadAllEmbeddings(repoId) {
     cursor = await cursor.continue();
   }
   return embeddings;
+}
+
+export async function removeEmbeddings(repoId) {
+  const db = await getDB();
+  const tx = db.transaction('embeddings', 'readwrite');
+  const store = tx.objectStore('embeddings');
+  let cursor = await store.openCursor();
+  while (cursor) {
+    if (cursor.key[0] === repoId) {
+      await cursor.delete();
+    }
+    cursor = await cursor.continue();
+  }
+  await tx.done;
 }
 
 export async function clearEmbeddings(repoId) {

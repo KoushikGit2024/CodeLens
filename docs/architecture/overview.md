@@ -20,11 +20,11 @@ graph TD
     end
 
     subgraph Server["Server (Node.js / Express)"]
-        AIProxy[IBM watsonx Proxy]
+        AIProxy[AI Proxy]
     end
 
     CTX -->|Pre-built context prompt| AIProxy
-    AIProxy <-->|Watsonx API| AI[IBM watsonx AI]
+    AIProxy <-->|AI Provider API| AI[Configured AI]
     AIProxy -->|AI response| UI
 ```
 
@@ -37,7 +37,7 @@ graph TD
 
 The server is intentionally minimal and strictly stateless. It has exactly one job:
 
-1. **AI Proxy**: Receive a fully pre-built context prompt from the client and forward it to the IBM watsonx API. Return the AI response verbatim.
+1. **AI Proxy**: Receive a fully pre-built context prompt from the client and forward it to the configured AI API. Return the AI response verbatim.
 
 The server does **NOT**:
 - Parse ASTs
@@ -76,7 +76,7 @@ Results persisted to IndexedDB
        ↓
 Client builds AI context from local models
        ↓
-Server receives context prompt → forwards to watsonx → returns response
+Server receives context prompt → forwards to AI Provider → returns response
 ```
 
 ## Core Services
@@ -84,4 +84,4 @@ Server receives context prompt → forwards to watsonx → returns response
 - **[Client Analysis Worker](../frontend/overview.md)**: `analyzer.worker.js` — the Tree-sitter WASM parser and core analysis pipeline running in a Web Worker.
 - **[Client Services](../frontend/overview.md)**: `client/src/services/analyzer/` — graph builders, complexity calculators, clone detectors, reachability analyzers.
 - **[Server](../architecture/backend-architecture.md)**: A minimal Express server — AI proxy only, storing zero data.
-- **[AI Pipeline](../ai/overview.md)**: The integration with IBM watsonx for repository Q&A and automated documentation.
+- **[AI Pipeline](../ai/overview.md)**: The integration with the AI provider for repository Q&A and automated documentation.

@@ -12,7 +12,7 @@ We decided to build an **Actionable Refactoring Intelligence** layer that strict
 1. **Deterministic Strategies**: We introduced `refactoringStrategies.js` which maps known structural risks to established refactoring patterns (e.g., "Extract Shared Abstraction").
 2. **Priority Scoring**: We implemented a transparent formula (`severity * impact * confidence`) in `refactoringAnalyzer.js` to rank candidates.
 3. **Change Impact Integration**: We reused the existing `changeImpact.js` module to predict the blast radius of a refactoring operation *before* the developer starts.
-4. **Bounded AI**: We extended `refactoringGenerator.js` to use IBM watsonx to explain the refactoring strategies specifically in the context of the repository. The AI is restricted to referencing files involved in the candidate or its impact radius.
+4. **Bounded AI**: We extended `refactoringGenerator.js` to use the AI provider to explain the refactoring strategies specifically in the context of the repository. The AI is restricted to referencing files involved in the candidate or its impact radius.
 
 ## Consequences
 - **Positive**: Refactoring advice is highly actionable because it comes with an immediate blast radius (change impact) calculation.

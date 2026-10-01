@@ -77,7 +77,7 @@ The Architecture Intelligence layer automatically translates the `ArchitectureMo
 The generated Mermaid string is sent to the frontend and rendered using `mermaid.js` in `ArchitecturePage.jsx`.
 
 ## AI Insights
-The structured `ArchitectureModel` is injected into a specialized prompt and sent to IBM watsonx (`architectureInsights.js`). The model is asked to provide:
+The structured `ArchitectureModel` is injected into a specialized prompt and sent to the configured AI provider (`architectureInsights.js`). The model is asked to provide:
 1. **Architecture Summary**
 2. **Major Responsibilities**
 3. **Architectural Observations (Facts)**

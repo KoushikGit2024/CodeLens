@@ -12,7 +12,7 @@ server/src/
 ├── controllers/         # Request handlers linking routes to analyzers
 ├── repositories/        # Repository store (manages extracted ZIPs)
 ├── analyzers/           # The core intelligence engines
-└── ai/                  # Integrations with IBM watsonx and prompt builders
+└── ai/                  # Integrations with the AI provider and prompt builders
 ```
 
 ## Analyzers Layer
@@ -31,8 +31,8 @@ The `analyzers/` directory contains all pure, deterministic logic for analyzing 
 The `ai/` directory is strictly separated from the analyzers. It relies entirely on the outputs of the `analyzers/` directory.
 
 - **Context Builders**: Scripts like `questionContextBuilder.js` serialize AST and graph data into JSON context.
-- **Generators**: Scripts like `documentationGenerator.js` format prompts and handle the watsonx API lifecycle.
-- **AI Provider**: `aiProvider.js` acts as an abstraction layer over IBM watsonx.
+- **Generators**: Scripts like `documentationGenerator.js` format prompts and handle the AI API lifecycle.
+- **AI Provider**: `aiProvider.js` acts as an abstraction layer over the configured LLM.
 
 ## Storage and Lifecycle
 

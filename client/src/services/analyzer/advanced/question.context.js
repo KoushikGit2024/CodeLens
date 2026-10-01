@@ -2,7 +2,7 @@
  * question.context.js
  *
  * It evaluates the user question, then extracts deterministic facts based on intent, 
- * and then it applies the source context builder to feed the IBM watsonx proxy.
+ * and then it applies the source context builder to feed the AI provider proxy.
  */
 
 import { buildDependencyGraph, getFileDependencies } from '../dependencies/dependency.analyzer.js';

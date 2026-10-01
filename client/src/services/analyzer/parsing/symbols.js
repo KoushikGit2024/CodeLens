@@ -143,7 +143,7 @@ export function createAnalysisEdge({ id, source, target, type = 'default', anima
 }
 
 /**
- * Initializes the master payload structure used by the Frontend UI and IBM watsonx Proxy.
+ * Initializes the master payload structure used by the Frontend UI and LLM Proxy.
  */
 export function createRepositoryIntelligencePayload({ repoId, fingerprint, totalFiles = 0, totalLinesOfCode = 0, languages = {} }) {
   return {

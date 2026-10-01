@@ -36,7 +36,7 @@ This bundles the application using Vite into the `client/dist/` directory.
 
 ## Contributing Guidelines
 
-1. **Deterministic First**: When adding new features that analyze source code, you MUST implement deterministic parsers in the `server/src/analyzers/` directory. Never use the AI (watsonx) to extract structural information (e.g., function names, dependencies).
+1. **Deterministic First**: When adding new features that analyze source code, you MUST implement deterministic parsers in the `server/src/analyzers/` directory. Never use the AI provider to extract structural information (e.g., function names, dependencies).
 2. **Update Documentation**: If you add an endpoint, update `docs/api.md`. If you add an analyzer, document it in `docs/analyzers/`. Run `npm run docs:check` to verify no links are broken.
 3. **Tests**: Every new analyzer or AI context builder must be covered by a Jest test in `server/tests/`.
 

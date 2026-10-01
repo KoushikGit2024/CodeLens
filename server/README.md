@@ -4,14 +4,14 @@ This directory contains the Node.js/Express server that powers CodeLens.
 
 ## Responsibilities
 
-The backend orchestrates the entire intelligence pipeline. Communicates with IBM watsonx for AI synthesis.
+The backend orchestrates the entire intelligence pipeline. Communicates with the AI provider for AI synthesis.
 
 ## Technology Stack
 
 - **Node.js 18+**
 - **Express.js**
 - **Jest** (Testing)
-- **IBM watsonx SDK** (AI Provider)
+- **AI Provider SDK** (AI Provider)
 
 ## Folder Structure
 
@@ -23,7 +23,7 @@ server/
 │   │   ├── app.js            # Express app configuration
 │   │   ├── utils/            # Shared utilities
 │   │   ├── middleware/       # Express middleware
-│   │   └── ai/               # AI provider clients (Watsonx)
+│   │   └── ai/               # AI provider clients
 │   ├── domains/              # Feature-oriented vertical slices
 │   │   └── assistant/        # Q&A routing and generators
 ├── tests/                    # Jest test suites (mirroring domains/)
@@ -35,7 +35,7 @@ server/
 
 The backend is strictly divided between deterministic domains (e.g., `parsing/`, `dependencies/`) and AI generation (e.g., `assistant/generators/`). 
 The core domains contain zero AI logic. They compute absolute, deterministic facts about the codebase.
-The `assistant/context/` builders take the deterministic output of the domains and pass it to IBM watsonx as structured JSON context. **Code is never blindly dumped into the LLM.**
+The `assistant/context/` builders take the deterministic output of the domains and pass it to the AI provider as structured JSON context. **Code is never blindly dumped into the LLM.**
 
 ## Running Locally
 

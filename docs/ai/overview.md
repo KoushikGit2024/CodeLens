@@ -1,6 +1,6 @@
 # AI Pipeline Overview
 
-CodeLens integrates IBM watsonx to provide natural language explanations, automated documentation, and refactoring advice. However, it operates on a strict **"Deterministic First"** principle.
+CodeLens integrates a configurable AI provider to provide natural language explanations, automated documentation, and refactoring advice. However, it operates on a strict **"Deterministic First"** principle.
 
 ## The Problem with Naive AI Integration
 
@@ -14,4 +14,4 @@ Dumping an entire repository's source code into an LLM context window is ineffic
 
 ## Fallbacks and Safety
 
-If the IBM watsonx provider is unconfigured or unavailable, CodeLens gracefully falls back to displaying the raw deterministic facts. AI is an enhancement layer, not a structural dependency.
+If the AI provider is unconfigured or unavailable, CodeLens gracefully falls back to displaying the raw deterministic facts. AI is an enhancement layer, not a structural dependency.

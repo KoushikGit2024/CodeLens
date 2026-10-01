@@ -11,7 +11,7 @@ app.listen(PORT, async () => {
     let providerName = 'Unknown';
     if (process.env.GEMINI_API_KEY) providerName = 'Google Gemini';
     else if (process.env.OPENAI_API_KEY) providerName = 'OpenAI-Compatible';
-    else if (process.env.IBM_API_KEY && process.env.IBM_PROJECT_ID) providerName = 'IBM watsonx';
+    else if (process.env.LLM_API_KEY && process.env.LLM_PROJECT_ID) providerName = 'LLM Provider';
 
     // console.log(`[CodeLens] ⏳ Verifying connection to ${providerName}...`);
     // const isConnected = await verifyProviderConnection();

@@ -40,7 +40,7 @@ These are the deterministic engines that extract absolute facts from the reposit
 
 ## AI Interpretations
 
-How IBM watsonx is integrated safely and effectively:
+How the AI provider is integrated safely and effectively:
 
 - [AI Pipeline Overview](ai/overview.md)
 - [AI Context Building](ai/context-building.md)

@@ -34,7 +34,7 @@ generateAnswer(prompt: string): Promise<string>
 isProviderConfigured(): boolean
 ```
 
-Currently implements IBM watsonx.ai. The provider is selected by environment
+Currently implements multiple generic LLM proxies. The provider is selected by environment
 variables at startup. Adding a new provider requires only a new function and
 a one-line change to `getProvider()`.
 
@@ -162,19 +162,19 @@ The prompt sent to the AI model contains:
 
 ## AI Provider Configuration
 
-### IBM watsonx.ai (default)
+### Configured AI Provider (default)
 
 Set these in `server/.env`:
 
 ```env
-IBM_API_KEY=<IBM Cloud IAM API key>
-IBM_PROJECT_ID=<watsonx.ai project ID>
-IBM_API_URL=https://us-south.ml.cloud.ibm.com   # optional
-IBM_MODEL_ID=ibm/granite-13b-instruct-v2         # optional
+LLM_API_KEY=<API key>
+LLM_PROJECT_ID=<Project ID>
+LLM_API_URL=https://api.your-provider.com   # optional
+LLM_MODEL_ID=meta-llama/llama-3-70b         # optional
 ```
 
-The provider uses IBM Cloud IAM for authentication. A fresh IAM token is
-obtained for each request via `grant_type=apikey`.
+The provider uses standard token exchange for authentication. A fresh token is
+obtained for each request.
 
 **If not configured:** the `/ask` endpoint returns `HTTP 503` with
 `{ error: '...', configured: false }`. The frontend displays this as an
@@ -313,7 +313,7 @@ All tests are in `server/tests/ai/`. The AI provider is always mocked:
 cd server && npm test
 ```
 
-No real IBM API calls are made in tests.
+No real external API calls are made in tests.
 
 ---
 
@@ -336,4 +336,4 @@ No real IBM API calls are made in tests.
 | Simple keyword matching only | No semantic/embedding-based retrieval yet |
 | Only JS/TS files have symbol analysis | Other files matched by filename only |
 | Long questions may produce more stop-word filtered tokens | Questions > ~10 meaningful words work best |
-| IBM watsonx only | Other providers require code addition; well-documented above |
+| Configured AI | Other providers require code addition; well-documented above |

@@ -8,8 +8,8 @@ CodeLens is NOT a generic chat wrapper around a repository.
 
 **Rule:** AI must NEVER replace deterministic analysis when facts can be obtained from the repository itself.
 
-- **Bad**: Passing raw source code to Watsonx and asking "What are the dependencies of this file?"
-- **Good**: Running Tree-sitter in the browser to parse the AST, building the dependency graph locally, and then sending the computed graph facts to Watsonx to ask "Can you explain why this dependency structure is highly coupled?"
+- **Bad**: Passing raw source code to the AI provider and asking "What are the dependencies of this file?"
+- **Good**: Running Tree-sitter in the browser to parse the AST, building the dependency graph locally, and then sending the computed graph facts to the AI provider to ask "Can you explain why this dependency structure is highly coupled?"
 
 ### The Architecture: Client-Dominant Analysis, Server-Only AI
 
@@ -19,7 +19,7 @@ CodeLens operates on a strict **client-dominant** architecture. The guiding rule
 
 #### Server (`server/src/`) — AI Proxy Only
 The server is intentionally minimal and strictly stateless. It stores absolutely zero information — no files, no analysis, no user data. Its ONLY mechanical role is:
-1. **AI Proxy**: Receive a fully pre-built context prompt (assembled entirely by the client) and forward it verbatim to the IBM watsonx API. Return the AI response to the client. The server does not build this prompt — it only relays it.
+1. **AI Proxy**: Receive a fully pre-built context prompt (assembled entirely by the client) and forward it verbatim to the configured AI API. Return the AI response to the client. The server does not build this prompt — it only relays it.
 
 The server does NOT parse code, does NOT build dependency graphs, does NOT compute complexity scores, does NOT detect clones, and does NOT produce architecture or risk models. It has no concept of code structure at all.
 

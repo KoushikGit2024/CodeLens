@@ -17,11 +17,11 @@ The extraction process (`server/src/repositories/repositoryStore.js`) protects a
 
 ## 3. Reference Validation
 
-When IBM watsonx generates a response that references source files, the references are passed through a validation layer.
+When the AI provider generates a response that references source files, the references are passed through a validation layer.
 If the AI hallucinates a file path that does not exist in the deterministic repository file tree, the reference is securely stripped before being sent to the client.
 
 ## 4. Environment Secrets
 
-API keys for IBM watsonx are strictly managed via the `server/.env` file. 
+API keys for the AI provider are strictly managed via the `server/.env` file. 
 - The `.gitignore` at the project root explicitly ignores `.env`, preventing accidental commits of secrets.
 - The backend never sends API keys to the frontend client. All LLM calls are proxied securely through the Express backend.
