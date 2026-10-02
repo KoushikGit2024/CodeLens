@@ -47,10 +47,26 @@ app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
+const { getSupabaseClient } = require('./core/db/supabase.client');
+
 // ── Error handler ─────────────────────────────────────────────────────────────
 // eslint-disable-next-line no-unused-vars
-app.use((err, _req, res, _next) => {
+app.use(async (err, req, res, _next) => {
   console.error('[CodeLens] Unhandled error:', err);
+  
+  // Log the error to Supabase database
+  try {
+    const supabase = getSupabaseClient();
+    await supabase.from('server_errors').insert({
+      error_message: err.message || 'Internal server error',
+      stack_trace: err.stack || '',
+      route: req.originalUrl || '',
+      method: req.method || ''
+    });
+  } catch (dbErr) {
+    console.error('[CodeLens] Failed to log error to database:', dbErr.message);
+  }
+
   res.status(err.status || 500).json({
     error: err.message || 'Internal server error',
   });

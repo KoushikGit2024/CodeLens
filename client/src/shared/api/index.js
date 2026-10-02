@@ -647,11 +647,37 @@ Generate a structured JSON response matching this exact schema:
     const originalCode = await persistenceStore.loadFile(repoId, targetFile);
     if (!originalCode) throw new Error(`Could not load source file ${targetFile}`);
     
+    // Analyze downstream impact to ensure integration safety
+    let impactConstraints = '';
+    try {
+      const impact = analyzeChangeImpact(record.analysis, record.analysis.graph, [targetFile]);
+      if (impact.directlyAffectedFiles && impact.directlyAffectedFiles.length > 0) {
+        impactConstraints = `\nCRITICAL INTEGRATION CONSTRAINTS:\nThe following ${impact.directlyAffectedFiles.length} downstream file(s) depend on this module:\n${impact.directlyAffectedFiles.map(f => `- ${f}`).join('\n')}\n\nYou MUST preserve all existing exported function/class signatures, argument orders, and public APIs. If you rename or remove an export, you will break the build.`;
+      }
+    } catch (e) {
+      console.warn("Could not calculate downstream impact for constraints", e);
+    }
+    
     const strategiesText = candidate.suggestedStrategies?.map(s => `- ${s.action}: ${s.description}`).join('\n') || 'Improve code quality and structure.';
+    
+    let specificEvidenceText = '';
+    if (candidate.evidence) {
+      if (candidate.type === 'QUALITY' && candidate.evidence.instances) {
+        specificEvidenceText = '\nSpecific Offending Code Blocks (AST Focus):\n' + candidate.evidence.instances.map(inst => `- Function/Method '${inst.name}' has a high cyclomatic complexity of ${inst.complexity}. Target this specifically.`).join('\n');
+      } else if (candidate.type === 'SIZE') {
+        specificEvidenceText = `\nSpecific File Metrics:\n- Lines of Code: ${candidate.evidence.lineCount}\n- Public Exports: ${candidate.evidence.exportCount}\n- Total File Complexity: ${candidate.evidence.complexity}`;
+      } else if (candidate.type === 'COUPLING') {
+        specificEvidenceText = `\nSpecific Coupling Issues:\n- Dependent Files (Fan-In): ${candidate.evidence.fanIn}\n- Dependencies (Fan-Out): ${candidate.evidence.fanOut}`;
+      } else if (candidate.type === 'DEPENDENCY' && candidate.evidence.cyclePath) {
+        specificEvidenceText = `\nCircular Dependency Path:\n${candidate.evidence.cyclePath.join(' -> ')}\nPlease refactor to break this exact circular reference.`;
+      }
+    }
     
     const prompt = `You are an expert AI software architect. Please refactor the following file to resolve the issue: "${candidate.title}".
 Category: ${candidate.type}
 Description: ${candidate.summary}
+${specificEvidenceText}
+${impactConstraints}
 
 Recommended Strategies:
 ${strategiesText}
@@ -677,6 +703,50 @@ ${originalCode}
     }
 
     return { data: { originalCode, refactoredCode, file: targetFile } };
+  },
+
+  async generateTestsRefactoringCandidate(repoId, candidateId) {
+    const record = await repositoryStore.get(repoId);
+    if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
+    
+    const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
+    const risks = buildEngineeringRiskModel(record.analysis, record.analysis.graph, architecture);
+    const refactoring = buildRefactoringIntelligence(risks, record.analysis, record.analysis.graph);
+    
+    const candidate = refactoring.candidates.find(c => c.id === candidateId);
+    if (!candidate) throw new Error('Candidate not found');
+    if (!candidate.files || candidate.files.length === 0) throw new Error('No files associated with this candidate');
+    
+    const targetFile = candidate.files[0];
+    const originalCode = await persistenceStore.loadFile(repoId, targetFile);
+    if (!originalCode) throw new Error(`Could not load source file ${targetFile}`);
+    
+    const prompt = `You are an expert Software Engineer in Test (SDET). We are planning to refactor the following file to resolve an issue ("${candidate.title}"). 
+To ensure safety, we need baseline tests BEFORE refactoring.
+
+Please write a comprehensive suite of unit tests (using Jest or similar standard testing framework) for the current implementation of this file. Focus on capturing the existing behavior.
+
+Please provide ONLY the fully working test code inside a markdown code block (e.g. \`\`\`javascript ... \`\`\`). Do not include explanations outside the code block.
+
+File: ${targetFile}
+Original Code:
+\`\`\`
+${originalCode}
+\`\`\`
+`;
+
+    const res = await api.post(`/ai/chat`, { prompt });
+    const responseText = res.data?.response || res.data || '';
+    
+    let testCode = responseText;
+    const codeBlockMatch = responseText.match(/```[a-z]*\n([\s\S]*?)\n```/);
+    if (codeBlockMatch) {
+      testCode = codeBlockMatch[1];
+    } else {
+      testCode = responseText;
+    }
+
+    return { data: { originalCode, testCode, file: targetFile } };
   },
 
   // ── AI Prompt Endpoints ──────────────────────────────────────────────────────
@@ -860,5 +930,6 @@ export const getRefactoringIntelligence = (id) => repositoryApi.getRefactoringIn
 export const getRefactoringCandidate = (id, candidateId) => repositoryApi.getRefactoringIntelligence(id).then(res => res.data.candidates.find(c => c.id === candidateId));
 export const getRefactoringImpact = (id, candidateId) => repositoryApi.getChangeImpact(id).then(res => res.data);
 export const autoFixRefactoringCandidate = (id, candidateId) => repositoryApi.autoFixRefactoringCandidate(id, candidateId).then(res => res.data);
+export const generateTestsRefactoringCandidate = (id, candidateId) => repositoryApi.generateTestsRefactoringCandidate(id, candidateId).then(res => res.data);
 
 export default api;

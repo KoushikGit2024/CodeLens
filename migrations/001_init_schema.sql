@@ -93,3 +93,46 @@ create index if not exists idx_usage_periods_user_id   on usage_periods(user_id)
 create index if not exists idx_ai_requests_user_id      on ai_requests(user_id);
 create index if not exists idx_ai_requests_created_at   on ai_requests(created_at);
 create index if not exists idx_stored_assets_user_id    on stored_assets(user_id);
+
+-- ── server_errors ────────────────────────────────────────────────────────
+-- Log table for backend 500 errors to maintain a persistent record.
+create table if not exists server_errors (
+  id            uuid primary key default gen_random_uuid(),
+  created_at    timestamptz default now(),
+  error_message text not null,
+  stack_trace   text,
+  route         text,
+  method        text
+);
+
+create index if not exists idx_server_errors_created_at on server_errors(created_at);
+
+-- ── Row Level Security (RLS) Policies ────────────────────────────────────────
+
+-- Enable RLS on all tables
+alter table plans enable row level security;
+alter table users enable row level security;
+alter table usage_periods enable row level security;
+alter table ai_requests enable row level security;
+alter table stored_assets enable row level security;
+alter table server_errors enable row level security;
+
+-- Plans: Anyone can read plans, only admins (or service role) can modify
+create policy "Plans are viewable by everyone" on plans for select using (true);
+
+-- Users: Users can read and update their own profile
+create policy "Users can view own profile" on users for select using (auth.uid() = id);
+create policy "Users can update own profile" on users for update using (auth.uid() = id);
+create policy "Users can insert own profile" on users for insert with check (auth.uid() = id);
+
+-- Usage Periods: Users can view their own periods
+create policy "Users can view own usage" on usage_periods for select using (auth.uid() = user_id);
+
+-- AI Requests: Users can view their own requests
+create policy "Users can view own ai requests" on ai_requests for select using (auth.uid() = user_id);
+
+-- Stored Assets: Users have full control over their own assets
+create policy "Users can manage own assets" on stored_assets for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Server Errors: Only backend service_role can access, block all frontend access
+-- (No policies created = completely locked out for anon/authenticated roles)

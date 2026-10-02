@@ -48,9 +48,9 @@ export default function UserAvatarWidget() {
       title="Go to Account & Usage"
     >
       <div className="w-8 h-8 rounded-full overflow-hidden bg-surface flex items-center justify-center">
-        {user?.user_metadata?.avatar_url ? (
+        {(user?.user_metadata?.custom_avatar_url || user?.user_metadata?.avatar_url) ? (
           <img 
-            src={user.user_metadata.avatar_url} 
+            src={user.user_metadata.custom_avatar_url || user.user_metadata.avatar_url} 
             alt="User Avatar" 
             className="w-full h-full object-cover"
           />

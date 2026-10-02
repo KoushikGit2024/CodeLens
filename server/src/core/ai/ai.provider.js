@@ -20,6 +20,10 @@
  *       GEMINI_API_KEY   — Gemini API Key
  *       GEMINI_MODEL     — model ID (optional, defaults to gemini-1.5-flash)
  *
+ *     Groq (default when GROQ_API_KEY is set)
+ *       GROQ_API_KEY     — Groq API Key
+ *       GROQ_MODEL       — model ID (optional, defaults to llama-3.1-8b-instant)
+ *
  *     OpenAI-Compatible (e.g. Groq, LMStudio, OpenRouter, OpenAI) (default when OPENAI_API_KEY is set)
  *       OPENAI_API_KEY   — API Key
  *       OPENAI_API_URL   — Endpoint (optional, defaults to https://api.openai.com/v1/chat/completions)
@@ -213,6 +217,45 @@ async function openAiCompatibleProvider(prompt) {
   throw new Error(`Unexpected OpenAI-compatible response: ${resStr.slice(0, 200)}`);
 }
 
+// ── Groq provider ─────────────────────────────────────────────────────────────
+
+async function groqProvider(prompt) {
+  const apiKey = process.env.GROQ_API_KEY;
+  const url = process.env.GROQ_API_URL || 'https://api.groq.com/openai/v1/chat/completions';
+  const model = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+
+  const payload = {
+    model: model,
+    messages: [
+      { role: 'user', content: prompt }
+    ],
+    temperature: 0.1,
+    max_tokens: 4096
+  };
+
+  const headers = { 
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${apiKey}`
+  };
+  
+  const resStr = await httpPost(url, JSON.stringify(payload), headers);
+  const data = JSON.parse(resStr);
+  
+  if (data.choices && data.choices[0]?.message?.content) {
+    const usage = data.usage || {};
+    return {
+      text: data.choices[0].message.content.trim(),
+      usage: {
+        input_tokens: usage.prompt_tokens ?? null,
+        output_tokens: usage.completion_tokens ?? null,
+        total_tokens: usage.total_tokens ?? null,
+        source: usage.total_tokens != null ? 'provider_reported' : null,
+      },
+    };
+  }
+  throw new Error(`Unexpected Groq response: ${resStr.slice(0, 200)}`);
+}
+
 // ── Provider registry (ordered fallback chain) ───────────────────────────────
 
 /**
@@ -225,6 +268,9 @@ function getConfiguredProviders() {
   const providers = [];
   if (process.env.LLM_API_KEY && process.env.LLM_PROJECT_ID) {
     providers.push({ name: 'Generic LLM', fn: genericLlmProvider });
+  }
+  if (process.env.GROQ_API_KEY) {
+    providers.push({ name: 'Groq', fn: groqProvider });
   }
   if (process.env.GEMINI_API_KEY) {
     providers.push({ name: 'Google Gemini', fn: geminiProvider });

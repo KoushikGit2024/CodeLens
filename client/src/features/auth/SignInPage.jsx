@@ -39,8 +39,10 @@ export default function SignInPage() {
       formData.append('signature', signature);
       formData.append('expire', expire);
       formData.append('token', token);
-      formData.append('folder', '/avatars');
+      formData.append('folder', '/MyProjects/CodeLens');
       formData.append('fileName', `user_${userId}.jpg`);
+      formData.append('useUniqueFileName', 'false');
+      formData.append('overwriteFile', 'true');
 
       const uploadRes = await fetch('https://upload.imagekit.io/api/v1/files/upload', {
         method: 'POST',
@@ -50,8 +52,13 @@ export default function SignInPage() {
       if (!uploadRes.ok) throw new Error('Upload failed');
       const uploadData = await uploadRes.json();
 
+      const cacheBustedUrl = `${uploadData.url}?t=${Date.now()}`;
+      
       await supabase.auth.updateUser({
-        data: { avatar_url: uploadData.url }
+        data: { 
+          avatar_url: cacheBustedUrl,
+          custom_avatar_url: cacheBustedUrl 
+        }
       });
       
     } catch (err) {

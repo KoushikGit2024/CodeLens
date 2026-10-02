@@ -46,8 +46,8 @@ export default function AccountPage() {
             {/* Profile Card */}
             <div className="bg-panel border border-border rounded-xl p-6 sm:p-8 flex flex-col sm:flex-row items-center sm:items-start gap-6 relative overflow-hidden">
               <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-surface shadow-xl bg-surface-light flex items-center justify-center shrink-0 relative z-10 overflow-hidden">
-                {user.user_metadata?.avatar_url ? (
-                  <img src={user.user_metadata.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                {(user.user_metadata?.custom_avatar_url || user.user_metadata?.avatar_url) ? (
+                  <img src={user.user_metadata.custom_avatar_url || user.user_metadata.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
                   <User className="w-10 h-10 text-muted" />
                 )}

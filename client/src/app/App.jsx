@@ -21,6 +21,7 @@ import SignUpPage from '../features/auth/SignUpPage';
 import ForgotPasswordPage from '../features/auth/ForgotPasswordPage';
 import ResetPasswordPage from '../features/auth/ResetPasswordPage';
 import AuthLayout from '../features/auth/AuthLayout';
+import AuthCallback from '../features/auth/AuthCallback';
 import AuthGuard from '../features/auth/AuthGuard';
 import AccountPage from '../features/account/AccountPage';
 import { AIProvider } from '../shared/context/AIContext';
@@ -29,7 +30,16 @@ import RepositoryShell from '../shared/layout/RepositoryShell';
 import { ErrorBoundary } from '../shared/components/ErrorBoundary';
 import { EnvironmentGuard } from '../shared/components/EnvironmentGuard';
 import { ThemeProvider } from '../shared/context/ThemeContext';
+import { useEffect } from 'react';
+
 export default function App() {
+  useEffect(() => {
+    // If Supabase fell back to root instead of /auth/callback, manually route it
+    if (window.location.pathname === '/' && window.location.hash.includes('access_token')) {
+      window.location.replace('/auth/callback' + window.location.hash);
+    }
+  }, []);
+
   return (
     <ThemeProvider>
       <EnvironmentGuard>
@@ -39,6 +49,8 @@ export default function App() {
           <AIProvider>
             <Routes>
               <Route path="/" element={<UploadPage />} />
+              
+              <Route path="/auth/callback" element={<AuthCallback />} />
               
               <Route element={<AuthLayout />}>
                 <Route path="/auth/signin" element={<SignInPage />} />

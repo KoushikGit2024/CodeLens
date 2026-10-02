@@ -19,6 +19,8 @@ try {
 // (the first time we detect a dead domain) to permanently silence it.
 // The user will simply be signed out, which is fine for local-first usage.
 (function evictStaleSupabaseSession() {
+  if (rawUrl && supabaseAnonKey) return; // Do not evict if configured
+  
   // Identify and remove ALL Supabase auth keys from localStorage (they start with "sb-")
   const staleKeys = Object.keys(localStorage).filter(k => k.startsWith('sb-'));
   if (staleKeys.length > 0) {
@@ -27,14 +29,12 @@ try {
   }
 })();
 
-if (!rawUrl || !supabaseAnonKey) {
-  console.warn('[Supabase] VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY is missing.');
-}
+const isConfigured = !!(rawUrl && supabaseAnonKey);
 
 export const supabase = createClient(validUrl, supabaseAnonKey || 'placeholder', {
   auth: {
-    autoRefreshToken: false,   // Never auto-refresh — prevents ERR_NAME_NOT_RESOLVED spam
-    persistSession: false,     // Don't write new tokens to localStorage either
-    detectSessionInUrl: false, // No OAuth flows needed locally
+    autoRefreshToken: isConfigured,   
+    persistSession: isConfigured,     
+    detectSessionInUrl: isConfigured, 
   },
 });

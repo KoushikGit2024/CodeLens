@@ -57,6 +57,58 @@ const formatCategory = (category) => {
   return category.replace(/([A-Z])/g, ' $1').trim().replace(/^./, str => str.toUpperCase());
 };
 
+// ── Code Peek ─────────────────────────────────────────────────────────────────
+const CodePeek = ({ repoId, filePath, startLine, endLine }) => {
+  const [code, setCode] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  useEffect(() => {
+    async function loadCode() {
+      try {
+        const res = await repositoryApi.getFile(repoId, filePath);
+        if (res?.data?.content) {
+          const lines = res.data.content.split('\n');
+          // Bound lines safely
+          const s = Math.max(1, startLine || 1);
+          const e = Math.min(lines.length, endLine || s + 10);
+          
+          const sliced = lines.slice(s - 1, e).join('\n');
+          setCode({ snippet: sliced, startLine: s });
+        }
+      } catch (err) {
+        console.error("Failed to load code peek:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadCode();
+  }, [repoId, filePath, startLine, endLine]);
+
+  if (loading) return <div className="text-[10px] text-muted/50 p-2 animate-pulse bg-panel/50 rounded">Loading snippet...</div>;
+  if (!code) return null;
+
+  return (
+    <div className="mt-2 rounded overflow-hidden border border-border/50 bg-surface">
+      <button 
+        onClick={() => setIsExpanded(o => !o)}
+        className="w-full bg-panel hover:bg-surface/80 transition-colors px-3 py-1.5 flex justify-between items-center border-b border-border/50"
+      >
+        <span className="text-[9px] uppercase tracking-wider text-muted font-semibold flex items-center gap-1.5">
+          {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+          <File className="w-3 h-3" /> Code Peek
+        </span>
+        <span className="text-[9px] text-muted/60 font-mono">Lines {code.startLine}-{code.startLine + code.snippet.split('\n').length - 1}</span>
+      </button>
+      {isExpanded && (
+        <pre className="p-3 overflow-auto max-h-[300px] custom-scrollbar text-[11px] font-mono leading-relaxed text-text bg-surface">
+          <code>{code.snippet}</code>
+        </pre>
+      )}
+    </div>
+  );
+};
+
 // ── Candidate Card ────────────────────────────────────────────────────────────
 /**
  * It evaluates the priority level, then extracts the specific styling metadata, 
@@ -414,7 +466,7 @@ export default function RefactoringPage() {
       </div>
       <div className="flex-1 p-6 pt-3">
         {selectedCandidate ? (
-          <CandidateDetail candidate={selectedCandidate} repoId={repoId} />
+          <CandidateDetail candidate={selectedCandidate} repoId={repoId} allCandidates={intel.candidates} onSelectCandidate={setSelectedCandidateId} />
         ) : (
           <div className="h-full flex items-center justify-center text-muted text-sm">
             Select a candidate from the sidebar to view details
@@ -480,7 +532,7 @@ export default function RefactoringPage() {
                 Select a candidate from the sidebar to view details
               </div>
             ) : mobileTab === 'details' ? (
-              <CandidateDetail candidate={selectedCandidate} repoId={repoId} />
+              <CandidateDetail candidate={selectedCandidate} repoId={repoId} allCandidates={intel.candidates} onSelectCandidate={setSelectedCandidateId} />
             ) : (
               <div className="flex-1 min-h-[500px] bg-panel rounded-lg border border-border overflow-hidden">
                 <AiAdvisor candidate={selectedCandidate} repoId={repoId} />
@@ -547,18 +599,25 @@ export default function RefactoringPage() {
  * It fetches the change impact payload, then extracts the directly affected files, 
  * and then it applies them alongside the suggested strategies for manual or AI review.
  */
-function CandidateDetail({ candidate, repoId }) {
+function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }) {
   const navigate = useNavigate();
   const [impact, setImpact] = useState(null);
   const [loading, setLoading] = useState(true);
   const [fixing, setFixing] = useState(false);
   const [fixResult, setFixResult] = useState(null);
   const [fixError, setFixError] = useState(null);
+  
+  const [generatingTests, setGeneratingTests] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+  const [testError, setTestError] = useState(null);
+  
   const { aiState } = useAIState();
 
   useEffect(() => {
     setFixResult(null);
     setFixError(null);
+    setTestResult(null);
+    setTestError(null);
   }, [candidate.id]);
 
   useEffect(() => {
@@ -601,40 +660,99 @@ function CandidateDetail({ candidate, repoId }) {
             <div className="text-2xl  font-bold text-text">{candidate.priorityScore}</div>
             <div className="text-[10px] text-muted uppercase tracking-wide">Priority Score</div>
           </div>
-          <button
-            onClick={async () => {
-              if (aiState.authState === 'unauthenticated') {
-                navigate('/auth/signin');
-                return;
+          <div className="flex gap-2">
+            <button
+              onClick={async () => {
+                if (aiState.authState === 'unauthenticated') {
+                  navigate('/auth/signin');
+                  return;
+                }
+                setGeneratingTests(true);
+                setTestError(null);
+                try {
+                  const res = await repositoryApi.generateTestsRefactoringCandidate(repoId, candidate.id);
+                  setTestResult(res.data);
+                } catch (err) {
+                  setTestError(err?.response?.data?.error || err.message);
+                } finally {
+                  setGeneratingTests(false);
+                }
+              }}
+              disabled={generatingTests || !!testResult || aiState.status === 'loading' || (aiState.authState !== 'unauthenticated' && (aiState.status === 'offline' || aiState.quotaStatus === 'exhausted'))}
+              title="Generate a baseline test suite before refactoring"
+              className="flex items-center gap-2 px-3 py-1.5 bg-surface border border-border hover:bg-panel disabled:opacity-40 text-text rounded text-sm font-medium transition-colors"
+            >
+              {generatingTests ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4 text-accent" />}
+              {generatingTests ? 'Writing Tests...' : 'Generate Tests First'}
+            </button>
+            <button
+              onClick={async () => {
+                if (aiState.authState === 'unauthenticated') {
+                  navigate('/auth/signin');
+                  return;
+                }
+                setFixing(true);
+                setFixError(null);
+                try {
+                  const res = await repositoryApi.autoFixRefactoringCandidate(repoId, candidate.id);
+                  setFixResult(res.data);
+                } catch (err) {
+                  setFixError(err?.response?.data?.error || err.message);
+                } finally {
+                  setFixing(false);
+                }
+              }}
+              
+              disabled={fixing || !!fixResult || aiState.status === 'loading' || (aiState.authState !== 'unauthenticated' && (aiState.status === 'offline' || aiState.quotaStatus === 'exhausted'))}
+              title={
+                aiState.status === 'offline' ? 'No AI provider configured' :
+                aiState.quotaStatus === 'exhausted' ? 'AI quota exceeded' : ''
               }
-              setFixing(true);
-              setFixError(null);
-              try {
-                const res = await repositoryApi.autoFixRefactoringCandidate(repoId, candidate.id);
-                setFixResult(res.data);
-              } catch (err) {
-                setFixError(err?.response?.data?.error || err.message);
-              } finally {
-                setFixing(false);
-              }
-            }}
-            
-            disabled={fixing || !!fixResult || aiState.status === 'loading' || (aiState.authState !== 'unauthenticated' && (aiState.status === 'offline' || aiState.quotaStatus === 'exhausted'))}
-            title={
-              aiState.status === 'offline' ? 'No AI provider configured' :
-              aiState.quotaStatus === 'exhausted' ? 'AI quota exceeded' : ''
-            }
-            className="flex items-center gap-2 px-3 py-1.5 bg-accent hover:bg-accent/80 disabled:opacity-40 text-text rounded text-sm font-medium transition-colors"
-          >
-            {fixing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            {fixing ? 'Auto-Fixing...' : aiState.authState === 'unauthenticated' ? 'Sign in to Auto-Fix' : 'Auto-Fix with AI'}
-          </button>
+              className="flex items-center gap-2 px-3 py-1.5 bg-accent hover:bg-accent/80 disabled:opacity-40 text-text rounded text-sm font-medium transition-colors"
+            >
+              {fixing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              {fixing ? 'Auto-Fixing...' : aiState.authState === 'unauthenticated' ? 'Sign in to Auto-Fix' : 'Auto-Fix with AI'}
+            </button>
+          </div>
         </div>
       </div>
+
+      {testError && (
+        <div className="bg-danger/8 border border-danger/25 text-danger text-sm p-3 rounded flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" /> {testError}
+        </div>
+      )}
 
       {fixError && (
         <div className="bg-danger/8 border border-danger/25 text-danger text-sm p-3 rounded flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" /> {fixError}
+        </div>
+      )}
+
+      {testResult && (
+        <div className="border border-accent/30 rounded-lg flex flex-col h-[400px] overflow-hidden mb-4">
+          <div className="px-4 py-3 border-b border-border bg-panel flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Database className="w-4 h-4 text-accent" />
+              <div>
+                <div className="text-sm font-medium text-text">Baseline Test Suite Generated</div>
+                <div className="text-xs  text-muted">Target: {testResult.file}</div>
+              </div>
+            </div>
+            <button 
+              onClick={() => {
+                navigator.clipboard.writeText(testResult.testCode);
+              }}
+              className="bg-surface hover:bg-panel border border-border px-3 py-1.5 rounded text-xs font-medium transition-colors"
+            >
+              Copy Test Code
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 relative bg-surface p-4 overflow-auto">
+            <pre className="text-xs font-mono text-[#d4d4d4] leading-relaxed">
+              <code>{testResult.testCode}</code>
+            </pre>
+          </div>
         </div>
       )}
 
@@ -674,9 +792,9 @@ function CandidateDetail({ candidate, repoId }) {
       {/* Info Grid */}
       <div className="grid grid-cols-2 gap-3">
         <div className="border border-border rounded p-4 min-w-0">
-          <h3 className="text-[11px] font-medium text-muted uppercase tracking-wider mb-3">Affected Files</h3>
-          <ul className="space-y-2">
-            {[...(candidate.files || [])].sort((a, b) => {
+          <h3 className="text-[11px] font-medium text-muted uppercase tracking-wider mb-3">Affected Files & Evidence</h3>
+          <div className="space-y-3">
+            {[...(candidate.files || [])].filter(Boolean).sort((a, b) => {
               if (a === candidate.mainFile) return -1;
               if (b === candidate.mainFile) return 1;
               return a.localeCompare(b);
@@ -684,28 +802,112 @@ function CandidateDetail({ candidate, repoId }) {
               const range = candidate.fileRanges && candidate.fileRanges[f];
               const isMain = candidate.mainFile === f;
               const ref = tryMakeSourceRef({ filePath: f, startLine: range?.startLine, endLine: range?.endLine });
+              const ev = candidate.evidence;
+              console.log('Rendering candidate file:', f, 'isMain:', isMain, 'type:', candidate.type, 'evidence:', ev);
+              
               return (
-                <li key={f} className="flex flex-col gap-0.5 min-w-0 pb-2 border-b border-border/30 last:border-0">
+                <div key={f} className="flex flex-col gap-2 min-w-0 p-3 bg-panel border border-border/50 rounded-lg">
                   <div className="flex items-center gap-2 min-w-0">
+                    <File className="w-3.5 h-3.5 text-muted shrink-0" />
                     {ref
-                      ? <OpenSourceButton ref={ref} variant="button" className="flex-1 truncate text-[11px] justify-start" />
-                      : <span className="text-[11px] font-mono text-muted truncate flex-1">{f}</span>
+                      ? <OpenSourceButton ref={ref} variant="button" className="flex-1 truncate text-xs justify-start hover:text-accent transition-colors" />
+                      : <span className="text-xs font-mono text-muted truncate flex-1">{f}</span>
                     }
                     {isMain && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent/20 text-accent font-semibold uppercase tracking-wider shrink-0">
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent/10 text-accent font-semibold uppercase tracking-wider shrink-0 border border-accent/20">
                         Target
                       </span>
                     )}
                   </div>
-                  {range?.startLine && (
-                    <span className="text-[10px] font-mono text-muted/60 pl-1">
-                      Lines {range.startLine}{range.endLine && range.endLine !== range.startLine ? `–${range.endLine}` : ''}
-                    </span>
+                  
+                  {/* Evidence Block */}
+                  {ev && (isMain || candidate.type === 'DEPENDENCY' || candidate.type === 'QUALITY') && (
+                    <div className="mt-1 pl-5">
+                      {candidate.type === 'QUALITY' && ev.instances && isMain && (
+                        <div className="space-y-1.5">
+                          {ev.instances.map((inst, i) => (
+                            <div key={i} className="text-[11px] bg-surface/80 border border-border/50 px-2 py-1.5 rounded flex items-center justify-between">
+                              <div className="flex items-center gap-2 truncate">
+                                <span className="text-muted/80">{inst.kind}:</span>
+                                <span className="font-mono text-text truncate">{inst.name}</span>
+                              </div>
+                              {inst.complexity && (
+                                <span className="text-warning font-medium shrink-0 ml-3">Score: {inst.complexity}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {candidate.type === 'QUALITY' && ev.count && ev.instances && !isMain && candidate.title.includes('Clone') && (
+                        <div className="text-[11px] text-muted bg-surface/50 px-2 py-1.5 rounded border border-border/30">
+                          Clone detected in this file.
+                        </div>
+                      )}
+
+                      {candidate.type === 'SIZE' && isMain && (
+                        <div className="text-[11px] bg-surface/80 border border-border/50 px-2 py-1.5 rounded grid grid-cols-2 gap-2">
+                          {ev.lineCount && <div><span className="text-muted">Lines:</span> <span className="text-warning font-medium">{ev.lineCount}</span></div>}
+                          {ev.complexity && <div><span className="text-muted">Complexity:</span> <span className="text-warning font-medium">{ev.complexity}</span></div>}
+                          {ev.exportCount && <div><span className="text-muted">Exports:</span> <span className="text-warning font-medium">{ev.exportCount}</span></div>}
+                        </div>
+                      )}
+
+                      {candidate.type === 'COUPLING' && isMain && (
+                        <div className="text-[11px] bg-surface/80 border border-border/50 px-2 py-1.5 rounded flex gap-4">
+                          {ev.fanIn && <div><span className="text-muted">Dependent Files (Fan-In):</span> <span className="text-warning font-medium ml-1">{ev.fanIn}</span></div>}
+                          {ev.fanOut && <div><span className="text-muted">Dependencies (Fan-Out):</span> <span className="text-warning font-medium ml-1">{ev.fanOut}</span></div>}
+                        </div>
+                      )}
+
+                      {candidate.type === 'DEPENDENCY' && ev.cyclePath && isMain && (
+                        <div className="text-[10px] bg-danger/5 border border-danger/20 px-2 py-1.5 rounded text-danger font-mono break-all leading-relaxed">
+                          {ev.cyclePath.join(' → ')}
+                        </div>
+                      )}
+
+                      {candidate.type === 'ARCHITECTURE' && isMain && (
+                        <div className="text-[11px] bg-surface/80 border border-border/50 px-2 py-1.5 rounded">
+                          <span className="text-muted">Violated Rule:</span> <span className="text-warning font-mono ml-1">{ev.ruleId}</span>
+                        </div>
+                      )}
+
+                      {candidate.type === 'CHURN' && isMain && (
+                        <div className="text-[11px] bg-surface/80 border border-border/50 px-2 py-1.5 rounded flex gap-4">
+                          {ev.churnScore && <div><span className="text-muted">Churn Score:</span> <span className="text-warning font-medium ml-1">{ev.churnScore.toFixed(1)}/100</span></div>}
+                          {ev.commitsModified && <div><span className="text-muted">Commits:</span> <span className="text-text font-medium ml-1">{ev.commitsModified}</span></div>}
+                        </div>
+                      )}
+                    </div>
                   )}
-                </li>
+                  
+                  {range?.startLine && !ev?.instances && (
+                    <div className="mt-2 pl-5">
+                      <CodePeek 
+                        repoId={repoId} 
+                        filePath={f} 
+                        startLine={range.startLine} 
+                        endLine={range.endLine} 
+                      />
+                    </div>
+                  )}
+                  {candidate.type === 'QUALITY' && ev?.instances && isMain && (
+                    <div className="mt-2 pl-5 flex flex-col gap-2">
+                      {ev.instances.slice(0, 3).map((inst, i) => (
+                        <CodePeek 
+                          key={i}
+                          repoId={repoId}
+                          filePath={f}
+                          startLine={inst.location?.startLine || range?.startLine}
+                          endLine={inst.location?.endLine || range?.endLine}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
               );
             })}
-          </ul>
+          </div>
         </div>
 
         <div className="border border-border rounded p-4 min-w-0">
@@ -717,14 +919,49 @@ function CandidateDetail({ candidate, repoId }) {
               <Loader2 className="w-3 h-3 animate-spin" /> Calculating...
             </div>
           ) : impact ? (
-            <div className="space-y-2.5">
-              <div className="flex justify-between items-baseline">
-                <span className="text-xs text-muted">Direct</span>
-                <span className="text-sm  font-medium text-text">{impact?.directlyAffectedFiles?.length || 0} files</span>
+            <div className="space-y-4">
+              <div>
+                <div className="flex justify-between items-baseline mb-1">
+                  <span className="text-xs text-muted">Direct Dependencies</span>
+                  <span className="text-sm font-medium text-text">{impact?.directlyAffectedFiles?.length || 0} files</span>
+                </div>
+                {impact?.directlyAffectedFiles?.length > 0 && (
+                  <div className="max-h-[120px] overflow-auto custom-scrollbar bg-surface/50 rounded border border-border/40 p-2 flex flex-col items-start">
+                    {impact.directlyAffectedFiles.map(f => {
+                      const ref = tryMakeSourceRef({ filePath: f });
+                      if (ref) {
+                        return <OpenSourceButton key={f} ref={ref} label={f.split('/').pop()} variant="button" className="text-[10px] font-mono text-muted/80 truncate mb-1 last:mb-0 hover:text-accent transition-colors text-left" title={f} />;
+                      }
+                      return (
+                        <div key={f} className="text-[10px] font-mono text-muted/80 truncate mb-1 last:mb-0" title={f}>
+                          {f.split('/').pop()}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-              <div className="flex justify-between items-baseline">
-                <span className="text-xs text-muted">Transitive</span>
-                <span className="text-sm  font-medium text-text">{impact?.transitivelyAffectedFiles?.length || 0} files</span>
+              
+              <div>
+                <div className="flex justify-between items-baseline mb-1">
+                  <span className="text-xs text-muted">Transitive (Indirect)</span>
+                  <span className="text-sm font-medium text-text">{impact?.transitivelyAffectedFiles?.length || 0} files</span>
+                </div>
+                {impact?.transitivelyAffectedFiles?.length > 0 && (
+                  <div className="max-h-[120px] overflow-auto custom-scrollbar bg-surface/50 rounded border border-border/40 p-2 flex flex-col items-start">
+                    {impact.transitivelyAffectedFiles.map(f => {
+                      const ref = tryMakeSourceRef({ filePath: f });
+                      if (ref) {
+                        return <OpenSourceButton key={f} ref={ref} label={f.split('/').pop()} variant="button" className="text-[10px] font-mono text-muted/80 truncate mb-1 last:mb-0 hover:text-accent transition-colors text-left" title={f} />;
+                      }
+                      return (
+                        <div key={f} className="text-[10px] font-mono text-muted/80 truncate mb-1 last:mb-0" title={f}>
+                          {f.split('/').pop()}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               {impact?.affectedComponents?.length > 0 && (
                 <div>
@@ -745,35 +982,55 @@ function CandidateDetail({ candidate, repoId }) {
 
       {/* Strategies */}
       {candidate.suggestedStrategies?.length > 0 && (
-        <div className="border border-border rounded p-4">
-          <h3 className="text-[11px] font-medium text-muted uppercase tracking-wider mb-4">Deterministic Strategies</h3>
-          <div className="space-y-5">
+        <div className="flex flex-col gap-3">
+          <h3 className="text-[11px] font-medium text-muted uppercase tracking-wider mb-1 flex items-center gap-1.5">
+            <Wrench className="w-3.5 h-3.5" /> Action Plan
+          </h3>
+          <div className="grid grid-cols-1 gap-4">
             {candidate.suggestedStrategies.map((strat, idx) => (
-              <div key={idx} className="border-l-2 border-border pl-4">
-                <h4 className="text-sm font-semibold text-text mb-1">{strat.action}</h4>
-                <p className="text-sm text-muted mb-3 leading-relaxed">{strat.description}</p>
-                <div className="grid grid-cols-2 gap-4 text-xs">
-                  <div>
-                    <span className="text-success font-medium mb-1.5 block">Expected Benefits</span>
-                    <ul className="space-y-0.5 text-muted">
-                      {strat.expectedBenefits?.map((b, i) => (
-                        <li key={i} className="flex items-start gap-1.5">
-                          <span className="mt-1 w-1 h-1 rounded-full bg-success/60 shrink-0" />
-                          {b}
-                        </li>
-                      ))}
-                    </ul>
+              <div key={idx} className="bg-panel border border-border/50 rounded-xl overflow-hidden shadow-sm group hover:border-accent/30 transition-colors">
+                <div className="bg-surface/50 px-4 py-3 border-b border-border/50 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 rounded-full bg-accent/10 text-accent flex items-center justify-center text-xs font-bold shrink-0">
+                      {idx + 1}
+                    </div>
+                    <h4 className="text-sm font-semibold text-text">{strat.action}</h4>
                   </div>
-                  <div>
-                    <span className="text-warning font-medium mb-1.5 block">Risks</span>
-                    <ul className="space-y-0.5 text-muted">
-                      {strat.risks?.map((r, i) => (
-                        <li key={i} className="flex items-start gap-1.5">
-                          <span className="mt-1 w-1 h-1 rounded-full bg-warning/60 shrink-0" />
-                          {r}
-                        </li>
-                      ))}
-                    </ul>
+                </div>
+                
+                <div className="p-4">
+                  <p className="text-[13px] text-muted mb-4 leading-relaxed">
+                    {strat.description}
+                  </p>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-[11px]">
+                    <div className="bg-success/5 border border-success/10 rounded-lg p-3">
+                      <span className="text-success font-medium mb-2 flex items-center gap-1.5 uppercase tracking-wider text-[10px]">
+                        <CheckCircle className="w-3 h-3" /> Expected Benefits
+                      </span>
+                      <ul className="space-y-1.5 text-muted/90">
+                        {strat.expectedBenefits?.map((b, i) => (
+                          <li key={i} className="flex items-start gap-1.5">
+                            <span className="mt-1 w-1 h-1 rounded-full bg-success/40 shrink-0" />
+                            <span className="leading-tight">{b}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    
+                    <div className="bg-warning/5 border border-warning/10 rounded-lg p-3">
+                      <span className="text-warning font-medium mb-2 flex items-center gap-1.5 uppercase tracking-wider text-[10px]">
+                        <AlertTriangle className="w-3 h-3" /> Potential Risks
+                      </span>
+                      <ul className="space-y-1.5 text-muted/90">
+                        {strat.risks?.map((r, i) => (
+                          <li key={i} className="flex items-start gap-1.5">
+                            <span className="mt-1 w-1 h-1 rounded-full bg-warning/40 shrink-0" />
+                            <span className="leading-tight">{r}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -783,10 +1040,46 @@ function CandidateDetail({ candidate, repoId }) {
       )}
 
       {/* Footer meta */}
-      <div className="flex items-center gap-6 text-xs text-muted pt-2 border-t border-border">
+      <div className="flex items-center gap-6 text-xs text-muted pt-2 border-t border-border mt-2">
         <span>Severity: <span className="text-text uppercase">{candidate.severity}</span></span>
         <span>Confidence: <span className="text-text uppercase">{candidate.confidence}</span></span>
       </div>
+
+      {/* Other Issues in this File */}
+      {allCandidates && candidate.mainFile && (
+        (() => {
+          const otherIssues = allCandidates.filter(c => 
+            c.id !== candidate.id && 
+            c.files?.includes(candidate.mainFile)
+          );
+          
+          if (otherIssues.length === 0) return null;
+          
+          return (
+            <div className="mt-6 border-t border-border pt-6">
+              <h3 className="text-[11px] font-medium text-muted uppercase tracking-wider mb-3">Other Issues in {candidate.mainFile.split('/').pop()}</h3>
+              <div className="flex flex-col gap-2">
+                {otherIssues.map(other => (
+                  <button
+                    key={other.id}
+                    onClick={() => onSelectCandidate && onSelectCandidate(other.id)}
+                    className="flex items-center justify-between p-3 bg-panel border border-border/50 rounded-lg hover:border-accent/40 transition-colors text-left group"
+                  >
+                    <div>
+                      <div className="text-sm font-semibold text-text group-hover:text-accent transition-colors">{other.title}</div>
+                      <div className="text-[11px] text-muted line-clamp-1 mt-0.5">{other.summary}</div>
+                    </div>
+                    <div className="flex flex-col items-end shrink-0 ml-4">
+                      <span className="text-xs font-bold text-text">{other.priorityScore}</span>
+                      <span className="text-[9px] uppercase text-muted tracking-widest">{other.priority}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })()
+      )}
     </div>
   );
 }

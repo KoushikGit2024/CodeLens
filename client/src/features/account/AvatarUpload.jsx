@@ -90,6 +90,9 @@ export default function AvatarUpload({ onUploadSuccess }) {
       formData.append('token', token);
       formData.append('folder', '/MyProjects/CodeLens');
       formData.append('fileName', `user_${user.id}.jpg`);
+      // Explicitly tell ImageKit to overwrite the old file instead of appending a random string!
+      formData.append('useUniqueFileName', 'false');
+      formData.append('overwriteFile', 'true');
 
       const uploadRes = await fetch('https://upload.imagekit.io/api/v1/files/upload', {
         method: 'POST',
@@ -100,13 +103,19 @@ export default function AvatarUpload({ onUploadSuccess }) {
       const uploadData = await uploadRes.json();
 
       // 4. Update Supabase user metadata with new avatar URL
+      // We explicitly save it as custom_avatar_url so that Google OAuth doesn't overwrite it on next login!
+      const cacheBustedUrl = `${uploadData.url}?t=${Date.now()}`;
+      
       const { error: updateError } = await supabase.auth.updateUser({
-        data: { avatar_url: uploadData.url }
+        data: { 
+          avatar_url: cacheBustedUrl,
+          custom_avatar_url: cacheBustedUrl 
+        }
       });
 
       if (updateError) throw updateError;
 
-      if (onUploadSuccess) onUploadSuccess(uploadData.url);
+      if (onUploadSuccess) onUploadSuccess(cacheBustedUrl);
       setImgSrc('');
     } catch (err) {
       console.error('Avatar upload error:', err);
