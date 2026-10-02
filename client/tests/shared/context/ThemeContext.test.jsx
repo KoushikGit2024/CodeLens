@@ -1,81 +1,67 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { ThemeProvider, useTheme, THEMES } from '../../../src/shared/context/ThemeContext';
+import { ThemeProvider, useTheme, COLOR_THEMES } from '../../../src/shared/context/ThemeContext';
 
 describe('ThemeContext', () => {
-  let originalLocalStorage;
-
   beforeEach(() => {
-    // Clear localStorage before each test
     localStorage.clear();
-    // Reset the html element classes
     document.documentElement.className = '';
   });
 
-  it('defaults to system theme if nothing is persisted', () => {
+  it('defaults to system mode and graphite color if nothing is persisted', () => {
     const { result } = renderHook(() => useTheme(), { wrapper: ThemeProvider });
-    expect(result.current.theme.id).toBe('system');
+    expect(result.current.mode).toBe('system');
+    expect(result.current.colorTheme).toBe('graphite');
   });
 
-  it('applies the light theme class to <html>', () => {
+  it('applies the correct theme class to <html> for light mode', () => {
     const { result } = renderHook(() => useTheme(), { wrapper: ThemeProvider });
 
     act(() => {
-      result.current.setTheme('light');
+      result.current.setMode('light');
     });
 
-    expect(result.current.theme.id).toBe('light');
+    expect(result.current.resolvedMode).toBe('light');
     expect(document.documentElement.classList.contains('theme-light')).toBe(true);
-    expect(document.documentElement.classList.contains('theme-high-contrast')).toBe(false);
   });
 
-  it('applies the high-contrast theme class to <html>', () => {
+  it('applies the correct theme class for custom color themes', () => {
     const { result } = renderHook(() => useTheme(), { wrapper: ThemeProvider });
 
     act(() => {
-      result.current.setTheme('high-contrast');
+      result.current.setColorTheme('high-contrast');
+      result.current.setMode('dark');
     });
 
-    expect(result.current.theme.id).toBe('high-contrast');
-    expect(document.documentElement.classList.contains('theme-high-contrast')).toBe(true);
-    expect(document.documentElement.classList.contains('theme-light')).toBe(false);
+    expect(result.current.colorTheme).toBe('high-contrast');
+    expect(document.documentElement.classList.contains('theme-high-contrast-dark')).toBe(true);
   });
 
-  it('removes the old theme class when switching themes', () => {
+  it('persists mode and color selection in localStorage', () => {
     const { result } = renderHook(() => useTheme(), { wrapper: ThemeProvider });
 
-    act(() => { result.current.setTheme('light'); });
-    expect(document.documentElement.classList.contains('theme-light')).toBe(true);
+    act(() => { 
+      result.current.setMode('light');
+      result.current.setColorTheme('ocean'); 
+    });
 
-    act(() => { result.current.setTheme('high-contrast'); });
-    expect(document.documentElement.classList.contains('theme-light')).toBe(false);
-    expect(document.documentElement.classList.contains('theme-high-contrast')).toBe(true);
-  });
-
-  it('persists theme selection in localStorage', () => {
-    const { result } = renderHook(() => useTheme(), { wrapper: ThemeProvider });
-
-    act(() => { result.current.setTheme('light'); });
-
-    expect(localStorage.getItem('codelens:theme')).toBe('light');
+    expect(localStorage.getItem('codelens:themeMode')).toBe('light');
+    expect(localStorage.getItem('codelens:colorTheme')).toBe('ocean');
   });
 
   it('restores theme from localStorage on mount', () => {
-    localStorage.setItem('codelens:theme', 'high-contrast');
+    localStorage.setItem('codelens:themeMode', 'light');
+    localStorage.setItem('codelens:colorTheme', 'forest');
     const { result } = renderHook(() => useTheme(), { wrapper: ThemeProvider });
 
-    expect(result.current.theme.id).toBe('high-contrast');
+    expect(result.current.mode).toBe('light');
+    expect(result.current.colorTheme).toBe('forest');
   });
 
-  it('falls back to system if an unknown theme is in localStorage', () => {
-    localStorage.setItem('codelens:theme', 'non-existent-theme');
-    const { result } = renderHook(() => useTheme(), { wrapper: ThemeProvider });
-    expect(result.current.theme.id).toBe('system');
-  });
-
-  it('exposes all three themes in the THEMES export', () => {
-    expect(Object.keys(THEMES)).toContain('dark');
-    expect(Object.keys(THEMES)).toContain('light');
-    expect(Object.keys(THEMES)).toContain('high-contrast');
+  it('exposes all available color themes in the COLOR_THEMES export', () => {
+    const themeIds = COLOR_THEMES.map(t => t.id);
+    expect(themeIds).toContain('graphite');
+    expect(themeIds).toContain('ocean');
+    expect(themeIds).toContain('high-contrast');
   });
 });

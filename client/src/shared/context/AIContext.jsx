@@ -89,9 +89,10 @@ export function useAIState() {
 export function useAI({ repoId, feature, contextData } = {}) {
   const { effectiveState, aiState, reportAiError, refreshStatus } = useAIState();
   const [messages, setMessages] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [loadingState, setLoadingState] = useState('idle'); // idle, gathering_dependencies, waiting_for_ai
   const [error, setError] = useState(null);
   const [lastFailedPrompt, setLastFailedPrompt] = useState(null);
+  const [pendingContextPayload, setPendingContextPayload] = useState(null);
   const abortControllerRef = useRef(null);
 
   const stopGeneration = useCallback(() => {
@@ -120,18 +121,10 @@ export function useAI({ repoId, feature, contextData } = {}) {
     return () => { mounted = false; };
   }, [repoId, feature]);
 
-  /**
-   * It evaluates the user submission (text + optional attachments), then extracts Monaco
-   * context ranges and serialises any file / image / snippet attachments into the prompt,
-   * and then it applies the combined payload to the local API processor.
-   *
-   * @param {string}   prompt       - User-visible message text
-   * @param {object[]} attachments  - Optional array of { type, name, content, dataUrl, path }
-   */
   const sendMessage = useCallback(async (prompt, attachments = []) => {
     if ((!prompt?.trim() && attachments.length === 0) || !repoId || !feature) return;
 
-    // ── Build the display message (what appears in the chat bubble) ────────
+    // Build the display message (what appears in the chat bubble)
     const displayParts = [prompt?.trim()].filter(Boolean);
     if (attachments.length > 0) {
       const labels = attachments.map(a => {
@@ -143,45 +136,79 @@ export function useAI({ repoId, feature, contextData } = {}) {
     }
     const displayText = displayParts.join('');
 
-    // ── Build the actual AI prompt (text + serialised attachments) ─────────
+    // Build the actual AI prompt (text + serialised attachments)
     const promptParts = [prompt?.trim()].filter(Boolean);
     for (const a of attachments) {
       if (a.type === 'image' && a.dataUrl) {
-        promptParts.push(
-          `\n\n--- Attached Image: ${a.name} ---\n[Image data: ${a.dataUrl.slice(0, 80)}…]\n---`
-        );
+        promptParts.push(`\n\n--- Attached Image: ${a.name} ---\n[Image data: ${a.dataUrl.slice(0, 80)}…]\n---`);
       } else if (a.content) {
         const fence = a.type === 'snippet' ? 'text' : (a.name?.split('.').pop() || 'text');
-        promptParts.push(
-          `\n\n--- Attached ${a.type === 'snippet' ? 'Text Snippet' : `File: ${a.path || a.name}`} ---\n\`\`\`${fence}\n${a.content}\n\`\`\`\n---`
-        );
+        promptParts.push(`\n\n--- Attached ${a.type === 'snippet' ? 'Text Snippet' : `File: ${a.path || a.name}`} ---\n\`\`\`${fence}\n${a.content}\n\`\`\`\n---`);
       }
     }
     const fullPrompt = promptParts.join('');
 
+    const isFirstTurn = messages.length === 0;
+    
+    if (isFirstTurn) {
+      // Step 1: Build context deterministically, then wait for user confirmation
+      setLoadingState('gathering_dependencies');
+      setError(null);
+      try {
+        const activeContext = contextData?.filePath ? {
+          filePath: contextData.filePath,
+          startLine: contextData.startLine,
+          endLine: contextData.endLine
+        } : null;
+        
+        const builtContext = await repositoryApi.buildAIContext(repoId, fullPrompt, activeContext);
+        setPendingContextPayload({
+          builtContext,
+          fullPrompt,
+          displayText
+        });
+        setLoadingState('idle'); // Wait for user to confirm
+      } catch (err) {
+        console.error(err);
+        setError(err.message || 'Failed to gather context.');
+        setLoadingState('idle');
+      }
+      return;
+    }
+
+    // Follow-up turns immediately send
+    await commitSend(fullPrompt, displayText, null);
+  }, [repoId, feature, messages, contextData]);
+
+  const confirmPendingContext = useCallback(async (modifiedContext) => {
+    if (!pendingContextPayload) return;
+    const { fullPrompt, displayText } = pendingContextPayload;
+    setPendingContextPayload(null);
+    await commitSend(fullPrompt, displayText, modifiedContext);
+  }, [pendingContextPayload]);
+
+  const cancelPendingContext = useCallback(() => {
+    setPendingContextPayload(null);
+  }, []);
+
+  const commitSend = async (fullPrompt, displayText, builtContext) => {
     const userMessage = { role: 'user', content: displayText };
     const optimisticMessages = [...messages, userMessage];
 
     setMessages(optimisticMessages);
-    setIsLoading(true);
+    setLoadingState('waiting_for_ai');
     setError(null);
     setLastFailedPrompt(null);
 
     try {
-      const activeContext = contextData?.filePath ? {
-        filePath: contextData.filePath,
-        startLine: contextData.startLine,
-        endLine: contextData.endLine
-      } : null;
-
       abortControllerRef.current = new AbortController();
-      const res = await repositoryApi.askQuestion(
-        repoId, 
-        fullPrompt, 
-        activeContext, 
-        optimisticMessages, 
-        { signal: abortControllerRef.current.signal }
-      );
+      const reqOptions = { signal: abortControllerRef.current.signal };
+      let res;
+      if (builtContext) {
+        res = await repositoryApi.askQuestionWithContext(builtContext, fullPrompt, optimisticMessages, reqOptions);
+      } else {
+        res = await repositoryApi.askQuestion(repoId, fullPrompt, null, optimisticMessages, reqOptions);
+      }
 
       const finalMessages = [...optimisticMessages, { role: 'assistant', content: res.data.answer || res.data.response }];
       setMessages(finalMessages);
@@ -189,7 +216,6 @@ export function useAI({ repoId, feature, contextData } = {}) {
       await chatStore.saveChat(repoId, feature, finalMessages);
     } catch (err) {
       if (err.name === 'CanceledError') {
-        // User aborted the request — just silently revert the optimistic message
         setMessages(messages);
         return;
       }
@@ -205,10 +231,10 @@ export function useAI({ repoId, feature, contextData } = {}) {
       }
       throw err;
     } finally {
-      setIsLoading(false);
+      setLoadingState('idle');
       abortControllerRef.current = null;
     }
-  }, [repoId, feature, messages, contextData, reportAiError, refreshStatus]);
+  };
 
   const retryLast = useCallback(() => {
     if (lastFailedPrompt) {
@@ -221,14 +247,19 @@ export function useAI({ repoId, feature, contextData } = {}) {
     setMessages([]);
     setError(null);
     setLastFailedPrompt(null);
+    setPendingContextPayload(null);
     await chatStore.clearChat(repoId, feature);
   }, [repoId, feature]);
 
   return {
     messages,
-    isLoading,
+    isLoading: loadingState !== 'idle',
+    loadingState,
     error,
     lastFailedPrompt,
+    pendingContextPayload,
+    confirmPendingContext,
+    cancelPendingContext,
     sendMessage,
     retryLast,
     clearHistory,

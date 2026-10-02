@@ -22,6 +22,7 @@ import { buildPrompt } from '../../services/analyzer/advanced/base.context.js';
 import { buildOverviewContext, buildModuleContext, buildOverviewPrompt, buildModulePrompt } from '../../services/analyzer/advanced/documentation.context.js';
 import { aiArtifactStore, buildCacheKey } from '../../services/storage/aiArtifact.store.js';
 import { clearRepoBookmarks } from '../../services/storage/bookmark.store.js';
+import { ContextOrchestrator } from '../../services/analyzer/advanced/context.orchestrator.js';
 
 // It initiates the axios instance, then extracts the base configuration, and then it applies a timeout for LLM proxy calls.
 const api = axios.create({
@@ -35,6 +36,27 @@ api.interceptors.request.use(async (config) => {
     config.headers.Authorization = `Bearer ${session.access_token}`;
   }
   return config;
+}, (error) => {
+  return Promise.reject(error);
+});
+
+api.interceptors.response.use(async (response) => {
+  if (response.status === 202 && response.data?.jobId) {
+    const jobId = response.data.jobId;
+    while (true) {
+      await new Promise(r => setTimeout(r, 2000));
+      const pollRes = await axios.get(`${api.defaults.baseURL}/ai/job/${jobId}`, {
+        headers: { Authorization: response.config.headers.Authorization }
+      });
+      if (pollRes.data.status === 'completed') {
+        return { ...response, status: 200, data: { response: pollRes.data.result } };
+      }
+      if (pollRes.data.status === 'failed') {
+        return Promise.reject(new Error(pollRes.data.error || 'AI Job failed.'));
+      }
+    }
+  }
+  return response;
 }, (error) => {
   return Promise.reject(error);
 });
@@ -431,15 +453,7 @@ export const repositoryApi = {
     };
 
     if (options.generateAi) {
-      const prompt = `You are a software architect analyzing a codebase.
-Provide a clear, 2-3 paragraph architectural evaluation based on these metrics.
-
-Components: ${model.components.map(c => c.data.label).join(', ')}
-Total Relations: ${model.relations.length}
-Boundary Violations: ${model.violations.length}
-Entry Points: ${model.entryPoints.join(', ')}
-
-Evaluate the modularity, coupling, and any apparent risks based on the violations.`;
+      const prompt = ContextOrchestrator.buildArchitecturePrompt(model);
 
       const aiResponse = await api.post('/ai/chat', { prompt, jsonMode: true });
       let insights = null;
@@ -463,46 +477,7 @@ Evaluate the modularity, coupling, and any apparent risks based on the violation
     const intelligence = buildRepositoryIntelligence(record.analysis, record.analysis.graph, architecture);
 
     if (options.generateAi) {
-      const langs = Object.entries(intelligence.repository.languages || {})
-        .sort((a, b) => b[1] - a[1]).slice(0, 5)
-        .map(([l, n]) => `${l} (${n} files)`).join(', ');
-
-      const hotspotList = (intelligence.hotspots || []).slice(0, 5)
-        .map(h => `  - ${h.filePath} (hotspot score: ${h.score})`).join('\n');
-
-      const topCandidates = (intelligence.refactoring.topCandidates || [])
-        .map(c => `  - ${c.title} [${c.priority}]`).join('\n');
-
-      const prompt = `You are CodeLens, a senior software architect and code intelligence assistant.
-Analyze the following deterministic repository metrics and produce a clear, concise, high-level overview.
-
-REPOSITORY: ${intelligence.repository.name}
-FILES: ${intelligence.repository.fileCount} source files
-LANGUAGES: ${langs}
-
-ARCHITECTURE:
-- ${intelligence.architecture.components} detected components
-- Layers: ${(intelligence.architecture.layers || []).join(', ') || 'N/A'}
-
-DEPENDENCY GRAPH:
-- ${intelligence.dependencies.nodes} nodes, ${intelligence.dependencies.edges} edges
-- Circular dependencies: ${intelligence.dependencies.cycles}
-
-ENGINEERING HEALTH:
-- Overall score: ${intelligence.engineeringHealth.score}/100
-- Critical issues: ${intelligence.engineeringHealth.critical}
-- High-severity issues: ${intelligence.engineeringHealth.high}
-- Warnings: ${intelligence.engineeringHealth.warnings}
-
-REFACTORING:
-- ${intelligence.refactoring.candidateCount} candidate(s) identified (${intelligence.refactoring.critical} critical, ${intelligence.refactoring.high} high)
-- Top candidates:
-${topCandidates || '  None'}
-
-TOP HOTSPOT FILES:
-${hotspotList || '  None identified'}
-
-Provide a 3-5 paragraph technical summary covering: overall codebase health, main architectural observations, key risks to address, and recommended immediate actions.`;
+      const prompt = ContextOrchestrator.buildIntelligencePrompt(intelligence);
 
       const aiResponse = await api.post('/ai/chat', { prompt });
       const insights = {
@@ -533,18 +508,7 @@ Provide a 3-5 paragraph technical summary covering: overall codebase health, mai
     const risks = buildEngineeringRiskModel(record.analysis, record.analysis.graph, architecture, ignoredRiskIds);
 
     if (options.generateAi) {
-      const prompt = `You are a senior technical lead reviewing engineering health metrics.
-Overall Score: ${risks.score}
-Critical Risks: ${risks.risks.filter(r => r.severity === 'critical').length}
-High Risks: ${risks.risks.filter(r => r.severity === 'high').length}
-Total Hotspots: ${risks.hotspots.length}
-
-Please provide a 2-3 paragraph interpretation of these metrics, highlighting what the most critical areas of concern might be and what a general mitigation strategy should look like.
-Format the output as JSON with the following structure:
-{
-  "summary": "High level interpretation text",
-  "limitations": "Potential limitations or risks text"
-}`;
+      const prompt = ContextOrchestrator.buildRisksPrompt(risks);
       const aiResponse = await api.post('/ai/chat', { prompt, jsonMode: true });
       let insights = null;
       try {
@@ -569,24 +533,7 @@ Format the output as JSON with the following structure:
     const candidate = refactoring.candidates.find(c => c.id === candidateId);
     if (!candidate) throw new Error('Candidate not found');
 
-    const prompt = `You are an expert software architect. Analyze the following refactoring candidate and provide a detailed strategy.
-Title: ${candidate.title}
-Summary: ${candidate.summary}
-Affected Files: ${candidate.files?.join(', ')}
-Severity: ${candidate.severity}
-
-Generate a structured JSON response matching this exact schema:
-{
-  "summary": "A 1-paragraph summary of the approach",
-  "recommendations": [
-    {
-      "strategy": "Name of the strategy",
-      "reasoning": "Why this is recommended",
-      "steps": ["Step 1", "Step 2"]
-    }
-  ],
-  "limitations": ["Risk 1", "Limitation 1"]
-}`;
+    const prompt = ContextOrchestrator.buildRefactoringStrategyPrompt(candidate);
 
     const res = await api.post('/ai/chat', { prompt, jsonMode: true });
     let insights;
@@ -647,12 +594,60 @@ Generate a structured JSON response matching this exact schema:
     const originalCode = await persistenceStore.loadFile(repoId, targetFile);
     if (!originalCode) throw new Error(`Could not load source file ${targetFile}`);
     
-    // Analyze downstream impact to ensure integration safety
+    // Phase 2: AST Snippet Slicing
+    let slicedCode = originalCode;
+    let snippetContext = "";
+    if (candidate.fileRanges && candidate.fileRanges[targetFile]) {
+      const range = candidate.fileRanges[targetFile];
+      if (range.startLine && range.endLine) {
+        const lines = originalCode.split('\n');
+        const buffer = 5;
+        const start = Math.max(0, range.startLine - 1 - buffer);
+        const end = Math.min(lines.length, range.endLine + buffer);
+        slicedCode = lines.slice(start, end).join('\n');
+        snippetContext = `(Showing target lines ${start + 1} to ${end})`;
+      }
+    }
+
+    // Phase 2b: Cross-File Clone Sibling Injection
+    // If this is a clone, provide the other file's snippet so the AI can generalize the abstraction.
+    let siblingContextText = "";
+    if (candidate.title && candidate.title.includes('Clone') && candidate.files && candidate.files.length > 1) {
+      const siblingFile = candidate.files.find(f => f !== targetFile);
+      if (siblingFile) {
+        try {
+          const siblingCode = await persistenceStore.loadFile(repoId, siblingFile);
+          if (siblingCode && candidate.fileRanges && candidate.fileRanges[siblingFile]) {
+            const sRange = candidate.fileRanges[siblingFile];
+            if (sRange.startLine && sRange.endLine) {
+              const sLines = siblingCode.split('\n');
+              const sStart = Math.max(0, sRange.startLine - 1 - 5);
+              const sEnd = Math.min(sLines.length, sRange.endLine + 5);
+              const sSliced = sLines.slice(sStart, sEnd).join('\n');
+              siblingContextText = `\n\nCross-File Clone Sibling Context:\nThe following code in ${siblingFile} is identical to the target snippet. Please ensure your refactoring approach generalizes both use cases (e.g., by extracting a shared utility).\n\`\`\`\n${sSliced}\n\`\`\``;
+            }
+          }
+        } catch (e) {
+          console.warn('Could not load sibling clone file for context', e);
+        }
+      }
+    }
+    
+    // Phase 3: Graph Context (Signatures)
     let impactConstraints = '';
     try {
       const impact = analyzeChangeImpact(record.analysis, record.analysis.graph, [targetFile]);
       if (impact.directlyAffectedFiles && impact.directlyAffectedFiles.length > 0) {
-        impactConstraints = `\nCRITICAL INTEGRATION CONSTRAINTS:\nThe following ${impact.directlyAffectedFiles.length} downstream file(s) depend on this module:\n${impact.directlyAffectedFiles.map(f => `- ${f}`).join('\n')}\n\nYou MUST preserve all existing exported function/class signatures, argument orders, and public APIs. If you rename or remove an export, you will break the build.`;
+        const depSignatures = [];
+        for (const depFile of impact.directlyAffectedFiles) {
+          const fileMeta = record.analysis.files.find(f => f.filePath === depFile);
+          if (fileMeta && fileMeta.exports && fileMeta.exports.length > 0) {
+            depSignatures.push(`- ${depFile}: ${fileMeta.exports.map(e => e.name || e.id).join(', ')}`);
+          } else {
+            depSignatures.push(`- ${depFile}`);
+          }
+        }
+        impactConstraints = `\nCRITICAL INTEGRATION CONSTRAINTS:\nThe following ${impact.directlyAffectedFiles.length} downstream file(s) depend on this module. You MUST preserve all existing exported function/class signatures, argument orders, and public APIs:\n${depSignatures.join('\n')}`;
       }
     } catch (e) {
       console.warn("Could not calculate downstream impact for constraints", e);
@@ -673,33 +668,30 @@ Generate a structured JSON response matching this exact schema:
       }
     }
     
-    const prompt = `You are an expert AI software architect. Please refactor the following file to resolve the issue: "${candidate.title}".
-Category: ${candidate.type}
-Description: ${candidate.summary}
-${specificEvidenceText}
-${impactConstraints}
-
-Recommended Strategies:
-${strategiesText}
-
-Please provide ONLY the fully refactored source code inside a markdown code block (e.g. \`\`\`javascript ... \`\`\`). Do not include explanations outside the code block.
-
-File: ${targetFile}
-Original Code:
-\`\`\`
-${originalCode}
-\`\`\`
-`;
+    // Append sibling clone context to the evidence if it exists
+    if (siblingContextText) {
+      specificEvidenceText += siblingContextText;
+    }
+    
+    const prompt = ContextOrchestrator.buildAutoFixPrompt(candidate, targetFile, slicedCode, impactConstraints, specificEvidenceText, strategiesText, snippetContext);
 
     const res = await api.post(`/ai/chat`, { prompt });
     const responseText = res.data?.response || res.data || '';
     
-    let refactoredCode = responseText;
+    let refactoredChunk = responseText;
     const codeBlockMatch = responseText.match(/```[a-z]*\n([\s\S]*?)\n```/);
     if (codeBlockMatch) {
-      refactoredCode = codeBlockMatch[1];
+      refactoredChunk = codeBlockMatch[1];
     } else {
-      refactoredCode = responseText;
+      refactoredChunk = responseText;
+    }
+
+    // Phase 4: Apply the chunk replacement to get the full refactored file
+    let refactoredCode = originalCode;
+    if (slicedCode && slicedCode !== originalCode) {
+      refactoredCode = originalCode.replace(slicedCode, refactoredChunk);
+    } else {
+      refactoredCode = refactoredChunk;
     }
 
     return { data: { originalCode, refactoredCode, file: targetFile } };
@@ -721,19 +713,7 @@ ${originalCode}
     const originalCode = await persistenceStore.loadFile(repoId, targetFile);
     if (!originalCode) throw new Error(`Could not load source file ${targetFile}`);
     
-    const prompt = `You are an expert Software Engineer in Test (SDET). We are planning to refactor the following file to resolve an issue ("${candidate.title}"). 
-To ensure safety, we need baseline tests BEFORE refactoring.
-
-Please write a comprehensive suite of unit tests (using Jest or similar standard testing framework) for the current implementation of this file. Focus on capturing the existing behavior.
-
-Please provide ONLY the fully working test code inside a markdown code block (e.g. \`\`\`javascript ... \`\`\`). Do not include explanations outside the code block.
-
-File: ${targetFile}
-Original Code:
-\`\`\`
-${originalCode}
-\`\`\`
-`;
+    const prompt = ContextOrchestrator.buildGenerateTestsPrompt(candidate, targetFile, originalCode);
 
     const res = await api.post(`/ai/chat`, { prompt });
     const responseText = res.data?.response || res.data || '';
@@ -751,27 +731,23 @@ ${originalCode}
 
   // ── AI Prompt Endpoints ──────────────────────────────────────────────────────
   /**
-   * It maps the active file context, then extracts local database loaders, 
-   * and then it applies the context builder to proxy structured prompts to the LLM.
+   * Builds the deterministic context (facts, files) without sending to the AI.
+   * Useful for the Context Inspector UX.
    */
-  async askQuestion(id, question, activeContext, history = [], options = {}) {
+  async buildAIContext(id, question, activeContext) {
     const record = await repositoryStore.get(id);
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Analysis not available');
 
-    // On follow-up turns, skip the expensive context rebuild entirely.
-    // The server-side formatWithHistory() will prepend prior turns so the model
-    // already has grounding — re-scoring every file on each message is pure waste.
-    const isFirstTurn = !history || history.length === 0;
-    const reqOptions = options.signal ? { signal: options.signal } : {};
-
-    if (!isFirstTurn) {
-      return api.post(`/ai/chat`, { prompt: question, history }, reqOptions);
-    }
-
-    // First turn only: build full deterministic context and attach it to the prompt.
     const fileLoaderCallback = (path) => persistenceStore.loadFile(id, path);
     const { contextData } = await buildQuestionContext(record.analysis, question, fileLoaderCallback, activeContext);
     
+    return contextData;
+  },
+
+  /**
+   * Sends the fully built context to the AI proxy.
+   */
+  async askQuestionWithContext(contextData, question, history = [], options = {}) {
     const promptContext = {
        question,
        repository: contextData.meta,
@@ -780,12 +756,29 @@ ${originalCode}
     };
     const rawPrompt = buildPrompt(promptContext);
     
-    const fullPrompt = contextData.facts.length > 0 
+    const fullPrompt = contextData.facts && contextData.facts.length > 0 
       ? `Facts:\n${contextData.facts.join('\n')}\n\n${rawPrompt}` 
       : rawPrompt;
 
+    const reqOptions = options.signal ? { signal: options.signal } : {};
     return api.post(`/ai/chat`, { prompt: fullPrompt, history }, reqOptions);
   },
+
+  /**
+   * Legacy wrapper for standard flow.
+   */
+  async askQuestion(id, question, activeContext, history = [], options = {}) {
+    const isFirstTurn = !history || history.length === 0;
+    const reqOptions = options.signal ? { signal: options.signal } : {};
+
+    if (!isFirstTurn) {
+      return api.post(`/ai/chat`, { prompt: question, history }, reqOptions);
+    }
+
+    const contextData = await this.buildAIContext(id, question, activeContext);
+    return this.askQuestionWithContext(contextData, question, history, options);
+  },
+
 
   async getOverviewDocumentation(id, options = {}) {
     const record = await repositoryStore.get(id);
@@ -821,25 +814,7 @@ ${originalCode}
     const cached = await aiArtifactStore.get(cacheKey, analysisVersion);
     if (cached) return { data: cached };
 
-    const prompt = `You are a Principal Software Architect. Given the following engineering/architecture finding, draft an Architecture Decision Record (ADR) that addresses this issue.
-
-Context:
-Title: ${findingContext.title}
-Category: ${findingContext.category}
-Severity: ${findingContext.severity}
-Description: ${findingContext.description}
-File/Evidence: ${findingContext.file || findingContext.evidence || 'N/A'}
-
-Produce a structured JSON response matching this exact schema:
-{
-  "title": "A short, concise title for the ADR",
-  "status": "Proposed",
-  "context": "Background and description of the current situation and the finding.",
-  "decision": "The proposed change or decision to resolve the issue.",
-  "consequences": "Positive and negative consequences of this decision.",
-  "alternatives": "Other options that were considered and why they were rejected.",
-  "evidence": "References to the specific finding, file, or architectural rule."
-}`;
+    const prompt = ContextOrchestrator.buildADRPrompt(findingContext);
 
     const aiResponse = await api.post('/ai/chat', { prompt, jsonMode: true });
     let adr = null;

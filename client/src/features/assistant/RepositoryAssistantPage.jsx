@@ -13,6 +13,7 @@ import AiMarkdown from '../../shared/components/ai/AiMarkdown';
 import { useRepository } from '../../shared/context/RepositoryContext';
 import { useAI } from '../../shared/context/AIContext';
 import ChatInputArea from './ChatInputArea';
+import ContextInspector from './ContextInspector';
 
 export default function RepositoryAssistantPage() {
   const { repoId } = useParams();
@@ -24,7 +25,11 @@ export default function RepositoryAssistantPage() {
    * It initializes the AI state manager, then extracts IndexedDB chat histories, 
    * and then it applies automatic message syncing for the assistant feature.
    */
-  const { messages, isLoading, error: chatError, sendMessage, clearHistory, effectiveState, stopGeneration } = useAI({ 
+  const { 
+    messages, isLoading, loadingState, error: chatError, 
+    pendingContextPayload, confirmPendingContext, cancelPendingContext,
+    sendMessage, clearHistory, effectiveState, stopGeneration 
+  } = useAI({ 
     repoId, 
     feature: 'assistant', 
     contextData: null 
@@ -187,7 +192,7 @@ export default function RepositoryAssistantPage() {
             <ChatMessage key={i} msg={msg} repoId={repoId} />
           ))}
 
-          {isLoading && <ThinkingIndicator onStop={stopGeneration} />}
+          {isLoading && <ThinkingIndicator onStop={stopGeneration} loadingState={loadingState} />}
           
           {chatError && (
              <div className="flex items-center gap-3 text-danger bg-danger/10 border border-danger/20 rounded-lg p-4 self-start">
@@ -203,6 +208,15 @@ export default function RepositoryAssistantPage() {
       {/* ── Input Area ─────────────────────────────────────────────────────── */}
       <div className="bg-panel/80 border-t border-border p-4 shrink-0" style={{ backdropFilter: 'blur(8px)' }}>
         <div className="max-w-4xl mx-auto flex flex-col gap-2">
+          
+          {pendingContextPayload && (
+            <ContextInspector 
+              contextData={pendingContextPayload.builtContext} 
+              onConfirm={confirmPendingContext}
+              onCancel={cancelPendingContext}
+            />
+          )}
+
           <ChatInputArea
             ref={chatInputRef}
             repoId={repoId}
@@ -248,7 +262,7 @@ export default function RepositoryAssistantPage() {
   );
 }
 
-function ThinkingIndicator({ onStop }) {
+function ThinkingIndicator({ onStop, loadingState }) {
   const PHASES = [
     'Thinking…',
     'Reading context…',
@@ -256,6 +270,11 @@ function ThinkingIndicator({ onStop }) {
     'Synthesising response…',
     'Almost there…',
   ];
+  
+  let currentStatusStr = '';
+  if (loadingState === 'gathering_dependencies') currentStatusStr = 'Building context payload…';
+  else if (loadingState === 'waiting_for_ai') currentStatusStr = 'Waiting for AI response…';
+
   const [phase, setPhase] = useState(0);
   const [dots, setDots] = useState(0);
 
@@ -287,7 +306,7 @@ function ThinkingIndicator({ onStop }) {
 
         {/* Phase text + dots */}
         <span className="text-sm text-text/70 tabular-nums" style={{ minWidth: 160 }}>
-          {PHASES[phase]}<span className="text-accent/60" style={{ letterSpacing: 2 }}>{dotStr}</span>
+          {currentStatusStr || PHASES[phase]}<span className="text-accent/60" style={{ letterSpacing: 2 }}>{dotStr}</span>
         </span>
 
         {/* Three bouncing dots */}
