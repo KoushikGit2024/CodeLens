@@ -65,6 +65,17 @@ class ProviderUnavailableError extends Error {
   }
 }
 
+// ── Token Estimation Fallback ──────────────────────────────────────────────────
+
+/**
+ * Fallback token estimator if the API provider doesn't return exact token counts.
+ * Uses a standard 4 characters per token heuristic (approx. cl100k_base).
+ */
+function estimateTokens(text) {
+  if (!text || typeof text !== 'string') return 0;
+  return Math.ceil(text.length / 4);
+}
+
 // ── Generic LLM provider ──────────────────────────────────────────────────────
 const LLM_DEFAULT_URL      = 'https://api.your-provider.com';
 const LLM_DEFAULT_MODEL    = 'generic-llm-instruct-v2';
@@ -133,13 +144,17 @@ async function genericLlmProvider(prompt) {
   if (typeof text !== 'string') {
     throw new Error(`Unexpected LLM response shape: ${data.slice(0, 200)}`);
   }
+  
+  const estimatedInput = estimateTokens(prompt);
+  const estimatedOutput = estimateTokens(text);
+  
   return {
     text: text.trim(),
     usage: {
-      input_tokens: result?.input_token_count ?? null,
-      output_tokens: result?.generated_token_count ?? null,
-      total_tokens: (result?.input_token_count ?? 0) + (result?.generated_token_count ?? 0) || null,
-      source: 'provider_reported',
+      input_tokens: result?.input_token_count ?? estimatedInput,
+      output_tokens: result?.generated_token_count ?? estimatedOutput,
+      total_tokens: (result?.input_token_count ?? estimatedInput) + (result?.generated_token_count ?? estimatedOutput),
+      source: result?.input_token_count != null ? 'provider_reported' : 'estimated',
     },
   };
 }
@@ -165,13 +180,18 @@ async function geminiProvider(prompt) {
   
   if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
     const usageMeta = data.usageMetadata || {};
+    const text = data.candidates[0].content.parts[0].text.trim();
+    
+    const estimatedInput = estimateTokens(prompt);
+    const estimatedOutput = estimateTokens(text);
+    
     return {
-      text: data.candidates[0].content.parts[0].text.trim(),
+      text: text,
       usage: {
-        input_tokens: usageMeta.promptTokenCount ?? null,
-        output_tokens: usageMeta.candidatesTokenCount ?? null,
-        total_tokens: usageMeta.totalTokenCount ?? null,
-        source: usageMeta.totalTokenCount != null ? 'provider_reported' : null,
+        input_tokens: usageMeta.promptTokenCount ?? estimatedInput,
+        output_tokens: usageMeta.candidatesTokenCount ?? estimatedOutput,
+        total_tokens: usageMeta.totalTokenCount ?? (estimatedInput + estimatedOutput),
+        source: usageMeta.totalTokenCount != null ? 'provider_reported' : 'estimated',
       },
     };
   }
@@ -204,13 +224,18 @@ async function openAiCompatibleProvider(prompt) {
   
   if (data.choices && data.choices[0]?.message?.content) {
     const usage = data.usage || {};
+    const text = data.choices[0].message.content.trim();
+    
+    const estimatedInput = estimateTokens(prompt);
+    const estimatedOutput = estimateTokens(text);
+    
     return {
-      text: data.choices[0].message.content.trim(),
+      text: text,
       usage: {
-        input_tokens: usage.prompt_tokens ?? null,
-        output_tokens: usage.completion_tokens ?? null,
-        total_tokens: usage.total_tokens ?? null,
-        source: usage.total_tokens != null ? 'provider_reported' : null,
+        input_tokens: usage.prompt_tokens ?? estimatedInput,
+        output_tokens: usage.completion_tokens ?? estimatedOutput,
+        total_tokens: usage.total_tokens ?? (estimatedInput + estimatedOutput),
+        source: usage.total_tokens != null ? 'provider_reported' : 'estimated',
       },
     };
   }
@@ -243,13 +268,18 @@ async function groqProvider(prompt) {
   
   if (data.choices && data.choices[0]?.message?.content) {
     const usage = data.usage || {};
+    const text = data.choices[0].message.content.trim();
+    
+    const estimatedInput = estimateTokens(prompt);
+    const estimatedOutput = estimateTokens(text);
+    
     return {
-      text: data.choices[0].message.content.trim(),
+      text: text,
       usage: {
-        input_tokens: usage.prompt_tokens ?? null,
-        output_tokens: usage.completion_tokens ?? null,
-        total_tokens: usage.total_tokens ?? null,
-        source: usage.total_tokens != null ? 'provider_reported' : null,
+        input_tokens: usage.prompt_tokens ?? estimatedInput,
+        output_tokens: usage.completion_tokens ?? estimatedOutput,
+        total_tokens: usage.total_tokens ?? (estimatedInput + estimatedOutput),
+        source: usage.total_tokens != null ? 'provider_reported' : 'estimated',
       },
     };
   }

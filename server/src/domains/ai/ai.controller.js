@@ -3,6 +3,10 @@
 const aiProvider = require('../../core/ai/ai.provider');
 const aiService = require('../../core/ai/ai.service');
 const { recordUsage } = require('../../core/auth/usage.recorder');
+const crypto = require('crypto');
+
+// In-memory job store for async AI requests
+const activeJobs = new Map();
 
 function isSupabaseAvailable() {
   return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -26,12 +30,9 @@ function formatWithHistory(prompt, history) {
 
 /**
  * Handle AI prompt generation (Proxy to AI Provider)
- * Now requires req.user (authMiddleware) and req.quota (quotaMiddleware).
- * Every outcome — success, provider failure, or unexpected error — is logged
- * via recordUsage() so usage_periods stays accurate even on failure paths.
+ * Converts to Async Webhook pattern to prevent frontend timeouts.
  */
 async function generateChat(req, res, next) {
-  const startedAt = Date.now();
   const { prompt, history, jsonMode, feature } = req.body;
 
   if (!prompt) {
@@ -42,36 +43,53 @@ async function generateChat(req, res, next) {
     ? formatWithHistory(prompt, history)
     : prompt;
 
+  const jobId = crypto.randomUUID();
+  activeJobs.set(jobId, { status: 'processing', result: null, error: null });
+
+  // Return immediately to frontend
+  res.status(202).json({ jobId, status: 'processing' });
+
+  // Process AI request in the background
+  processAiJob(jobId, req, finalPrompt, jsonMode, feature).catch(err => {
+    console.error(`[AI Job ${jobId}] Unhandled background error:`, err);
+  });
+}
+
+async function processAiJob(jobId, req, finalPrompt, jsonMode, feature) {
+  const startedAt = Date.now();
   try {
     if (jsonMode) {
       const json = await aiService.generateStructuredResponse(finalPrompt);
       const responseText = JSON.stringify(json);
+      const estimatedInput = finalPrompt.length / 4;
+      const estimatedOutput = responseText.length / 4;
 
       await recordUsage(req, {
         provider: aiProvider.getProviderName(),
         feature: feature || 'chat_json',
         status: 'success',
+        usage: { input_tokens: estimatedInput, output_tokens: estimatedOutput, total_tokens: estimatedInput + estimatedOutput, source: 'estimated' },
         promptChars: finalPrompt.length,
         responseChars: responseText.length,
         latencyMs: Date.now() - startedAt,
       });
 
-      return res.json({ response: responseText });
+      activeJobs.set(jobId, { status: 'completed', result: responseText });
+    } else {
+      const { text, usage } = await aiProvider.generateAnswer(finalPrompt);
+
+      await recordUsage(req, {
+        provider: aiProvider.getProviderName(),
+        feature: feature || 'chat',
+        status: 'success',
+        usage: usage,
+        promptChars: finalPrompt.length,
+        responseChars: text.length,
+        latencyMs: Date.now() - startedAt,
+      });
+
+      activeJobs.set(jobId, { status: 'completed', result: text });
     }
-
-    const responseText = await aiProvider.generateAnswer(finalPrompt);
-
-    await recordUsage(req, {
-      provider: aiProvider.getProviderName(),
-      feature: feature || 'chat',
-      status: 'success',
-      promptChars: finalPrompt.length,
-      responseChars: responseText.length,
-      latencyMs: Date.now() - startedAt,
-    });
-
-    return res.json({ response: responseText });
-
   } catch (error) {
     const isUnavailable = error.name === 'ProviderUnavailableError' || error.statusCode === 503;
 
@@ -84,12 +102,30 @@ async function generateChat(req, res, next) {
       errorMessage: error.message,
     });
 
-    if (isUnavailable) {
-      return res.status(503).json({ error: error.message });
-    }
-    console.error('[AI Provider Error]', error);
-    return res.status(500).json({ error: error.message || 'An unexpected error occurred during AI generation.' });
+    activeJobs.set(jobId, { 
+      status: 'failed', 
+      error: isUnavailable ? 'AI providers are currently unavailable due to high demand.' : error.message 
+    });
   }
+
+  // Cleanup job after 1 hour to prevent memory leaks
+  setTimeout(() => {
+    activeJobs.delete(jobId);
+  }, 60 * 60 * 1000);
+}
+
+/**
+ * Poll endpoint for the frontend to check job status.
+ */
+function getJobStatus(req, res) {
+  const { jobId } = req.params;
+  const job = activeJobs.get(jobId);
+  
+  if (!job) {
+    return res.status(404).json({ error: 'Job not found or expired.' });
+  }
+  
+  return res.json(job);
 }
 
 /**
@@ -171,4 +207,5 @@ module.exports = {
   generateChat,
   healthCheck,
   statusCheck,
+  getJobStatus
 };

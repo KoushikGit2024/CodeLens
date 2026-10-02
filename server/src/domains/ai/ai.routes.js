@@ -16,4 +16,7 @@ router.get('/health', aiController.healthCheck);
 // New: auth-aware status endpoint for the client AI state machine (Phase 5).
 router.get('/status', authMiddleware, aiController.statusCheck);
 
+// New: Async job polling endpoint
+router.get('/job/:jobId', authMiddleware, aiController.getJobStatus);
+
 module.exports = router;
