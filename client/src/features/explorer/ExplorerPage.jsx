@@ -117,6 +117,16 @@ export default function ExplorerPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const { addToast } = useToast();
 
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const [mobileTreeOpen, setMobileTreeOpen] = useState(false);
+  const [mobileAiOpen, setMobileAiOpen] = useState(false);
+
   // URL is the single source of truth
   const selectedPath = searchParams.get('path');
   const viewMode = searchParams.get('view') || 'source';
@@ -503,14 +513,24 @@ export default function ExplorerPage() {
         <div className="flex-1 overflow-y-auto overflow-x-auto p-3 custom-scrollbar bg-panel flex flex-col">
           <div className="flex items-center justify-between mb-2 px-1 shrink-0">
             <p className="text-xs text-muted uppercase tracking-wider">Files</p>
-            <button 
-              onClick={handleIncrementalAnalyze}
-              disabled={reanalyzing}
-              className="text-muted hover:text-text transition-colors"
-              title="Refresh File Tree"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${reanalyzing ? 'animate-spin' : ''}`} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={handleIncrementalAnalyze}
+                disabled={reanalyzing}
+                className="text-muted hover:text-text transition-colors p-1"
+                title="Refresh File Tree"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${reanalyzing ? 'animate-spin' : ''}`} />
+              </button>
+              {isMobile && (
+                <button 
+                  onClick={() => setMobileTreeOpen(false)} 
+                  className="xl:hidden p-1 bg-surface/50 rounded text-muted hover:text-text border border-border/50 shrink-0"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
           <div className="px-1 mb-3 shrink-0">
             <input 
@@ -525,7 +545,10 @@ export default function ExplorerPage() {
             <FileTree
               nodes={fileTree}
               selectedPath={selectedPath}
-              onSelectFile={(p) => openFile(p)}
+              onSelectFile={(p) => {
+                openFile(p);
+                setMobileTreeOpen(false);
+              }}
               searchTerm={searchTerm}
             />
           </div>
@@ -551,6 +574,9 @@ export default function ExplorerPage() {
             moduleDocs={moduleDocs}
             onGenerateAi={handleGenerateAi}
             isGeneratingAi={isGeneratingAi}
+            isMobile={isMobile}
+            onOpenMobileTree={() => setMobileTreeOpen(true)}
+            onOpenMobileAi={() => setMobileAiOpen(true)}
           />
         </div>
       )
@@ -575,6 +601,7 @@ export default function ExplorerPage() {
             onHighlightRange={(filePath, start, end) => {
               openFile(filePath).then(() => highlightRange(start, end));
             }}
+            onMobileClose={isMobile ? () => setMobileAiOpen(false) : null}
           />
         </div>
       )
@@ -582,7 +609,29 @@ export default function ExplorerPage() {
   }
 
   return (
-    <ResizableLayout panels={panels} />
+    <>
+      <ResizableLayout panels={isMobile ? [panels[1]] : panels} />
+
+      {/* Mobile File Tree Drawer */}
+      {isMobile && (
+        <div className={`fixed inset-0 z-[100] transition-opacity ${mobileTreeOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setMobileTreeOpen(false)} />
+          <div className={`absolute top-0 left-0 bottom-0 w-[85%] max-w-sm bg-panel border-r border-border transform transition-transform duration-300 ${mobileTreeOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col`}>
+             {panels[0].content}
+          </div>
+        </div>
+      )}
+
+      {/* Mobile AI Panel Drawer */}
+      {isMobile && viewMode !== 'docs' && (
+        <div className={`fixed inset-0 z-[100] transition-opacity ${mobileAiOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setMobileAiOpen(false)} />
+          <div className={`absolute top-0 right-0 bottom-0 w-[85%] max-w-sm bg-panel border-l border-border transform transition-transform duration-300 ${mobileAiOpen ? 'translate-x-0' : 'translate-x-full'} flex flex-col`}>
+             {panels[panels.length - 1].content}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -595,7 +644,7 @@ export default function ExplorerPage() {
  *   error   — fetch failed
  *   editor  — Monaco
  */
-function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMount, viewMode, setViewMode, moduleDocs, onGenerateAi, isGeneratingAi }) {
+function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMount, viewMode, setViewMode, moduleDocs, onGenerateAi, isGeneratingAi, isMobile, onOpenMobileTree, onOpenMobileAi }) {
   const { theme } = useTheme();
   const [copied, setCopied] = useState(false);
   const bookmark = useBookmark(repoId, filePath);
@@ -634,34 +683,48 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
 
   if (!filePath) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-muted gap-2">
-        <File className="w-8 h-8 opacity-30" />
+      <div className="flex-1 flex flex-col items-center justify-center text-muted gap-4">
+        <File className="w-12 h-12 opacity-30" />
         <p className="text-sm">Select a file from the tree to view its contents</p>
+        {isMobile && (
+          <button 
+            onClick={onOpenMobileTree}
+            className="px-4 py-2 bg-accent/10 text-accent rounded hover:bg-accent/20 text-sm font-medium transition-colors flex items-center gap-2"
+          >
+            <FolderTree className="w-4 h-4" /> Browse Files
+          </button>
+        )}
       </div>
     );
   }
 
   const header = (
-    <div className="flex items-center justify-between px-4 pt-2 bg-panel border-b border-border shadow-sm shrink-0 z-10 relative">
+    <div className="flex items-center justify-between px-2 sm:px-4 pt-2 bg-panel border-b border-border shadow-sm shrink-0 z-10 relative">
       {loading && fileContent && (
         <div className="absolute bottom-0 left-0 h-0.5 bg-accent animate-pulse w-full z-20"></div>
       )}
-      <div className="flex-1"></div>
-      <div className="flex items-center gap-6">
+      <div className="flex items-center flex-1">
+        {isMobile && (
+          <button onClick={onOpenMobileTree} className="mr-2 text-muted hover:text-text p-1.5 rounded hover:bg-surface">
+            <FolderTree className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+      <div className="flex items-center gap-2 sm:gap-6 justify-center">
         <button 
           onClick={() => setViewMode('source')} 
-          className={`px-4 py-2 text-xs font-medium border-b-2 transition-all ${viewMode === 'source' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-text hover:border-border'}`}
+          className={`px-2 sm:px-4 py-2 text-[11px] sm:text-xs font-medium border-b-2 transition-all whitespace-nowrap ${viewMode === 'source' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-text hover:border-border'}`}
         >
           Source Code
         </button>
         <button 
           onClick={() => setViewMode('docs')} 
-          className={`px-4 py-2 text-xs font-medium border-b-2 transition-all ${viewMode === 'docs' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-text hover:border-border'}`}
+          className={`px-2 sm:px-4 py-2 text-[11px] sm:text-xs font-medium border-b-2 transition-all whitespace-nowrap ${viewMode === 'docs' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-text hover:border-border'}`}
         >
           Documentation
         </button>
       </div>
-      <div className="flex-1 flex justify-end gap-2">
+      <div className="flex-1 flex justify-end gap-1 sm:gap-2">
         <button
           onClick={handleToggleBookmark}
           className={`flex items-center gap-1.5 px-2 py-1 mb-1 rounded text-xs transition-colors ${bookmark ? 'text-accent hover:bg-accent/10' : 'text-muted hover:text-text hover:bg-text/10'}`}
@@ -669,7 +732,7 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
         >
           <Bookmark className="w-3.5 h-3.5" fill={bookmark ? "currentColor" : "none"} />
         </button>
-        {viewMode === 'source' && fileContent?.content && (
+        {viewMode === 'source' && fileContent?.content && !isMobile && (
           <button 
             onClick={handleCopyCode}
             className="flex items-center gap-1.5 px-2 py-1 mb-1 rounded text-xs text-muted hover:text-text hover:bg-text/10 transition-colors"
@@ -677,6 +740,11 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
           >
             {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
             {copied ? <span className="text-green-400">Copied!</span> : <span>Copy</span>}
+          </button>
+        )}
+        {isMobile && viewMode !== 'docs' && (
+          <button onClick={onOpenMobileAi} className="ml-1 mb-1 text-accent hover:text-accent p-1.5 rounded bg-accent/10">
+            <Sparkles className="w-4 h-4" />
           </button>
         )}
       </div>
@@ -815,7 +883,7 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
 
 // ── AI Q&A Panel ──────────────────────────────────────────────────────────────
 
-function AiPanel({ repoId, onOpenFile, onHighlightRange, getActiveContext }) {
+function AiPanel({ repoId, onOpenFile, onHighlightRange, getActiveContext, onMobileClose }) {
   const [messages,  setMessages]  = useState([]);
   const [question,  setQuestion]  = useState('');
   const [loading,   setLoading]   = useState(false);
@@ -859,8 +927,13 @@ function AiPanel({ repoId, onOpenFile, onHighlightRange, getActiveContext }) {
 
   return (
     <>
-      <div className="h-10 flex items-center px-3 border-b border-border shrink-0">
+      <div className="h-10 flex items-center justify-between px-3 border-b border-border shrink-0">
         <span className="text-xs text-muted uppercase tracking-wider">Ask about this repo</span>
+        {onMobileClose && (
+          <button onClick={onMobileClose} className="xl:hidden p-1 bg-surface/50 rounded text-muted hover:text-text border border-border/50 shrink-0">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3">

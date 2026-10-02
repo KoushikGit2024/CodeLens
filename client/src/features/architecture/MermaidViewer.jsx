@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
-import { Copy, Download, AlertCircle } from 'lucide-react';
+import { Copy, Download, AlertCircle, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 import { useToast } from '../../shared/context/ToastContext';
 import { useTheme } from '../../shared/context/ThemeContext';
 
@@ -23,14 +23,12 @@ export default function MermaidViewer({ diagramStr, repoId }) {
   useEffect(() => {
     let isMounted = true;
     const renderDiagram = async () => {
-      if (!diagramStr || !containerRef.current) return;
+      if (!diagramStr) return;
       try {
         setError(null);
-        containerRef.current.innerHTML = '';
         const id = `mermaid-arch-${Date.now()}`;
         const { svg } = await mermaid.render(id, diagramStr);
         if (isMounted) {
-          containerRef.current.innerHTML = svg;
           setSvgContent(svg);
         }
       } catch (err) {
@@ -40,8 +38,13 @@ export default function MermaidViewer({ diagramStr, repoId }) {
       }
     };
     renderDiagram();
-    return () => { isMounted = false; };
   }, [diagramStr]);
+
+  const [zoom, setZoom] = useState(1);
+
+  const handleZoomIn = () => setZoom(z => z + 0.25);
+  const handleZoomOut = () => setZoom(z => Math.max(0.25, z - 0.25));
+  const handleResetZoom = () => setZoom(1);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(diagramStr);
@@ -75,7 +78,7 @@ export default function MermaidViewer({ diagramStr, repoId }) {
 
   return (
     <div className="flex flex-col h-full w-full relative group">
-      <div className="absolute top-4 right-4 z-10 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute bottom-20 sm:bottom-4 right-4 z-10 flex flex-col sm:flex-row items-end gap-2">
         <button onClick={handleCopy} className="p-2 bg-panel border border-border rounded shadow hover:bg-surface text-muted hover:text-text transition-colors" title="Copy Mermaid syntax">
           <Copy className="w-4 h-4" />
         </button>
@@ -87,15 +90,31 @@ export default function MermaidViewer({ diagramStr, repoId }) {
         </button>
       </div>
       
-      <div className="flex-1 overflow-auto p-8 custom-scrollbar flex items-start justify-center bg-surface/50 w-full h-full min-h-[600px]">
+      <div className="absolute bottom-20 sm:bottom-4 left-4 z-10 flex gap-2">
+        <button onClick={handleZoomOut} className="p-2 bg-panel border border-border rounded shadow hover:bg-surface text-muted hover:text-text transition-colors" title="Zoom Out">
+          <ZoomOut className="w-4 h-4" />
+        </button>
+        <button onClick={handleResetZoom} className="px-3 py-2 bg-panel border border-border rounded shadow hover:bg-surface text-xs font-medium text-muted hover:text-text flex items-center gap-1 transition-colors" title="Reset Zoom">
+          <Maximize className="w-3.5 h-3.5" /> {Math.round(zoom * 100)}%
+        </button>
+        <button onClick={handleZoomIn} className="p-2 bg-panel border border-border rounded shadow hover:bg-surface text-muted hover:text-text transition-colors" title="Zoom In">
+          <ZoomIn className="w-4 h-4" />
+        </button>
+      </div>
+      
+      <div className="flex-1 overflow-auto custom-scrollbar bg-surface/50 w-full h-full min-h-[600px] relative">
         {error ? (
-          <div className="flex flex-col items-center justify-center p-6 bg-danger/10 border border-danger/30 rounded-lg text-danger max-w-lg mt-10">
+          <div className="flex flex-col items-center justify-center p-6 bg-danger/10 border border-danger/30 rounded-lg text-danger max-w-lg mx-auto mt-10">
             <AlertCircle className="w-8 h-8 mb-2" />
             <span className="font-semibold mb-2">Mermaid Rendering Error</span>
             <pre className="text-[10px] bg-black/30 p-4 rounded w-full overflow-x-auto whitespace-pre-wrap">{error}</pre>
           </div>
         ) : (
-          <div ref={containerRef} className="mermaid-container w-full flex justify-center [&>svg]:max-w-full [&>svg]:h-auto" />
+          <div 
+            className="mermaid-container flex justify-center p-4 sm:p-8 min-w-max mx-auto transition-transform duration-200 origin-top-left [&>svg]:!max-w-none [&>svg]:h-auto" 
+            style={{ transform: `scale(${zoom})`, width: `${zoom * 100}%` }}
+            dangerouslySetInnerHTML={{ __html: svgContent }} 
+          />
         )}
       </div>
     </div>

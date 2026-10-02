@@ -165,23 +165,23 @@ export default function SemanticSearchPage() {
 
   if (!isInitialized) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-4 max-w-4xl mx-auto animate-in fade-in zoom-in duration-500">
-        
-        <div className="flex items-start gap-5 mb-6 bg-surface/30 p-5 rounded-xl border border-border/50">
-          <div className="w-16 h-16 shrink-0 bg-accent/10 border border-accent/20 rounded-xl flex items-center justify-center shadow-inner shadow-accent/5">
-            <Network className="w-8 h-8 text-accent" />
+      <div className="w-full h-full overflow-y-auto custom-scrollbar">
+        <div className="flex flex-col items-center justify-center min-h-full p-4 sm:p-6 max-w-4xl mx-auto animate-in fade-in zoom-in duration-500">
+        <div className="flex flex-col sm:flex-row items-start gap-5 mb-6 bg-surface/30 p-5 rounded-xl border border-border/50">
+          <div className="w-14 h-14 sm:w-16 sm:h-16 shrink-0 bg-accent/10 border border-accent/20 rounded-xl flex items-center justify-center shadow-inner shadow-accent/5">
+            <Network className="w-7 h-7 sm:w-8 sm:h-8 text-accent" />
           </div>
           <div className="text-left">
-            <h2 className="text-2xl font-medium tracking-tight text-text mb-2 flex items-center gap-3">
+            <h2 className="text-xl sm:text-2xl font-medium tracking-tight text-text mb-2 flex items-center gap-3">
               Semantic Search <span className="text-[10px] font-bold px-2 py-0.5 bg-accent/20 text-accent rounded border border-accent/30 uppercase tracking-wider">Pro</span>
             </h2>
-            <p className="text-muted text-base leading-relaxed">
+            <p className="text-muted text-sm sm:text-base leading-relaxed">
               Upgrade your search from exact keywords to natural language. Find where "user authentication happens" or "database connections are pooled" using a highly-optimized local AI model.
             </p>
           </div>
         </div>
 
-        <div className="bg-surface border border-border shadow-lg rounded-xl p-6 text-left mb-6 w-full grid grid-cols-2 gap-8">
+        <div className="bg-surface border border-border shadow-lg rounded-xl p-5 sm:p-6 text-left mb-6 w-full grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
           <div>
             <h4 className="text-sm font-semibold flex items-center gap-2 mb-4 text-text">
               <Info className="w-4 h-4 text-accent" /> Before you activate:
@@ -227,14 +227,14 @@ export default function SemanticSearchPage() {
               )}
             </div>
             
-            <label className="flex items-center gap-2 cursor-pointer pt-1">
+            <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 mt-2 transition-colors hover:bg-yellow-500/15">
               <input 
                 type="checkbox" 
                 checked={useBrowserCache} 
                 onChange={(e) => setUseBrowserCache(e.target.checked)}
-                className="w-4 h-4 rounded border-border bg-panel text-accent focus:ring-accent"
+                className="w-4 h-4 rounded border-yellow-500/50 bg-yellow-900/40 text-yellow-500 focus:ring-yellow-500/40 focus:ring-offset-0 cursor-pointer transition-colors"
               />
-              <span className="text-[13px] text-text">Cache model in browser storage for future use</span>
+              <span className="text-[13px] text-yellow-600 font-medium">Cache model in browser storage for future use</span>
             </label>
           </div>
         </div>
@@ -266,25 +266,29 @@ export default function SemanticSearchPage() {
             <Brain className="w-5 h-5" /> Initialize Semantic Engine
           </button>
         )}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col p-6 max-w-4xl mx-auto w-full animate-in fade-in duration-500">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 bg-accent/10 rounded-lg">
-          <Network className="w-6 h-6 text-accent" />
-        </div>
-        <div>
-          <h2 className="text-xl font-semibold flex items-center gap-2">
-            Semantic Search <span className="text-[10px] font-bold px-1.5 py-0.5 bg-accent/20 text-accent rounded flex items-center uppercase tracking-wider">Pro</span>
-          </h2>
-          <p className="text-xs text-muted">Ask what the code does, not just what it says.</p>
+    <div className="w-full h-full overflow-y-auto custom-scrollbar">
+      <div className="flex flex-col p-4 sm:p-6 max-w-4xl mx-auto w-full animate-in fade-in duration-500 min-h-full">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-accent/10 rounded-lg shrink-0">
+            <Network className="w-6 h-6 text-accent" />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              Semantic Search <span className="text-[10px] font-bold px-1.5 py-0.5 bg-accent/20 text-accent rounded flex items-center uppercase tracking-wider">Pro</span>
+            </h2>
+            <p className="text-xs text-muted">Ask what the code does, not just what it says.</p>
+          </div>
         </div>
         <button 
           onClick={handleClearCache}
-          className="ml-auto px-4 py-2 text-xs border border-red-500/50 text-red-500 rounded hover:bg-red-500/10 transition-colors"
+          className="w-full sm:w-auto sm:ml-auto px-4 py-2 text-xs border border-red-500/50 text-red-500 rounded hover:bg-red-500/10 transition-colors shrink-0"
         >
           Clear Cache & Models
         </button>
@@ -296,38 +300,38 @@ export default function SemanticSearchPage() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder='Try "Where is the payment gateway logic?"...'
-          className="w-full bg-panel border-2 border-border rounded-lg pl-14 pr-32 py-5 text-lg shadow-sm focus:outline-none focus:border-accent/50 focus:ring-4 focus:ring-accent/10 transition-all text-text placeholder:text-muted/50"
+          className="w-full bg-panel border-2 border-border rounded-lg pl-10 sm:pl-14 pr-24 sm:pr-32 py-4 sm:py-5 text-base sm:text-lg shadow-sm focus:outline-none focus:border-accent/50 focus:ring-4 focus:ring-accent/10 transition-all text-text placeholder:text-muted/50"
         />
-        <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-6 h-6 text-muted group-focus-within:text-accent transition-colors" />
+        <Search className="absolute left-3 sm:left-5 top-1/2 -translate-y-1/2 w-5 h-5 sm:w-6 sm:h-6 text-muted group-focus-within:text-accent transition-colors" />
         <button 
           type="submit"
           disabled={isSearching || !query.trim()}
-          className="absolute right-3 top-1/2 -translate-y-1/2 px-6 py-2.5 bg-surface hover:bg-accent hover:text-black border border-border hover:border-accent rounded-lg text-sm font-medium transition-all disabled:opacity-50 disabled:hover:bg-surface disabled:hover:text-text disabled:hover:border-border"
+          className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 px-4 sm:px-6 py-1.5 sm:py-2.5 bg-surface hover:bg-accent hover:text-black border border-border hover:border-accent rounded-lg text-xs sm:text-sm font-medium transition-all disabled:opacity-50 disabled:hover:bg-surface disabled:hover:text-text disabled:hover:border-border"
         >
-          {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Search'}
+          {isSearching ? <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" /> : 'Search'}
         </button>
       </form>
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-3 pb-6">
+      <div className="flex flex-col gap-3 pb-6">
         {results.length > 0 ? (
           results.map((res, i) => (
             <div 
               key={i} 
               onClick={() => navigate(`/explore/${repoId}/source?path=${encodeURIComponent(res.filePath)}`)}
-              className="bg-panel border border-border rounded-lg p-4 flex items-center justify-between hover:border-accent/50 hover:bg-surface transition-all cursor-pointer group"
+              className="bg-panel border border-border rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-accent/50 hover:bg-surface transition-all cursor-pointer group"
             >
-              <div className="flex items-center gap-4 truncate">
+              <div className="flex items-center gap-3 min-w-0">
                 <FileCode2 className="w-5 h-5 text-muted group-hover:text-accent transition-colors shrink-0" />
                 <span className="font-medium text-sm truncate group-hover:text-text transition-colors">
                   {res.filePath}
                 </span>
               </div>
-              <div className="flex items-center gap-3 shrink-0 ml-4">
-                <div className="flex flex-col items-end">
+              <div className="flex items-center gap-3 shrink-0 sm:ml-4">
+                <div className="flex flex-row sm:flex-col items-center sm:items-end gap-3 sm:gap-0">
                   <span className="text-xs font-medium text-accent">
                     {(res.score * 100).toFixed(1)}% Match
                   </span>
-                  <div className="w-20 h-1.5 bg-surface rounded-full mt-1 overflow-hidden">
+                  <div className="w-20 h-1.5 bg-surface rounded-full sm:mt-1 overflow-hidden">
                     <div 
                       className="h-full bg-accent" 
                       style={{ width: `${Math.max(0, res.score * 100)}%` }}
@@ -345,6 +349,7 @@ export default function SemanticSearchPage() {
           )
         )}
       </div>
+    </div>
     </div>
   );
 }

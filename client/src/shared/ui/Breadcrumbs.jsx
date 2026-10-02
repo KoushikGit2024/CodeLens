@@ -40,14 +40,14 @@ export default function Breadcrumbs() {
       
       <ChevronRight className="w-3.5 h-3.5 opacity-50" />
       
-      <span className={!filePath ? "text-text/90 font-medium" : ""}>
+      <span className={!filePath ? "text-text/90 font-medium truncate min-w-0" : "truncate min-w-0"}>
         {label}
       </span>
 
       {filePath && (
         <>
-          <ChevronRight className="w-3.5 h-3.5 opacity-50" />
-          <span className="text-text/90 font-medium truncate max-w-[300px]" title={filePath}>
+          <ChevronRight className="w-3.5 h-3.5 opacity-50 shrink-0" />
+          <span className="text-text/90 font-medium truncate max-w-[100px] sm:max-w-[200px] md:max-w-[300px] min-w-0" title={filePath}>
             {filePath.split('/').pop()}
           </span>
         </>

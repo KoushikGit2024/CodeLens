@@ -215,6 +215,10 @@ export default function RefactoringPage() {
 
   // ── URL-synced UI State ──
   const selectedCandidateId = searchParams.get('candidate');
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(!selectedCandidateId);
+  const [mobileTab, setMobileTab] = useState('details');
+
   const setSelectedCandidateId = (val) => {
     setSearchParams(prev => {
       const next = new URLSearchParams(prev);
@@ -222,6 +226,7 @@ export default function RefactoringPage() {
       else next.delete('candidate');
       return next;
     });
+    if (isMobile) setMobileDrawerOpen(false);
   };
 
   const searchQuery = searchParams.get('search') || '';
@@ -234,13 +239,22 @@ export default function RefactoringPage() {
     }, { replace: true });
   };
 
+
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 1024);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   useEffect(() => {
     async function load() {
       try {
         const data = await repositoryApi.getRefactoringIntelligence(repoId);
         setIntel(data.data);
         const currentCandidate = new URLSearchParams(window.location.search).get('candidate');
-        if (data.data?.candidates?.length > 0 && !currentCandidate) {
+        // Do not auto-select on mobile so they can see the list first
+        if (data.data?.candidates?.length > 0 && !currentCandidate && window.innerWidth >= 1024) {
           setSearchParams(prev => {
             const next = new URLSearchParams(prev);
             next.set('candidate', data.data.candidates[0].id);
@@ -339,6 +353,158 @@ export default function RefactoringPage() {
 
 
 
+  const candidatesList = (
+    <aside className="flex-1 overflow-y-auto p-3 flex flex-col custom-scrollbar bg-panel h-full">
+      {/* Search bar */}
+      <div className="relative mb-3">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted pointer-events-none" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          placeholder="Search candidates..."
+          className="w-full bg-surface border border-border rounded pl-8 pr-7 py-1.5 text-xs text-text placeholder-muted/60 focus:outline-none focus:border-accent/50 transition-colors"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery('')}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-text"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+
+      {filteredCandidates.length === 0 ? (
+        <div className="flex flex-col items-center justify-center p-6 mt-10 text-center gap-3">
+          {searchQuery
+            ? <><Search className="w-8 h-8 text-muted/30" /><p className="text-sm text-muted">No candidates match "{searchQuery}"</p></>
+            : <><CheckCircle className="w-8 h-8 text-success/30 opacity-80" /><p className="text-sm text-muted">No refactoring candidates found.</p></>
+          }
+        </div>
+      ) : (
+        <div className="flex flex-col divide-y divide-border/30">
+          {['critical', 'high', 'warning'].map(level => {
+            const group = filteredCandidates.filter(c => c.priority === level);
+            if (group.length === 0) return null;
+            return (
+              <div key={level} className="py-2">
+                <PrioritySection
+                  priorityLevel={level}
+                  group={group}
+                  selectedCandidateId={selectedCandidateId}
+                  setSelectedCandidateId={setSelectedCandidateId}
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </aside>
+  );
+
+  const detailsContent = (
+    <>
+      <div className="px-6 pt-6 shrink-0">
+        <PageHeader 
+          title="Refactoring Intelligence" 
+          description="Automatically prioritize technical debt into actionable candidates. Select a candidate to see its blast radius and request an AI rewrite."
+          icon={Wrench}
+        />
+      </div>
+      <div className="flex-1 p-6 pt-3">
+        {selectedCandidate ? (
+          <CandidateDetail candidate={selectedCandidate} repoId={repoId} />
+        ) : (
+          <div className="h-full flex items-center justify-center text-muted text-sm">
+            Select a candidate from the sidebar to view details
+          </div>
+        )}
+      </div>
+    </>
+  );
+
+  const detailsPane = (
+    <main className="flex-1 overflow-y-auto custom-scrollbar flex flex-col bg-surface h-full">
+      {detailsContent}
+    </main>
+  );
+
+  const advisorPane = (
+    <aside className="flex-1 overflow-y-auto custom-scrollbar flex flex-col bg-panel h-full">
+      {selectedCandidate && (
+        <AiAdvisor candidate={selectedCandidate} repoId={repoId} />
+      )}
+    </aside>
+  );
+
+  if (isMobile) {
+    return (
+      <div className="relative flex flex-col h-full bg-surface overflow-hidden">
+        
+        {/* Main Scrolling View */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col">
+          <div className="px-6 pt-6 shrink-0">
+            <button 
+              onClick={() => setMobileDrawerOpen(true)}
+              className="mb-4 flex items-center gap-2 px-3 py-1.5 bg-panel border border-border hover:bg-surface text-text rounded text-xs transition-colors w-fit shadow-sm"
+            >
+              <Layers className="w-4 h-4" /> View Candidates
+            </button>
+            <PageHeader 
+              title="Refactoring Intelligence" 
+              description="Automatically prioritize technical debt into actionable candidates."
+              icon={Wrench}
+            />
+            {selectedCandidate && (
+              <div className="flex items-center gap-6 border-b border-border mt-4">
+                <button 
+                  onClick={() => setMobileTab('details')}
+                  className={`pb-3 text-sm font-medium transition-colors border-b-2 ${mobileTab === 'details' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-text'}`}
+                >
+                  Details
+                </button>
+                <button 
+                  onClick={() => setMobileTab('advisor')}
+                  className={`pb-3 text-sm font-medium transition-colors border-b-2 flex items-center gap-1.5 ${mobileTab === 'advisor' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-text'}`}
+                >
+                  <Sparkles className="w-3.5 h-3.5" /> AI Advisor
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 p-6 pt-4 flex flex-col">
+            {!selectedCandidate ? (
+              <div className="h-full flex items-center justify-center text-muted text-sm">
+                Select a candidate from the sidebar to view details
+              </div>
+            ) : mobileTab === 'details' ? (
+              <CandidateDetail candidate={selectedCandidate} repoId={repoId} />
+            ) : (
+              <div className="flex-1 min-h-[500px] bg-panel rounded-lg border border-border overflow-hidden">
+                <AiAdvisor candidate={selectedCandidate} repoId={repoId} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Drawer Backdrop */}
+        {mobileDrawerOpen && (
+          <div 
+            className="absolute inset-0 z-40 bg-black/50 backdrop-blur-[2px] transition-opacity"
+            onClick={() => setMobileDrawerOpen(false)}
+          />
+        )}
+
+        {/* Drawer Panel */}
+        <div className={`absolute top-0 bottom-0 left-0 z-50 w-[85%] max-w-[320px] bg-panel border-r border-border shadow-2xl transition-transform duration-300 ease-in-out ${mobileDrawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+          {candidatesList}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-surface">
       <ResizableLayout
@@ -351,81 +517,14 @@ export default function RefactoringPage() {
             collapseDirection: 'left',
             title: 'Candidates',
             icon: <Wrench />,
-            content: (
-              <aside className="flex-1 overflow-y-auto p-3 flex flex-col custom-scrollbar bg-panel h-full">
-                {/* Search bar */}
-                <div className="relative mb-3">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted pointer-events-none" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    placeholder="Search candidates..."
-                    className="w-full bg-surface border border-border rounded pl-8 pr-7 py-1.5 text-xs text-text placeholder-muted/60 focus:outline-none focus:border-accent/50 transition-colors"
-                  />
-                  {searchQuery && (
-                    <button
-                      onClick={() => setSearchQuery('')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-text"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-
-                {filteredCandidates.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center p-6 mt-10 text-center gap-3">
-                    {searchQuery
-                      ? <><Search className="w-8 h-8 text-muted/30" /><p className="text-sm text-muted">No candidates match "{searchQuery}"</p></>
-                      : <><CheckCircle className="w-8 h-8 text-success/30 opacity-80" /><p className="text-sm text-muted">No refactoring candidates found.</p></>
-                    }
-                  </div>
-                ) : (
-                  <div className="flex flex-col divide-y divide-border/30">
-                    {['critical', 'high', 'warning'].map(level => {
-                      const group = filteredCandidates.filter(c => c.priority === level);
-                      if (group.length === 0) return null;
-                      return (
-                        <div key={level} className="py-2">
-                          <PrioritySection
-                            priorityLevel={level}
-                            group={group}
-                            selectedCandidateId={selectedCandidateId}
-                            setSelectedCandidateId={setSelectedCandidateId}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </aside>
-            )
+            content: candidatesList
           },
           {
             id: 'details',
             defaultSize: 48,
             minWidth: 300,
             collapsible: false,
-            content: (
-              <main className="flex-1 overflow-y-auto custom-scrollbar flex flex-col bg-surface h-full">
-                <div className="px-6 pt-6 shrink-0">
-                  <PageHeader 
-                    title="Refactoring Intelligence" 
-                    description="Automatically prioritize technical debt into actionable candidates. Select a candidate to see its blast radius and request an AI rewrite."
-                    icon={Wrench}
-                  />
-                </div>
-                <div className="flex-1 p-6 pt-3">
-                  {selectedCandidate ? (
-                    <CandidateDetail candidate={selectedCandidate} repoId={repoId} />
-                  ) : (
-                    <div className="h-full flex items-center justify-center text-muted text-sm">
-                      Select a candidate from the sidebar to view details
-                    </div>
-                  )}
-                </div>
-              </main>
-            )
+            content: detailsPane
           },
           {
             id: 'advisor',
@@ -435,13 +534,7 @@ export default function RefactoringPage() {
             collapseDirection: 'right',
             title: 'AI Advisor',
             icon: <Sparkles />,
-            content: (
-              <aside className="flex-1 overflow-y-auto custom-scrollbar flex flex-col bg-panel h-full">
-                {selectedCandidate && (
-                  <AiAdvisor candidate={selectedCandidate} repoId={repoId} />
-                )}
-              </aside>
-            )
+            content: advisorPane
           }
         ]}
       />

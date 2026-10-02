@@ -8,7 +8,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import ReactFlow, { Background, Controls, MiniMap, useNodesState, useEdgesState } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Loader2, AlertCircle, AlertTriangle, Database, GitBranch, Layers, Zap, LayoutGrid, Filter, Info, RefreshCw } from 'lucide-react';
+import { Loader2, AlertCircle, AlertTriangle, Database, GitBranch, Layers, Zap, LayoutGrid, Filter, Info, RefreshCw, X } from 'lucide-react';
 import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide, forceX, forceY } from 'd3-force';
 
 import { repositoryApi } from '../../shared/api';
@@ -60,6 +60,15 @@ export default function DependencyGraphPage() {
       return prev;
     });
   };
+
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
 
   const [dirColorMap, setDirColorMap] = useState(new Map());
 
@@ -241,6 +250,7 @@ export default function DependencyGraphPage() {
     if (rfNode.type === 'group') return;
     const nodeId = rfNode.id;
     setSelected(prev => prev === nodeId ? null : nodeId); 
+    if (isMobile) setMobileDetailOpen(true);
 
     if (rfNode.data.nodeType !== 'fileNode' && rfNode.data.nodeType !== 'file') {
       setFileInfo(null);
@@ -258,7 +268,7 @@ export default function DependencyGraphPage() {
     } finally {
       setInfoLoading(false);
     }
-  }, [repoId]);
+  }, [repoId, isMobile]);
 
   const onPaneClick = useCallback(() => {
     setSelected(null);
@@ -353,10 +363,7 @@ export default function DependencyGraphPage() {
     );
   }
 
-  return (
-    <>
-      <ResizableLayout
-      panels={[
+  const layoutPanels = [
         {
           id: 'controls',
           defaultSize: 14,
@@ -437,8 +444,16 @@ export default function DependencyGraphPage() {
                     <button
                       onClick={() => {
                         if (!visualExternal) {
-                          // Turning ON — show confirmation modal first
-                          setShowExternalWarningModal(true);
+                          if (sessionStorage.getItem('codeLens_hideExternalWarning') === 'true') {
+                            setVisualExternal(true);
+                            setIsCalculatingGraph(true);
+                            setTimeout(() => {
+                              setShowExternalPackages(true);
+                              setIsCalculatingGraph(false);
+                            }, 50);
+                          } else {
+                            setShowExternalWarningModal(true);
+                          }
                         } else {
                           // Turning OFF — no confirmation needed
                           setVisualExternal(false);
@@ -451,7 +466,21 @@ export default function DependencyGraphPage() {
                     </button>
                   </div>
                 </div>
-                <p className="text-muted" style={{ fontSize: 10 }}>Show npm/system packages</p>
+                <p className="text-muted mb-2" style={{ fontSize: 10 }}>Show npm/system packages</p>
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-muted text-[10px]">Warn before enabling</span>
+                  <button
+                    onClick={() => {
+                      const current = sessionStorage.getItem('codeLens_hideExternalWarning') === 'true';
+                      sessionStorage.setItem('codeLens_hideExternalWarning', current ? 'false' : 'true');
+                      // force re-render by touching state
+                      setSpread(s => s + 0.0001 - 0.0001);
+                    }}
+                    className={`w-6 h-3 rounded-full transition-colors ${sessionStorage.getItem('codeLens_hideExternalWarning') !== 'true' ? 'bg-accent' : 'bg-surface border border-border'}`}
+                  >
+                    <div className={`w-3 h-3 bg-text rounded-full shadow-sm transition-transform ${sessionStorage.getItem('codeLens_hideExternalWarning') !== 'true' ? 'translate-x-3' : 'translate-x-0'} border`} />
+                  </button>
+                </div>
               </section>
 
               {/* graph?.gitChurn && (
@@ -506,21 +535,23 @@ export default function DependencyGraphPage() {
           collapsible: false,
           content: (
             <div ref={graphRef} className="relative bg-surface shadow-inner flex flex-col h-full w-full">
-              <div className="export-element-breadcrumbs shrink-0">
-                <ContextBreadcrumbs 
-                  domain="Dependency Graph" 
-                  activeNode={selected} 
-                  onClear={() => setSelected(null)} 
-                />
-              </div>
-              <div className="export-element-breadcrumbs absolute top-3 right-3 z-30 pointer-events-auto">
-                <ExportDiagramButton 
-                  elementRef={graphRef} 
-                  filename={`dependency-graph-${repoId.replace(/[^a-zA-Z0-9-]/g, '_')}`} 
-                  availableToggles={['breadcrumbs', 'controls', 'minimap']}
-                  nodes={nodes}
-                  edges={edges}
-                />
+              <div className="absolute top-3 left-3 right-3 z-30 pointer-events-none flex flex-col sm:flex-row flex-wrap justify-between items-start sm:items-center gap-2">
+                <div className="export-element-breadcrumbs pointer-events-auto max-w-full">
+                  <ContextBreadcrumbs 
+                    domain="Dependency Graph" 
+                    activeNode={selected} 
+                    onClear={() => setSelected(null)} 
+                  />
+                </div>
+                <div className="export-element-breadcrumbs pointer-events-auto shrink-0">
+                  <ExportDiagramButton 
+                    elementRef={graphRef} 
+                    filename={`dependency-graph-${repoId.replace(/[^a-zA-Z0-9-]/g, '_')}`} 
+                    availableToggles={['breadcrumbs', 'controls', 'minimap']}
+                    nodes={nodes}
+                    edges={edges}
+                  />
+                </div>
               </div>
               {nodes.length === 0 ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
@@ -553,14 +584,14 @@ export default function DependencyGraphPage() {
                   defaultEdgeOptions={{ zIndex: 1 }}
                 >
                   <Background color="#1D2130" gap={20} size={1} variant="dots" />
-                  <Controls className="bg-panel border-border" />
+                  <Controls position="bottom-left" className="bg-panel border-border" style={{ bottom: isMobile ? 80 : 12, left: 12, margin: 0 }} />
                   <MiniMap
                     nodeColor={n => {
                       if (n.type === 'group') return isLight ? '#00000015' : '#ffffff08';
                       return n.data?.heatColor || '#4D7EFF';
                     }}
                     maskColor={isLight ? "rgba(255,255,255,0.7)" : "rgba(12,14,20,0.85)"}
-                    className="bg-panel border border-border"
+                    className="bg-panel border border-border mt-20 sm:mt-12 hidden sm:block"
                   />
                 </ReactFlow>
               )}
@@ -602,8 +633,59 @@ export default function DependencyGraphPage() {
             </div>
           )
         }
-      ]}
-    />
+      ];
+
+  return (
+    <>
+      <ResizableLayout panels={isMobile ? [layoutPanels[1]] : layoutPanels} />
+
+      {/* Mobile Bottom Navigation Bar */}
+      {isMobile && (
+        <div className="fixed bottom-0 left-0 right-0 bg-panel border-t border-border shadow-[0_-4px_20px_rgba(0,0,0,0.5)] z-[80] p-1 flex justify-around items-center">
+          <button 
+            onClick={() => setMobileFiltersOpen(true)}
+            className={`flex flex-col items-center p-2 rounded-lg transition-all w-20 ${mobileFiltersOpen ? 'text-accent bg-accent/10' : 'text-muted hover:text-text'}`}
+          >
+            <Filter className="w-5 h-5 mb-1" />
+            <span className="text-[10px] font-medium">Filters</span>
+          </button>
+          <button 
+            onClick={() => setMobileDetailOpen(true)}
+            className={`flex flex-col items-center p-2 rounded-lg transition-all w-20 ${selected || mobileDetailOpen ? 'text-accent bg-accent/10' : 'text-muted hover:text-text'}`}
+          >
+            <Info className="w-5 h-5 mb-1" />
+            <span className="text-[10px] font-medium">Details</span>
+          </button>
+        </div>
+      )}
+
+      {/* Mobile Filters Bottom Sheet */}
+      {isMobile && (
+        <div className={`fixed inset-0 z-[100] transition-opacity ${mobileFiltersOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setMobileFiltersOpen(false)} />
+          <div className={`absolute bottom-0 left-0 right-0 bg-panel rounded-t-xl border-t border-border transform transition-transform duration-300 max-h-[85vh] flex flex-col ${mobileFiltersOpen ? 'translate-y-0' : 'translate-y-full'}`}>
+            <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
+               <span className="font-semibold text-text text-sm flex items-center gap-2"><Filter className="w-4 h-4"/> Filters & Layout</span>
+               <button onClick={() => setMobileFiltersOpen(false)} className="p-1.5 bg-surface/50 rounded text-muted hover:text-text"><X className="w-4 h-4" /></button>
+            </div>
+            {layoutPanels[0].content}
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Details Bottom Sheet */}
+      {isMobile && (
+        <div className={`fixed inset-0 z-[100] transition-opacity ${mobileDetailOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setMobileDetailOpen(false)} />
+          <div className={`absolute bottom-0 left-0 right-0 bg-panel rounded-t-xl border-t border-border transform transition-transform duration-300 max-h-[85vh] flex flex-col ${mobileDetailOpen ? 'translate-y-0' : 'translate-y-full'}`}>
+            <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
+               <span className="font-semibold text-text text-sm flex items-center gap-2"><Info className="w-4 h-4"/> Node Details</span>
+               <button onClick={() => setMobileDetailOpen(false)} className="p-1.5 bg-surface/50 rounded text-muted hover:text-text"><X className="w-4 h-4" /></button>
+            </div>
+            {layoutPanels[2].content}
+          </div>
+        </div>
+      )}
 
     {/* External Packages Warning Modal */}
     {showExternalWarningModal && (
@@ -621,9 +703,23 @@ export default function DependencyGraphPage() {
             <p className="text-sm text-text leading-relaxed">
               Depending on your codebase size, this can add <strong className="text-warning">thousands of nodes</strong>, causing severe performance slowdowns or potentially crashing your browser tab.
             </p>
-            <p className="text-xs text-muted">
-              Proceed only if you understand the risk. You can turn it back off at any time.
-            </p>
+            <div className="mt-2 flex items-center gap-2">
+              <input 
+                type="checkbox" 
+                id="dontShowAgain" 
+                className="accent-accent"
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    sessionStorage.setItem('codeLens_hideExternalWarning', 'true');
+                  } else {
+                    sessionStorage.setItem('codeLens_hideExternalWarning', 'false');
+                  }
+                }}
+              />
+              <label htmlFor="dontShowAgain" className="text-xs text-muted cursor-pointer select-none">
+                Don't show this warning again
+              </label>
+            </div>
           </div>
           <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-border bg-panel">
             <button

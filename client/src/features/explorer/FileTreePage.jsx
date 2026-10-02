@@ -19,7 +19,9 @@ import {
   Database,
   Search,
   Loader2,
-  FolderTree
+  FolderTree,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 import { repositoryApi } from '../../shared/api';
 import PageHeader from '../../shared/components/PageHeader';
@@ -248,6 +250,7 @@ export default function FileTreePage() {
   const { repo, fileTree, loading: repoLoading, error: repoError } = useRepository();
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(true);
   const reactFlowInstance = useRef(null);
   const diagramRef = useRef(null);
 
@@ -307,14 +310,33 @@ export default function FileTreePage() {
 
   return (
     <div className="flex-1 h-full flex flex-col bg-surface text-text overflow-hidden">
-      <div className="px-6 pt-6 shrink-0 flex items-center justify-between">
-        <PageHeader 
-          title="Architectural File Tree" 
-          description="A visual, interactive topology of your entire codebase."
-          icon={FolderTree}
-        />
-        <div className="flex items-center gap-4">
-          <div className="relative w-72 group">
+      <div className={clsx(
+        "shrink-0 flex flex-col lg:flex-row lg:items-center justify-between relative z-20 transition-all duration-300",
+        isHeaderCollapsed ? "p-3 lg:px-6 lg:pt-6 gap-0 lg:gap-4" : "px-4 pt-4 sm:px-6 sm:pt-6 gap-4"
+      )}>
+        
+        <div className={`flex justify-between w-full lg:w-auto ${isHeaderCollapsed ? 'items-center' : 'items-start'}`}>
+          <PageHeader 
+            title="Architectural File Tree" 
+            description="A visual, interactive topology of your entire codebase."
+            icon={FolderTree}
+            collapseOnMobile={isHeaderCollapsed}
+          />
+          
+          <button 
+            onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)} 
+            className={`lg:hidden p-1.5 text-muted hover:text-text bg-panel rounded-lg border border-border/60 shadow-sm shrink-0 transition-colors ${isHeaderCollapsed ? '' : 'mt-1'}`}
+            title="Toggle Controls"
+          >
+            {isHeaderCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+          </button>
+        </div>
+
+        <div className={clsx(
+          "flex-col lg:flex-row items-stretch lg:items-center gap-3 w-full lg:w-auto transition-all duration-300",
+          isHeaderCollapsed ? "hidden lg:flex" : "flex"
+        )}>
+          <div className="relative w-full lg:w-72 group">
             <div className="absolute inset-0 bg-accent/20 rounded-lg blur opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-500"></div>
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted group-focus-within:text-accent transition-colors z-10" />
             <input
@@ -328,7 +350,7 @@ export default function FileTreePage() {
           <ExportDiagramButton 
             elementRef={diagramRef} 
             filename={`file-tree-${repoId.replace(/[^a-zA-Z0-9-]/g, '_')}`} 
-            className="z-10" 
+            className="z-10 w-full lg:w-auto" 
             availableToggles={['controls', 'minimap']}
             nodes={nodes}
             edges={edges}
@@ -359,15 +381,17 @@ export default function FileTreePage() {
             onNodeDoubleClick={onNodeDoubleClick}
             onInit={(rf) => {
               reactFlowInstance.current = rf;
-              const rootNode = nodes.find(n => n.id === 'root-repo') || nodes[0];
-              if (rootNode) {
-                // Focus strictly on the root node at 1x zoom when the graph loads
-                rf.setCenter(
-                  rootNode.position.x + 90, // + NODE_WIDTH/2
-                  rootNode.position.y + 25, // + NODE_HEIGHT/2
-                  { zoom: 1, duration: 800 }
-                );
-              }
+              setTimeout(() => {
+                const rootNode = nodes.find(n => n.id === 'root-repo') || nodes[0];
+                if (rootNode) {
+                  // Focus strictly on the root node at 1x zoom when the graph loads
+                  rf.setCenter(
+                    rootNode.position.x + 90, // + NODE_WIDTH/2
+                    rootNode.position.y + 25, // + NODE_HEIGHT/2
+                    { zoom: 1, duration: 800 }
+                  );
+                }
+              }, 150);
             }}
             minZoom={0.05}
             maxZoom={2}

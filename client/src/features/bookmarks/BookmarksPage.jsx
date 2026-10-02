@@ -18,6 +18,64 @@ function highlightMatch(text, query) {
   );
 }
 
+function BookmarkNote({ bookmark, editingPath, editNote, setEditNote, setEditingPath, saveNote, searchQuery }) {
+  const [expanded, setExpanded] = useState(false);
+  const isEditing = editingPath === bookmark.filePath;
+
+  return (
+    <div className="bg-surface/50 rounded p-2 sm:p-3 text-sm ml-0 sm:ml-8 mt-2 sm:mt-0">
+      {isEditing ? (
+        <div className="flex gap-2">
+          <input 
+            type="text"
+            value={editNote}
+            onChange={(e) => setEditNote(e.target.value)}
+            placeholder="Add a note..."
+            className="flex-1 min-w-0 bg-surface border border-border rounded px-2 py-1.5 text-xs text-text focus:outline-none focus:border-accent"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') saveNote(bookmark.filePath);
+              if (e.key === 'Escape') setEditingPath(null);
+            }}
+          />
+          <button onClick={() => saveNote(bookmark.filePath)} className="px-2 sm:px-3 py-1 bg-accent/10 text-accent rounded hover:bg-accent/20 text-xs font-medium shrink-0">Save</button>
+          <button onClick={() => setEditingPath(null)} className="px-2 sm:px-3 py-1 text-muted hover:text-text text-xs shrink-0">Cancel</button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex justify-between items-start gap-4">
+            <div className="flex-1 min-w-0">
+              {bookmark.note ? (
+                <div className={`text-text/80 whitespace-pre-wrap break-all ${expanded ? '' : 'line-clamp-2'}`}>
+                  {highlightMatch(bookmark.note, searchQuery)}
+                </div>
+              ) : (
+                <p className="text-muted italic opacity-50">No note added.</p>
+              )}
+            </div>
+            <button 
+              onClick={() => {
+                setEditingPath(bookmark.filePath);
+              }}
+              className="text-xs text-accent hover:underline shrink-0"
+            >
+              Edit
+            </button>
+          </div>
+          {bookmark.note && bookmark.note.length > 80 && (
+            <button 
+              onClick={() => setExpanded(!expanded)} 
+              className="text-[11px] text-muted hover:text-text self-start mt-0.5"
+            >
+              {expanded ? 'Show less' : 'Read more'}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function BookmarksPage() {
   const { repoId } = useParams();
   const navigate = useNavigate();
@@ -98,8 +156,8 @@ export default function BookmarksPage() {
 
   return (
     <div className="flex-1 bg-surface h-full flex flex-col overflow-hidden">
-      <div className="px-8 py-6 border-b border-border bg-panel shrink-0">
-        <div className="flex justify-between items-start gap-4">
+      <div className="px-4 py-4 sm:px-8 sm:py-6 border-b border-border bg-panel shrink-0">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
           <div>
             <h1 className="text-xl font-semibold text-text flex items-center gap-2">
               <Bookmark className="w-5 h-5 text-accent" />
@@ -110,7 +168,7 @@ export default function BookmarksPage() {
             </p>
           </div>
           
-          <div className="flex items-center gap-3 w-72">
+          <div className="flex items-center gap-3 w-full md:w-72 shrink-0">
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2" />
               <input 
@@ -148,7 +206,7 @@ export default function BookmarksPage() {
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-8 custom-scrollbar">
         <div className="max-w-4xl mx-auto">
           {Object.keys(bookmarksMap).length === 0 ? (
             <div className="text-center py-20 bg-panel/30 border border-border rounded-lg border-dashed">
@@ -173,15 +231,15 @@ export default function BookmarksPage() {
               {bookmarks.map(bookmark => (
                 <div 
                   key={bookmark.filePath} 
-                  className={`bg-panel border rounded-lg p-5 flex flex-col gap-4 group transition-colors shadow-sm ${
+                  className={`bg-panel border rounded-lg p-3 sm:p-5 flex flex-col gap-2 sm:gap-4 group transition-colors shadow-sm ${
                     selectedPaths.has(bookmark.filePath) ? 'border-accent/50' : 'border-border hover:border-accent/30'
                   }`}
                 >
-                  <div className="flex justify-between items-start gap-4">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
                     <div className="flex-1 min-w-0 flex items-start gap-3">
                       <button 
                         onClick={() => toggleSelection(bookmark.filePath)}
-                        className="mt-0.5 text-muted hover:text-text transition-colors"
+                        className="mt-0.5 text-muted hover:text-text transition-colors shrink-0"
                       >
                         {selectedPaths.has(bookmark.filePath) 
                           ? <CheckSquare className="w-5 h-5 text-accent" /> 
@@ -200,7 +258,7 @@ export default function BookmarksPage() {
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-2 shrink-0 sm:opacity-0 group-hover:opacity-100 transition-opacity self-end sm:self-auto">
                       <button 
                         onClick={() => handleRemove(bookmark.filePath)}
                         className="p-1.5 text-muted hover:text-danger hover:bg-danger/10 rounded transition-colors"
@@ -218,42 +276,15 @@ export default function BookmarksPage() {
                     </div>
                   </div>
 
-                  <div className="bg-surface/50 rounded p-3 text-sm ml-8">
-                    {editingPath === bookmark.filePath ? (
-                      <div className="flex gap-2">
-                        <input 
-                          type="text"
-                          value={editNote}
-                          onChange={(e) => setEditNote(e.target.value)}
-                          placeholder="Add a note..."
-                          className="flex-1 bg-surface border border-border rounded px-2 py-1.5 text-xs text-text focus:outline-none focus:border-accent"
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') saveNote(bookmark.filePath);
-                            if (e.key === 'Escape') setEditingPath(null);
-                          }}
-                        />
-                        <button onClick={() => saveNote(bookmark.filePath)} className="px-3 py-1 bg-accent/10 text-accent rounded hover:bg-accent/20 text-xs font-medium">Save</button>
-                        <button onClick={() => setEditingPath(null)} className="px-3 py-1 text-muted hover:text-text text-xs">Cancel</button>
-                      </div>
-                    ) : (
-                      <div className="flex justify-between items-start gap-4">
-                        <div className="flex-1 min-w-0">
-                          {bookmark.note ? (
-                            <p className="text-text/80 whitespace-pre-wrap">{highlightMatch(bookmark.note, searchQuery)}</p>
-                          ) : (
-                            <p className="text-muted italic opacity-50">No note added.</p>
-                          )}
-                        </div>
-                        <button 
-                          onClick={() => startEditing(bookmark)}
-                          className="text-xs text-accent hover:underline shrink-0"
-                        >
-                          Edit
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  <BookmarkNote 
+                    bookmark={bookmark}
+                    editingPath={editingPath}
+                    editNote={editNote}
+                    setEditNote={setEditNote}
+                    setEditingPath={setEditingPath}
+                    saveNote={saveNote}
+                    searchQuery={searchQuery}
+                  />
                   
                   <div className="text-[10px] text-muted flex justify-end">
                     Bookmarked on {new Date(bookmark.bookmarkedAt).toLocaleDateString()}

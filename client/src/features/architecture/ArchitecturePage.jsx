@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { RefreshCw, AlertCircle, Loader2, File, Box, Wrench, Layers, Cpu, Sparkles, GitBranch, ChevronDown, ChevronRight } from 'lucide-react';
+import { RefreshCw, AlertCircle, Loader2, File, Box, Wrench, Layers, Cpu, Sparkles, GitBranch, ChevronDown, ChevronRight, X } from 'lucide-react';
 import { ResizableLayout } from '../../shared/components/ResizableLayout';
 import { repositoryApi } from '../../shared/api';
 import AiResponse from '../../shared/components/ai/AiResponse';
@@ -348,6 +348,15 @@ export default function ArchitecturePage() {
   const [isReanalyzing, setIsReanalyzing] = useState(false);
   const [aiError, setAiError] = useState(null);
   const [expandedComponents, setExpandedComponents] = useState(new Set());
+
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
+  const [mobileInsightsOpen, setMobileInsightsOpen] = useState(false);
   const [viewMode, setViewMode] = useState('interactive');
   const diagramRef = useRef(null);
 
@@ -404,7 +413,8 @@ export default function ArchitecturePage() {
 
   const onNodeClick = useCallback((_, node) => {
     setSelectedComponent(node.id);
-  }, []);
+    if (isMobile) setMobileControlsOpen(true);
+  }, [isMobile]);
 
   if (loading) {
     return (
@@ -460,9 +470,7 @@ export default function ArchitecturePage() {
     );
   }
 
-  return (
-    <ResizableLayout
-      panels={[
+  const layoutPanels = [
         {
           id: 'data',
           defaultSize: 20,
@@ -686,33 +694,35 @@ export default function ArchitecturePage() {
           collapsible: false,
           content: (
             <main ref={diagramRef} className="flex-1 bg-surface shadow-inner relative flex flex-col justify-center h-full w-full">
-              <div className="export-element-breadcrumbs absolute top-4 left-4 z-20 pointer-events-auto">
-                <ContextBreadcrumbs 
-                  domain="Architecture" 
-                  activeNode={selectedComponent} 
-                  onClear={() => setSelectedComponent(null)} 
-                />
-              </div>
-              <div className="export-element-breadcrumbs absolute top-4 right-4 z-20 flex items-center gap-2 pointer-events-auto">
-                <ExportDiagramButton 
-                  elementRef={diagramRef} 
-                  filename={`architecture-diagram-${repoId.replace(/[^a-zA-Z0-9-]/g, '_')}`} 
-                  nodes={rfNodes}
-                  edges={rfEdges}
-                />
-                <div className="flex bg-panel border border-border rounded-lg overflow-hidden p-0.5 shadow-sm">
-                  <button 
-                    onClick={() => setViewMode('interactive')}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${viewMode === 'interactive' ? 'bg-surface text-text shadow-sm' : 'text-muted hover:text-text'}`}
-                  >
-                    Interactive Graph
-                  </button>
-                  <button 
-                    onClick={() => setViewMode('mermaid')}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${viewMode === 'mermaid' ? 'bg-surface text-text shadow-sm' : 'text-muted hover:text-text'}`}
-                  >
-                    Mermaid
-                  </button>
+              <div className="absolute top-4 left-4 right-4 z-20 pointer-events-none flex flex-col lg:flex-row flex-wrap justify-between items-start lg:items-center gap-3">
+                <div className="export-element-breadcrumbs pointer-events-auto max-w-full">
+                  <ContextBreadcrumbs 
+                    domain="Architecture" 
+                    activeNode={selectedComponent} 
+                    onClear={() => setSelectedComponent(null)} 
+                  />
+                </div>
+                <div className="export-element-breadcrumbs flex flex-wrap items-center gap-2 pointer-events-auto">
+                  <ExportDiagramButton 
+                    elementRef={diagramRef} 
+                    filename={`architecture-diagram-${repoId.replace(/[^a-zA-Z0-9-]/g, '_')}`} 
+                    nodes={rfNodes}
+                    edges={rfEdges}
+                  />
+                  <div className="flex bg-panel border border-border rounded-lg overflow-hidden p-0.5 shadow-sm">
+                    <button 
+                      onClick={() => setViewMode('interactive')}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${viewMode === 'interactive' ? 'bg-surface text-text shadow-sm' : 'text-muted hover:text-text'}`}
+                    >
+                      Interactive Graph
+                    </button>
+                    <button 
+                      onClick={() => setViewMode('mermaid')}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${viewMode === 'mermaid' ? 'bg-surface text-text shadow-sm' : 'text-muted hover:text-text'}`}
+                    >
+                      Mermaid
+                    </button>
+                  </div>
                 </div>
               </div>
               
@@ -739,7 +749,7 @@ export default function ArchitecturePage() {
                   className="bg-transparent"
                 >
                   <Background color="#1D2130" gap={20} size={1} variant="dots" />
-                  <Controls position="bottom-right" className="bg-panel border-border" />
+                  <Controls position="bottom-right" className="bg-panel border-border" style={{ bottom: isMobile ? 80 : 12, right: 12, margin: 0 }} />
                   <MiniMap
                     position="top-right"
                     nodeColor={n => {
@@ -747,14 +757,14 @@ export default function ArchitecturePage() {
                       return c.bg;
                     }}
                     maskColor={isLight ? "rgba(255,255,255,0.7)" : "rgba(12,14,20,0.75)"}
-                    className="bg-panel border border-border"
+                    className="bg-panel border border-border mt-28 lg:mt-16 hidden sm:block"
                   />
 
                   {/* Layer legend */}
                   <div
                     className="export-element-legend"
                     style={{
-                      position: 'absolute', bottom: 12, left: 12, zIndex: 10,
+                      position: 'absolute', bottom: isMobile ? 80 : 12, left: 12, zIndex: 10,
                       background: 'rgba(17,19,24,0.93)', border: '1px solid #1D2130',
                       borderRadius: 8, padding: '8px 12px',
                     }}
@@ -844,7 +854,59 @@ export default function ArchitecturePage() {
             </div>
           )
         }
-      ]}
-    />
+      ];
+
+  return (
+    <>
+      <ResizableLayout panels={isMobile ? [layoutPanels[1]] : layoutPanels} />
+
+      {/* Mobile Bottom Navigation Bar */}
+      {isMobile && (
+        <div className="fixed bottom-0 left-0 right-0 bg-panel border-t border-border shadow-[0_-4px_20px_rgba(0,0,0,0.5)] z-[80] p-1 flex justify-around items-center">
+          <button 
+            onClick={() => setMobileControlsOpen(true)}
+            className={`flex flex-col items-center p-2 rounded-lg transition-all w-20 ${mobileControlsOpen || selectedComponent ? 'text-accent bg-accent/10' : 'text-muted hover:text-text'}`}
+          >
+            <Layers className="w-5 h-5 mb-1" />
+            <span className="text-[10px] font-medium">Controls</span>
+          </button>
+          <button 
+            onClick={() => setMobileInsightsOpen(true)}
+            className={`flex flex-col items-center p-2 rounded-lg transition-all w-20 ${mobileInsightsOpen ? 'text-accent bg-accent/10' : 'text-muted hover:text-text'}`}
+          >
+            <Sparkles className="w-5 h-5 mb-1" />
+            <span className="text-[10px] font-medium">Insights</span>
+          </button>
+        </div>
+      )}
+
+      {/* Mobile Controls Bottom Sheet */}
+      {isMobile && (
+        <div className={`fixed inset-0 z-[100] transition-opacity ${mobileControlsOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setMobileControlsOpen(false)} />
+          <div className={`absolute bottom-0 left-0 right-0 bg-panel rounded-t-xl border-t border-border transform transition-transform duration-300 h-[95vh] flex flex-col ${mobileControlsOpen ? 'translate-y-0' : 'translate-y-full'}`}>
+            <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
+               <span className="font-semibold text-text text-sm flex items-center gap-2"><Layers className="w-4 h-4"/> Controls</span>
+               <button onClick={() => setMobileControlsOpen(false)} className="p-1.5 bg-surface/50 rounded text-muted hover:text-text"><X className="w-4 h-4" /></button>
+            </div>
+            {layoutPanels[0].content}
+          </div>
+        </div>
+      )}
+
+      {/* Mobile AI Insights Bottom Sheet */}
+      {isMobile && (
+        <div className={`fixed inset-0 z-[100] transition-opacity ${mobileInsightsOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setMobileInsightsOpen(false)} />
+          <div className={`absolute bottom-0 left-0 right-0 bg-panel rounded-t-xl border-t border-border transform transition-transform duration-300 h-[95vh] flex flex-col ${mobileInsightsOpen ? 'translate-y-0' : 'translate-y-full'}`}>
+            <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
+               <span className="font-semibold text-text text-sm flex items-center gap-2"><Sparkles className="w-4 h-4"/> AI Insights</span>
+               <button onClick={() => setMobileInsightsOpen(false)} className="p-1.5 bg-surface/50 rounded text-muted hover:text-text"><X className="w-4 h-4" /></button>
+            </div>
+            {layoutPanels[2].content}
+          </div>
+        </div>
+      )}
+    </>
   );
 }

@@ -6,7 +6,7 @@
  */
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Activity, CheckSquare, Loader2, GitCommit, AlertCircle, X, ExternalLink, File, RefreshCw } from 'lucide-react';
+import { Activity, CheckSquare, Loader2, GitCommit, AlertCircle, X, ExternalLink, File, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import { repositoryApi } from '../../shared/api';
 import { useRepository } from '../../shared/context/RepositoryContext';
 import { useToast } from '../../shared/context/ToastContext';
@@ -197,6 +197,14 @@ export default function ImpactPage() {
   const [edges, setEdges] = useState([]);
   const [rfInstance, setRfInstance] = useState(null);
   const diagramRef = useRef(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 1024);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   /**
    * It maps the file paths from the analysis array, then extracts nested directory chunks, 
@@ -409,6 +417,189 @@ export default function ImpactPage() {
     );
   }
 
+  const fileSelectorContent = (
+    <aside className="flex-1 flex flex-col bg-panel h-full p-4 overflow-hidden border-l border-border">
+      <input 
+        type="text"
+        placeholder="Search files..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-sm text-text placeholder-muted focus:outline-none focus:border-accent mb-4 shrink-0 transition-colors"
+      />
+      
+      <div className="flex-1 overflow-auto custom-scrollbar border border-border rounded bg-surface py-2 mb-4">
+        {fileTreeNodes.length === 0 ? (
+          <div className="text-sm text-muted p-6 text-center flex flex-col items-center gap-2">
+            <File className="w-6 h-6 opacity-30" />
+            No files found.
+          </div>
+        ) : (
+          <FileTree 
+            nodes={fileTreeNodes} 
+            mode="select" 
+            selectedFiles={selectedFiles} 
+            onToggleFile={toggleFile} 
+            searchTerm={searchTerm} 
+          />
+        )}
+      </div>
+      
+      <div className="flex flex-col gap-3 shrink-0 pt-3 border-t border-border/50">
+        <div className="text-xs text-muted flex justify-between items-center bg-surface/50 p-2 rounded border border-border/30">
+          <span className="font-medium text-text/80">{selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''} selected</span>
+          {selectedFiles.length > 0 && (
+            <button onClick={() => setSelectedFiles([])} className="text-danger hover:underline hover:text-danger/80 transition-colors">Clear All</button>
+          )}
+        </div>
+        <button 
+          onClick={() => { analyzeImpact(); if (isMobile) setDrawerOpen(false); }}
+          disabled={selectedFiles.length === 0 || loading}
+          className="w-full bg-accent hover:bg-accent-hover text-text px-4 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-sm"
+        >
+          {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+          {loading ? 'Calculating Blast Radius...' : 'Analyze Impact'}
+        </button>
+      </div>
+    </aside>
+  );
+
+  const mainContent = (
+    <main className="flex-1 overflow-hidden flex flex-col bg-surface/50 h-full">
+      <div className="px-6 pt-6 shrink-0">
+        <PageHeader 
+          title="Change Impact Analysis" 
+          description="Select files that you plan to modify. The deterministic engine will traverse the dependency graph to identify exactly which files and architectural components will be affected downstream."
+          icon={Activity}
+        />
+      </div>
+      <div className="flex-1 p-6 pt-2 h-full flex flex-col min-h-0">
+        {!impact ? (
+          <div className="flex-1 h-full flex flex-col items-center justify-center text-muted gap-3 bg-panel rounded border border-border border-dashed">
+            <Activity className="w-10 h-10 opacity-30" />
+            <p className="text-sm">Select files from the sidebar and click "Analyze Impact".</p>
+            {isMobile && (
+              <button
+                onClick={() => setDrawerOpen(true)}
+                className="flex items-center gap-2 mt-2 px-4 py-2 bg-accent/20 border border-accent/40 text-accent rounded-lg text-sm font-medium transition-colors"
+              >
+                <SlidersHorizontal className="w-4 h-4" /> Select Files
+              </button>
+            )}
+          </div>
+        ) : (
+          <div ref={diagramRef} className="flex-1 w-full h-full bg-surface border border-border rounded shadow-inner relative overflow-hidden">
+            <ReactFlow
+              onInit={setRfInstance}
+              nodes={nodes}
+              edges={edges}
+              nodeTypes={impactNodeTypes}
+              onNodesChange={(changes) => setNodes((nds) => applyNodeChanges(changes, nds))}
+              onNodeClick={(_, node) => setSelectedNode(node.data)}
+              onPaneClick={() => setSelectedNode(null)}
+              fitView
+              minZoom={0.01} 
+              maxZoom={2}
+              nodesConnectable={false}
+              nodesDraggable={true} 
+              proOptions={{ hideAttribution: true }}
+            >
+              <Controls showInteractive={false} className="bg-panel border-border" />
+            </ReactFlow>
+            <div className="export-element-legend absolute top-4 right-4 z-20 flex flex-col gap-2 pointer-events-none [&>*]:pointer-events-auto">
+              <ExportDiagramButton 
+                elementRef={diagramRef} 
+                filename={`impact-graph-${repoId.replace(/[^a-zA-Z0-9-]/g, '_')}`} 
+                availableToggles={['legend', 'controls']}
+                nodes={nodes}
+                edges={edges}
+              />
+              <div className="bg-panel/90 border border-border rounded p-3 text-xs flex flex-col gap-2 backdrop-blur-sm shadow-xl">
+                <div className="font-semibold text-text/90 border-b border-border/50 pb-2 mb-1">Impact Legend</div>
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#da3633] shadow-[0_0_8px_rgba(218,54,51,0.6)]"></div> Changed Files</div>
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#d29922] shadow-[0_0_8px_rgba(210,153,34,0.6)]"></div> Directly Affected</div>
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#8957e5] shadow-[0_0_8px_rgba(137,87,229,0.6)]"></div> Transitively Affected</div>
+              </div>
+            </div>
+
+            {/* Node detail panel */}
+            {selectedNode && (() => {
+              const srcRef = tryMakeSourceRef({ filePath: selectedNode.fullPath });
+              return (
+                <div className="export-element-legend absolute bottom-4 left-4 bg-panel/95 border border-border rounded-lg p-4 shadow-2xl backdrop-blur-sm text-xs min-w-[240px] max-w-[320px]">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-semibold text-text truncate" title={selectedNode.fullPath}>{selectedNode.label}</span>
+                    <button onClick={() => setSelectedNode(null)} className="text-muted hover:text-text ml-2 shrink-0"><X className="w-3.5 h-3.5" /></button>
+                  </div>
+                  <div className="mb-3">
+                    {srcRef ? (
+                      <OpenSourceButton ref={srcRef} label={selectedNode.fullPath} className="text-muted hover:text-accent font-mono text-[10px]" />
+                    ) : (
+                      <div className="text-muted text-[10px] font-mono">{selectedNode.fullPath}</div>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {srcRef && <OpenSourceButton ref={srcRef} variant="button" label="Open in Explorer" />}
+                    <Link
+                      to={`/explore/${repoId}/architecture`}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-surface border border-border hover:border-accent hover:text-accent transition-colors"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" /> View Architecture
+                    </Link>
+                    <Link
+                      to={`/explore/${repoId}/health?file=${encodeURIComponent(selectedNode.fullPath)}`}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-surface border border-border hover:border-accent hover:text-accent transition-colors"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" /> View Health Risks
+                    </Link>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+      </div>
+    </main>
+  );
+
+  if (isMobile) {
+    return (
+      <div className="relative flex flex-col h-full bg-surface overflow-hidden">
+        {/* Main graph — full screen */}
+        <div className="flex-1 overflow-hidden flex flex-col">
+          {mainContent}
+        </div>
+
+        {/* Floating FAB to open the drawer when impact is already shown */}
+        {impact && !drawerOpen && (
+          <button
+            onClick={() => setDrawerOpen(true)}
+            className="absolute bottom-6 right-6 z-30 flex items-center gap-2 px-4 py-2.5 bg-accent text-text rounded-full shadow-2xl text-sm font-medium transition-colors hover:bg-accent/80"
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            {selectedFiles.length > 0 ? `${selectedFiles.length} files` : 'Select Files'}
+          </button>
+        )}
+
+        {/* Drawer Backdrop */}
+        {drawerOpen && (
+          <div 
+            className="absolute inset-0 z-40 bg-black/50 backdrop-blur-[2px]"
+            onClick={() => setDrawerOpen(false)}
+          />
+        )}
+
+        {/* Drawer Panel — slides in from right */}
+        <div className={`absolute top-0 bottom-0 right-0 z-50 w-[90%] max-w-[360px] bg-panel border-l border-border shadow-2xl transition-transform duration-300 ease-in-out flex flex-col ${drawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
+            <span className="text-sm font-semibold text-text flex items-center gap-2"><CheckSquare className="w-4 h-4 text-accent" /> Files to Modify</span>
+            <button onClick={() => setDrawerOpen(false)} className="text-muted hover:text-text"><X className="w-4 h-4" /></button>
+          </div>
+          <div className="flex-1 overflow-hidden">{fileSelectorContent}</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-surface">
       <ResizableLayout
@@ -417,95 +608,7 @@ export default function ImpactPage() {
             id: 'impact-results',
             defaultSize: 70,
             minWidth: 400,
-            content: (
-              <main className="flex-1 overflow-hidden flex flex-col bg-surface/50 h-full">
-                <div className="px-6 pt-6 shrink-0">
-                  <PageHeader 
-                    title="Change Impact Analysis" 
-                    description="Select files that you plan to modify. The deterministic engine will traverse the dependency graph to identify exactly which files and architectural components will be affected downstream."
-                    icon={Activity}
-                  />
-                </div>
-                <div className="flex-1 p-6 pt-2 h-full flex flex-col min-h-0">
-                  {!impact ? (
-                    <div className="flex-1 h-full flex flex-col items-center justify-center text-muted gap-3 bg-panel rounded border border-border border-dashed">
-                      <Activity className="w-10 h-10 opacity-30" />
-                      <p className="text-sm">Select files from the sidebar and click "Analyze Impact".</p>
-                    </div>
-                  ) : (
-                    <div ref={diagramRef} className="flex-1 w-full h-full bg-surface border border-border rounded shadow-inner relative overflow-hidden">
-                      <ReactFlow
-                        onInit={setRfInstance}
-                        nodes={nodes}
-                        edges={edges}
-                        nodeTypes={impactNodeTypes}
-                        onNodesChange={(changes) => setNodes((nds) => applyNodeChanges(changes, nds))}
-                        onNodeClick={(_, node) => setSelectedNode(node.data)}
-                        onPaneClick={() => setSelectedNode(null)}
-                        fitView
-                        minZoom={0.01} 
-                        maxZoom={2}
-                        nodesConnectable={false}
-                        nodesDraggable={true} 
-                        proOptions={{ hideAttribution: true }}
-                      >
-                        <Controls showInteractive={false} className="bg-panel border-border" />
-                      </ReactFlow>
-                      <div className="export-element-legend absolute top-4 right-4 flex flex-col gap-2">
-                        <ExportDiagramButton 
-                          elementRef={diagramRef} 
-                          filename={`impact-graph-${repoId.replace(/[^a-zA-Z0-9-]/g, '_')}`} 
-                          availableToggles={['legend', 'controls']}
-                          nodes={nodes}
-                          edges={edges}
-                        />
-                        <div className="bg-panel/90 border border-border rounded p-3 text-xs flex flex-col gap-2 backdrop-blur-sm shadow-xl">
-                          <div className="font-semibold text-text/90 border-b border-border/50 pb-2 mb-1">Impact Legend</div>
-                        <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#da3633] shadow-[0_0_8px_rgba(218,54,51,0.6)]"></div> Changed Files</div>
-                        <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#d29922] shadow-[0_0_8px_rgba(210,153,34,0.6)]"></div> Directly Affected</div>
-                        <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#8957e5] shadow-[0_0_8px_rgba(137,87,229,0.6)]"></div> Transitively Affected</div>
-                        </div>
-                      </div>
-
-                      {/* Node detail panel — appears when a node is clicked */}
-                      {selectedNode && (() => {
-                        const srcRef = tryMakeSourceRef({ filePath: selectedNode.fullPath });
-                        return (
-                          <div className="export-element-legend absolute bottom-4 left-4 bg-panel/95 border border-border rounded-lg p-4 shadow-2xl backdrop-blur-sm text-xs min-w-[240px] max-w-[320px]">
-                            <div className="flex items-center justify-between mb-3">
-                              <span className="font-semibold text-text truncate" title={selectedNode.fullPath}>{selectedNode.label}</span>
-                              <button onClick={() => setSelectedNode(null)} className="text-muted hover:text-text ml-2 shrink-0"><X className="w-3.5 h-3.5" /></button>
-                            </div>
-                            <div className="mb-3">
-                              {srcRef ? (
-                                <OpenSourceButton ref={srcRef} label={selectedNode.fullPath} className="text-muted hover:text-accent font-mono text-[10px]" />
-                              ) : (
-                                <div className="text-muted text-[10px] font-mono">{selectedNode.fullPath}</div>
-                              )}
-                            </div>
-                            <div className="flex flex-col gap-2">
-                              {srcRef && <OpenSourceButton ref={srcRef} variant="button" label="Open in Explorer" />}
-                              <Link
-                                to={`/explore/${repoId}/architecture`}
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-surface border border-border hover:border-accent hover:text-accent transition-colors"
-                              >
-                                <ExternalLink className="w-3.5 h-3.5" /> View Architecture
-                              </Link>
-                              <Link
-                                to={`/explore/${repoId}/health?file=${encodeURIComponent(selectedNode.fullPath)}`}
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-surface border border-border hover:border-accent hover:text-accent transition-colors"
-                              >
-                                <ExternalLink className="w-3.5 h-3.5" /> View Health Risks
-                              </Link>
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  )}
-                </div>
-              </main>
-            )
+            content: mainContent
           },
           {
             id: 'file-selector',
@@ -515,51 +618,7 @@ export default function ImpactPage() {
             collapseDirection: 'right',
             title: 'Files to Modify',
             icon: <CheckSquare />,
-            content: (
-              <aside className="flex-1 flex flex-col bg-panel h-full p-4 overflow-hidden border-l border-border">
-                <input 
-                  type="text"
-                  placeholder="Search files..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-sm text-text placeholder-muted focus:outline-none focus:border-accent mb-4 shrink-0 transition-colors"
-                />
-                
-                <div className="flex-1 overflow-auto custom-scrollbar border border-border rounded bg-surface py-2 mb-4">
-                  {fileTreeNodes.length === 0 ? (
-                    <div className="text-sm text-muted p-6 text-center flex flex-col items-center gap-2">
-                      <File className="w-6 h-6 opacity-30" />
-                      No files found.
-                    </div>
-                  ) : (
-                    <FileTree 
-                      nodes={fileTreeNodes} 
-                      mode="select" 
-                      selectedFiles={selectedFiles} 
-                      onToggleFile={toggleFile} 
-                      searchTerm={searchTerm} 
-                    />
-                  )}
-                </div>
-                
-                <div className="flex flex-col gap-3 shrink-0 pt-3 border-t border-border/50">
-                  <div className="text-xs text-muted flex justify-between items-center bg-surface/50 p-2 rounded border border-border/30">
-                    <span className="font-medium text-text/80">{selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''} selected</span>
-                    {selectedFiles.length > 0 && (
-                      <button onClick={() => setSelectedFiles([])} className="text-danger hover:underline hover:text-danger/80 transition-colors">Clear All</button>
-                    )}
-                  </div>
-                  <button 
-                    onClick={analyzeImpact}
-                    disabled={selectedFiles.length === 0 || loading}
-                    className="w-full bg-accent hover:bg-accent-hover text-text px-4 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-sm"
-                  >
-                    {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {loading ? 'Calculating Blast Radius...' : 'Analyze Impact'}
-                  </button>
-                </div>
-              </aside>
-            )
+            content: fileSelectorContent
           }
         ]}
       />
