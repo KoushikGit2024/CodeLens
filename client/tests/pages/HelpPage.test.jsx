@@ -6,16 +6,14 @@ import { RepositoryProvider } from '../../src/shared/context/RepositoryContext';
 import { AIProvider } from '../../src/shared/context/AIContext';
 
 vi.mock('../../src/shared/api', () => ({
-  repositoryApi: {}
+  repositoryApi: {},
 }));
 
-const renderWithProviders = (component) => {
+const renderWithProviders = component => {
   return render(
     <BrowserRouter>
       <RepositoryProvider>
-        <AIProvider>
-          {component}
-        </AIProvider>
+        <AIProvider>{component}</AIProvider>
       </RepositoryProvider>
     </BrowserRouter>
   );
@@ -27,4 +25,3 @@ describe('HelpPage', () => {
     expect(screen.getByText(/CodeLens Help Center/i)).toBeInTheDocument();
   });
 });
-

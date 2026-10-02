@@ -90,9 +90,9 @@ describe('CommonJS require — cjs-named specifier (destructured)', () => {
     const imports = getImports(`const { Router } = require('express');`);
     expect(imports).toHaveLength(1);
     expect(imports[0].specifiers[0]).toMatchObject({
-      name:  'Router',
+      name: 'Router',
       alias: null,
-      type:  'cjs-named',
+      type: 'cjs-named',
     });
   });
 
@@ -100,9 +100,7 @@ describe('CommonJS require — cjs-named specifier (destructured)', () => {
     const imports = getImports(`const { Router, json, urlencoded } = require('express');`);
     expect(imports[0].specifiers).toHaveLength(3);
     expect(imports[0].specifiers.every(s => s.type === 'cjs-named')).toBe(true);
-    expect(imports[0].specifiers.map(s => s.name)).toEqual(
-      expect.arrayContaining(['Router', 'json', 'urlencoded'])
-    );
+    expect(imports[0].specifiers.map(s => s.name)).toEqual(expect.arrayContaining(['Router', 'json', 'urlencoded']));
   });
 
   test('renamed destructure sets alias', () => {
@@ -147,9 +145,7 @@ describe('CommonJS require — multiple requires in same file', () => {
     `;
     const imports = getImports(src);
     expect(imports).toHaveLength(4);
-    expect(imports.map(i => i.source)).toEqual(
-      expect.arrayContaining(['express', 'mongoose', './models/User'])
-    );
+    expect(imports.map(i => i.source)).toEqual(expect.arrayContaining(['express', 'mongoose', './models/User']));
   });
 
   test('mix of ES import and CJS require produces all imports', () => {
@@ -159,7 +155,7 @@ describe('CommonJS require — multiple requires in same file', () => {
     `;
     const imports = getImports(src);
     expect(imports).toHaveLength(2);
-    const esImport  = imports.find(i => i.source === 'path');
+    const esImport = imports.find(i => i.source === 'path');
     const cjsImport = imports.find(i => i.source === 'express');
     expect(esImport.specifiers[0].type).toBe('default');
     expect(cjsImport.specifiers[0].type).toBe('cjs-default');
@@ -214,57 +210,53 @@ describe('CommonJS require — non-require calls not extracted', () => {
 
 describe('CommonJS require — integration with dependency graph', () => {
   test('require() import becomes a "requires" edge in the graph', async () => {
-    const {
-      buildDependencyGraph,
-    } = await import('@/services/analyzer/dependencies/dependency.analyzer.js');
+    const { buildDependencyGraph } = await import('@/services/analyzer/dependencies/dependency.analyzer.js');
 
     const analysis = {
       files: [
         {
           filePath: 'src/server.js',
-          symbols: [{
-            kind: 'import',
-            source: './app',
-            specifiers: [{ name: 'app', alias: null, type: 'cjs-default' }],
-            location: null,
-          }],
+          symbols: [
+            {
+              kind: 'import',
+              source: './app',
+              specifiers: [{ name: 'app', alias: null, type: 'cjs-default' }],
+              location: null,
+            },
+          ],
         },
         { filePath: 'src/app.js', symbols: [] },
       ],
     };
 
     const graph = buildDependencyGraph(analysis);
-    const edge = graph.edges.find(
-      e => e.source === 'file:src/server.js' && e.target === 'file:src/app.js'
-    );
+    const edge = graph.edges.find(e => e.source === 'file:src/server.js' && e.target === 'file:src/app.js');
     expect(edge).toBeDefined();
     expect(edge.type).toBe('smoothstep');
   });
 
   test('ES import becomes an "imports" edge in the graph', async () => {
-    const {
-      buildDependencyGraph,
-    } = await import('@/services/analyzer/dependencies/dependency.analyzer.js');
+    const { buildDependencyGraph } = await import('@/services/analyzer/dependencies/dependency.analyzer.js');
 
     const analysis = {
       files: [
         {
           filePath: 'src/index.js',
-          symbols: [{
-            kind: 'import',
-            source: './app',
-            specifiers: [{ name: 'app', alias: null, type: 'default' }],
-            location: null,
-          }],
+          symbols: [
+            {
+              kind: 'import',
+              source: './app',
+              specifiers: [{ name: 'app', alias: null, type: 'default' }],
+              location: null,
+            },
+          ],
         },
         { filePath: 'src/app.js', symbols: [] },
       ],
     };
 
     const graph = buildDependencyGraph(analysis);
-    const edge = graph.edges.find(
-      e => e.source === 'file:src/index.js' && e.target === 'file:src/app.js'
-    );
+    const edge = graph.edges.find(e => e.source === 'file:src/index.js' && e.target === 'file:src/app.js');
     expect(edge).toBeDefined();
     expect(edge.type).toBe('default');
   });

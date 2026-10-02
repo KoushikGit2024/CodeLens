@@ -21,11 +21,11 @@ export default function AiReference({ reference, onNavigate }) {
   const { repoId } = useParams();
   if (!reference) return null;
 
-  const refString = typeof reference === 'string' ? reference : (reference.path || '');
+  const refString = typeof reference === 'string' ? reference : reference.path || '';
   if (!refString) return null;
 
   let path, line, reason;
-  
+
   if (typeof reference === 'string') {
     const parsed = parseReference(refString);
     path = parsed.path;
@@ -35,10 +35,10 @@ export default function AiReference({ reference, onNavigate }) {
     line = reference.lines || reference.line || reference.startLine;
     reason = reference.reason;
   }
-  
+
   const displayPath = path.split('/').pop();
-  
-  const handleClick = (e) => {
+
+  const handleClick = e => {
     if (onNavigate) {
       e.preventDefault();
       onNavigate(path, line);
@@ -56,9 +56,7 @@ export default function AiReference({ reference, onNavigate }) {
         title={typeof reference === 'string' ? reference : `${path}${line ? `:${line}` : ''}`}
       >
         <FileText className="w-3.5 h-3.5 text-muted group-hover:text-accent transition-colors shrink-0" />
-        <span className="text-text/80 group-hover:text-text truncate min-w-0">
-          {displayPath}
-        </span>
+        <span className="text-text/80 group-hover:text-text truncate min-w-0">{displayPath}</span>
         {line && (
           <span className="flex items-center gap-0.5 text-muted group-hover:text-accent/80 text-[10px]">
             <MapPin className="w-3 h-3" />
@@ -66,7 +64,11 @@ export default function AiReference({ reference, onNavigate }) {
           </span>
         )}
       </Link>
-      {reason && <span className="text-[10px] text-muted pl-1 truncate" title={reason}>{reason}</span>}
+      {reason && (
+        <span className="text-[10px] text-muted pl-1 truncate" title={reason}>
+          {reason}
+        </span>
+      )}
     </div>
   );
 }

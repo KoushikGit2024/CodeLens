@@ -12,16 +12,18 @@ function MarkdownViewer({ content }) {
   let inCodeBlock = false;
   let codeContent = [];
   let codeLang = '';
-  
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    
+
     // Code block toggle
     if (line.trim().startsWith('```')) {
       if (inCodeBlock) {
         elements.push(
           <div key={`code-${i}`} className="bg-[#1e1e1e] rounded p-4 my-4 overflow-x-auto border border-border">
-            <pre><code className="text-sm font-mono text-gray-300">{codeContent.join('\n')}</code></pre>
+            <pre>
+              <code className="text-sm font-mono text-gray-300">{codeContent.join('\n')}</code>
+            </pre>
           </div>
         );
         codeContent = [];
@@ -32,7 +34,7 @@ function MarkdownViewer({ content }) {
       }
       continue;
     }
-    
+
     if (inCodeBlock) {
       codeContent.push(line);
       continue;
@@ -40,28 +42,47 @@ function MarkdownViewer({ content }) {
 
     // Headings
     if (line.startsWith('# ')) {
-      elements.push(<h1 key={`h1-${i}`} className="text-3xl font-bold text-text mt-8 mb-4 border-b border-border/50 pb-2">{line.slice(2)}</h1>);
+      elements.push(
+        <h1 key={`h1-${i}`} className="text-3xl font-bold text-text mt-8 mb-4 border-b border-border/50 pb-2">
+          {line.slice(2)}
+        </h1>
+      );
       continue;
     }
     if (line.startsWith('## ')) {
-      elements.push(<h2 key={`h2-${i}`} className="text-2xl font-semibold text-text mt-8 mb-3">{line.slice(3)}</h2>);
+      elements.push(
+        <h2 key={`h2-${i}`} className="text-2xl font-semibold text-text mt-8 mb-3">
+          {line.slice(3)}
+        </h2>
+      );
       continue;
     }
     if (line.startsWith('### ')) {
-      elements.push(<h3 key={`h3-${i}`} className="text-xl font-medium text-text mt-6 mb-2">{line.slice(4)}</h3>);
+      elements.push(
+        <h3 key={`h3-${i}`} className="text-xl font-medium text-text mt-6 mb-2">
+          {line.slice(4)}
+        </h3>
+      );
       continue;
     }
-    
+
     // Unordered Lists
     if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
-      elements.push(<li key={`li-${i}`} className="text-gray-300 ml-4 my-1">{renderInline(line.trim().slice(2))}</li>);
+      elements.push(
+        <li key={`li-${i}`} className="text-gray-300 ml-4 my-1">
+          {renderInline(line.trim().slice(2))}
+        </li>
+      );
       continue;
     }
 
     // Blockquotes
     if (line.trim().startsWith('> ')) {
       elements.push(
-        <blockquote key={`bq-${i}`} className="border-l-4 border-accent pl-4 py-1 my-4 text-gray-400 bg-surface/30 rounded-r">
+        <blockquote
+          key={`bq-${i}`}
+          className="border-l-4 border-accent pl-4 py-1 my-4 text-gray-400 bg-surface/30 rounded-r"
+        >
           {renderInline(line.trim().slice(2))}
         </blockquote>
       );
@@ -75,7 +96,11 @@ function MarkdownViewer({ content }) {
     }
 
     // Normal Paragraph
-    elements.push(<p key={`p-${i}`} className="text-gray-300 leading-relaxed my-2">{renderInline(line)}</p>);
+    elements.push(
+      <p key={`p-${i}`} className="text-gray-300 leading-relaxed my-2">
+        {renderInline(line)}
+      </p>
+    );
   }
 
   return <div className="max-w-4xl mx-auto pb-20">{elements}</div>;
@@ -86,16 +111,16 @@ function renderInline(text) {
   // A very simple regex approach to inline formatting.
   // We split by parts and map.
   let parts = [];
-  let current = "";
+  let current = '';
   let i = 0;
-  
+
   while (i < text.length) {
-    if (text.slice(i, i+2) === '**') {
+    if (text.slice(i, i + 2) === '**') {
       if (current) parts.push({ type: 'text', val: current });
-      current = "";
+      current = '';
       i += 2;
-      let boldText = "";
-      while (i < text.length && text.slice(i, i+2) !== '**') {
+      let boldText = '';
+      while (i < text.length && text.slice(i, i + 2) !== '**') {
         boldText += text[i];
         i++;
       }
@@ -103,9 +128,9 @@ function renderInline(text) {
       i += 2;
     } else if (text[i] === '`') {
       if (current) parts.push({ type: 'text', val: current });
-      current = "";
+      current = '';
       i++;
-      let codeText = "";
+      let codeText = '';
       while (i < text.length && text[i] !== '`') {
         codeText += text[i];
         i++;
@@ -114,9 +139,9 @@ function renderInline(text) {
       i++;
     } else if (text[i] === '[') {
       if (current) parts.push({ type: 'text', val: current });
-      current = "";
+      current = '';
       i++;
-      let linkText = "";
+      let linkText = '';
       while (i < text.length && text[i] !== ']') {
         linkText += text[i];
         i++;
@@ -124,7 +149,7 @@ function renderInline(text) {
       i++; // skip ']'
       if (text[i] === '(') {
         i++; // skip '('
-        let linkUrl = "";
+        let linkUrl = '';
         while (i < text.length && text[i] !== ')') {
           linkUrl += text[i];
           i++;
@@ -142,20 +167,46 @@ function renderInline(text) {
   if (current) parts.push({ type: 'text', val: current });
 
   return parts.map((p, idx) => {
-    if (p.type === 'bold') return <strong key={idx} className="text-text font-semibold">{p.val}</strong>;
-    if (p.type === 'code') return <code key={idx} className="bg-surface px-1.5 py-0.5 rounded text-sm text-[#e5c07b] font-mono border border-border/50">{p.val}</code>;
+    if (p.type === 'bold')
+      return (
+        <strong key={idx} className="text-text font-semibold">
+          {p.val}
+        </strong>
+      );
+    if (p.type === 'code')
+      return (
+        <code
+          key={idx}
+          className="bg-surface px-1.5 py-0.5 rounded text-sm text-[#e5c07b] font-mono border border-border/50"
+        >
+          {p.val}
+        </code>
+      );
     if (p.type === 'link') {
       const isExternal = p.url.startsWith('http');
       if (isExternal) {
-        return <a key={idx} href={p.url} target="_blank" rel="noreferrer" className="text-accent hover:underline inline-flex items-center gap-1">{p.text} <ExternalLink className="w-3 h-3"/></a>;
+        return (
+          <a
+            key={idx}
+            href={p.url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-accent hover:underline inline-flex items-center gap-1"
+          >
+            {p.text} <ExternalLink className="w-3 h-3" />
+          </a>
+        );
       }
       // Internal Markdown Link
-      return <Link key={idx} to={`/help?path=${encodeURIComponent(p.url)}`} className="text-accent hover:underline">{p.text}</Link>;
+      return (
+        <Link key={idx} to={`/help?path=${encodeURIComponent(p.url)}`} className="text-accent hover:underline">
+          {p.text}
+        </Link>
+      );
     }
     return <span key={idx}>{p.val}</span>;
   });
 }
-
 
 export default function HelpPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -188,7 +239,9 @@ export default function HelpPage() {
       }
     };
     fetchDoc();
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [currentPath]);
 
   const pathParts = actualPath.split('/');
@@ -209,7 +262,7 @@ export default function HelpPage() {
           <Book className="w-4 h-4 text-accent" />
           <span className="font-semibold">CodeLens Help Center</span>
         </div>
-        
+
         <div className="flex items-center gap-1.5 ml-8 text-xs text-muted">
           {pathParts.map((part, i) => (
             <React.Fragment key={i}>
@@ -234,7 +287,10 @@ export default function HelpPage() {
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
             <AlertCircle className="w-8 h-8 text-danger" />
             <p className="text-danger">{error}</p>
-            <button onClick={() => setSearchParams({ path: 'README.md' })} className="mt-4 px-4 py-2 bg-panel border border-border rounded hover:bg-surface text-sm">
+            <button
+              onClick={() => setSearchParams({ path: 'README.md' })}
+              className="mt-4 px-4 py-2 bg-panel border border-border rounded hover:bg-surface text-sm"
+            >
               Return to Home
             </button>
           </div>

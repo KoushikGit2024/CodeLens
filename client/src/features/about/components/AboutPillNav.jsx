@@ -1,17 +1,17 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { clsx } from 'clsx';
-import { 
-  LayoutDashboard, 
-  Bot, 
-  FileCode2, 
-  FolderTree, 
-  Bookmark, 
-  Box, 
-  GitMerge, 
-  ShieldAlert, 
-  Wrench, 
-  Activity, 
-  User 
+import {
+  LayoutDashboard,
+  Bot,
+  FileCode2,
+  FolderTree,
+  Bookmark,
+  Box,
+  GitMerge,
+  ShieldAlert,
+  Wrench,
+  Activity,
+  User,
 } from 'lucide-react';
 
 const TABS = [
@@ -59,7 +59,7 @@ export default function AboutPillNav({ activeTab, setActiveTab }) {
 
   const activeIndex = Math.max(
     0,
-    TABS.findIndex((t) => t.id === activeTab)
+    TABS.findIndex(t => t.id === activeTab)
   );
   const dragging = dragAngle !== null;
   const angle = dragging ? dragAngle : activeIndex * STEP;
@@ -76,57 +76,57 @@ export default function AboutPillNav({ activeTab, setActiveTab }) {
     }
   }, [shownIndex]);
 
-  const goTo = (i) => {
+  const goTo = i => {
     const next = Math.min(TABS.length - 1, Math.max(0, i));
     if (TABS[next].id !== activeTab) setActiveTab(TABS[next].id);
   };
 
   /* Pointer position -> dial angle, clamped to the dial's travel */
-  const angleFromPointer = (e) => {
+  const angleFromPointer = e => {
     const rect = rootRef.current.getBoundingClientRect();
     const dx = e.clientX - (rect.left + rect.width / 2);
     const dy = e.clientY - (rect.top + rect.height / 2);
     let deg = (Math.atan2(dx, -dy) * 180) / Math.PI;
     if (deg < 0) deg += 360;
-    
+
     // Map absolute deg (0=top) to relative angle from START_ANGLE
     let relativeDeg = deg - START_ANGLE;
     if (relativeDeg < 0) relativeDeg += 360;
-    
+
     if (relativeDeg > TOTAL_DIAL_ARC) {
       relativeDeg = relativeDeg > TOTAL_DIAL_ARC + (360 - TOTAL_DIAL_ARC) / 2 ? 0 : TOTAL_DIAL_ARC;
     }
     return relativeDeg;
   };
 
-  const handleDown = (e) => {
+  const handleDown = e => {
     rootRef.current.setPointerCapture(e.pointerId);
     const a = angleFromPointer(e);
     setDragAngle(a);
     goTo(Math.round(a / STEP));
   };
 
-  const handleMove = (e) => {
+  const handleMove = e => {
     if (!dragging) return;
     const a = angleFromPointer(e);
     setDragAngle(a);
     goTo(Math.round(a / STEP));
   };
 
-  const handleUp = (e) => {
+  const handleUp = e => {
     if (!dragging) return;
     rootRef.current.releasePointerCapture?.(e.pointerId);
     setDragAngle(null); // knob snaps to the nearest detent
   };
 
-  const handleWheel = (e) => {
+  const handleWheel = e => {
     const now = Date.now();
     if (now - lastWheel.current < 140) return;
     lastWheel.current = now;
     goTo(activeIndex + (e.deltaY > 0 ? 1 : -1));
   };
 
-  const handleKey = (e) => {
+  const handleKey = e => {
     if (e.key === 'ArrowRight' || e.key === 'ArrowUp') goTo(activeIndex + 1);
     else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') goTo(activeIndex - 1);
     else if (e.key === 'Home') goTo(0);
@@ -169,16 +169,16 @@ export default function AboutPillNav({ activeTab, setActiveTab }) {
             clipPath: 'circle(50% at 50% 50%)',
             background: `rgba(var(--color-surface), 0.8)`,
             borderColor: showCompletionAnim ? `rgba(74,222,128, 0.8)` : `rgb(var(--color-border))`,
-            boxShadow: showCompletionAnim 
-              ? '0 0 40px rgba(74,222,128,0.3), inset 0 0 20px rgba(74,222,128,0.2)' 
+            boxShadow: showCompletionAnim
+              ? '0 0 40px rgba(74,222,128,0.3), inset 0 0 20px rgba(74,222,128,0.2)'
               : '0 20px 50px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.05)',
           }}
         />
 
         <svg
           className={clsx(
-            "absolute inset-0 bg-transparent rounded-full transition-shadow duration-700",
-            showCompletionAnim ? "shadow-[0_0_80px_rgba(74,222,128,0.4)]" : ""
+            'absolute inset-0 bg-transparent rounded-full transition-shadow duration-700',
+            showCompletionAnim ? 'shadow-[0_0_80px_rgba(74,222,128,0.4)]' : ''
           )}
           width={SIZE}
           height={SIZE}
@@ -186,17 +186,10 @@ export default function AboutPillNav({ activeTab, setActiveTab }) {
           aria-hidden="true"
         >
           {/* Outer dial rim line */}
-          <circle
-            cx={C}
-            cy={C}
-            r={SIZE / 2 - 8}
-            fill="none"
-            stroke="rgba(var(--color-text), 0.05)"
-            strokeWidth="1"
-          />
+          <circle cx={C} cy={C} r={SIZE / 2 - 8} fill="none" stroke="rgba(var(--color-text), 0.05)" strokeWidth="1" />
 
           {/* Fine dial ticks */}
-          {ticks.map((t) => {
+          {ticks.map(t => {
             const a = polar(t, R - 12);
             const b = polar(t, R - (t % STEP === 0 ? 6 : 9));
             return (
@@ -231,12 +224,14 @@ export default function AboutPillNav({ activeTab, setActiveTab }) {
             cy={C}
             r={R}
             fill="none"
-            stroke={showCompletionAnim ? "#4ade80" : "rgb(var(--color-accent))"}
+            stroke={showCompletionAnim ? '#4ade80' : 'rgb(var(--color-accent))'}
             strokeWidth="2"
             strokeLinecap="round"
             transform={`rotate(${START_ANGLE - 90} ${C} ${C})`}
             strokeDasharray={`${(CIRC * (showCompletionAnim ? 360 : angle)) / 360} ${CIRC}`}
-            style={{ transition: dragging ? 'none' : 'stroke-dasharray 600ms cubic-bezier(0.4, 0, 0.2, 1), stroke 500ms ease' }}
+            style={{
+              transition: dragging ? 'none' : 'stroke-dasharray 600ms cubic-bezier(0.4, 0, 0.2, 1), stroke 500ms ease',
+            }}
           />
 
           {/* Tab nodes (commits) */}
@@ -251,9 +246,11 @@ export default function AboutPillNav({ activeTab, setActiveTab }) {
                 r="4.5"
                 fill="rgb(var(--color-surface))"
                 stroke={
-                  passed 
-                    ? (showCompletionAnim ? "#4ade80" : "rgb(var(--color-accent))") 
-                    : "rgba(var(--color-muted), 0.5)"
+                  passed
+                    ? showCompletionAnim
+                      ? '#4ade80'
+                      : 'rgb(var(--color-accent))'
+                    : 'rgba(var(--color-muted), 0.5)'
                 }
                 strokeWidth="2"
                 style={{ transition: 'stroke 500ms ease' }}
@@ -274,12 +271,18 @@ export default function AboutPillNav({ activeTab, setActiveTab }) {
               cy={C - R}
               r={dragging ? 16 : 14}
               fill="none"
-              stroke={showCompletionAnim ? "#4ade80" : "rgb(var(--color-accent))"}
+              stroke={showCompletionAnim ? '#4ade80' : 'rgb(var(--color-accent))'}
               strokeWidth="1"
               opacity="0.4"
               style={{ transition: 'r 150ms, stroke 500ms ease' }}
             />
-            <circle cx={C} cy={C - R} r="8" fill={showCompletionAnim ? "#4ade80" : "rgb(var(--color-accent))"} style={{ transition: 'fill 500ms ease' }} />
+            <circle
+              cx={C}
+              cy={C - R}
+              r="8"
+              fill={showCompletionAnim ? '#4ade80' : 'rgb(var(--color-accent))'}
+              style={{ transition: 'fill 500ms ease' }}
+            />
             <circle cx={C} cy={C - R} r="2.5" fill="#fff" opacity="0.9" />
           </g>
         </svg>
@@ -306,15 +309,15 @@ export default function AboutPillNav({ activeTab, setActiveTab }) {
 
         {/* Centre readout */}
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1.5">
-          <span 
+          <span
             className={clsx(
-              "font-mono text-[10px] tracking-wide transition-all duration-500",
-              showCompletionAnim 
-                ? "text-green-400 opacity-100 scale-110 drop-shadow-[0_0_8px_rgba(74,222,128,0.8)]" 
-                : "text-accent opacity-80"
+              'font-mono text-[10px] tracking-wide transition-all duration-500',
+              showCompletionAnim
+                ? 'text-green-400 opacity-100 scale-110 drop-shadow-[0_0_8px_rgba(74,222,128,0.8)]'
+                : 'text-accent opacity-80'
             )}
           >
-            {showCompletionAnim ? "COMPLETE" : "HEAD"}
+            {showCompletionAnim ? 'COMPLETE' : 'HEAD'}
           </span>
           <div
             key={TABS[shownIndex].id}
@@ -322,9 +325,7 @@ export default function AboutPillNav({ activeTab, setActiveTab }) {
             style={{ animation: 'dialFade 200ms ease-out' }}
           >
             <Active className="h-7 w-7 text-text" strokeWidth={1.75} />
-            <span className="font-mono text-[12px] font-medium text-text">
-              {TABS[shownIndex].label}
-            </span>
+            <span className="font-mono text-[12px] font-medium text-text">{TABS[shownIndex].label}</span>
           </div>
         </div>
 

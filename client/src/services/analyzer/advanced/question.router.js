@@ -1,7 +1,7 @@
 /**
  * question.router.js
  *
- * It intercepts the raw user question, then extracts keyword heuristics, 
+ * It intercepts the raw user question, then extracts keyword heuristics,
  * and then it applies an intent classification mapping to route the request efficiently.
  */
 
@@ -16,7 +16,7 @@ export const INTENTS = {
 };
 
 /**
- * It evaluates the question string against regex rules, then extracts the closest logical intent, 
+ * It evaluates the question string against regex rules, then extracts the closest logical intent,
  * and then it applies deterministic flags to skip the AI provider when possible.
  */
 export function routeQuestion(question, analysis, activeContext = null) {
@@ -51,10 +51,7 @@ export function routeQuestion(question, analysis, activeContext = null) {
     return result;
   }
 
-  if (
-    q.match(/how many (files|modules|components|packages)/) ||
-    q.match(/count of (files|modules)/)
-  ) {
+  if (q.match(/how many (files|modules|components|packages)/) || q.match(/count of (files|modules)/)) {
     result.intent = INTENTS.METRICS;
     result.requiresAi = false;
     return result;
@@ -90,21 +87,12 @@ export function routeQuestion(question, analysis, activeContext = null) {
     return result;
   }
 
-  if (
-    q.match(/refactor/) ||
-    q.match(/technical debt/) ||
-    q.match(/fix first/) ||
-    q.match(/safest refactoring/)
-  ) {
+  if (q.match(/refactor/) || q.match(/technical debt/) || q.match(/fix first/) || q.match(/safest refactoring/)) {
     result.intent = INTENTS.REFACTORING;
     return result;
   }
 
-  if (
-    q.match(/what does .* do/) ||
-    q.match(/explain /) ||
-    q.match(/how does .* work/)
-  ) {
+  if (q.match(/what does .* do/) || q.match(/explain /) || q.match(/how does .* work/)) {
     result.intent = result.targetFile ? INTENTS.FILE_EXPLANATION : INTENTS.GENERAL;
     return result;
   }

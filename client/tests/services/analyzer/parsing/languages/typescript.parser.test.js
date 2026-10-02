@@ -257,11 +257,17 @@ describe('TypeScriptParser — edge cases', () => {
     const result = parse(src);
     expect(result.hasErrors).toBe(false);
     expect(result.symbols.some(s => s.kind === SymbolKind.IMPORT)).toBe(true);
-    expect(result.symbols.some(s => s.kind === SymbolKind.CLASS && s.name === 'UserRepository' && s.tsKind === 'interface')).toBe(true);
-    expect(result.symbols.some(s => s.kind === SymbolKind.FUNCTION && s.name === 'UserId' && s.tsKind === 'type')).toBe(true);
+    expect(
+      result.symbols.some(s => s.kind === SymbolKind.CLASS && s.name === 'UserRepository' && s.tsKind === 'interface')
+    ).toBe(true);
+    expect(result.symbols.some(s => s.kind === SymbolKind.FUNCTION && s.name === 'UserId' && s.tsKind === 'type')).toBe(
+      true
+    );
     expect(result.symbols.some(s => s.kind === SymbolKind.CLASS && s.name === 'UserService')).toBe(true);
     expect(result.symbols.some(s => s.kind === SymbolKind.METHOD && s.name === 'findById')).toBe(true);
-    expect(result.symbols.some(s => s.kind === SymbolKind.METHOD && s.name === 'formatUser' && s.visibility === 'private')).toBe(true);
+    expect(
+      result.symbols.some(s => s.kind === SymbolKind.METHOD && s.name === 'formatUser' && s.visibility === 'private')
+    ).toBe(true);
     expect(result.symbols.some(s => s.kind === SymbolKind.EXPORT && s.exportType === 'default')).toBe(true);
   });
 

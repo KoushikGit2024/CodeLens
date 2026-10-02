@@ -11,10 +11,12 @@ npm run dev
 ```
 
 This command launches:
+
 - **Backend (Server)** on `http://localhost:3001`
 - **Frontend (Client)** on `http://localhost:5173`
 
 Alternatively, you can run them individually:
+
 ```bash
 # Terminal 1
 cd server && npm run dev

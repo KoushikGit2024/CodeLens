@@ -1,7 +1,7 @@
 /**
  * dependencyGraph.js
  *
- * It ingests the resolved AST imports, then extracts the dependencies, 
+ * It ingests the resolved AST imports, then extracts the dependencies,
  * and then it applies the canonical AnalysisGraph schema for React Flow rendering.
  *
  * How this file is structured:
@@ -26,7 +26,7 @@ export function packageNodeId(name) {
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
- * It resolves all repository imports, then extracts React Flow compatible nodes and edges, 
+ * It resolves all repository imports, then extracts React Flow compatible nodes and edges,
  * and then it applies deterministic sorting to guarantee stable graph UI rendering.
  */
 export function buildDependencyGraph(analysis) {
@@ -39,12 +39,15 @@ export function buildDependencyGraph(analysis) {
   // It iterates over every file, then extracts its path, and then it applies the AnalysisNode schema.
   for (const f of analysis.files) {
     const id = fileNodeId(f.filePath);
-    nodesMap.set(id, createAnalysisNode({
+    nodesMap.set(
       id,
-      type: 'fileNode',
-      label: f.filePath.split('/').pop(),
-      filePath: f.filePath
-    }));
+      createAnalysisNode({
+        id,
+        type: 'fileNode',
+        label: f.filePath.split('/').pop(),
+        filePath: f.filePath,
+      })
+    );
   }
 
   let unresolvedCount = 0;
@@ -56,7 +59,7 @@ export function buildDependencyGraph(analysis) {
     for (const ri of imports) {
       if (ri.kind === 'unresolved') {
         unresolvedCount++;
-        continue; 
+        continue;
       }
 
       let targetId;
@@ -64,31 +67,35 @@ export function buildDependencyGraph(analysis) {
       if (ri.kind === 'external') {
         targetId = packageNodeId(ri.specifier);
         if (!nodesMap.has(targetId)) {
-          nodesMap.set(targetId, createAnalysisNode({
-            id: targetId,
-            type: 'moduleNode',
-            label: ri.specifier
-          }));
+          nodesMap.set(
+            targetId,
+            createAnalysisNode({
+              id: targetId,
+              type: 'moduleNode',
+              label: ri.specifier,
+            })
+          );
         }
       } else {
         targetId = fileNodeId(ri.resolvedTo);
       }
 
-      const isCjs = ri.specifiers && ri.specifiers.some(
-        s => s.type === 'cjs-default' || s.type === 'cjs-named'
-      );
-      
+      const isCjs = ri.specifiers && ri.specifiers.some(s => s.type === 'cjs-default' || s.type === 'cjs-named');
+
       const edgeKey = `${sourceId}|${targetId}`;
 
       if (!edgesMap.has(edgeKey)) {
-        edgesMap.set(edgeKey, createAnalysisEdge({
-          id: edgeKey,
-          source: sourceId,
-          target: targetId,
-          type: isCjs ? 'smoothstep' : 'default',
-          importCount: 1,
-          specifiers: _extractNames(ri.specifiers)
-        }));
+        edgesMap.set(
+          edgeKey,
+          createAnalysisEdge({
+            id: edgeKey,
+            source: sourceId,
+            target: targetId,
+            type: isCjs ? 'smoothstep' : 'default',
+            importCount: 1,
+            specifiers: _extractNames(ri.specifiers),
+          })
+        );
       } else {
         // Increment weight for multiple imports of the same target
         const existingEdge = edgesMap.get(edgeKey);
@@ -105,7 +112,7 @@ export function buildDependencyGraph(analysis) {
     return cmp !== 0 ? cmp : a.target.localeCompare(b.target);
   });
 
-  const fileNodes    = nodes.filter(n => n.type === 'fileNode');
+  const fileNodes = nodes.filter(n => n.type === 'fileNode');
   const packageNodes = nodes.filter(n => n.type === 'moduleNode');
 
   // Compute In/Out degrees for graph metrics
@@ -120,11 +127,11 @@ export function buildDependencyGraph(analysis) {
     nodes,
     edges,
     meta: {
-      totalFiles:        fileNodes.length,
-      totalPackages:     packageNodes.length,
-      totalEdges:        edges.length,
+      totalFiles: fileNodes.length,
+      totalPackages: packageNodes.length,
+      totalEdges: edges.length,
       unresolvedImports: unresolvedCount,
-      builtAt:           new Date().toISOString(),
+      builtAt: new Date().toISOString(),
     },
   };
 }
@@ -132,15 +139,15 @@ export function buildDependencyGraph(analysis) {
 // ── Derived queries ───────────────────────────────────────────────────────────
 
 /**
- * It searches the full graph edge array, then extracts matching source/target connections, 
+ * It searches the full graph edge array, then extracts matching source/target connections,
  * and then it applies them into structured incoming and outgoing lists.
  */
 export function getFileDependencies(graph, filePath) {
   const sourceId = fileNodeId(filePath);
 
-  const dependencies  = [];
-  const dependents    = [];
-  const externalPkgs  = new Set();
+  const dependencies = [];
+  const dependents = [];
+  const externalPkgs = new Set();
 
   for (const edge of graph.edges) {
     if (edge.source === sourceId) {
@@ -149,13 +156,13 @@ export function getFileDependencies(graph, filePath) {
 
       if (targetNode.type === 'fileNode') {
         dependencies.push({
-          filePath:  targetNode.data.filePath,
-          evidence:  edge.data,
+          filePath: targetNode.data.filePath,
+          evidence: edge.data,
         });
       } else if (targetNode.type === 'moduleNode') {
         externalPkgs.add(targetNode.data.label);
         dependencies.push({
-          package:  targetNode.data.label,
+          package: targetNode.data.label,
           evidence: edge.data,
         });
       }
@@ -176,14 +183,14 @@ export function getFileDependencies(graph, filePath) {
     filePath,
     dependencies,
     dependents,
-    externalPackages:  Array.from(externalPkgs).sort(),
-    dependencyCount:   dependencies.length,
-    dependentCount:    dependents.length,
+    externalPackages: Array.from(externalPkgs).sort(),
+    dependencyCount: dependencies.length,
+    dependentCount: dependents.length,
   };
 }
 
 /**
- * It iterates the edges to find connected ids, then extracts the disconnected nodes, 
+ * It iterates the edges to find connected ids, then extracts the disconnected nodes,
  * and then it applies them to the isolated files array.
  */
 export function getIsolatedFiles(graph) {
@@ -200,7 +207,7 @@ export function getIsolatedFiles(graph) {
 }
 
 /**
- * It builds an adjacency list, then extracts recursion paths, 
+ * It builds an adjacency list, then extracts recursion paths,
  * and then it applies Depth First Search (DFS) to identify circular edges.
  */
 export function detectCycles(graph) {
@@ -213,9 +220,9 @@ export function detectCycles(graph) {
     adj.get(edge.source).push(edge.target);
   }
 
-  const visited   = new Set();
-  const inStack   = new Set();
-  const cycles    = [];
+  const visited = new Set();
+  const inStack = new Set();
+  const cycles = [];
 
   for (const startId of adj.keys()) {
     if (visited.has(startId)) continue;
@@ -235,7 +242,7 @@ function _dfsCycles(nodeId, adj, visited, inStack, path, cycles) {
   inStack.add(nodeId);
   path.push(nodeId);
 
-  for (const neighbour of (adj.get(nodeId) || [])) {
+  for (const neighbour of adj.get(nodeId) || []) {
     if (!visited.has(neighbour)) {
       _dfsCycles(neighbour, adj, visited, inStack, path, cycles);
     } else if (inStack.has(neighbour)) {
@@ -253,7 +260,7 @@ function _dfsCycles(nodeId, adj, visited, inStack, path, cycles) {
 // ── Private helpers ───────────────────────────────────────────────────────────
 
 /**
- * It filters side-effect specifiers, then extracts the valid aliases, 
+ * It filters side-effect specifiers, then extracts the valid aliases,
  * and then it applies them to the output name array.
  */
 function _extractNames(specifiers) {

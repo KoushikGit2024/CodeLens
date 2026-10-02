@@ -39,9 +39,7 @@ async function generateChat(req, res, next) {
     return res.status(400).json({ error: 'Missing prompt in request body.' });
   }
 
-  const finalPrompt = Array.isArray(history) && history.length > 0
-    ? formatWithHistory(prompt, history)
-    : prompt;
+  const finalPrompt = Array.isArray(history) && history.length > 0 ? formatWithHistory(prompt, history) : prompt;
 
   const jobId = crypto.randomUUID();
   activeJobs.set(jobId, { status: 'processing', result: null, error: null });
@@ -68,7 +66,12 @@ async function processAiJob(jobId, req, finalPrompt, jsonMode, feature) {
         provider: aiProvider.getProviderName(),
         feature: feature || 'chat_json',
         status: 'success',
-        usage: { input_tokens: estimatedInput, output_tokens: estimatedOutput, total_tokens: estimatedInput + estimatedOutput, source: 'estimated' },
+        usage: {
+          input_tokens: estimatedInput,
+          output_tokens: estimatedOutput,
+          total_tokens: estimatedInput + estimatedOutput,
+          source: 'estimated',
+        },
         promptChars: finalPrompt.length,
         responseChars: responseText.length,
         latencyMs: Date.now() - startedAt,
@@ -102,16 +105,19 @@ async function processAiJob(jobId, req, finalPrompt, jsonMode, feature) {
       errorMessage: error.message,
     });
 
-    activeJobs.set(jobId, { 
-      status: 'failed', 
-      error: isUnavailable ? 'AI providers are currently unavailable due to high demand.' : error.message 
+    activeJobs.set(jobId, {
+      status: 'failed',
+      error: isUnavailable ? 'AI providers are currently unavailable due to high demand.' : error.message,
     });
   }
 
   // Cleanup job after 1 hour to prevent memory leaks
-  setTimeout(() => {
-    activeJobs.delete(jobId);
-  }, 60 * 60 * 1000);
+  setTimeout(
+    () => {
+      activeJobs.delete(jobId);
+    },
+    60 * 60 * 1000
+  );
 }
 
 /**
@@ -120,11 +126,11 @@ async function processAiJob(jobId, req, finalPrompt, jsonMode, feature) {
 function getJobStatus(req, res) {
   const { jobId } = req.params;
   const job = activeJobs.get(jobId);
-  
+
   if (!job) {
     return res.status(404).json({ error: 'Job not found or expired.' });
   }
-  
+
   return res.json(job);
 }
 
@@ -155,19 +161,11 @@ async function statusCheck(req, res, next) {
 
     const { getSupabaseClient } = require('../../core/db/supabase.client');
     const supabase = getSupabaseClient();
-    const { data: userRow } = await supabase
-      .from('users')
-      .select('plan_id')
-      .eq('id', userId)
-      .single();
+    const { data: userRow } = await supabase.from('users').select('plan_id').eq('id', userId).single();
 
     const planId = userRow ? userRow.plan_id : 'free';
 
-    const { data: plan } = await supabase
-      .from('plans')
-      .select('*')
-      .eq('id', planId)
-      .single();
+    const { data: plan } = await supabase.from('plans').select('*').eq('id', planId).single();
 
     const { data: periods } = await supabase
       .from('usage_periods')
@@ -189,13 +187,15 @@ async function statusCheck(req, res, next) {
       authState: 'authenticated',
       providerConfigured: configured,
       quotaStatus,
-      usage: period ? {
-        requests: period.ai_requests,
-        requestLimit: plan ? plan.ai_requests_per_month : null,
-        tokens: period.ai_tokens,
-        tokenLimit: plan ? plan.ai_tokens_per_month : null,
-        periodEnd: period.period_end,
-      } : null,
+      usage: period
+        ? {
+            requests: period.ai_requests,
+            requestLimit: plan ? plan.ai_requests_per_month : null,
+            tokens: period.ai_tokens,
+            tokenLimit: plan ? plan.ai_tokens_per_month : null,
+            periodEnd: period.period_end,
+          }
+        : null,
     });
   } catch (error) {
     console.error('[AI Status Error]', error);
@@ -207,5 +207,5 @@ module.exports = {
   generateChat,
   healthCheck,
   statusCheck,
-  getJobStatus
+  getJobStatus,
 };

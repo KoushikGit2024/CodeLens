@@ -20,7 +20,7 @@ try {
 // The user will simply be signed out, which is fine for local-first usage.
 (function evictStaleSupabaseSession() {
   if (rawUrl && supabaseAnonKey) return; // Do not evict if configured
-  
+
   // Identify and remove ALL Supabase auth keys from localStorage (they start with "sb-")
   const staleKeys = Object.keys(localStorage).filter(k => k.startsWith('sb-'));
   if (staleKeys.length > 0) {
@@ -33,8 +33,8 @@ const isConfigured = !!(rawUrl && supabaseAnonKey);
 
 export const supabase = createClient(validUrl, supabaseAnonKey || 'placeholder', {
   auth: {
-    autoRefreshToken: isConfigured,   
-    persistSession: isConfigured,     
-    detectSessionInUrl: isConfigured, 
+    autoRefreshToken: isConfigured,
+    persistSession: isConfigured,
+    detectSessionInUrl: isConfigured,
   },
 });

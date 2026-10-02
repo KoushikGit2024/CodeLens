@@ -23,19 +23,19 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
-vi.mock("../src/shared/context/ToastContext.jsx", () => ({ useToast: () => ({ addToast: vi.fn() }) }));
+vi.mock('../src/shared/context/ToastContext.jsx', () => ({ useToast: () => ({ addToast: vi.fn() }) }));
 const mockUser = { id: 'test-user', email: 'test@example.com' };
-vi.mock("../src/shared/context/AuthContext.jsx", () => ({ 
-  useAuth: () => ({ 
+vi.mock('../src/shared/context/AuthContext.jsx', () => ({
+  useAuth: () => ({
     user: mockUser,
     signIn: vi.fn(),
     signOut: vi.fn(),
     signUp: vi.fn(),
     resetPasswordForEmail: vi.fn(),
     updateUserPassword: vi.fn(),
-    signInWithOAuth: vi.fn()
+    signInWithOAuth: vi.fn(),
   }),
-  AuthProvider: ({ children }) => children
+  AuthProvider: ({ children }) => children,
 }));
 
 import React from 'react';
@@ -51,8 +51,8 @@ vi.mock('reactflow', () => {
     Position: { Top: 'top', Bottom: 'bottom', Left: 'left', Right: 'right' },
     MarkerType: { ArrowClosed: 'arrowclosed' },
     applyNodeChanges: vi.fn(),
-    useNodesState: (initial) => [initial, vi.fn(), vi.fn()],
-    useEdgesState: (initial) => [initial, vi.fn(), vi.fn()],
+    useNodesState: initial => [initial, vi.fn(), vi.fn()],
+    useEdgesState: initial => [initial, vi.fn(), vi.fn()],
   };
 });
 
@@ -61,4 +61,4 @@ vi.mock('@monaco-editor/react', () => {
   return {
     default: () => React.createElement('div', { 'data-testid': 'monaco-editor-mock' }),
   };
-});
+});

@@ -1,6 +1,6 @@
 # CodeLens Documentation
 
-Welcome to the CodeLens Knowledge Base. CodeLens is an AI-Driven Code Intelligence and Automated Documentation System. 
+Welcome to the CodeLens Knowledge Base. CodeLens is an AI-Driven Code Intelligence and Automated Documentation System.
 
 <div align="center">
   <b>START HERE</b><br/>

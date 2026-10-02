@@ -9,20 +9,20 @@ const app = express();
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 const isProd = process.env.NODE_ENV === 'production';
-const allowedOrigins = isProd 
-  ? [process.env.FRONTEND_URL].filter(Boolean)
-  : ['http://localhost:5173'];
+const allowedOrigins = isProd ? [process.env.FRONTEND_URL].filter(Boolean) : ['http://localhost:5173'];
 
-app.use(cors({ 
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  }, 
-  credentials: true 
-}));
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+  })
+);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -35,7 +35,7 @@ app.get('/', (_req, res) => {
     name: 'CodeLens API',
     description: 'AI-Driven Code Intelligence and Automated Documentation System',
     version: '1.0.0',
-    docs: 'Available at /api/docs'
+    docs: 'Available at /api/docs',
   });
 });
 
@@ -53,7 +53,7 @@ const { getSupabaseClient } = require('./core/db/supabase.client');
 // eslint-disable-next-line no-unused-vars
 app.use(async (err, req, res, _next) => {
   console.error('[CodeLens] Unhandled error:', err);
-  
+
   // Log the error to Supabase database
   try {
     const supabase = getSupabaseClient();
@@ -61,7 +61,7 @@ app.use(async (err, req, res, _next) => {
       error_message: err.message || 'Internal server error',
       stack_trace: err.stack || '',
       route: req.originalUrl || '',
-      method: req.method || ''
+      method: req.method || '',
     });
   } catch (dbErr) {
     console.error('[CodeLens] Failed to log error to database:', dbErr.message);

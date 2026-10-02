@@ -25,7 +25,9 @@ export function AuthProvider({ children }) {
     });
 
     // Listen for changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -53,30 +55,41 @@ export function AuthProvider({ children }) {
     return supabase.auth.signOut();
   };
 
-  const signInWithOAuth = async (provider) => {
+  const signInWithOAuth = async provider => {
     if (!isConfigured) return { error: { message: 'Auth not configured.' } };
-    return supabase.auth.signInWithOAuth({ provider, options: { redirectTo: `${window.location.origin}/auth/callback` } });
+    return supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+    });
   };
 
-  const resetPasswordForEmail = async (email) => {
+  const resetPasswordForEmail = async email => {
     if (!isConfigured) return { error: { message: 'Auth not configured.' } };
     return supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/auth/reset-password`,
     });
   };
 
-  const updateUserPassword = async (newPassword) => {
+  const updateUserPassword = async newPassword => {
     if (!isConfigured) return { error: { message: 'Auth not configured.' } };
     return supabase.auth.updateUser({ password: newPassword });
   };
 
   // Always render children — analysis must never be gated on auth loading
   return (
-    <AuthContext.Provider value={{ 
-      session, user, loading, 
-      signIn, signUp, signOut, 
-      signInWithOAuth, resetPasswordForEmail, updateUserPassword 
-    }}>
+    <AuthContext.Provider
+      value={{
+        session,
+        user,
+        loading,
+        signIn,
+        signUp,
+        signOut,
+        signInWithOAuth,
+        resetPasswordForEmail,
+        updateUserPassword,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

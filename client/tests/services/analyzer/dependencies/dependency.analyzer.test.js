@@ -70,8 +70,8 @@ describe('node ID helpers', () => {
 describe('buildDependencyGraph — nodes', () => {
   test('every file in analysis becomes a file node', () => {
     const analysis = makeAnalysis([
-      { path: 'src/app.js',    imports: [] },
-      { path: 'src/utils.js',  imports: [] },
+      { path: 'src/app.js', imports: [] },
+      { path: 'src/utils.js', imports: [] },
     ]);
     const graph = buildDependencyGraph(analysis);
 
@@ -81,9 +81,7 @@ describe('buildDependencyGraph — nodes', () => {
   });
 
   test('external packages become package nodes', () => {
-    const analysis = makeAnalysis([
-      { path: 'src/app.js', imports: [{ source: 'express' }] },
-    ]);
+    const analysis = makeAnalysis([{ path: 'src/app.js', imports: [{ source: 'express' }] }]);
     const graph = buildDependencyGraph(analysis);
 
     const pkgNodes = graph.nodes.filter(n => n.type === 'moduleNode');
@@ -93,9 +91,7 @@ describe('buildDependencyGraph — nodes', () => {
   });
 
   test('external package node has name field', () => {
-    const analysis = makeAnalysis([
-      { path: 'src/app.js', imports: [{ source: 'mongoose' }] },
-    ]);
+    const analysis = makeAnalysis([{ path: 'src/app.js', imports: [{ source: 'mongoose' }] }]);
     const graph = buildDependencyGraph(analysis);
     const pkg = graph.nodes.find(n => n.type === 'moduleNode');
     expect(pkg).toMatchObject({ id: 'pkg:mongoose', type: 'moduleNode', data: { label: 'mongoose' } });
@@ -141,35 +137,27 @@ describe('buildDependencyGraph — edges', () => {
     ]);
     const graph = buildDependencyGraph(analysis);
 
-    const edge = graph.edges.find(
-      e => e.source === 'file:src/index.js' && e.target === 'file:src/utils.js'
-    );
+    const edge = graph.edges.find(e => e.source === 'file:src/index.js' && e.target === 'file:src/utils.js');
     expect(edge).toBeDefined();
     expect(edge.type).toBe('default');
   });
 
   test('external package import creates an edge pointing to package node', () => {
-    const analysis = makeAnalysis([
-      { path: 'src/app.js', imports: [{ source: 'express' }] },
-    ]);
+    const analysis = makeAnalysis([{ path: 'src/app.js', imports: [{ source: 'express' }] }]);
     const graph = buildDependencyGraph(analysis);
 
-    const edge = graph.edges.find(
-      e => e.source === 'file:src/app.js' && e.target === 'pkg:express'
-    );
+    const edge = graph.edges.find(e => e.source === 'file:src/app.js' && e.target === 'pkg:express');
     expect(edge).toBeDefined();
   });
 
   test('CJS require creates an edge with type=requires', () => {
     const analysis = makeAnalysis([
       { path: 'src/server.js', imports: [{ source: './db', cjs: true }] },
-      { path: 'src/db.js',     imports: [] },
+      { path: 'src/db.js', imports: [] },
     ]);
     const graph = buildDependencyGraph(analysis);
 
-    const edge = graph.edges.find(
-      e => e.source === 'file:src/server.js' && e.target === 'file:src/db.js'
-    );
+    const edge = graph.edges.find(e => e.source === 'file:src/server.js' && e.target === 'file:src/db.js');
     expect(edge).toBeDefined();
     expect(edge.type).toBe('smoothstep');
   });
@@ -189,21 +177,32 @@ describe('buildDependencyGraph — edges', () => {
   test('no duplicate edges for same source→target', () => {
     // Same specifier appears twice in symbols
     const analysis = {
-      files: [{
-        filePath: 'src/app.js',
-        symbols: [
-          { kind: 'import', source: './utils', specifiers: [{ name: 'a', alias: null, type: 'named' }], location: null },
-          { kind: 'import', source: './utils', specifiers: [{ name: 'b', alias: null, type: 'named' }], location: null },
-        ],
-      }, {
-        filePath: 'src/utils.js',
-        symbols: [],
-      }],
+      files: [
+        {
+          filePath: 'src/app.js',
+          symbols: [
+            {
+              kind: 'import',
+              source: './utils',
+              specifiers: [{ name: 'a', alias: null, type: 'named' }],
+              location: null,
+            },
+            {
+              kind: 'import',
+              source: './utils',
+              specifiers: [{ name: 'b', alias: null, type: 'named' }],
+              location: null,
+            },
+          ],
+        },
+        {
+          filePath: 'src/utils.js',
+          symbols: [],
+        },
+      ],
     };
     const graph = buildDependencyGraph(analysis);
-    const edges = graph.edges.filter(
-      e => e.source === 'file:src/app.js' && e.target === 'file:src/utils.js'
-    );
+    const edges = graph.edges.filter(e => e.source === 'file:src/app.js' && e.target === 'file:src/utils.js');
     expect(edges).toHaveLength(1);
   });
 
@@ -227,9 +226,7 @@ describe('buildDependencyGraph — edges', () => {
   });
 
   test('unresolved imports are NOT added as edges', () => {
-    const analysis = makeAnalysis([
-      { path: 'src/app.js', imports: [{ source: './doesNotExist' }] },
-    ]);
+    const analysis = makeAnalysis([{ path: 'src/app.js', imports: [{ source: './doesNotExist' }] }]);
     const graph = buildDependencyGraph(analysis);
     // No target file for ./doesNotExist → unresolved → no edge
     expect(graph.edges).toHaveLength(0);
@@ -249,9 +246,7 @@ describe('buildDependencyGraph — meta', () => {
   });
 
   test('meta.totalPackages matches package node count', () => {
-    const analysis = makeAnalysis([
-      { path: 'src/app.js', imports: [{ source: 'express' }, { source: 'mongoose' }] },
-    ]);
+    const analysis = makeAnalysis([{ path: 'src/app.js', imports: [{ source: 'express' }, { source: 'mongoose' }] }]);
     const graph = buildDependencyGraph(analysis);
     expect(graph.meta.totalPackages).toBe(2);
   });
@@ -266,9 +261,7 @@ describe('buildDependencyGraph — meta', () => {
   });
 
   test('meta.unresolvedImports counts unresolved', () => {
-    const analysis = makeAnalysis([
-      { path: 'src/app.js', imports: [{ source: './ghost' }] },
-    ]);
+    const analysis = makeAnalysis([{ path: 'src/app.js', imports: [{ source: './ghost' }] }]);
     const graph = buildDependencyGraph(analysis);
     expect(graph.meta.unresolvedImports).toBe(1);
   });
@@ -304,9 +297,7 @@ describe('buildDependencyGraph — internal vs external', () => {
   });
 
   test('bare package names resolve to external package nodes', () => {
-    const analysis = makeAnalysis([
-      { path: 'src/app.js', imports: [{ source: 'jsonwebtoken' }] },
-    ]);
+    const analysis = makeAnalysis([{ path: 'src/app.js', imports: [{ source: 'jsonwebtoken' }] }]);
     const graph = buildDependencyGraph(analysis);
     const edge = graph.edges[0];
     expect(edge.target).toBe('pkg:jsonwebtoken');
@@ -314,9 +305,7 @@ describe('buildDependencyGraph — internal vs external', () => {
   });
 
   test('@org/pkg is treated as external', () => {
-    const analysis = makeAnalysis([
-      { path: 'src/app.js', imports: [{ source: '@babel/core' }] },
-    ]);
+    const analysis = makeAnalysis([{ path: 'src/app.js', imports: [{ source: '@babel/core' }] }]);
     const graph = buildDependencyGraph(analysis);
     expect(graph.nodes.find(n => n.id === 'pkg:@babel/core')).toBeDefined();
   });
@@ -325,11 +314,7 @@ describe('buildDependencyGraph — internal vs external', () => {
     const analysis = makeAnalysis([
       {
         path: 'src/services/authService.js',
-        imports: [
-          { source: '../models/User' },
-          { source: 'jsonwebtoken' },
-          { source: 'bcrypt' },
-        ],
+        imports: [{ source: '../models/User' }, { source: 'jsonwebtoken' }, { source: 'bcrypt' }],
       },
       { path: 'src/models/User.js', imports: [] },
     ]);
@@ -389,7 +374,7 @@ describe('getFileDependencies', () => {
       { path: 'src/utils.js', imports: [] },
     ]);
     const graph = buildDependencyGraph(analysis);
-    const info  = getFileDependencies(graph, 'src/index.js');
+    const info = getFileDependencies(graph, 'src/index.js');
 
     expect(info.filePath).toBe('src/index.js');
     expect(info.dependencies).toHaveLength(1);
@@ -403,7 +388,7 @@ describe('getFileDependencies', () => {
       { path: 'src/utils.js', imports: [] },
     ]);
     const graph = buildDependencyGraph(analysis);
-    const info  = getFileDependencies(graph, 'src/utils.js');
+    const info = getFileDependencies(graph, 'src/utils.js');
 
     expect(info.dependents).toHaveLength(1);
     expect(info.dependents[0].filePath).toBe('src/index.js');
@@ -411,21 +396,17 @@ describe('getFileDependencies', () => {
   });
 
   test('returns externalPackages', () => {
-    const analysis = makeAnalysis([
-      { path: 'src/app.js', imports: [{ source: 'express' }, { source: 'mongoose' }] },
-    ]);
+    const analysis = makeAnalysis([{ path: 'src/app.js', imports: [{ source: 'express' }, { source: 'mongoose' }] }]);
     const graph = buildDependencyGraph(analysis);
-    const info  = getFileDependencies(graph, 'src/app.js');
+    const info = getFileDependencies(graph, 'src/app.js');
 
     expect(info.externalPackages.sort()).toEqual(['express', 'mongoose']);
   });
 
   test('file with no edges returns empty arrays', () => {
-    const analysis = makeAnalysis([
-      { path: 'src/isolated.js', imports: [] },
-    ]);
+    const analysis = makeAnalysis([{ path: 'src/isolated.js', imports: [] }]);
     const graph = buildDependencyGraph(analysis);
-    const info  = getFileDependencies(graph, 'src/isolated.js');
+    const info = getFileDependencies(graph, 'src/isolated.js');
 
     expect(info.dependencies).toHaveLength(0);
     expect(info.dependents).toHaveLength(0);
@@ -456,7 +437,7 @@ describe('getFileDependencies', () => {
       { path: 'src/utils.js', imports: [] },
     ]);
     const graph = buildDependencyGraph(analysis);
-    const info  = getFileDependencies(graph, 'src/app.js');
+    const info = getFileDependencies(graph, 'src/app.js');
 
     expect(info.dependencies).toHaveLength(2);
     const hasInternal = info.dependencies.some(d => d.filePath === 'src/utils.js');
@@ -475,7 +456,7 @@ describe('getIsolatedFiles', () => {
       { path: 'src/b.js', imports: [] },
       { path: 'src/lonely.js', imports: [] },
     ]);
-    const graph    = buildDependencyGraph(analysis);
+    const graph = buildDependencyGraph(analysis);
     const isolated = getIsolatedFiles(graph);
 
     expect(isolated).toContain('src/lonely.js');
@@ -488,7 +469,7 @@ describe('getIsolatedFiles', () => {
       { path: 'src/a.js', imports: [{ source: './b' }] },
       { path: 'src/b.js', imports: [] },
     ]);
-    const graph    = buildDependencyGraph(analysis);
+    const graph = buildDependencyGraph(analysis);
     const isolated = getIsolatedFiles(graph);
 
     expect(isolated).toHaveLength(0);
@@ -499,7 +480,7 @@ describe('getIsolatedFiles', () => {
       { path: 'src/a.js', imports: [] },
       { path: 'src/b.js', imports: [] },
     ]);
-    const graph    = buildDependencyGraph(analysis);
+    const graph = buildDependencyGraph(analysis);
     const isolated = getIsolatedFiles(graph);
 
     expect(isolated.sort()).toEqual(['src/a.js', 'src/b.js']);
@@ -510,17 +491,15 @@ describe('getIsolatedFiles', () => {
       { path: 'src/z.js', imports: [] },
       { path: 'src/a.js', imports: [] },
     ]);
-    const graph    = buildDependencyGraph(analysis);
+    const graph = buildDependencyGraph(analysis);
     const isolated = getIsolatedFiles(graph);
 
     expect(isolated).toEqual(['src/a.js', 'src/z.js']);
   });
 
   test('package nodes are not included in isolated files', () => {
-    const analysis = makeAnalysis([
-      { path: 'src/app.js', imports: [{ source: 'express' }] },
-    ]);
-    const graph    = buildDependencyGraph(analysis);
+    const analysis = makeAnalysis([{ path: 'src/app.js', imports: [{ source: 'express' }] }]);
+    const graph = buildDependencyGraph(analysis);
     const isolated = getIsolatedFiles(graph);
 
     // express is a package node, not a file node → not in isolated
@@ -537,7 +516,7 @@ describe('detectCycles', () => {
       { path: 'src/b.js', imports: [{ source: './c' }] },
       { path: 'src/c.js', imports: [] },
     ]);
-    const graph  = buildDependencyGraph(analysis);
+    const graph = buildDependencyGraph(analysis);
     const cycles = detectCycles(graph);
     expect(cycles).toHaveLength(0);
   });
@@ -547,7 +526,7 @@ describe('detectCycles', () => {
       { path: 'src/a.js', imports: [{ source: './b' }] },
       { path: 'src/b.js', imports: [{ source: './a' }] },
     ]);
-    const graph  = buildDependencyGraph(analysis);
+    const graph = buildDependencyGraph(analysis);
     const cycles = detectCycles(graph);
     expect(cycles.length).toBeGreaterThanOrEqual(1);
     // Each cycle entry is an array of file paths
@@ -559,7 +538,7 @@ describe('detectCycles', () => {
       { path: 'src/a.js', imports: [{ source: './b' }] },
       { path: 'src/b.js', imports: [{ source: './a' }] },
     ]);
-    const graph  = buildDependencyGraph(analysis);
+    const graph = buildDependencyGraph(analysis);
     const cycles = detectCycles(graph);
     // Should contain actual file paths
     const allPaths = cycles.flat();
@@ -573,16 +552,14 @@ describe('detectCycles', () => {
       { path: 'src/b.js', imports: [{ source: './c' }] },
       { path: 'src/c.js', imports: [{ source: './a' }] },
     ]);
-    const graph  = buildDependencyGraph(analysis);
+    const graph = buildDependencyGraph(analysis);
     const cycles = detectCycles(graph);
     expect(cycles.length).toBeGreaterThanOrEqual(1);
   });
 
   test('external package edges do not participate in cycle detection', () => {
-    const analysis = makeAnalysis([
-      { path: 'src/a.js', imports: [{ source: 'express' }] },
-    ]);
-    const graph  = buildDependencyGraph(analysis);
+    const analysis = makeAnalysis([{ path: 'src/a.js', imports: [{ source: 'express' }] }]);
+    const graph = buildDependencyGraph(analysis);
     // express → src/a.js edge doesn't exist, so no cycle
     const cycles = detectCycles(graph);
     expect(cycles).toHaveLength(0);
@@ -590,7 +567,7 @@ describe('detectCycles', () => {
 
   test('does not crash on empty graph', () => {
     const analysis = makeAnalysis([]);
-    const graph  = buildDependencyGraph(analysis);
+    const graph = buildDependencyGraph(analysis);
     expect(() => detectCycles(graph)).not.toThrow();
   });
 
@@ -599,7 +576,7 @@ describe('detectCycles', () => {
       { path: 'src/a.js', imports: [] },
       { path: 'src/b.js', imports: [] },
     ]);
-    const graph  = buildDependencyGraph(analysis);
+    const graph = buildDependencyGraph(analysis);
     const cycles = detectCycles(graph);
     expect(cycles).toHaveLength(0);
   });
@@ -621,50 +598,31 @@ describe('buildDependencyGraph — realistic scenario', () => {
       },
       {
         path: 'src/routes/auth.js',
-        imports: [
-          { source: 'express' },
-          { source: '../controllers/authController' },
-        ],
+        imports: [{ source: 'express' }, { source: '../controllers/authController' }],
       },
       {
         path: 'src/routes/user.js',
-        imports: [
-          { source: 'express' },
-          { source: '../controllers/userController' },
-        ],
+        imports: [{ source: 'express' }, { source: '../controllers/userController' }],
       },
       {
         path: 'src/controllers/authController.js',
-        imports: [
-          { source: '../services/authService' },
-          { source: 'jsonwebtoken' },
-        ],
+        imports: [{ source: '../services/authService' }, { source: 'jsonwebtoken' }],
       },
       {
         path: 'src/controllers/userController.js',
-        imports: [
-          { source: '../services/userService' },
-        ],
+        imports: [{ source: '../services/userService' }],
       },
       {
         path: 'src/services/authService.js',
-        imports: [
-          { source: '../models/User' },
-          { source: 'bcrypt' },
-          { source: 'jsonwebtoken' },
-        ],
+        imports: [{ source: '../models/User' }, { source: 'bcrypt' }, { source: 'jsonwebtoken' }],
       },
       {
         path: 'src/services/userService.js',
-        imports: [
-          { source: '../models/User' },
-        ],
+        imports: [{ source: '../models/User' }],
       },
       {
         path: 'src/models/User.js',
-        imports: [
-          { source: 'mongoose' },
-        ],
+        imports: [{ source: 'mongoose' }],
       },
       { path: 'src/middleware/errorHandler.js', imports: [] },
     ]);

@@ -4,10 +4,10 @@ CodeLens supports extracting and analyzing Git history from the local browser us
 
 ## How it works
 
-1. **Virtual File System**: During ZIP upload, if the user includes the `.git` directory, CodeLens persists it to an IndexedDB store. 
+1. **Virtual File System**: During ZIP upload, if the user includes the `.git` directory, CodeLens persists it to an IndexedDB store.
 2. **Commit Traversal**: The `git.analyzer.js` module extracts the `.git` folder from IndexedDB into a virtual `lightning-fs` volume. It then walks backwards through the last 500 commits using `isomorphic-git.log()`.
 3. **Diff Calculation**: For each consecutive pair of commits in the window, it runs `isomorphic-git.walk()` to identify exactly which files were modified.
-4. **Churn Score**: 
+4. **Churn Score**:
    `Churn Score = (number of times file changed / total diffs in window) * 100`
 5. **Composite Risk**: The analyzer combines the structural complexity score from the tree-sitter analysis with the temporal churn score:
    `Composite Risk = (0.6 * Complexity Score) + (0.4 * Churn Score)`

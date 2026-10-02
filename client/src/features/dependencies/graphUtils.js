@@ -1,36 +1,45 @@
 /**
  * graphUtils.js
  *
- * It initiates the layout algorithms, then extracts the specific node topologies, 
+ * It initiates the layout algorithms, then extracts the specific node topologies,
  * and then it applies the geometric coordinates for the React Flow canvas.
  */
 import dagre from 'dagre';
 
 export const NODE_W = 150;
 export const NODE_H = 34;
-export const PKG_W  = 110;
-export const PKG_H  = 30;
+export const PKG_W = 110;
+export const PKG_H = 30;
 
 export const DIR_PALETTE = [
-  '#1f6feb', '#2ea043', '#d29922', '#da3633', '#8957e5',
-  '#0096c7', '#e85d04', '#06d6a0', '#ef476f', '#ffd166',
-  '#118ab2', '#7209b7',
+  '#1f6feb',
+  '#2ea043',
+  '#d29922',
+  '#da3633',
+  '#8957e5',
+  '#0096c7',
+  '#e85d04',
+  '#06d6a0',
+  '#ef476f',
+  '#ffd166',
+  '#118ab2',
+  '#7209b7',
 ];
 
 /**
- * It evaluates the node degree, then extracts a normalized ratio against the maximum, 
+ * It evaluates the node degree, then extracts a normalized ratio against the maximum,
  * and then it applies a color gradient ranging from cool blue to hot orange.
  */
 export function couplingColor(degree, maxDegree) {
   if (maxDegree === 0) return '#1f6feb';
   const t = Math.min(degree / maxDegree, 1);
-  if (t < 0.4) return `hsl(${210 - t * 60 / 0.4}, 70%, 55%)`; 
-  if (t < 0.7) return `hsl(${150 - (t - 0.4) * 110 / 0.3}, 70%, 50%)`;
-  return `hsl(${40 - (t - 0.7) * 130 / 0.3}, 80%, 50%)`; 
+  if (t < 0.4) return `hsl(${210 - (t * 60) / 0.4}, 70%, 55%)`;
+  if (t < 0.7) return `hsl(${150 - ((t - 0.4) * 110) / 0.3}, 70%, 50%)`;
+  return `hsl(${40 - ((t - 0.7) * 130) / 0.3}, 80%, 50%)`;
 }
 
 /**
- * It processes the file path string, then extracts the directory segments, 
+ * It processes the file path string, then extracts the directory segments,
  * and then it applies a fallback string for root-level files.
  */
 export function getDir(filePath) {
@@ -40,22 +49,24 @@ export function getDir(filePath) {
 }
 
 /**
- * It initializes the Dagre engine, then extracts the edge configurations, 
+ * It initializes the Dagre engine, then extracts the edge configurations,
  * and then it applies the hierarchical positioning to the node array.
  */
 export function getDagreLayout(nodes, edges, direction = 'LR') {
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
   g.setGraph({ rankdir: direction, ranksep: 50, nodesep: 20, edgesep: 10 });
-  
-  nodes.forEach(n => g.setNode(n.id, {
-    width: parseInt(n.style?.width ?? n.width ?? NODE_W, 10),
-    height: parseInt(n.style?.height ?? n.height ?? NODE_H, 10)
-  }));
-  
+
+  nodes.forEach(n =>
+    g.setNode(n.id, {
+      width: parseInt(n.style?.width ?? n.width ?? NODE_W, 10),
+      height: parseInt(n.style?.height ?? n.height ?? NODE_H, 10),
+    })
+  );
+
   edges.forEach(e => g.setEdge(e.source, e.target));
   dagre.layout(g);
-  
+
   return nodes.map(n => {
     const pos = g.node(n.id);
     const w = parseInt(n.style?.width ?? n.width ?? NODE_W, 10);
@@ -65,21 +76,21 @@ export function getDagreLayout(nodes, edges, direction = 'LR') {
 }
 
 /**
- * It iterates over the node array, then extracts a random bounded coordinate, 
+ * It iterates over the node array, then extracts a random bounded coordinate,
  * and then it applies it as the initial starting point for the physics simulation.
  */
 export function getForceLayout(nodes) {
   return nodes.map(n => ({
     ...n,
-    position: { 
-      x: (Math.random() - 0.5) * 600, 
-      y: (Math.random() - 0.5) * 600 
-    }
+    position: {
+      x: (Math.random() - 0.5) * 600,
+      y: (Math.random() - 0.5) * 600,
+    },
   }));
 }
 
 /**
- * It groups nodes by directory, then extracts grid boundaries for each cluster, 
+ * It groups nodes by directory, then extracts grid boundaries for each cluster,
  * and then it applies absolute coordinate positioning to visually separate folders.
  */
 export function getClusteredLayout(fileNodes, edges, dirColorMap) {
@@ -90,14 +101,20 @@ export function getClusteredLayout(fileNodes, edges, dirColorMap) {
     groups[d].push(n);
   }
 
-  const PAD = 16, GAP_X = 10, GAP_Y = 10, GROUP_GAP_X = 60, GROUP_GAP_Y = 60;
+  const PAD = 16,
+    GAP_X = 10,
+    GAP_Y = 10,
+    GROUP_GAP_X = 60,
+    GROUP_GAP_Y = 60;
   const HEADER_H = 24;
-  function optCols(count) { return Math.min(6, Math.max(1, Math.round(Math.sqrt(count)))); }
+  function optCols(count) {
+    return Math.min(6, Math.max(1, Math.round(Math.sqrt(count))));
+  }
 
   const sortedDirs = Object.keys(groups).sort();
   const GROUP_COLS = 2;
 
-  const builtGroups = sortedDirs.map((dir) => {
+  const builtGroups = sortedDirs.map(dir => {
     const members = groups[dir];
     const cols = optCols(members.length);
     const rows = Math.ceil(members.length / cols);
@@ -151,7 +168,7 @@ export function getClusteredLayout(fileNodes, edges, dirColorMap) {
 }
 
 /**
- * It maps the raw analysis nodes to the visual schema, then extracts the coupling metrics, 
+ * It maps the raw analysis nodes to the visual schema, then extracts the coupling metrics,
  * and then it applies fading logic and routing to the selected layout generator.
  */
 export function graphToFlow(graph, selectedId, showExternalPackages, layoutType, edgeStyle = 'spring', options = {}) {
@@ -161,7 +178,7 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
   let pkgNodes = showExternalPackages ? graph.nodes.filter(n => n.type === 'moduleNode' || n.type === 'package') : [];
   const renderableNodes = [...fileNodes, ...pkgNodes];
   const nodeIds = new Set(renderableNodes.map(n => n.id));
-  
+
   const edgesToRender = graph.edges.filter(e => nodeIds.has(e.source) && nodeIds.has(e.target));
 
   const degreeMap = new Map();
@@ -215,7 +232,7 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
     // Churn data keyed by filePath (without the 'file:' prefix)
     const churnScore = churnData?.churnScores?.[rawPath] || 0;
     const compositeRisk = n.data?.metrics?.compositeRisk || churnScore;
-    
+
     return {
       id: n.id,
       type: 'custom',
@@ -223,10 +240,11 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
         label: n.data?.label || rawPath.split('/').pop(),
         fullLabel: rawPath,
         nodeType: 'file',
-        dir, shortDir,
+        dir,
+        shortDir,
         dirColor: dirColorMap.get(dir),
         heatColor: couplingColor(degree, maxDegree),
-        degree, 
+        degree,
         isFaded,
         isFocused: n.id === selectedId,
         isCycling: graph.cycles?.some(cycle => cycle.includes(n.id)) || false,
@@ -239,7 +257,7 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
         compositeRisk,
         exportBg: '#1e2335',
         exportBorder: couplingColor(degree, maxDegree) || '#343B54',
-        exportText: '#CBD5E8'
+        exportText: '#CBD5E8',
       },
       style: { width: NODE_W, height: NODE_H },
       position: { x: 0, y: 0 },
@@ -258,13 +276,13 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
         fullLabel: n.data?.label || n.name || '',
         nodeType: 'package',
         heatColor: '#d29922',
-        degree, 
+        degree,
         isFaded,
         isFocused: n.id === selectedId,
         findingsCount: { critical: 0, warning: 0 },
         exportBg: '#111318',
         exportBorder: '#d29922',
-        exportText: '#e3b341'
+        exportText: '#e3b341',
       },
       style: { width: PKG_W, height: PKG_H },
       position: { x: 0, y: 0 },
@@ -273,10 +291,10 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
   });
 
   const rfEdges = edgesToRender.map(e => {
-    const isFaded = selectedId ? (!connectedNodes.has(e.source) || !connectedNodes.has(e.target)) : false;
+    const isFaded = selectedId ? !connectedNodes.has(e.source) || !connectedNodes.has(e.target) : false;
     const isDirect = selectedId && (e.source === selectedId || e.target === selectedId);
     const isCjs = e.type === 'requires' || e.type === 'smoothstep';
-    
+
     const sourceDir = dirMap.get(e.source);
     const targetDir = dirMap.get(e.target);
     const sameDir = sourceDir && targetDir && sourceDir === targetDir;
@@ -292,12 +310,15 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
       type: 'spring',
       animated: isDirect,
       style: { stroke: strokeColor, strokeWidth, strokeDasharray: isCjs ? '5 3' : undefined, opacity },
-      markerEnd: isDirect || !isFaded ? {
-        type: 'arrowclosed',
-        color: strokeColor,
-        width: isDirect ? 12 : 8,
-        height: isDirect ? 12 : 8,
-      } : undefined,
+      markerEnd:
+        isDirect || !isFaded
+          ? {
+              type: 'arrowclosed',
+              color: strokeColor,
+              width: isDirect ? 12 : 8,
+              height: isDirect ? 12 : 8,
+            }
+          : undefined,
       label: isCjs && isDirect ? 'cjs' : undefined,
       labelStyle: { fill: '#6e7681', fontSize: 8, fontFamily: 'monospace' },
       labelBgStyle: { fill: '#0d1117', fillOpacity: 0.7 },

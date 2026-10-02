@@ -17,13 +17,32 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 // ── Language detection from file extension ─────────────────────────────────────
 const EXT_LANG = {
-  js: 'javascript', jsx: 'jsx', ts: 'typescript', tsx: 'tsx',
-  py: 'python', java: 'java', go: 'go', rs: 'rust', rb: 'ruby',
-  cs: 'csharp', cpp: 'cpp', c: 'c', h: 'c',
-  html: 'html', css: 'css', scss: 'scss', less: 'less',
-  json: 'json', yaml: 'yaml', yml: 'yaml',
-  md: 'markdown', sh: 'bash', bash: 'bash',
-  sql: 'sql', xml: 'xml', graphql: 'graphql',
+  js: 'javascript',
+  jsx: 'jsx',
+  ts: 'typescript',
+  tsx: 'tsx',
+  py: 'python',
+  java: 'java',
+  go: 'go',
+  rs: 'rust',
+  rb: 'ruby',
+  cs: 'csharp',
+  cpp: 'cpp',
+  c: 'c',
+  h: 'c',
+  html: 'html',
+  css: 'css',
+  scss: 'scss',
+  less: 'less',
+  json: 'json',
+  yaml: 'yaml',
+  yml: 'yaml',
+  md: 'markdown',
+  sh: 'bash',
+  bash: 'bash',
+  sql: 'sql',
+  xml: 'xml',
+  graphql: 'graphql',
 };
 
 function detectLanguage(name) {
@@ -34,32 +53,34 @@ function detectLanguage(name) {
 // ── Download helper ────────────────────────────────────────────────────────────
 function downloadText(content, filename) {
   const dateStamp = new Date().toISOString().replace(/[:.]/g, '-').split('T').join('_');
-  const uniqueName = filename.includes('.') 
-    ? filename.replace(/(\.[^.]+)$/, `_${dateStamp}$1`) 
+  const uniqueName = filename.includes('.')
+    ? filename.replace(/(\.[^.]+)$/, `_${dateStamp}$1`)
     : `${filename}_${dateStamp}`;
   const blob = new Blob([content], { type: 'text/plain' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = uniqueName;
+  a.href = url;
+  a.download = uniqueName;
   a.click();
   URL.revokeObjectURL(url);
 }
 
 function downloadImage(dataUrl, filename) {
   const dateStamp = new Date().toISOString().replace(/[:.]/g, '-').split('T').join('_');
-  const uniqueName = filename.includes('.') 
-    ? filename.replace(/(\.[^.]+)$/, `_${dateStamp}$1`) 
+  const uniqueName = filename.includes('.')
+    ? filename.replace(/(\.[^.]+)$/, `_${dateStamp}$1`)
     : `${filename}_${dateStamp}`;
   const a = document.createElement('a');
-  a.href = dataUrl; a.download = uniqueName;
+  a.href = dataUrl;
+  a.download = uniqueName;
   a.click();
 }
 
 // ── Type meta ──────────────────────────────────────────────────────────────────
 const TYPE_META = {
-  file:    { icon: FileCode,  label: 'Code File',    color: '#61dafb' },
-  image:   { icon: ImageIcon, label: 'Image',         color: '#a855f7' },
-  snippet: { icon: AlignLeft, label: 'Text Snippet',  color: '#e3b341' },
+  file: { icon: FileCode, label: 'Code File', color: '#61dafb' },
+  image: { icon: ImageIcon, label: 'Image', color: '#a855f7' },
+  snippet: { icon: AlignLeft, label: 'Text Snippet', color: '#e3b341' },
 };
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -70,20 +91,23 @@ export default function AttachmentPreview({ attachment, onClose }) {
 
   // Close on Escape
   useEffect(() => {
-    const handle = (e) => { if (e.key === 'Escape') onClose(); };
+    const handle = e => {
+      if (e.key === 'Escape') onClose();
+    };
     window.addEventListener('keydown', handle);
     return () => window.removeEventListener('keydown', handle);
   }, [onClose]);
 
   // Close on backdrop click
-  const handleBackdropClick = useCallback((e) => {
-    if (e.target === backdropRef.current) onClose();
-  }, [onClose]);
+  const handleBackdropClick = useCallback(
+    e => {
+      if (e.target === backdropRef.current) onClose();
+    },
+    [onClose]
+  );
 
   const lang = detectLanguage(attachment.name);
-  const lineCount = attachment.content
-    ? attachment.content.split('\n').length
-    : 0;
+  const lineCount = attachment.content ? attachment.content.split('\n').length : 0;
 
   const modal = (
     <div
@@ -113,26 +137,21 @@ export default function AttachmentPreview({ attachment, onClose }) {
               {attachment.name}
             </div>
             <div className="text-[10px] text-muted flex items-center gap-2 mt-0.5">
-              <span
-                className="uppercase tracking-widest font-medium"
-                style={{ color: meta.color }}
-              >
+              <span className="uppercase tracking-widest font-medium" style={{ color: meta.color }}>
                 {meta.label}
               </span>
-              {attachment.sizeLabel && (
-                <span>· {attachment.sizeLabel}</span>
-              )}
+              {attachment.sizeLabel && <span>· {attachment.sizeLabel}</span>}
               {attachment.type !== 'image' && lineCount > 0 && (
-                <span>· {lineCount.toLocaleString()} line{lineCount !== 1 ? 's' : ''}</span>
+                <span>
+                  · {lineCount.toLocaleString()} line{lineCount !== 1 ? 's' : ''}
+                </span>
               )}
-              {attachment.path && (
-                <span className="font-mono text-muted/70 truncate">· {attachment.path}</span>
-              )}
+              {attachment.path && <span className="font-mono text-muted/70 truncate">· {attachment.path}</span>}
             </div>
           </div>
 
           {/* Download */}
-          {(attachment.type === 'image' && attachment.dataUrl) && (
+          {attachment.type === 'image' && attachment.dataUrl && (
             <button
               onClick={() => downloadImage(attachment.dataUrl, attachment.name)}
               title="Download image"
@@ -141,7 +160,7 @@ export default function AttachmentPreview({ attachment, onClose }) {
               <Download className="w-4 h-4" />
             </button>
           )}
-          {(attachment.type !== 'image' && attachment.content) && (
+          {attachment.type !== 'image' && attachment.content && (
             <button
               onClick={() => downloadText(attachment.content, attachment.name)}
               title="Download as file"
@@ -162,7 +181,6 @@ export default function AttachmentPreview({ attachment, onClose }) {
 
         {/* ── Body ─────────────────────────────────────────────────────────── */}
         <div className="flex-1 overflow-auto custom-scrollbar">
-
           {/* IMAGE ─────────────────────────────────────────────────────────── */}
           {attachment.type === 'image' && attachment.dataUrl && (
             <div className="flex items-center justify-center p-6 min-h-[200px]">
@@ -215,9 +233,7 @@ export default function AttachmentPreview({ attachment, onClose }) {
 
           {/* Fallback */}
           {!attachment.content && !attachment.dataUrl && (
-            <div className="p-8 text-center text-muted text-sm">
-              No preview available for this attachment.
-            </div>
+            <div className="p-8 text-center text-muted text-sm">No preview available for this attachment.</div>
           )}
         </div>
       </div>

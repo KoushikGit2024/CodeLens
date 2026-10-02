@@ -1,7 +1,7 @@
 /**
  * CParser.js
  *
- * It configures the C Tree-sitter parser, then extracts native procedural symbols, 
+ * It configures the C Tree-sitter parser, then extracts native procedural symbols,
  * and then it applies the unified AST schemas for CodeLens intelligence.
  *
  * How this file is structured:
@@ -11,12 +11,7 @@
  */
 
 import { BaseParser } from './base.parser.js';
-import {
-  locationFromNode,
-  createImport,
-  createStruct,
-  createFunction,
-} from '../symbols.js';
+import { locationFromNode, createImport, createStruct, createFunction } from '../symbols.js';
 import { calculateComplexity } from '../../advanced/complexity.analyzer.js';
 import { generateStructuralHash } from '../../advanced/clone.analyzer.js';
 
@@ -28,7 +23,7 @@ export class CParser extends BaseParser {
   // ── Public entry points ─────────────────────────────────────────────────────
 
   /**
-   * It receives the top-level program node, then extracts the symbols via a depth-first walk, 
+   * It receives the top-level program node, then extracts the symbols via a depth-first walk,
    * and then it applies the collected array to the caller.
    */
   extractSymbols(rootNode, source) {
@@ -38,7 +33,7 @@ export class CParser extends BaseParser {
   }
 
   /**
-   * It receives the parsed AST root, then extracts the advanced static findings using S-expression queries, 
+   * It receives the parsed AST root, then extracts the advanced static findings using S-expression queries,
    * and then it applies the canonical AnalysisFinding schema for the frontend intelligence dashboard.
    */
   extractAdvancedFindings(rootNode, filePath) {
@@ -48,11 +43,19 @@ export class CParser extends BaseParser {
     const sinkQuery = `
       (call_expression function: (identifier) @func (#match? @func "^(system|popen|strcpy|sprintf|gets)$"))
     `;
-    findings.push(...this.extractFindings(
-      rootNode, sinkQuery, filePath, 'security', 'UNSAFE_MEMORY_OR_EXEC', 'security', 'critical',
-      'Unsafe function call: {text}',
-      'Usage of `{text}` is highly discouraged in C due to buffer overflow or command injection risks.'
-    ));
+    findings.push(
+      ...this.extractFindings(
+        rootNode,
+        sinkQuery,
+        filePath,
+        'security',
+        'UNSAFE_MEMORY_OR_EXEC',
+        'security',
+        'critical',
+        'Unsafe function call: {text}',
+        'Usage of `{text}` is highly discouraged in C due to buffer overflow or command injection risks.'
+      )
+    );
 
     return findings;
   }
@@ -60,7 +63,7 @@ export class CParser extends BaseParser {
   // ── AST walker ──────────────────────────────────────────────────────────────
 
   /**
-   * It inspects the current node type, then extracts the specific language construct, 
+   * It inspects the current node type, then extracts the specific language construct,
    * and then it applies the correct extraction method or walks the children.
    */
   _walk(node, source, symbols) {
@@ -98,7 +101,7 @@ export class CParser extends BaseParser {
   // ── Symbol extractors ────────────────────────────────────────────────────────
 
   /**
-   * It evaluates the preprocessor directive, then extracts the string path or system bracket path, 
+   * It evaluates the preprocessor directive, then extracts the string path or system bracket path,
    * and then it applies the import symbol factory to track dependencies.
    */
   _extractInclude(node, source, symbols) {
@@ -110,18 +113,20 @@ export class CParser extends BaseParser {
     let isExternal = true;
 
     if (specifier.startsWith('"') && specifier.endsWith('"')) {
-        specifier = specifier.slice(1, -1);
-        isExternal = false;
+      specifier = specifier.slice(1, -1);
+      isExternal = false;
     } else if (specifier.startsWith('<') && specifier.endsWith('>')) {
-        specifier = specifier.slice(1, -1);
-        isExternal = true;
+      specifier = specifier.slice(1, -1);
+      isExternal = true;
     }
 
-    symbols.push(createImport({
-      source: specifier,
-      specifiers: [{ name: specifier, alias: null, type: isExternal ? 'external' : 'internal' }],
-      location: locationFromNode(node),
-    }));
+    symbols.push(
+      createImport({
+        source: specifier,
+        specifiers: [{ name: specifier, alias: null, type: isExternal ? 'external' : 'internal' }],
+        location: locationFromNode(node),
+      })
+    );
   }
 
   /**
@@ -129,16 +134,18 @@ export class CParser extends BaseParser {
    */
   _extractStruct(node, source, symbols) {
     const nameNode = node.childForFieldName('name');
-    if (!nameNode) return; 
+    if (!nameNode) return;
 
-    symbols.push(createStruct({
-      name: nodeText(nameNode, source),
-      location: locationFromNode(node),
-    }));
+    symbols.push(
+      createStruct({
+        name: nodeText(nameNode, source),
+        location: locationFromNode(node),
+      })
+    );
   }
 
   /**
-   * It targets the function declarator, then extracts the core identifier, 
+   * It targets the function declarator, then extracts the core identifier,
    * and then it applies the function factory.
    */
   _extractFunction(node, source, symbols) {
@@ -146,8 +153,8 @@ export class CParser extends BaseParser {
     if (!declarator) return;
 
     let coreDeclarator = declarator;
-    while (coreDeclarator && (coreDeclarator.type === 'pointer_declarator')) {
-        coreDeclarator = coreDeclarator.childForFieldName('declarator');
+    while (coreDeclarator && coreDeclarator.type === 'pointer_declarator') {
+      coreDeclarator = coreDeclarator.childForFieldName('declarator');
     }
 
     if (!coreDeclarator || coreDeclarator.type !== 'function_declarator') return;
@@ -160,7 +167,8 @@ export class CParser extends BaseParser {
     const complexity = calculateComplexity(node);
     const hash = generateStructuralHash(node);
 
-    symbols.push(createFunction({
+    symbols.push(
+      createFunction({
         name: fnName,
         async: false,
         generator: false,
@@ -168,13 +176,14 @@ export class CParser extends BaseParser {
         complexity,
         hash,
         location: locationFromNode(node),
-    }));
+      })
+    );
   }
 
   // ── Utilities ────────────────────────────────────────────────────────────────
 
   /**
-   * It scans the parameter list, then extracts individual parameter declarations, 
+   * It scans the parameter list, then extracts individual parameter declarations,
    * and then it applies fallback underscores for complex pointer combinations.
    */
   _extractParams(fnDeclaratorNode, source) {
@@ -182,22 +191,22 @@ export class CParser extends BaseParser {
     const paramsNode = fnDeclaratorNode.childForFieldName('parameters');
     if (paramsNode) {
       for (const p of paramsNode.namedChildren) {
-          if (p.type === 'parameter_declaration') {
-              const decl = p.childForFieldName('declarator');
-              if (decl) {
-                  let coreDecl = decl;
-                  while (coreDecl && (coreDecl.type === 'pointer_declarator')) {
-                      coreDecl = coreDecl.childForFieldName('declarator');
-                  }
-                  if (coreDecl && coreDecl.type === 'identifier') {
-                      params.push(nodeText(coreDecl, source));
-                  } else {
-                      params.push('_');
-                  }
-              } else {
-                  params.push('_');
-              }
+        if (p.type === 'parameter_declaration') {
+          const decl = p.childForFieldName('declarator');
+          if (decl) {
+            let coreDecl = decl;
+            while (coreDecl && coreDecl.type === 'pointer_declarator') {
+              coreDecl = coreDecl.childForFieldName('declarator');
+            }
+            if (coreDecl && coreDecl.type === 'identifier') {
+              params.push(nodeText(coreDecl, source));
+            } else {
+              params.push('_');
+            }
+          } else {
+            params.push('_');
           }
+        }
       }
     }
     return params;

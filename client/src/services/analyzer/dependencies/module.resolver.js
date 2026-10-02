@@ -1,7 +1,7 @@
 /**
  * moduleResolver.js
  *
- * It takes the AST import symbols, then extracts the target paths, 
+ * It takes the AST import symbols, then extracts the target paths,
  * and then it applies repository-aware resolution to connect internal graphs.
  *
  * How this file is structured:
@@ -12,15 +12,39 @@
 
 import path from 'path-browserify';
 
-export const RESOLUTION_EXTENSIONS = ['.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.cpp', '.cc', '.cxx', '.h', '.hpp', '.go', '.rs', '.c'];
+export const RESOLUTION_EXTENSIONS = [
+  '.js',
+  '.jsx',
+  '.ts',
+  '.tsx',
+  '.py',
+  '.java',
+  '.cpp',
+  '.cc',
+  '.cxx',
+  '.h',
+  '.hpp',
+  '.go',
+  '.rs',
+  '.c',
+];
 
 /**
- * It evaluates the specifier string, then extracts its leading characters, 
+ * It evaluates the specifier string, then extracts its leading characters,
  * and then it applies the corresponding module resolution category.
  */
-export function classifySpecifier(specifier, isCpp = false, isJava = false, isPython = false, isGo = false, isRust = false) {
+export function classifySpecifier(
+  specifier,
+  isCpp = false,
+  isJava = false,
+  isPython = false,
+  isGo = false,
+  isRust = false
+) {
   if (isCpp || isGo || isRust) {
-    return specifier.startsWith('/') || specifier.startsWith('./') || specifier.startsWith('../') ? 'relative' : 'relative';
+    return specifier.startsWith('/') || specifier.startsWith('./') || specifier.startsWith('../')
+      ? 'relative'
+      : 'relative';
   }
   if (isPython || isJava) {
     return 'relative';
@@ -38,7 +62,7 @@ export function classifySpecifier(specifier, isCpp = false, isJava = false, isPy
 }
 
 /**
- * It parses the raw import text, then extracts possible file extensions, 
+ * It parses the raw import text, then extracts possible file extensions,
  * and then it applies the internal path matching logic to return a ResolvedImport object.
  */
 export function resolveImport({ importingFile, specifier, knownFiles, type }) {
@@ -50,10 +74,10 @@ export function resolveImport({ importingFile, specifier, knownFiles, type }) {
 
   const ext = path.posix.extname(importingFile).toLowerCase();
   const isPython = ext === '.py';
-  const isJava   = ext === '.java' || ext === '.kt' || ext === '.kts';
-  const isCpp    = ['.cpp', '.cc', '.cxx', '.h', '.hpp', '.c'].includes(ext);
-  const isGo     = ext === '.go';
-  const isRust   = ext === '.rs';
+  const isJava = ext === '.java' || ext === '.kt' || ext === '.kts';
+  const isCpp = ['.cpp', '.cc', '.cxx', '.h', '.hpp', '.c'].includes(ext);
+  const isGo = ext === '.go';
+  const isRust = ext === '.rs';
 
   if ((isCpp || isRust) && type === 'external') {
     return { specifier, kind: 'external', resolvedTo: null, reason: null };
@@ -76,8 +100,8 @@ export function resolveImport({ importingFile, specifier, knownFiles, type }) {
   } else if (isPython) {
     let pyPath = cleanSpecifier;
     if (pyPath.startsWith('.')) {
-      pyPath = pyPath.replace(/^\.+/, (match) => {
-         return '../'.repeat(match.length - 1) + './';
+      pyPath = pyPath.replace(/^\.+/, match => {
+        return '../'.repeat(match.length - 1) + './';
       });
       pyPath = pyPath.replace(/\./g, '/');
       baseCandidates.push(normalisePath(path.posix.join(importDir, pyPath)));
@@ -90,15 +114,18 @@ export function resolveImport({ importingFile, specifier, knownFiles, type }) {
     const isWildcard = javaPath.endsWith('/*');
     if (isWildcard) javaPath = javaPath.slice(0, -2);
 
-    const ktSuffix   = javaPath + '.kt';
+    const ktSuffix = javaPath + '.kt';
     const javaSuffix = javaPath + '.java';
-    const ktsSuffix  = javaPath + '.kts';
+    const ktsSuffix = javaPath + '.kts';
 
     for (const knownFile of knownFiles) {
       if (
-        knownFile.endsWith('/' + ktSuffix)   || knownFile === ktSuffix ||
-        knownFile.endsWith('/' + javaSuffix) || knownFile === javaSuffix ||
-        knownFile.endsWith('/' + ktsSuffix)  || knownFile === ktsSuffix
+        knownFile.endsWith('/' + ktSuffix) ||
+        knownFile === ktSuffix ||
+        knownFile.endsWith('/' + javaSuffix) ||
+        knownFile === javaSuffix ||
+        knownFile.endsWith('/' + ktsSuffix) ||
+        knownFile === ktsSuffix
       ) {
         return { specifier, kind: 'internal', resolvedTo: knownFile, reason: null };
       }
@@ -106,8 +133,8 @@ export function resolveImport({ importingFile, specifier, knownFiles, type }) {
         const pkgDir = javaPath + '/';
         if (
           (knownFile.endsWith('/' + pkgDir.slice(0, -1)) ||
-           knownFile.includes('/' + pkgDir) ||
-           knownFile.startsWith(pkgDir)) &&
+            knownFile.includes('/' + pkgDir) ||
+            knownFile.startsWith(pkgDir)) &&
           (knownFile.endsWith('.kt') || knownFile.endsWith('.java'))
         ) {
           break;
@@ -169,7 +196,7 @@ export function resolveImport({ importingFile, specifier, knownFiles, type }) {
   }
 
   if (isPython || isJava || isGo || isRust) {
-     return { specifier, kind: 'external', resolvedTo: null, reason: null };
+    return { specifier, kind: 'external', resolvedTo: null, reason: null };
   }
 
   if (kind === 'alias' && specifier.startsWith('@')) {
@@ -185,7 +212,7 @@ export function resolveImport({ importingFile, specifier, knownFiles, type }) {
 }
 
 /**
- * It iterates over the analyzed files, then extracts their paths, 
+ * It iterates over the analyzed files, then extracts their paths,
  * and then it applies them into a Set for fast lookup.
  */
 export function buildKnownFilesSet(analysis) {
@@ -197,7 +224,7 @@ export function buildKnownFilesSet(analysis) {
 }
 
 /**
- * It iterates through the repository files, then extracts all internal symbols, 
+ * It iterates through the repository files, then extracts all internal symbols,
  * and then it applies the resolver logic to map them together.
  */
 export function resolveAllImports(analysis, knownFiles) {
@@ -217,15 +244,15 @@ export function resolveAllImports(analysis, knownFiles) {
 
       const resolution = resolveImport({
         importingFile: normalisePath(filePath),
-        specifier:     sym.source,
+        specifier: sym.source,
         knownFiles,
-        type:          sym.specifiers && sym.specifiers.length > 0 ? sym.specifiers[0].type : undefined
+        type: sym.specifiers && sym.specifiers.length > 0 ? sym.specifiers[0].type : undefined,
       });
 
       resolvedImports.push({
         ...resolution,
         specifiers: sym.specifiers,
-        location:   sym.location,
+        location: sym.location,
       });
     }
 
@@ -236,7 +263,7 @@ export function resolveAllImports(analysis, knownFiles) {
 }
 
 /**
- * It detects the slash characters, then extracts OS specific backslashes, 
+ * It detects the slash characters, then extracts OS specific backslashes,
  * and then it applies standard POSIX formatting.
  */
 function normalisePath(p) {

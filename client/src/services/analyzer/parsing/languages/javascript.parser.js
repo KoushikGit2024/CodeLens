@@ -1,7 +1,7 @@
 /**
  * JavaScriptParser.js
  *
- * It initializes the Tree-sitter parser, then extracts symbols from JavaScript/JSX code, 
+ * It initializes the Tree-sitter parser, then extracts symbols from JavaScript/JSX code,
  * and then it applies the canonical schemas to build intelligence models.
  *
  * Symbols extracted:
@@ -22,9 +22,15 @@
  *   3. _walk()                    — It traverses the tree, then extracts node types, and then it applies the specific dispatchers.
  */
 
-import { 
-  locationFromNode, createFunction, createArrow, createClass, 
-  createMethod, createImport, createExport, SymbolKind 
+import {
+  locationFromNode,
+  createFunction,
+  createArrow,
+  createClass,
+  createMethod,
+  createImport,
+  createExport,
+  SymbolKind,
 } from '../symbols';
 import { BaseParser } from './base.parser.js';
 import { calculateComplexity } from '../../advanced/complexity.analyzer.js';
@@ -38,7 +44,7 @@ export class JavaScriptParser extends BaseParser {
   // ── Public entry points ─────────────────────────────────────────────────────
 
   /**
-   * It receives the top-level program node, then extracts the symbols via a depth-first walk, 
+   * It receives the top-level program node, then extracts the symbols via a depth-first walk,
    * and then it applies the collected array to the caller.
    */
   extractSymbols(rootNode, source) {
@@ -48,7 +54,7 @@ export class JavaScriptParser extends BaseParser {
   }
 
   /**
-   * It receives the parsed AST root, then extracts the advanced static findings using S-expression queries, 
+   * It receives the parsed AST root, then extracts the advanced static findings using S-expression queries,
    * and then it applies the canonical AnalysisFinding schema for the frontend intelligence dashboard.
    */
   extractAdvancedFindings(rootNode, filePath) {
@@ -58,31 +64,55 @@ export class JavaScriptParser extends BaseParser {
     const sinkQuery = `
       (call_expression function: (identifier) @func (#match? @func "^(eval|setTimeout|setInterval|exec)$"))
     `;
-    findings.push(...this.extractFindings(
-      rootNode, sinkQuery, filePath, 'security', 'DANGEROUS_SINK', 'security', 'critical',
-      'Dangerous sink detected: {text}',
-      'The function `{text}` can lead to remote code execution if provided with unsanitized user input.'
-    ));
+    findings.push(
+      ...this.extractFindings(
+        rootNode,
+        sinkQuery,
+        filePath,
+        'security',
+        'DANGEROUS_SINK',
+        'security',
+        'critical',
+        'Dangerous sink detected: {text}',
+        'The function `{text}` can lead to remote code execution if provided with unsanitized user input.'
+      )
+    );
 
     // It defines the test block query, then extracts the test suite nodes, and then it applies the architectural info schema.
     const testQuery = `
       (call_expression function: (identifier) @test_func (#match? @test_func "^(describe|it|test)$"))
     `;
-    findings.push(...this.extractFindings(
-      rootNode, testQuery, filePath, 'architecture', 'TEST_BLOCK', 'reliability', 'info',
-      'Test Suite / Case found',
-      'Identified test block: {text}'
-    ));
+    findings.push(
+      ...this.extractFindings(
+        rootNode,
+        testQuery,
+        filePath,
+        'architecture',
+        'TEST_BLOCK',
+        'reliability',
+        'info',
+        'Test Suite / Case found',
+        'Identified test block: {text}'
+      )
+    );
 
     // It defines the floating promise query, then extracts unhandled promise chains, and then it applies the reliability warning schema.
     const floatingPromiseQuery = `
       (expression_statement (call_expression function: (member_expression property: (property_identifier) @prop (#match? @prop "^(then|catch)$")))) @floating
     `;
-    findings.push(...this.extractFindings(
-      rootNode, floatingPromiseQuery, filePath, 'hygiene', 'FLOATING_PROMISE', 'reliability', 'warning',
-      'Floating Promise Chain',
-      'This promise chain is neither awaited nor returned, which may lead to unhandled rejections.'
-    ));
+    findings.push(
+      ...this.extractFindings(
+        rootNode,
+        floatingPromiseQuery,
+        filePath,
+        'hygiene',
+        'FLOATING_PROMISE',
+        'reliability',
+        'warning',
+        'Floating Promise Chain',
+        'This promise chain is neither awaited nor returned, which may lead to unhandled rejections.'
+      )
+    );
 
     return findings;
   }
@@ -90,7 +120,7 @@ export class JavaScriptParser extends BaseParser {
   // ── AST walker ──────────────────────────────────────────────────────────────
 
   /**
-   * It inspects the current node type, then extracts the specific language construct, 
+   * It inspects the current node type, then extracts the specific language construct,
    * and then it applies the correct extraction method or walks the children.
    */
   _walk(node, source, symbols, className) {
@@ -169,33 +199,35 @@ export class JavaScriptParser extends BaseParser {
   // ── Symbol extractors ────────────────────────────────────────────────────────
 
   /**
-   * It validates the function name node, then extracts the async/generator modifiers, 
+   * It validates the function name node, then extracts the async/generator modifiers,
    * and then it applies the function factory to populate the symbol array.
    */
   _extractFunction(node, source, symbols) {
     const nameNode = node.childForFieldName('name');
     if (!nameNode) return;
 
-    const name       = nodeText(nameNode, source);
-    const isAsync    = nodeHasChild(node, 'async');
-    const isGen      = node.type === 'generator_function_declaration';
-    const params     = this._extractParams(node, source);
+    const name = nodeText(nameNode, source);
+    const isAsync = nodeHasChild(node, 'async');
+    const isGen = node.type === 'generator_function_declaration';
+    const params = this._extractParams(node, source);
     const complexity = calculateComplexity(node);
-    const hash       = generateStructuralHash(node);
+    const hash = generateStructuralHash(node);
 
-    symbols.push(createFunction({
-      name,
-      async: isAsync,
-      generator: isGen,
-      params,
-      complexity,
-      hash,
-      location: locationFromNode(node),
-    }));
+    symbols.push(
+      createFunction({
+        name,
+        async: isAsync,
+        generator: isGen,
+        params,
+        complexity,
+        hash,
+        location: locationFromNode(node),
+      })
+    );
   }
 
   /**
-   * It filters for variable declarators, then extracts the arrow function value, 
+   * It filters for variable declarators, then extracts the arrow function value,
    * and then it applies the arrow symbol factory.
    */
   _extractArrowFromDeclaration(node, source, symbols) {
@@ -209,25 +241,27 @@ export class JavaScriptParser extends BaseParser {
       const nameNode = child.childForFieldName('name');
       if (!nameNode) continue;
 
-      const name       = nodeText(nameNode, source);
-      const isAsync    = nodeHasChild(valueNode, 'async');
-      const params     = this._extractParams(valueNode, source);
+      const name = nodeText(nameNode, source);
+      const isAsync = nodeHasChild(valueNode, 'async');
+      const params = this._extractParams(valueNode, source);
       const complexity = calculateComplexity(valueNode);
-      const hash       = generateStructuralHash(valueNode);
+      const hash = generateStructuralHash(valueNode);
 
-      symbols.push(createArrow({
-        name,
-        async: isAsync,
-        params,
-        complexity,
-        hash,
-        location: locationFromNode(child),
-      }));
+      symbols.push(
+        createArrow({
+          name,
+          async: isAsync,
+          params,
+          complexity,
+          hash,
+          location: locationFromNode(child),
+        })
+      );
     }
   }
 
   /**
-   * It parses the class identifier, then extracts the heritage/superclass if present, 
+   * It parses the class identifier, then extracts the heritage/superclass if present,
    * and then it applies the class factory configuration.
    */
   _extractClass(node, source, symbols) {
@@ -240,44 +274,48 @@ export class JavaScriptParser extends BaseParser {
       if (superNode) superClass = nodeText(superNode, source);
     }
 
-    symbols.push(createClass({
-      name,
-      superClass,
-      location: locationFromNode(node),
-    }));
+    symbols.push(
+      createClass({
+        name,
+        superClass,
+        location: locationFromNode(node),
+      })
+    );
   }
 
   /**
-   * It reads the method name field, then extracts static/async modifiers, 
+   * It reads the method name field, then extracts static/async modifiers,
    * and then it applies the method factory while linking the parent class.
    */
   _extractMethod(node, source, symbols, className) {
     const nameNode = node.childForFieldName('name');
     if (!nameNode) return;
 
-    const name       = nodeText(nameNode, source);
-    const isStatic   = nodeHasChild(node, 'static');
-    const isAsync    = nodeHasChild(node, 'async');
-    const isGen      = nodeHasChild(node, '*');
-    const params     = this._extractParams(node, source);
+    const name = nodeText(nameNode, source);
+    const isStatic = nodeHasChild(node, 'static');
+    const isAsync = nodeHasChild(node, 'async');
+    const isGen = nodeHasChild(node, '*');
+    const params = this._extractParams(node, source);
     const complexity = calculateComplexity(node);
-    const hash       = generateStructuralHash(node);
+    const hash = generateStructuralHash(node);
 
-    symbols.push(createMethod({
-      name,
-      className,
-      static: isStatic,
-      async: isAsync,
-      generator: isGen,
-      params,
-      complexity,
-      hash,
-      location: locationFromNode(node),
-    }));
+    symbols.push(
+      createMethod({
+        name,
+        className,
+        static: isStatic,
+        async: isAsync,
+        generator: isGen,
+        params,
+        complexity,
+        hash,
+        location: locationFromNode(node),
+      })
+    );
   }
 
   /**
-   * It isolates the import source, then extracts the specifier clauses, 
+   * It isolates the import source, then extracts the specifier clauses,
    * and then it applies them to construct a unified ES module import symbol.
    */
   _extractImport(node, source, symbols) {
@@ -285,10 +323,10 @@ export class JavaScriptParser extends BaseParser {
     if (!sourceNode) return;
 
     const moduleSource = stripQuotes(nodeText(sourceNode, source));
-    const specifiers   = [];
+    const specifiers = [];
 
     const child1 = node.child(1);
-    const clauseNode = (child1 && child1.type === 'import_clause') ? child1 : null;
+    const clauseNode = child1 && child1.type === 'import_clause' ? child1 : null;
 
     if (!clauseNode) {
       specifiers.push({ name: moduleSource, alias: null, type: 'side-effect' });
@@ -296,15 +334,17 @@ export class JavaScriptParser extends BaseParser {
       this._walkImportClause(clauseNode, source, specifiers);
     }
 
-    symbols.push(createImport({
-      source: moduleSource,
-      specifiers,
-      location: locationFromNode(node),
-    }));
+    symbols.push(
+      createImport({
+        source: moduleSource,
+        specifiers,
+        location: locationFromNode(node),
+      })
+    );
   }
 
   /**
-   * It iterates through the import clause, then extracts named/namespace/default identifiers, 
+   * It iterates through the import clause, then extracts named/namespace/default identifiers,
    * and then it applies them to the specifier array passed by reference.
    */
   _walkImportClause(clauseNode, source, specifiers) {
@@ -313,21 +353,19 @@ export class JavaScriptParser extends BaseParser {
 
       if (child.type === 'identifier') {
         specifiers.push({ name: nodeText(child, source), alias: null, type: 'default' });
-
       } else if (child.type === 'namespace_import') {
         const idNode = child.namedChildren.find(n => n.type === 'identifier');
         if (idNode) specifiers.push({ name: nodeText(idNode, source), alias: null, type: 'namespace' });
-
       } else if (child.type === 'named_imports') {
         for (const specNode of child.namedChildren) {
           if (specNode.type !== 'import_specifier') continue;
-          const nameNode  = specNode.childForFieldName('name');
+          const nameNode = specNode.childForFieldName('name');
           const aliasNode = specNode.childForFieldName('alias');
           if (nameNode) {
             specifiers.push({
-              name:  nodeText(nameNode, source),
+              name: nodeText(nameNode, source),
               alias: aliasNode ? nodeText(aliasNode, source) : null,
-              type:  'named',
+              type: 'named',
             });
           }
         }
@@ -336,12 +374,13 @@ export class JavaScriptParser extends BaseParser {
   }
 
   /**
-   * It evaluates the export wrapper, then extracts the declaration or default value, 
+   * It evaluates the export wrapper, then extracts the declaration or default value,
    * and then it applies the export factory for tracking modular boundaries.
    */
   _extractExport(node, source, symbols) {
-    const isDefault = nodeHasNamedChild(node, 'export_clause') === false
-                   && this._nodeChildText(node, source).startsWith('export default');
+    const isDefault =
+      nodeHasNamedChild(node, 'export_clause') === false &&
+      this._nodeChildText(node, source).startsWith('export default');
 
     const sourceNode = node.childForFieldName('source');
     const reexportSource = sourceNode ? stripQuotes(nodeText(sourceNode, source)) : null;
@@ -356,12 +395,14 @@ export class JavaScriptParser extends BaseParser {
           name = nodeText(valueNode.childForFieldName('name'), source);
         }
       }
-      symbols.push(createExport({
-        exportType: 'default',
-        name,
-        source: null,
-        location: locationFromNode(node),
-      }));
+      symbols.push(
+        createExport({
+          exportType: 'default',
+          name,
+          source: null,
+          location: locationFromNode(node),
+        })
+      );
       return;
     }
 
@@ -371,24 +412,28 @@ export class JavaScriptParser extends BaseParser {
         if (spec.type !== 'export_specifier') continue;
         const nameNode = spec.childForFieldName('name');
         if (nameNode) {
-          symbols.push(createExport({
-            exportType: reexportSource ? 'reexport' : 'named',
-            name: nodeText(nameNode, source),
-            source: reexportSource,
-            location: locationFromNode(spec),
-          }));
+          symbols.push(
+            createExport({
+              exportType: reexportSource ? 'reexport' : 'named',
+              name: nodeText(nameNode, source),
+              source: reexportSource,
+              location: locationFromNode(spec),
+            })
+          );
         }
       }
       return;
     }
 
     if (reexportSource) {
-      symbols.push(createExport({
-        exportType: 'reexport',
-        name: '*',
-        source: reexportSource,
-        location: locationFromNode(node),
-      }));
+      symbols.push(
+        createExport({
+          exportType: 'reexport',
+          name: '*',
+          source: reexportSource,
+          location: locationFromNode(node),
+        })
+      );
       return;
     }
 
@@ -397,17 +442,19 @@ export class JavaScriptParser extends BaseParser {
 
     const exportedNames = this._namesFromDeclaration(declNode, source);
     for (const name of exportedNames) {
-      symbols.push(createExport({
-        exportType: 'named',
-        name,
-        source: null,
-        location: locationFromNode(node),
-      }));
+      symbols.push(
+        createExport({
+          exportType: 'named',
+          name,
+          source: null,
+          location: locationFromNode(node),
+        })
+      );
     }
   }
 
   /**
-   * It scans variable declarators, then extracts the require() call arguments, 
+   * It scans variable declarators, then extracts the require() call arguments,
    * and then it applies the data into standard ImportSymbols to unify ESM and CJS dependencies.
    */
   _extractCommonJsRequire(node, source, symbols) {
@@ -423,39 +470,39 @@ export class JavaScriptParser extends BaseParser {
 
       const argsNode = callNode.childForFieldName('arguments');
       if (!argsNode) continue;
-      
+
       const firstArg = argsNode.namedChildren[0];
       if (!firstArg || (firstArg.type !== 'string' && firstArg.type !== 'template_string')) continue;
 
       const moduleSource = stripQuotes(nodeText(firstArg, source));
-      const location     = locationFromNode(declarator);
-      const specifiers   = [];
+      const location = locationFromNode(declarator);
+      const specifiers = [];
 
       const nameNode = declarator.childForFieldName('name');
       if (!nameNode) continue;
 
       if (nameNode.type === 'identifier') {
         specifiers.push({
-          name:  nodeText(nameNode, source),
+          name: nodeText(nameNode, source),
           alias: null,
-          type:  'cjs-default',
+          type: 'cjs-default',
         });
       } else if (nameNode.type === 'object_pattern') {
         for (const prop of nameNode.namedChildren) {
           if (prop.type === 'shorthand_property_identifier_pattern') {
             specifiers.push({
-              name:  nodeText(prop, source),
+              name: nodeText(prop, source),
               alias: null,
-              type:  'cjs-named',
+              type: 'cjs-named',
             });
           } else if (prop.type === 'pair_pattern') {
             const keyNode = prop.childForFieldName('key');
             const valNode = prop.childForFieldName('value');
             if (keyNode) {
               specifiers.push({
-                name:  nodeText(keyNode, source),
+                name: nodeText(keyNode, source),
                 alias: valNode ? nodeText(valNode, source) : null,
-                type:  'cjs-named',
+                type: 'cjs-named',
               });
             }
           }
@@ -464,16 +511,18 @@ export class JavaScriptParser extends BaseParser {
 
       if (specifiers.length === 0) continue;
 
-      symbols.push(createImport({
-        source: moduleSource,
-        specifiers,
-        location,
-      }));
+      symbols.push(
+        createImport({
+          source: moduleSource,
+          specifiers,
+          location,
+        })
+      );
     }
   }
 
   /**
-   * It checks for assignment expressions, then extracts the module.exports prefix, 
+   * It checks for assignment expressions, then extracts the module.exports prefix,
    * and then it applies the right-hand object properties to the export tracking.
    */
   _extractCommonJsExport(node, source, symbols) {
@@ -501,12 +550,14 @@ export class JavaScriptParser extends BaseParser {
         if (prop.type !== 'pair' && prop.type !== 'shorthand_property_identifier') continue;
         const keyNode = prop.childForFieldName('key') ?? prop;
         if (keyNode.type === 'identifier' || keyNode.type === 'shorthand_property_identifier') {
-          symbols.push(createExport({
-            exportType: 'named',
-            name: nodeText(keyNode, source),
-            source: null,
-            location: locationFromNode(prop),
-          }));
+          symbols.push(
+            createExport({
+              exportType: 'named',
+              name: nodeText(keyNode, source),
+              source: null,
+              location: locationFromNode(prop),
+            })
+          );
         }
       }
     }
@@ -515,7 +566,7 @@ export class JavaScriptParser extends BaseParser {
   // ── Parameter extraction ─────────────────────────────────────────────────────
 
   /**
-   * It evaluates function-like nodes, then extracts the parameter identifiers, 
+   * It evaluates function-like nodes, then extracts the parameter identifiers,
    * and then it applies fallback underscores for complex destructuring logic.
    */
   _extractParams(fnNode, source) {
@@ -536,7 +587,7 @@ export class JavaScriptParser extends BaseParser {
   }
 
   /**
-   * It loops through formal parameters, then extracts valid argument names or rest patterns, 
+   * It loops through formal parameters, then extracts valid argument names or rest patterns,
    * and then it applies them to the output parameter list.
    */
   _extractFromFormalParams(paramsNode, source) {
@@ -594,7 +645,11 @@ export class JavaScriptParser extends BaseParser {
    * It safely checks the node text, then extracts it via error catching, and then it applies a blank string on failure.
    */
   _nodeChildText(node, source) {
-    try { return nodeText(node, source); } catch { return ''; }
+    try {
+      return nodeText(node, source);
+    } catch {
+      return '';
+    }
   }
 
   /**
@@ -619,7 +674,7 @@ export class JavaScriptParser extends BaseParser {
   }
 
   /**
-   * It checks for standard name fields, then extracts declarator identifiers if missing, 
+   * It checks for standard name fields, then extracts declarator identifiers if missing,
    * and then it applies them to the exported names array.
    */
   _namesFromDeclaration(declNode, source) {

@@ -17,6 +17,7 @@ This executes `cd server && npm test`.
 If your project path contains special characters like `&` (e.g., `C:\User & Profiles\CodeLens`), running `npm test` may fail due to how npm resolves binaries.
 
 To safely run tests bypassing npm's binary wrapper, use:
+
 ```bash
 cd server
 node ../node_modules/jest/bin/jest.js --runInBand --forceExit
@@ -32,5 +33,5 @@ Tests are located in `server/tests/`:
 
 ## Coverage Requirements
 
-CodeLens maintains a high test coverage. Any new analyzer or API endpoint must include comprehensive tests. 
+CodeLens maintains a high test coverage. Any new analyzer or API endpoint must include comprehensive tests.
 Because the AI relies on deterministic facts, the parsers and context builders must be rock-solid.

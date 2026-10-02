@@ -4,13 +4,13 @@ The Kotlin analyzer extracts symbols from `.kt` and `.kts` source files using th
 
 ## Supported Symbol Types
 
-| Symbol Kind  | Kotlin Construct                    |
-|-------------|-------------------------------------|
-| `package`   | `package com.example.app`           |
-| `import`    | `import com.example.Foo`            |
+| Symbol Kind | Kotlin Construct                                  |
+| ----------- | ------------------------------------------------- |
+| `package`   | `package com.example.app`                         |
+| `import`    | `import com.example.Foo`                          |
 | `class`     | `class Foo`, `data class Foo`, `object Singleton` |
-| `interface` | `interface Bar`                     |
-| `method`    | `fun doSomething()` (top-level or member) |
+| `interface` | `interface Bar`                                   |
+| `method`    | `fun doSomething()` (top-level or member)         |
 
 ## Module Resolution
 

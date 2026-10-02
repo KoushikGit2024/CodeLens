@@ -8,27 +8,27 @@ This document details the complete end-to-end data lifecycle in CodeLens, from w
 flowchart TD
     A[Upload ZIP] --> B(Extraction & Sandbox)
     B --> C{File Discovery}
-    
+
     C --> D[Language Detection]
-    
+
     D --> E(Tree-sitter Parsing)
     E --> F[Symbol Extraction]
-    
+
     F --> G(RepositoryAnalysis)
-    
+
     G --> H[Module Resolution]
     H --> I(DependencyGraph)
-    
+
     I --> J(ArchitectureModel)
     I --> K(EngineeringRisk)
-    
+
     K --> L(RefactoringCandidates)
-    
+
     I & J & K & L --> M(RepositoryIntelligence)
-    
+
     M --> N[Context Builders]
     N --> O(AI Provider)
-    
+
     O --> P[Frontend Visualization]
 ```
 

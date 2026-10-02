@@ -1,9 +1,11 @@
 # ADR-012: Client-Dominant Analysis Architecture
 
 ## Status
+
 Accepted
 
 ## Date
+
 2026
 
 ## Context
@@ -32,35 +34,37 @@ Adopt a **Client-Dominant Analysis Architecture** where the server is strictly a
 
 The server is intentionally minimal and strictly stateless. It has exactly one role:
 
-| Responsibility | What It Means |
-|---|---|
-| AI proxy | Receive a pre-built prompt from the client → forward to AI provider → return response. Does not build the prompt. |
+| Responsibility | What It Means                                                                                                     |
+| -------------- | ----------------------------------------------------------------------------------------------------------------- |
+| AI proxy       | Receive a pre-built prompt from the client → forward to AI provider → return response. Does not build the prompt. |
 
 ### Client Responsibilities (everything else)
 
-| Responsibility | Implementation |
-|---|---|
-| File handling | Processes ZIP uploads in-browser via `JSZip` |
-| AST parsing | `web-tree-sitter` WASM in `analyzer.worker.js` |
-| Symbol extraction | Parser classes in `client/src/services/analyzer/` |
-| Dependency graph construction | Graph builder in `client/src/services/analyzer/` |
-| Architecture model building | Architecture analyzer in `client/src/services/analyzer/` |
-| Cyclomatic complexity | Complexity service in `client/src/services/analyzer/` |
-| Cross-file clone detection | Clone detector in `client/src/services/analyzer/` |
-| Dead code / reachability | Reachability service in `client/src/services/analyzer/` |
-| Risk model and hotspot scoring | Risk builder in `client/src/services/analyzer/` |
-| Result persistence | Browser IndexedDB |
-| AI context assembly | Context builder in `client/src/services/` |
+| Responsibility                 | Implementation                                           |
+| ------------------------------ | -------------------------------------------------------- |
+| File handling                  | Processes ZIP uploads in-browser via `JSZip`             |
+| AST parsing                    | `web-tree-sitter` WASM in `analyzer.worker.js`           |
+| Symbol extraction              | Parser classes in `client/src/services/analyzer/`        |
+| Dependency graph construction  | Graph builder in `client/src/services/analyzer/`         |
+| Architecture model building    | Architecture analyzer in `client/src/services/analyzer/` |
+| Cyclomatic complexity          | Complexity service in `client/src/services/analyzer/`    |
+| Cross-file clone detection     | Clone detector in `client/src/services/analyzer/`        |
+| Dead code / reachability       | Reachability service in `client/src/services/analyzer/`  |
+| Risk model and hotspot scoring | Risk builder in `client/src/services/analyzer/`          |
+| Result persistence             | Browser IndexedDB                                        |
+| AI context assembly            | Context builder in `client/src/services/`                |
 
 ## Consequences
 
 ### Positive
+
 - The server becomes trivially simple — a thin HTTP layer with no domain knowledge.
 - All analysis is instantaneous after initial parse (no network round-trips).
 - The browser's IndexedDB cache means repeat visits are fast with zero server load.
 - Complete separation: the server never needs to understand code structure at all.
 
 ### Negative
+
 - Initial parse may be slightly slower on low-end devices (WASM in browser). Mitigated by Web Worker offloading and IndexedDB caching.
 - Client bundle size increases due to WASM grammar files. Mitigated by lazy-loading.
 

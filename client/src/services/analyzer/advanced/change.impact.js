@@ -1,7 +1,7 @@
 /**
  * change.impact.js
  *
- * It initiates the change impact workflow, then extracts direct and transitive dependencies, 
+ * It initiates the change impact workflow, then extracts direct and transitive dependencies,
  * and then it applies architectural bounds to calculate the blast radius.
  */
 
@@ -10,7 +10,7 @@ import { buildArchitectureModel } from './architecture.analyzer.js';
 import { createAnalysisFinding } from '../parsing/symbols.js';
 
 /**
- * It processes the changed files array, then extracts their direct graph dependents, 
+ * It processes the changed files array, then extracts their direct graph dependents,
  * and then it applies a Breadth-First Search (BFS) to map the transitive ripple effect.
  */
 export function analyzeChangeImpact(analysis, graph, changedFiles) {
@@ -29,8 +29,8 @@ export function analyzeChangeImpact(analysis, graph, changedFiles) {
   }
 
   const queue = Array.from(directlyAffectedFiles);
-  const visited = new Set(changedFiles); 
-  
+  const visited = new Set(changedFiles);
+
   for (const f of directlyAffectedFiles) visited.add(f);
 
   let head = 0;
@@ -52,10 +52,10 @@ export function analyzeChangeImpact(analysis, graph, changedFiles) {
 
   for (const component of architecture.layers) {
     // Note: layers is the Array of AnalysisNode components built in architecture.analyzer
-    const componentFiles = graph.nodes.filter(n => 
-      n.type === 'fileNode' && n.data.layer === component.data.layer
-    ).map(n => n.data.filePath);
-    
+    const componentFiles = graph.nodes
+      .filter(n => n.type === 'fileNode' && n.data.layer === component.data.layer)
+      .map(n => n.data.filePath);
+
     const componentHasAffectedFile = componentFiles.some(f => allAffected.has(f));
     if (componentHasAffectedFile) {
       affectedComponents.add(component.data.label);
@@ -63,10 +63,11 @@ export function analyzeChangeImpact(analysis, graph, changedFiles) {
   }
 
   const findings = [];
-  
+
   // It evaluates the transitive size, then extracts cases exceeding a safety threshold, and then it applies a risk finding.
   if (transitivelyAffectedFiles.size > 10) {
-     findings.push(createAnalysisFinding({
+    findings.push(
+      createAnalysisFinding({
         id: `IMPACT-WIDE-BLAST-${changedFiles[0]}`,
         analyzerId: 'impact',
         ruleId: 'WIDE_BLAST_RADIUS',
@@ -75,8 +76,9 @@ export function analyzeChangeImpact(analysis, graph, changedFiles) {
         title: 'High Change Impact',
         message: `Modifying ${changedFiles.join(', ')} affects ${transitivelyAffectedFiles.size} downstream files. Consider extracting shared logic.`,
         filePath: changedFiles[0],
-        range: { startLine: 1, startColumn: 1, endLine: 1, endColumn: 1 }
-     }));
+        range: { startLine: 1, startColumn: 1, endLine: 1, endColumn: 1 },
+      })
+    );
   }
 
   return {
@@ -84,6 +86,6 @@ export function analyzeChangeImpact(analysis, graph, changedFiles) {
     directlyAffectedFiles: Array.from(directlyAffectedFiles).sort(),
     transitivelyAffectedFiles: Array.from(transitivelyAffectedFiles).sort(),
     affectedComponents: Array.from(affectedComponents).sort(),
-    findings
+    findings,
   };
 }

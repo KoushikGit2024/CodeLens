@@ -17,13 +17,17 @@ async function ensureDir(dirPath) {
   let current = '/';
   for (const part of parts) {
     current += part + '/';
-    try { await pfs.stat(current); } catch { await pfs.mkdir(current); }
+    try {
+      await pfs.stat(current);
+    } catch {
+      await pfs.mkdir(current);
+    }
   }
 }
 
 export async function analyzeGitChurn(repoId, postMessage = () => {}) {
   const allFiles = await persistenceStore.listFilePaths(repoId);
-  const gitFiles = allFiles.filter(f => f.match(/(^|\/)\.git\//) );
+  const gitFiles = allFiles.filter(f => f.match(/(^|\/)\.git\//));
 
   if (gitFiles.length === 0) return null;
 
@@ -55,15 +59,15 @@ export async function analyzeGitChurn(repoId, postMessage = () => {}) {
     // Manually walk history to handle shallow clone boundaries gracefully
     let currentOid = await git.resolveRef({ fs, dir: repoDir, ref: 'HEAD' });
     const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
-    
+
     for (let i = 0; i < 500; i++) {
       try {
         const commit = await git.readCommit({ fs, dir: repoDir, oid: currentOid });
         commits.push(commit);
-        
+
         const commitTime = commit.commit.author.timestamp * 1000;
         if (commitTime < ninetyDaysAgo) break;
-        
+
         if (commit.commit.parent && commit.commit.parent.length > 0) {
           currentOid = commit.commit.parent[0];
         } else {
@@ -99,25 +103,30 @@ export async function analyzeGitChurn(repoId, postMessage = () => {}) {
         fs,
         dir: repoDir,
         trees: [git.TREE({ ref: commit.oid }), git.TREE({ ref: parent.oid })],
-        map: async function(filepath, [A, B]) {
+        map: async function (filepath, [A, B]) {
           if (filepath === '.') return;
           const typeA = A ? await A.type() : null;
           const typeB = B ? await B.type() : null;
           if (typeA === 'tree' || typeB === 'tree') return;
-          
+
           const oidA = A ? await A.oid() : null;
           const oidB = B ? await B.oid() : null;
           if (oidA !== oidB) return filepath;
-        }
+        },
       });
-      
+
       for (const filepath of changes) {
         if (!filepath) continue;
         if (!fileChurn[filepath]) fileChurn[filepath] = 0;
         fileChurn[filepath]++;
       }
 
-      postMessage({ type: 'PROGRESS', repoId, phase: 'analyzing_git_churn', details: `Diffing commit ${i + 1} of ${commits.length - 1}…` });
+      postMessage({
+        type: 'PROGRESS',
+        repoId,
+        phase: 'analyzing_git_churn',
+        details: `Diffing commit ${i + 1} of ${commits.length - 1}…`,
+      });
     } catch (err) {
       console.warn(`[Git Analyzer] Failed to diff commit ${commit.oid}`, err);
     }
@@ -126,7 +135,7 @@ export async function analyzeGitChurn(repoId, postMessage = () => {}) {
   // Calculate normalized churn scores (0 to 100)
   const churnScores = {};
   for (const [filepath, count] of Object.entries(fileChurn)) {
-    churnScores[filepath] = Math.min(100, Math.round((count / totalCommitsAnalyzed) * 100 * 3)); 
+    churnScores[filepath] = Math.min(100, Math.round((count / totalCommitsAnalyzed) * 100 * 3));
     // Multiplied by 3 to spread the score out a bit, since 100% of commits touching a file is rare
   }
 
@@ -137,8 +146,8 @@ export async function analyzeGitChurn(repoId, postMessage = () => {}) {
       message: c.commit.message,
       author: c.commit.author,
       committer: c.commit.committer,
-      parent: c.commit.parent
-    }
+      parent: c.commit.parent,
+    },
   }));
 
   return { totalCommitsAnalyzed, churnScores, fileChurn, commits: serializedCommits };

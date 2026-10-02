@@ -1,7 +1,7 @@
 /**
  * AIContext.jsx
  *
- * It initiates the AI tracking hooks, then extracts structured conversational payloads, 
+ * It initiates the AI tracking hooks, then extracts structured conversational payloads,
  * and then it applies local active-file bindings before sending queries to LLM.
  */
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
@@ -118,74 +118,86 @@ export function useAI({ repoId, feature, contextData } = {}) {
     };
 
     loadHistory();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [repoId, feature]);
 
-  const sendMessage = useCallback(async (prompt, attachments = []) => {
-    if ((!prompt?.trim() && attachments.length === 0) || !repoId || !feature) return;
+  const sendMessage = useCallback(
+    async (prompt, attachments = []) => {
+      if ((!prompt?.trim() && attachments.length === 0) || !repoId || !feature) return;
 
-    // Build the display message (what appears in the chat bubble)
-    const displayParts = [prompt?.trim()].filter(Boolean);
-    if (attachments.length > 0) {
-      const labels = attachments.map(a => {
-        if (a.type === 'image') return `[Image] ${a.name}`;
-        if (a.type === 'snippet') return `[Snippet] ${a.name}`;
-        return `[File] ${a.name}`;
-      });
-      displayParts.push(`\n\n_Attachments: ${labels.join(', ')}_`);
-    }
-    const displayText = displayParts.join('');
-
-    // Build the actual AI prompt (text + serialised attachments)
-    const promptParts = [prompt?.trim()].filter(Boolean);
-    for (const a of attachments) {
-      if (a.type === 'image' && a.dataUrl) {
-        promptParts.push(`\n\n--- Attached Image: ${a.name} ---\n[Image data: ${a.dataUrl.slice(0, 80)}…]\n---`);
-      } else if (a.content) {
-        const fence = a.type === 'snippet' ? 'text' : (a.name?.split('.').pop() || 'text');
-        promptParts.push(`\n\n--- Attached ${a.type === 'snippet' ? 'Text Snippet' : `File: ${a.path || a.name}`} ---\n\`\`\`${fence}\n${a.content}\n\`\`\`\n---`);
-      }
-    }
-    const fullPrompt = promptParts.join('');
-
-    const isFirstTurn = messages.length === 0;
-    
-    if (isFirstTurn) {
-      // Step 1: Build context deterministically, then wait for user confirmation
-      setLoadingState('gathering_dependencies');
-      setError(null);
-      try {
-        const activeContext = contextData?.filePath ? {
-          filePath: contextData.filePath,
-          startLine: contextData.startLine,
-          endLine: contextData.endLine
-        } : null;
-        
-        const builtContext = await repositoryApi.buildAIContext(repoId, fullPrompt, activeContext);
-        setPendingContextPayload({
-          builtContext,
-          fullPrompt,
-          displayText
+      // Build the display message (what appears in the chat bubble)
+      const displayParts = [prompt?.trim()].filter(Boolean);
+      if (attachments.length > 0) {
+        const labels = attachments.map(a => {
+          if (a.type === 'image') return `[Image] ${a.name}`;
+          if (a.type === 'snippet') return `[Snippet] ${a.name}`;
+          return `[File] ${a.name}`;
         });
-        setLoadingState('idle'); // Wait for user to confirm
-      } catch (err) {
-        console.error(err);
-        setError(err.message || 'Failed to gather context.');
-        setLoadingState('idle');
+        displayParts.push(`\n\n_Attachments: ${labels.join(', ')}_`);
       }
-      return;
-    }
+      const displayText = displayParts.join('');
 
-    // Follow-up turns immediately send
-    await commitSend(fullPrompt, displayText, null);
-  }, [repoId, feature, messages, contextData]);
+      // Build the actual AI prompt (text + serialised attachments)
+      const promptParts = [prompt?.trim()].filter(Boolean);
+      for (const a of attachments) {
+        if (a.type === 'image' && a.dataUrl) {
+          promptParts.push(`\n\n--- Attached Image: ${a.name} ---\n[Image data: ${a.dataUrl.slice(0, 80)}…]\n---`);
+        } else if (a.content) {
+          const fence = a.type === 'snippet' ? 'text' : a.name?.split('.').pop() || 'text';
+          promptParts.push(
+            `\n\n--- Attached ${a.type === 'snippet' ? 'Text Snippet' : `File: ${a.path || a.name}`} ---\n\`\`\`${fence}\n${a.content}\n\`\`\`\n---`
+          );
+        }
+      }
+      const fullPrompt = promptParts.join('');
 
-  const confirmPendingContext = useCallback(async (modifiedContext) => {
-    if (!pendingContextPayload) return;
-    const { fullPrompt, displayText } = pendingContextPayload;
-    setPendingContextPayload(null);
-    await commitSend(fullPrompt, displayText, modifiedContext);
-  }, [pendingContextPayload]);
+      const isFirstTurn = messages.length === 0;
+
+      if (isFirstTurn) {
+        // Step 1: Build context deterministically, then wait for user confirmation
+        setLoadingState('gathering_dependencies');
+        setError(null);
+        try {
+          const activeContext = contextData?.filePath
+            ? {
+                filePath: contextData.filePath,
+                startLine: contextData.startLine,
+                endLine: contextData.endLine,
+              }
+            : null;
+
+          const builtContext = await repositoryApi.buildAIContext(repoId, fullPrompt, activeContext);
+          setPendingContextPayload({
+            builtContext,
+            fullPrompt,
+            displayText,
+          });
+          setLoadingState('idle'); // Wait for user to confirm
+        } catch (err) {
+          console.error(err);
+          setError(err.message || 'Failed to gather context.');
+          setLoadingState('idle');
+        }
+        return;
+      }
+
+      // Follow-up turns immediately send
+      await commitSend(fullPrompt, displayText, null);
+    },
+    [repoId, feature, messages, contextData]
+  );
+
+  const confirmPendingContext = useCallback(
+    async modifiedContext => {
+      if (!pendingContextPayload) return;
+      const { fullPrompt, displayText } = pendingContextPayload;
+      setPendingContextPayload(null);
+      await commitSend(fullPrompt, displayText, modifiedContext);
+    },
+    [pendingContextPayload]
+  );
 
   const cancelPendingContext = useCallback(() => {
     setPendingContextPayload(null);
@@ -210,7 +222,10 @@ export function useAI({ repoId, feature, contextData } = {}) {
         res = await repositoryApi.askQuestion(repoId, fullPrompt, null, optimisticMessages, reqOptions);
       }
 
-      const finalMessages = [...optimisticMessages, { role: 'assistant', content: res.data.answer || res.data.response }];
+      const finalMessages = [
+        ...optimisticMessages,
+        { role: 'assistant', content: res.data.answer || res.data.response },
+      ];
       setMessages(finalMessages);
 
       await chatStore.saveChat(repoId, feature, finalMessages);
@@ -264,6 +279,6 @@ export function useAI({ repoId, feature, contextData } = {}) {
     retryLast,
     clearHistory,
     stopGeneration,
-    effectiveState
+    effectiveState,
   };
 }

@@ -1,11 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import AiMarkdown from './AiMarkdown';
 import AiReference from './AiReference';
-import { AlertCircle, FileText, Settings, ShieldAlert, Sparkles, Lightbulb, ListChecks, Send, Loader2, User, Copy, Check } from 'lucide-react';
+import {
+  AlertCircle,
+  FileText,
+  Settings,
+  ShieldAlert,
+  Sparkles,
+  Lightbulb,
+  ListChecks,
+  Send,
+  Loader2,
+  User,
+  Copy,
+  Check,
+} from 'lucide-react';
 import { useAI } from '../../context/AIContext';
 
 // ── TypewriterMarkdown (New Animation Component) ──────────────────────────────
-function TypewriterMarkdown({ content, animate = true, speed = 15, className = "" }) {
+function TypewriterMarkdown({ content, animate = true, speed = 15, className = '' }) {
   const [displayed, setDisplayed] = useState(animate ? '' : content);
   const [isTyping, setIsTyping] = useState(animate);
 
@@ -19,14 +32,14 @@ function TypewriterMarkdown({ content, animate = true, speed = 15, className = "
 
     let currentLength = 0;
     setIsTyping(true);
-    
+
     // Adaptive chunk size: prevents massive responses from taking 2 minutes to type out,
     // while keeping short responses looking like a natural keystroke speed.
-    const chunkSize = Math.max(1, Math.floor(content.length / 150)); 
+    const chunkSize = Math.max(1, Math.floor(content.length / 150));
 
     const interval = setInterval(() => {
       currentLength += chunkSize;
-      
+
       if (currentLength >= content.length) {
         setDisplayed(content);
         setIsTyping(false);
@@ -55,11 +68,11 @@ function CopyableListItem({ content, className }) {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
-  
+
   return (
     <li className={`${className} group/item relative pr-6`}>
       <AiMarkdown content={content} />
-      <button 
+      <button
         onClick={handleCopy}
         className="absolute top-0 right-0 opacity-0 group-hover/item:opacity-100 transition-opacity text-muted hover:text-text"
         title="Copy item"
@@ -86,13 +99,13 @@ function CopyableChatMessage({ msg }) {
           <Sparkles className="w-3.5 h-3.5 text-accent" />
         </div>
       )}
-      
+
       <div className="flex flex-col gap-1 max-w-[85%] w-full">
-        <div className={`text-sm px-4 py-2.5 rounded-lg w-full ${
-          msg.role === 'user' 
-            ? 'bg-panel border border-border text-text' 
-            : 'bg-transparent text-text/90'
-        }`}>
+        <div
+          className={`text-sm px-4 py-2.5 rounded-lg w-full ${
+            msg.role === 'user' ? 'bg-panel border border-border text-text' : 'bg-transparent text-text/90'
+          }`}
+        >
           {msg.role === 'user' ? (
             msg.content
           ) : (
@@ -101,9 +114,9 @@ function CopyableChatMessage({ msg }) {
           )}
         </div>
 
-        <button 
-          onClick={handleCopy} 
-          className={`opacity-0 group-hover/chat:opacity-100 text-muted hover:text-text transition-opacity shrink-0 flex items-center gap-1 text-[10px] ${msg.role === 'user' ? 'self-end' : 'self-start'}`} 
+        <button
+          onClick={handleCopy}
+          className={`opacity-0 group-hover/chat:opacity-100 text-muted hover:text-text transition-opacity shrink-0 flex items-center gap-1 text-[10px] ${msg.role === 'user' ? 'self-end' : 'self-start'}`}
           title="Copy Message"
         >
           {copied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
@@ -120,16 +133,23 @@ function CopyableChatMessage({ msg }) {
   );
 }
 
-export default function AiResponse({ data, title = "AI Intelligence", onNavigate, repoId, chatId }) {
-  const { messages: chatHistory, isLoading: isAsking, error: chatError, sendMessage, retryLast, lastFailedPrompt } = useAI({ 
-    repoId, 
-    feature: chatId, 
-    contextData: data 
+export default function AiResponse({ data, title = 'AI Intelligence', onNavigate, repoId, chatId }) {
+  const {
+    messages: chatHistory,
+    isLoading: isAsking,
+    error: chatError,
+    sendMessage,
+    retryLast,
+    lastFailedPrompt,
+  } = useAI({
+    repoId,
+    feature: chatId,
+    contextData: data,
   });
   const [input, setInput] = useState('');
   const chatEndRef = useRef(null);
 
-  const handleAskQuestion = async (e) => {
+  const handleAskQuestion = async e => {
     e.preventDefault();
     if (!input.trim() || isAsking) return;
     const currentInput = input;
@@ -153,8 +173,7 @@ export default function AiResponse({ data, title = "AI Intelligence", onNavigate
           <h3 className="font-semibold text-sm">AI Unavailable</h3>
         </div>
         <p className="text-xs text-warning/80 leading-relaxed mb-4">
-          The AI provider is currently unconfigured or unreachable. 
-          Deterministic analysis remains fully available.
+          The AI provider is currently unconfigured or unreachable. Deterministic analysis remains fully available.
         </p>
         <div className="text-[10px] uppercase tracking-wider text-muted font-bold border-t border-border pt-4">
           Deterministic Mode Active
@@ -186,7 +205,7 @@ export default function AiResponse({ data, title = "AI Intelligence", onNavigate
   const risks = data.risks || data.mainRisks || data.limitations || [];
 
   const references = (data.references || []).filter(Boolean);
-  
+
   return (
     <div className="flex flex-col gap-6">
       {/* ── Summary / Main Content ────────────────────────────────────────── */}
@@ -290,9 +309,8 @@ export default function AiResponse({ data, title = "AI Intelligence", onNavigate
       )}
 
       {/* ── Continuous Chat UI ───────────────────────────────────────────── */}
-      {(repoId && chatId && (data.status !== 'error' && data.status !== 'unavailable')) && (
+      {repoId && chatId && data.status !== 'error' && data.status !== 'unavailable' && (
         <section className="mt-4 border-t border-border pt-6 flex flex-col gap-4">
-          
           {/* Chat History */}
           {chatHistory.length > 0 && (
             <div className="flex flex-col gap-4 mb-2">

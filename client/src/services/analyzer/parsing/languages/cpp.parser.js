@@ -1,7 +1,7 @@
 /**
  * CppParser.js
  *
- * It configures the C++ Tree-sitter parser, then extracts native symbols, 
+ * It configures the C++ Tree-sitter parser, then extracts native symbols,
  * and then it applies the unified AST schemas for CodeLens intelligence.
  *
  * How this file is structured:
@@ -34,7 +34,7 @@ export class CppParser extends BaseParser {
   // ── Public entry points ─────────────────────────────────────────────────────
 
   /**
-   * It receives the top-level program node, then extracts the symbols via a depth-first walk, 
+   * It receives the top-level program node, then extracts the symbols via a depth-first walk,
    * and then it applies the collected array to the caller.
    */
   extractSymbols(rootNode, source) {
@@ -44,7 +44,7 @@ export class CppParser extends BaseParser {
   }
 
   /**
-   * It receives the parsed AST root, then extracts the advanced static findings using S-expression queries, 
+   * It receives the parsed AST root, then extracts the advanced static findings using S-expression queries,
    * and then it applies the canonical AnalysisFinding schema for the frontend intelligence dashboard.
    */
   extractAdvancedFindings(rootNode, filePath) {
@@ -54,21 +54,37 @@ export class CppParser extends BaseParser {
     const sinkQuery = `
       (call_expression function: (identifier) @func (#match? @func "^(system|popen|strcpy|sprintf)$"))
     `;
-    findings.push(...this.extractFindings(
-      rootNode, sinkQuery, filePath, 'security', 'UNSAFE_MEMORY_OR_EXEC', 'security', 'critical',
-      'Unsafe function call: {text}',
-      'Usage of `{text}` is discouraged due to buffer overflow or command injection risks.'
-    ));
+    findings.push(
+      ...this.extractFindings(
+        rootNode,
+        sinkQuery,
+        filePath,
+        'security',
+        'UNSAFE_MEMORY_OR_EXEC',
+        'security',
+        'critical',
+        'Unsafe function call: {text}',
+        'Usage of `{text}` is discouraged due to buffer overflow or command injection risks.'
+      )
+    );
 
     // It defines the Google Test macro query, then extracts the test call expressions, and then it applies the architectural info schema.
     const testQuery = `
       (call_expression function: (identifier) @func (#match? @func "^(TEST|TEST_F)$"))
     `;
-    findings.push(...this.extractFindings(
-      rootNode, testQuery, filePath, 'architecture', 'TEST_BLOCK', 'reliability', 'info',
-      'GTest identified',
-      'Google Test macro detected.'
-    ));
+    findings.push(
+      ...this.extractFindings(
+        rootNode,
+        testQuery,
+        filePath,
+        'architecture',
+        'TEST_BLOCK',
+        'reliability',
+        'info',
+        'GTest identified',
+        'Google Test macro detected.'
+      )
+    );
 
     return findings;
   }
@@ -76,7 +92,7 @@ export class CppParser extends BaseParser {
   // ── AST walker ──────────────────────────────────────────────────────────────
 
   /**
-   * It inspects the current node type, then extracts the specific language construct, 
+   * It inspects the current node type, then extracts the specific language construct,
    * and then it applies the correct extraction method or walks the children.
    */
   _walk(node, source, symbols, className) {
@@ -137,7 +153,7 @@ export class CppParser extends BaseParser {
   // ── Symbol extractors ────────────────────────────────────────────────────────
 
   /**
-   * It evaluates the preprocessor directive, then extracts the string path or system bracket path, 
+   * It evaluates the preprocessor directive, then extracts the string path or system bracket path,
    * and then it applies the import symbol factory to track dependencies.
    */
   _extractInclude(node, source, symbols) {
@@ -149,18 +165,20 @@ export class CppParser extends BaseParser {
     let isExternal = true;
 
     if (specifier.startsWith('"') && specifier.endsWith('"')) {
-        specifier = specifier.slice(1, -1);
-        isExternal = false;
+      specifier = specifier.slice(1, -1);
+      isExternal = false;
     } else if (specifier.startsWith('<') && specifier.endsWith('>')) {
-        specifier = specifier.slice(1, -1);
-        isExternal = true;
+      specifier = specifier.slice(1, -1);
+      isExternal = true;
     }
 
-    symbols.push(createImport({
-      source: specifier,
-      specifiers: [{ name: specifier, alias: null, type: isExternal ? 'external' : 'internal' }],
-      location: locationFromNode(node),
-    }));
+    symbols.push(
+      createImport({
+        source: specifier,
+        specifiers: [{ name: specifier, alias: null, type: isExternal ? 'external' : 'internal' }],
+        location: locationFromNode(node),
+      })
+    );
   }
 
   /**
@@ -170,10 +188,12 @@ export class CppParser extends BaseParser {
     const nameNode = node.childForFieldName('name');
     if (!nameNode) return;
 
-    symbols.push(createNamespace({
-      name: nodeText(nameNode, source),
-      location: locationFromNode(node),
-    }));
+    symbols.push(
+      createNamespace({
+        name: nodeText(nameNode, source),
+        location: locationFromNode(node),
+      })
+    );
   }
 
   /**
@@ -181,13 +201,15 @@ export class CppParser extends BaseParser {
    */
   _extractClass(node, source, symbols) {
     const name = this._classNameFromNode(node, source);
-    if (!name || name === '<anonymous>') return; 
+    if (!name || name === '<anonymous>') return;
 
-    symbols.push(createClass({
-      name,
-      superClass: null, 
-      location: locationFromNode(node),
-    }));
+    symbols.push(
+      createClass({
+        name,
+        superClass: null,
+        location: locationFromNode(node),
+      })
+    );
   }
 
   /**
@@ -197,14 +219,16 @@ export class CppParser extends BaseParser {
     const name = this._classNameFromNode(node, source);
     if (!name || name === '<anonymous>') return;
 
-    symbols.push(createStruct({
-      name,
-      location: locationFromNode(node),
-    }));
+    symbols.push(
+      createStruct({
+        name,
+        location: locationFromNode(node),
+      })
+    );
   }
 
   /**
-   * It targets the function declarator, then extracts the core identifier through pointers/references, 
+   * It targets the function declarator, then extracts the core identifier through pointers/references,
    * and then it applies either the method or function factory based on scope qualification.
    */
   _extractFunctionOrMethod(node, source, symbols, currentClassName) {
@@ -212,8 +236,11 @@ export class CppParser extends BaseParser {
     if (!declarator) return;
 
     let coreDeclarator = declarator;
-    while (coreDeclarator && (coreDeclarator.type === 'pointer_declarator' || coreDeclarator.type === 'reference_declarator')) {
-        coreDeclarator = coreDeclarator.childForFieldName('declarator');
+    while (
+      coreDeclarator &&
+      (coreDeclarator.type === 'pointer_declarator' || coreDeclarator.type === 'reference_declarator')
+    ) {
+      coreDeclarator = coreDeclarator.childForFieldName('declarator');
     }
 
     if (!coreDeclarator || coreDeclarator.type !== 'function_declarator') return;
@@ -226,48 +253,52 @@ export class CppParser extends BaseParser {
     let isMethod = !!className;
 
     if (nameNode.type === 'qualified_identifier') {
-        const scope = nameNode.childForFieldName('scope');
-        const name = nameNode.childForFieldName('name');
-        if (scope && name) {
-            className = nodeText(scope, source);
-            fnName = nodeText(name, source);
-            isMethod = true;
-        }
+      const scope = nameNode.childForFieldName('scope');
+      const name = nameNode.childForFieldName('name');
+      if (scope && name) {
+        className = nodeText(scope, source);
+        fnName = nodeText(name, source);
+        isMethod = true;
+      }
     }
 
-    const params     = this._extractParams(coreDeclarator, source);
+    const params = this._extractParams(coreDeclarator, source);
     const complexity = calculateComplexity(node);
-    const hash       = generateStructuralHash(node);
+    const hash = generateStructuralHash(node);
 
     if (isMethod) {
-        symbols.push(createMethod({
-            name: fnName,
-            className: className,
-            static: false, 
-            async: false,
-            generator: false,
-            params,
-            complexity,
-            hash,
-            location: locationFromNode(node),
-        }));
+      symbols.push(
+        createMethod({
+          name: fnName,
+          className: className,
+          static: false,
+          async: false,
+          generator: false,
+          params,
+          complexity,
+          hash,
+          location: locationFromNode(node),
+        })
+      );
     } else {
-        symbols.push(createFunction({
-            name: fnName,
-            async: false,
-            generator: false,
-            params,
-            complexity,
-            hash,
-            location: locationFromNode(node),
-        }));
+      symbols.push(
+        createFunction({
+          name: fnName,
+          async: false,
+          generator: false,
+          params,
+          complexity,
+          hash,
+          location: locationFromNode(node),
+        })
+      );
     }
   }
 
   // ── Utilities ────────────────────────────────────────────────────────────────
 
   /**
-   * It scans the parameter list, then extracts individual parameter declarations, 
+   * It scans the parameter list, then extracts individual parameter declarations,
    * and then it applies fallback underscores for complex pointer/reference combinations.
    */
   _extractParams(fnDeclaratorNode, source) {
@@ -275,22 +306,22 @@ export class CppParser extends BaseParser {
     const paramsNode = fnDeclaratorNode.childForFieldName('parameters');
     if (paramsNode) {
       for (const p of paramsNode.namedChildren) {
-          if (p.type === 'parameter_declaration' || p.type === 'optional_parameter_declaration') {
-              const decl = p.childForFieldName('declarator');
-              if (decl) {
-                  let coreDecl = decl;
-                  while (coreDecl && (coreDecl.type === 'pointer_declarator' || coreDecl.type === 'reference_declarator')) {
-                      coreDecl = coreDecl.childForFieldName('declarator');
-                  }
-                  if (coreDecl && coreDecl.type === 'identifier') {
-                      params.push(nodeText(coreDecl, source));
-                  } else {
-                      params.push('_');
-                  }
-              } else {
-                  params.push('_');
-              }
+        if (p.type === 'parameter_declaration' || p.type === 'optional_parameter_declaration') {
+          const decl = p.childForFieldName('declarator');
+          if (decl) {
+            let coreDecl = decl;
+            while (coreDecl && (coreDecl.type === 'pointer_declarator' || coreDecl.type === 'reference_declarator')) {
+              coreDecl = coreDecl.childForFieldName('declarator');
+            }
+            if (coreDecl && coreDecl.type === 'identifier') {
+              params.push(nodeText(coreDecl, source));
+            } else {
+              params.push('_');
+            }
+          } else {
+            params.push('_');
           }
+        }
       }
     }
     return params;

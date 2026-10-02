@@ -16,7 +16,7 @@ describe('analyzer pipeline integration', () => {
 
     // 2. Track messages posted back to main thread
     const messages = [];
-    const postMessage = (msg) => messages.push(msg);
+    const postMessage = msg => messages.push(msg);
 
     // 3. Execute pipeline
     const analysis = await executeAnalysisPipeline(repoId, {}, postMessage);
@@ -31,11 +31,11 @@ describe('analyzer pipeline integration', () => {
     expect(analysis.graph).toBeDefined();
     expect(analysis.graph.nodes).toBeDefined();
     expect(analysis.graph.edges).toBeDefined();
-    
+
     // Check nodes exist for both files
     expect(analysis.graph.nodes.some(n => n.id === 'file:index.js')).toBe(true);
     expect(analysis.graph.nodes.some(n => n.id === 'file:app.ts')).toBe(true);
-    
+
     // Check edge exists from app.ts -> index.js
     const toIndex = analysis.graph.edges.find(e => e.source === 'file:app.ts' && e.target === 'file:index.js');
     expect(toIndex).toBeDefined();

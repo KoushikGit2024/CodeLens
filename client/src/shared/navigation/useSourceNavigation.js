@@ -30,7 +30,7 @@ export function useSourceNavigation() {
    *   Pass null or omit to navigate to the Explorer root (no file selected).
    */
   const openSource = useCallback(
-    (ref) => {
+    ref => {
       if (!repoId) return;
       if (!ref?.filePath) {
         navigate(`/explore/${repoId}/source`);
@@ -38,7 +38,7 @@ export function useSourceNavigation() {
       }
       navigate(buildSourceUrl(repoId, ref));
     },
-    [navigate, repoId],
+    [navigate, repoId]
   );
 
   /**
@@ -49,11 +49,11 @@ export function useSourceNavigation() {
    * @returns {string}
    */
   const sourceUrl = useCallback(
-    (ref) => {
+    ref => {
       if (!repoId) return '#';
       return buildSourceUrl(repoId, ref);
     },
-    [repoId],
+    [repoId]
   );
 
   /**
@@ -73,7 +73,7 @@ export function useSourceNavigation() {
         console.warn('[useSourceNavigation] Invalid source reference:', err.message);
       }
     },
-    [openSource],
+    [openSource]
   );
 
   return { openSource, sourceUrl, openFile };

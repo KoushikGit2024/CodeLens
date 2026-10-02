@@ -9,7 +9,7 @@
 
 self.onmessage = function (e) {
   const { nodes, edges, bounds, options } = e.data;
-  
+
   try {
     const svgString = generateNativeSVG(nodes, edges, bounds, options);
     self.postMessage({ success: true, svgString });
@@ -20,7 +20,7 @@ self.onmessage = function (e) {
 
 function generateNativeSVG(nodes, edges, bounds, options) {
   const { includeBackground, backgroundColor = '#0C0E14' } = options;
-  
+
   // Padding for the final SVG
   const padding = 50;
   const width = bounds.width + padding * 2;
@@ -45,13 +45,13 @@ function generateNativeSVG(nodes, edges, bounds, options) {
   // 2. Render Edges (Paths)
   svg += `<g id="edges">`;
   edges.forEach(edge => {
-    // If the edge has bezier control points, we'd need them. 
-    // Since we don't have React Flow's internal path generator here, 
+    // If the edge has bezier control points, we'd need them.
+    // Since we don't have React Flow's internal path generator here,
     // we'll draw a simple straight line between source and target node centers.
-    
+
     const sourceNode = nodes.find(n => n.id === edge.source);
     const targetNode = nodes.find(n => n.id === edge.target);
-    
+
     if (sourceNode && targetNode) {
       const sx = sourceNode.position.x + (sourceNode.width || 150) / 2 + offsetX;
       const sy = sourceNode.position.y + (sourceNode.height || 40) / 2 + offsetY;
@@ -70,7 +70,7 @@ function generateNativeSVG(nodes, edges, bounds, options) {
     const y = node.position.y + offsetY;
     const w = node.width || 150;
     const h = node.height || 40;
-    
+
     // Determine colors based on node type or data
     let bgColor = node.data?.exportBg || '#1E2335';
     let borderColor = node.data?.exportBorder || '#343B54';
@@ -80,14 +80,14 @@ function generateNativeSVG(nodes, edges, bounds, options) {
     svg += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" ry="6" fill="${backgroundColor}" />`;
     // Node Box
     svg += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" ry="6" fill="${bgColor}" stroke="${borderColor}" stroke-width="1" />`;
-    
+
     // Node Text
     const label = node.data?.label || node.data?.name || node.id;
     // Basic text truncation for SVG
     const maxChars = Math.max(10, Math.floor(w / 7));
     const displayLabel = label.length > maxChars ? label.substring(0, maxChars - 3) + '...' : label;
 
-    svg += `<text x="${x + w/2}" y="${y + h/2}" font-family="sans-serif" font-size="12" fill="${textColor}" text-anchor="middle" dominant-baseline="middle">${displayLabel}</text>`;
+    svg += `<text x="${x + w / 2}" y="${y + h / 2}" font-family="sans-serif" font-size="12" fill="${textColor}" text-anchor="middle" dominant-baseline="middle">${displayLabel}</text>`;
   });
   svg += `</g>`;
 

@@ -1,7 +1,7 @@
 /**
  * architecture.rules.js
- * 
- * It registers strict boundary policies, then extracts layer interaction violations, 
+ *
+ * It registers strict boundary policies, then extracts layer interaction violations,
  * and then it applies the unified AnalysisFinding schema for the dashboard.
  */
 
@@ -15,7 +15,7 @@ export const ARCHITECTURE_RULES = [
     severity: 'critical',
     evaluate: (srcComp, tgtComp) => {
       return srcComp.layer === 'Presentation' && tgtComp.layer === 'Data';
-    }
+    },
   },
   {
     id: 'rule-api-isolation',
@@ -24,7 +24,7 @@ export const ARCHITECTURE_RULES = [
     severity: 'warning',
     evaluate: (srcComp, tgtComp) => {
       return srcComp.layer === 'API' && tgtComp.layer === 'Presentation';
-    }
+    },
   },
   {
     id: 'rule-data-isolation',
@@ -33,17 +33,17 @@ export const ARCHITECTURE_RULES = [
     severity: 'critical',
     evaluate: (srcComp, tgtComp) => {
       return srcComp.layer === 'Data' && (tgtComp.layer === 'Presentation' || tgtComp.layer === 'API');
-    }
-  }
+    },
+  },
 ];
 
 /**
- * It maps component layers, then extracts forbidden dependency edges, 
+ * It maps component layers, then extracts forbidden dependency edges,
  * and then it applies the findings schema to return architectural breaches.
  */
 export function validateArchitecture(components, edges) {
   const findings = [];
-  
+
   const compLayerMap = new Map();
   for (const comp of components) {
     // Key by label (= what relations use as source/target), not by node id
@@ -62,7 +62,6 @@ export function validateArchitecture(components, edges) {
 
     for (const rule of ARCHITECTURE_RULES) {
       if (rule.evaluate(srcCompMock, tgtCompMock)) {
-        
         // It detects a rule failure, then extracts the edge source, and then it applies the frontend finding format.
         findings.push({
           ...createAnalysisFinding({
@@ -78,8 +77,8 @@ export function validateArchitecture(components, edges) {
               startLine: 1,
               startColumn: 1,
               endLine: 1,
-              endColumn: 1
-            }
+              endColumn: 1,
+            },
           }),
           // Extra fields consumed by graphToFlow for node/edge highlighting
           sourceComponent: edge.source,

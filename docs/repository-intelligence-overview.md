@@ -9,6 +9,7 @@ Instead of making developers click through separate tabs (Architecture, Dependen
 ## Deterministic Data Model
 
 The intelligence model aggregates facts without re-parsing the source code:
+
 - **Repository**: Files, languages, line limits.
 - **Architecture**: Components, layers, and entry points.
 - **Dependencies**: Total nodes, edges, cycles, and unresolved imports.
@@ -17,7 +18,8 @@ The intelligence model aggregates facts without re-parsing the source code:
 
 ## Hotspot Detection
 
-To help developers know exactly *where* to start reading, CodeLens features a deterministic **Hotspot Detection Algorithm**. Files are scored based on:
+To help developers know exactly _where_ to start reading, CodeLens features a deterministic **Hotspot Detection Algorithm**. Files are scored based on:
+
 1. **Size/Complexity**: Files exporting or defining large numbers of symbols.
 2. **Coupling (Fan-in/Fan-out)**: Files with unusually high outgoing dependencies (coordinators) or extremely high incoming dependencies.
 3. **Architecture**: Whether the file is an application entry point.
@@ -27,7 +29,7 @@ Shared utilities (high fan-in but low complexity) are bounded to prevent them fr
 
 ## AI Repository Assistant
 
-The dashboard includes an **"Understand Repository"** action. When clicked, CodeLens feeds the *deterministic repository summary* into the AI provider. The AI is instructed to synthesize these facts into a cohesive explanation, highlighting the main architecture patterns, critical risks, and recommended first steps.
+The dashboard includes an **"Understand Repository"** action. When clicked, CodeLens feeds the _deterministic repository summary_ into the AI provider. The AI is instructed to synthesize these facts into a cohesive explanation, highlighting the main architecture patterns, critical risks, and recommended first steps.
 
 Because the AI only sees the aggregated facts and not the entire raw source tree, hallucination is minimized, and performance is maximized.
 

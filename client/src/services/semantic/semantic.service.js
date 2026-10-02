@@ -5,7 +5,7 @@ let worker = null;
 function getWorker() {
   if (!worker) {
     worker = new Worker(new URL('./semantic.worker.js', import.meta.url), {
-      type: 'module'
+      type: 'module',
     });
   }
   return worker;
@@ -30,8 +30,8 @@ export function cosineSimilarity(vecA, vecB) {
 export function initializeSemanticEngine(model, useBrowserCache, onProgress) {
   return new Promise((resolve, reject) => {
     const w = getWorker();
-    
-    const handler = (e) => {
+
+    const handler = e => {
       const { type, payload, error } = e.data;
       if (type === 'progress' && onProgress) {
         onProgress(payload);
@@ -43,7 +43,7 @@ export function initializeSemanticEngine(model, useBrowserCache, onProgress) {
         reject(new Error(error));
       }
     };
-    
+
     w.addEventListener('message', handler);
     w.postMessage({ type: 'init', model, useBrowserCache });
   });
@@ -62,18 +62,18 @@ export async function indexRepository(repoId, onProgress) {
 
     const w = getWorker();
 
-    const handler = async (e) => {
+    const handler = async e => {
       const { type, current, total, embeddings, error } = e.data;
       if (type === 'index_progress' && onProgress) {
         onProgress({ current, total });
       } else if (type === 'index_done') {
         w.removeEventListener('message', handler);
-        
+
         // 2. Save all generated embeddings to IndexedDB
         for (const emp of embeddings) {
           await saveEmbedding(emp.repoId, emp.filePath, emp.chunks || emp.embedding);
         }
-        
+
         resolve(embeddings.length);
       } else if (type === 'error') {
         w.removeEventListener('message', handler);
@@ -90,14 +90,14 @@ export async function search(repoId, query) {
   return new Promise(async (resolve, reject) => {
     const w = getWorker();
 
-    const handler = async (e) => {
+    const handler = async e => {
       const { type, embedding, error } = e.data;
       if (type === 'search_done') {
         w.removeEventListener('message', handler);
-        
+
         // Load all embeddings for repo
         const allEmbeddings = await loadAllEmbeddings(repoId);
-        
+
         // Calculate similarity for each chunk
         const results = [];
         for (const emp of allEmbeddings) {
@@ -109,7 +109,7 @@ export async function search(repoId, query) {
                 filePath: emp.filePath,
                 symbolName: chunk.symbolName,
                 startLine: chunk.startLine,
-                score
+                score,
               });
             }
           } else if (emp.embedding) {
@@ -117,7 +117,7 @@ export async function search(repoId, query) {
             const score = cosineSimilarity(embedding, emp.embedding);
             results.push({
               filePath: emp.filePath,
-              score
+              score,
             });
           }
         }

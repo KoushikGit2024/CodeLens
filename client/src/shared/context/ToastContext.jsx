@@ -14,7 +14,7 @@ export const ToastProvider = ({ children }) => {
 
   const addToast = useCallback(({ title, description, type = 'success', duration = 4000 }) => {
     const id = Math.random().toString(36).substring(2, 9);
-    setToasts((prev) => [...prev, { id, title, description, type }]);
+    setToasts(prev => [...prev, { id, title, description, type }]);
 
     if (duration > 0) {
       setTimeout(() => {
@@ -23,15 +23,15 @@ export const ToastProvider = ({ children }) => {
     }
   }, []);
 
-  const removeToast = useCallback((id) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
+  const removeToast = useCallback(id => {
+    setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
   return (
     <ToastContext.Provider value={{ addToast }}>
       {children}
       <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none">
-        {toasts.map((toast) => (
+        {toasts.map(toast => (
           <div
             key={toast.id}
             className={`pointer-events-auto flex items-start gap-3 w-80 p-4 rounded-lg shadow-xl border bg-surface text-text animate-in slide-in-from-bottom-5 fade-in duration-300

@@ -1,7 +1,7 @@
 /**
  * GraphSideBar.jsx
  *
- * It initiates the sidebar context panel, then extracts the selected node's dependencies and health metrics, 
+ * It initiates the sidebar context panel, then extracts the selected node's dependencies and health metrics,
  * and then it applies them into readable lists and status chips.
  */
 import React from 'react';
@@ -25,18 +25,20 @@ export function Chip({ label, color }) {
 }
 
 export function DepEntry({ dep, repoId, reverse = false }) {
-  const name  = dep.filePath ? dep.filePath.split('/').pop() : dep.package;
-  const Icon  = dep.package ? Package : File;
+  const name = dep.filePath ? dep.filePath.split('/').pop() : dep.package;
+  const Icon = dep.package ? Package : File;
   const color = dep.package ? 'text-amber-400' : 'text-accent';
 
   /**
-   * It evaluates the dependency entity, then extracts its routing data, 
+   * It evaluates the dependency entity, then extracts its routing data,
    * and then it applies a link to navigate the codebase explorer.
    */
   return (
     <div className="flex items-center gap-1.5 py-1 group border-b border-text/5 last:border-0">
       <Icon className={`w-3.5 h-3.5 ${color} shrink-0`} />
-      <span className="text-text text-xs font-mono truncate flex-1" title={dep.filePath || dep.package}>{name}</span>
+      <span className="text-text text-xs font-mono truncate flex-1" title={dep.filePath || dep.package}>
+        {name}
+      </span>
       {dep.filePath && (
         <OpenSourceButton
           ref={makeSourceRef({ filePath: dep.filePath })}
@@ -52,24 +54,30 @@ export function FileDetailPanel({ info, repoId, graph }) {
   const nodeCycles = graph?.cycles?.filter(c => c.includes(info.id || `file:${info.filePath}`)) || [];
   const isIsolated = graph?.nodes?.find(n => n.id === `file:${info.filePath}`)?.data?.isIsolated;
 
-  const getSeverityColor = (severity) => {
+  const getSeverityColor = severity => {
     switch (severity) {
-      case 'critical': return 'text-danger border-danger/30 bg-danger/10';
-      case 'high': return 'text-warning border-warning/30 bg-warning/10';
-      case 'warning': return 'text-amber-400 border-amber-400/30 bg-amber-400/10';
-      default: return 'text-success border-success/30 bg-success/10';
+      case 'critical':
+        return 'text-danger border-danger/30 bg-danger/10';
+      case 'high':
+        return 'text-warning border-warning/30 bg-warning/10';
+      case 'warning':
+        return 'text-amber-400 border-amber-400/30 bg-amber-400/10';
+      default:
+        return 'text-success border-success/30 bg-success/10';
     }
   };
 
   /**
-   * It reads the contextual file information, then extracts specific metadata like cycles and health scores, 
+   * It reads the contextual file information, then extracts specific metadata like cycles and health scores,
    * and then it applies them to the detailed DOM elements.
    */
   return (
     <div className="flex flex-col gap-4">
       <div>
         <p className="text-muted uppercase tracking-wider mb-1.5 text-[10px] font-bold">File Information</p>
-        <p className="text-text font-mono whitespace-nowrap overflow-x-auto custom-scrollbar pb-2 mb-2 text-xs bg-panel p-2 rounded border border-border">{info.filePath}</p>
+        <p className="text-text font-mono whitespace-nowrap overflow-x-auto custom-scrollbar pb-2 mb-2 text-xs bg-panel p-2 rounded border border-border">
+          {info.filePath}
+        </p>
         <div className="flex gap-2">
           <OpenSourceButton
             ref={makeSourceRef({ filePath: info.filePath })}
@@ -93,8 +101,14 @@ export function FileDetailPanel({ info, repoId, graph }) {
         <Chip label={`${info.dependencyCount} deps`} color="accent" />
         <Chip label={`${info.dependentCount} users`} color="success" />
         {info.health && (
-          <span className={`border rounded px-2 py-1 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 ${getSeverityColor(info.health.severity)}`}>
-            {info.health.severity !== 'healthy' ? <AlertCircle className="w-3.5 h-3.5" /> : <GitBranch className="w-3.5 h-3.5" />}
+          <span
+            className={`border rounded px-2 py-1 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 ${getSeverityColor(info.health.severity)}`}
+          >
+            {info.health.severity !== 'healthy' ? (
+              <AlertCircle className="w-3.5 h-3.5" />
+            ) : (
+              <GitBranch className="w-3.5 h-3.5" />
+            )}
             {info.health.severity}
           </span>
         )}
@@ -123,11 +137,16 @@ export function FileDetailPanel({ info, repoId, graph }) {
         <div className="bg-warning/10 border border-warning/30 p-3 rounded-lg flex flex-col gap-2 mt-1">
           <div className="flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-warning" />
-            <span className="text-xs font-bold text-warning uppercase tracking-wider">Involved in {nodeCycles.length} cycle{nodeCycles.length > 1 ? 's' : ''}</span>
+            <span className="text-xs font-bold text-warning uppercase tracking-wider">
+              Involved in {nodeCycles.length} cycle{nodeCycles.length > 1 ? 's' : ''}
+            </span>
           </div>
           <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto custom-scrollbar pr-1 bg-panel p-2 rounded">
             {nodeCycles.map((cycle, i) => (
-              <div key={i} className="text-[10px] text-muted leading-relaxed border-l-2 border-warning/40 pl-2 font-mono">
+              <div
+                key={i}
+                className="text-[10px] text-muted leading-relaxed border-l-2 border-warning/40 pl-2 font-mono"
+              >
                 {cycle.map(f => f.split('/').pop()).join(' → ')}
               </div>
             ))}
@@ -137,18 +156,26 @@ export function FileDetailPanel({ info, repoId, graph }) {
 
       {info.dependencies?.length > 0 && (
         <section className="bg-panel p-3 rounded-lg border border-border">
-          <p className="text-muted uppercase tracking-wider mb-2 text-[10px] font-bold">Imports ({info.dependencyCount})</p>
+          <p className="text-muted uppercase tracking-wider mb-2 text-[10px] font-bold">
+            Imports ({info.dependencyCount})
+          </p>
           <div className="flex flex-col max-h-48 overflow-y-auto custom-scrollbar pr-1">
-            {info.dependencies.map((dep, i) => <DepEntry key={i} dep={dep} repoId={repoId} />)}
+            {info.dependencies.map((dep, i) => (
+              <DepEntry key={i} dep={dep} repoId={repoId} />
+            ))}
           </div>
         </section>
       )}
 
       {info.dependents.length > 0 && (
         <section className="bg-panel p-3 rounded-lg border border-border">
-          <p className="text-muted uppercase tracking-wider mb-2 text-[10px] font-bold">Imported by ({info.dependentCount})</p>
+          <p className="text-muted uppercase tracking-wider mb-2 text-[10px] font-bold">
+            Imported by ({info.dependentCount})
+          </p>
           <div className="flex flex-col max-h-48 overflow-y-auto custom-scrollbar pr-1">
-            {info.dependents.map((dep, i) => <DepEntry key={i} dep={dep} reverse repoId={repoId} />)}
+            {info.dependents.map((dep, i) => (
+              <DepEntry key={i} dep={dep} reverse repoId={repoId} />
+            ))}
           </div>
         </section>
       )}
@@ -180,7 +207,7 @@ export function PackageDetailPanel({ nodeId, graph }) {
       .map(e => graph.nodes.find(n => n.id === e.source)?.data?.filePath ?? e.source);
 
     /**
-     * It checks for an external module node, then extracts the dependents from the edges, 
+     * It checks for an external module node, then extracts the dependents from the edges,
      * and then it applies them to the sidebar module view.
      */
     return (
@@ -192,10 +219,12 @@ export function PackageDetailPanel({ nodeId, graph }) {
             <p className="text-text font-mono break-all text-sm font-semibold">{node.data.label}</p>
           </div>
         </div>
-        
+
         {users.length > 0 && (
           <section className="bg-panel p-3 rounded-lg border border-border">
-            <p className="text-muted uppercase tracking-wider mb-2 text-[10px] font-bold">Imported by ({users.length})</p>
+            <p className="text-muted uppercase tracking-wider mb-2 text-[10px] font-bold">
+              Imported by ({users.length})
+            </p>
             <div className="flex flex-col max-h-64 overflow-y-auto custom-scrollbar pr-1">
               {users.map((f, i) => (
                 <div key={i} className="flex items-center gap-2 py-1.5 border-b border-text/5 last:border-0">

@@ -79,41 +79,68 @@ export default function MermaidViewer({ diagramStr, repoId }) {
   return (
     <div className="flex flex-col h-full w-full relative group">
       <div className="absolute bottom-20 sm:bottom-4 right-4 z-10 flex flex-col sm:flex-row items-end gap-2">
-        <button onClick={handleCopy} className="p-2 bg-panel border border-border rounded shadow hover:bg-surface text-muted hover:text-text transition-colors" title="Copy Mermaid syntax">
+        <button
+          onClick={handleCopy}
+          className="p-2 bg-panel border border-border rounded shadow hover:bg-surface text-muted hover:text-text transition-colors"
+          title="Copy Mermaid syntax"
+        >
           <Copy className="w-4 h-4" />
         </button>
-        <button onClick={handleDownloadSource} className="px-3 py-2 bg-panel border border-border rounded shadow hover:bg-surface text-xs font-medium text-muted hover:text-text flex items-center gap-1 transition-colors" title="Download .mmd source">
+        <button
+          onClick={handleDownloadSource}
+          className="px-3 py-2 bg-panel border border-border rounded shadow hover:bg-surface text-xs font-medium text-muted hover:text-text flex items-center gap-1 transition-colors"
+          title="Download .mmd source"
+        >
           <Download className="w-3.5 h-3.5" /> .mmd
         </button>
-        <button onClick={handleDownloadSvg} disabled={!svgContent} className="px-3 py-2 bg-panel border border-border rounded shadow hover:bg-surface text-xs font-medium text-muted hover:text-text flex items-center gap-1 transition-colors disabled:opacity-50" title="Download .svg image">
+        <button
+          onClick={handleDownloadSvg}
+          disabled={!svgContent}
+          className="px-3 py-2 bg-panel border border-border rounded shadow hover:bg-surface text-xs font-medium text-muted hover:text-text flex items-center gap-1 transition-colors disabled:opacity-50"
+          title="Download .svg image"
+        >
           <Download className="w-3.5 h-3.5" /> .svg
         </button>
       </div>
-      
+
       <div className="absolute bottom-20 sm:bottom-4 left-4 z-10 flex gap-2">
-        <button onClick={handleZoomOut} className="p-2 bg-panel border border-border rounded shadow hover:bg-surface text-muted hover:text-text transition-colors" title="Zoom Out">
+        <button
+          onClick={handleZoomOut}
+          className="p-2 bg-panel border border-border rounded shadow hover:bg-surface text-muted hover:text-text transition-colors"
+          title="Zoom Out"
+        >
           <ZoomOut className="w-4 h-4" />
         </button>
-        <button onClick={handleResetZoom} className="px-3 py-2 bg-panel border border-border rounded shadow hover:bg-surface text-xs font-medium text-muted hover:text-text flex items-center gap-1 transition-colors" title="Reset Zoom">
+        <button
+          onClick={handleResetZoom}
+          className="px-3 py-2 bg-panel border border-border rounded shadow hover:bg-surface text-xs font-medium text-muted hover:text-text flex items-center gap-1 transition-colors"
+          title="Reset Zoom"
+        >
           <Maximize className="w-3.5 h-3.5" /> {Math.round(zoom * 100)}%
         </button>
-        <button onClick={handleZoomIn} className="p-2 bg-panel border border-border rounded shadow hover:bg-surface text-muted hover:text-text transition-colors" title="Zoom In">
+        <button
+          onClick={handleZoomIn}
+          className="p-2 bg-panel border border-border rounded shadow hover:bg-surface text-muted hover:text-text transition-colors"
+          title="Zoom In"
+        >
           <ZoomIn className="w-4 h-4" />
         </button>
       </div>
-      
+
       <div className="flex-1 overflow-auto custom-scrollbar bg-surface/50 w-full h-full min-h-[600px] relative">
         {error ? (
           <div className="flex flex-col items-center justify-center p-6 bg-danger/10 border border-danger/30 rounded-lg text-danger max-w-lg mx-auto mt-10">
             <AlertCircle className="w-8 h-8 mb-2" />
             <span className="font-semibold mb-2">Mermaid Rendering Error</span>
-            <pre className="text-[10px] bg-black/30 p-4 rounded w-full overflow-x-auto whitespace-pre-wrap">{error}</pre>
+            <pre className="text-[10px] bg-black/30 p-4 rounded w-full overflow-x-auto whitespace-pre-wrap">
+              {error}
+            </pre>
           </div>
         ) : (
-          <div 
-            className="mermaid-container flex justify-center p-4 sm:p-8 min-w-max mx-auto transition-transform duration-200 origin-top-left [&>svg]:!max-w-none [&>svg]:h-auto" 
+          <div
+            className="mermaid-container flex justify-center p-4 sm:p-8 min-w-max mx-auto transition-transform duration-200 origin-top-left [&>svg]:!max-w-none [&>svg]:h-auto"
             style={{ transform: `scale(${zoom})`, width: `${zoom * 100}%` }}
-            dangerouslySetInnerHTML={{ __html: svgContent }} 
+            dangerouslySetInnerHTML={{ __html: svgContent }}
           />
         )}
       </div>

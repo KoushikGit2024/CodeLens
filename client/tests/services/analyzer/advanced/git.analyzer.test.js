@@ -10,8 +10,8 @@ vi.mock('isomorphic-git', () => ({
     walk: vi.fn(),
     TREE: vi.fn(),
     resolveRef: vi.fn(),
-    readCommit: vi.fn()
-  }
+    readCommit: vi.fn(),
+  },
 }));
 
 vi.mock('../../../../src/services/analyzer/repository/persistence.store', () => ({
@@ -26,7 +26,7 @@ describe('git.analyzer', () => {
 
   it('returns null if repo is missing .git folder', async () => {
     persistenceStore.listFilePaths.mockResolvedValue(['fileA.js', 'fileB.js']);
-    
+
     const result = await analyzeGitChurn('repo-123', vi.fn());
     expect(result).toBeNull();
   });
@@ -34,11 +34,17 @@ describe('git.analyzer', () => {
   it('calculates churn accurately from commit history', async () => {
     persistenceStore.listFilePaths.mockResolvedValue(['.git/config', 'fileA.js', 'fileB.js']);
     persistenceStore.loadFile.mockResolvedValue(new Uint8Array(0));
-    
+
     git.resolveRef.mockResolvedValue('commit3');
     git.readCommit
-      .mockResolvedValueOnce({ oid: 'commit3', commit: { author: { timestamp: Date.now() / 1000 }, parent: ['commit2'] } })
-      .mockResolvedValueOnce({ oid: 'commit2', commit: { author: { timestamp: Date.now() / 1000 }, parent: ['commit1'] } })
+      .mockResolvedValueOnce({
+        oid: 'commit3',
+        commit: { author: { timestamp: Date.now() / 1000 }, parent: ['commit2'] },
+      })
+      .mockResolvedValueOnce({
+        oid: 'commit2',
+        commit: { author: { timestamp: Date.now() / 1000 }, parent: ['commit1'] },
+      })
       .mockResolvedValueOnce({ oid: 'commit1', commit: { author: { timestamp: Date.now() / 1000 }, parent: [] } });
 
     // First diff: commit3 -> commit2 (fileB changed)
@@ -48,10 +54,10 @@ describe('git.analyzer', () => {
       .mockResolvedValueOnce(['fileA.js']);
 
     const result = await analyzeGitChurn('repo-123', vi.fn());
-    
+
     expect(result.fileChurn['fileA.js']).toBe(2);
     expect(result.fileChurn['fileB.js']).toBe(1);
-    
+
     expect(result.churnScores['fileA.js']).toBe(100);
     expect(result.churnScores['fileB.js']).toBe(100);
   });

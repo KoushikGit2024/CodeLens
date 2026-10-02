@@ -1,15 +1,28 @@
 /**
  * RefactoringPage.jsx
  *
- * It initiates the technical debt dashboard, then extracts deterministic refactoring candidates, 
+ * It initiates the technical debt dashboard, then extracts deterministic refactoring candidates,
  * and then it applies them to a prioritized triage interface.
  */
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { 
-  AlertTriangle, Layers, GitBranch, Search,
-  Database, Brain, Loader2, CheckCircle, Sparkles, Wrench,
-  ChevronDown, ChevronRight, File, RefreshCw, AlertCircle, X
+import {
+  AlertTriangle,
+  Layers,
+  GitBranch,
+  Search,
+  Database,
+  Brain,
+  Loader2,
+  CheckCircle,
+  Sparkles,
+  Wrench,
+  ChevronDown,
+  ChevronRight,
+  File,
+  RefreshCw,
+  AlertCircle,
+  X,
 } from 'lucide-react';
 import { DiffEditor } from '@monaco-editor/react';
 import { ResizableLayout } from '../../shared/components/ResizableLayout';
@@ -52,9 +65,12 @@ const PRIORITY_META = {
   },
 };
 
-const formatCategory = (category) => {
+const formatCategory = category => {
   if (!category) return 'General';
-  return category.replace(/([A-Z])/g, ' $1').trim().replace(/^./, str => str.toUpperCase());
+  return category
+    .replace(/([A-Z])/g, ' $1')
+    .trim()
+    .replace(/^./, str => str.toUpperCase());
 };
 
 // ── Code Peek ─────────────────────────────────────────────────────────────────
@@ -72,12 +88,12 @@ const CodePeek = ({ repoId, filePath, startLine, endLine }) => {
           // Bound lines safely
           const s = Math.max(1, startLine || 1);
           const e = Math.min(lines.length, endLine || s + 10);
-          
+
           const sliced = lines.slice(s - 1, e).join('\n');
           setCode({ snippet: sliced, startLine: s });
         }
       } catch (err) {
-        console.error("Failed to load code peek:", err);
+        console.error('Failed to load code peek:', err);
       } finally {
         setLoading(false);
       }
@@ -85,12 +101,13 @@ const CodePeek = ({ repoId, filePath, startLine, endLine }) => {
     loadCode();
   }, [repoId, filePath, startLine, endLine]);
 
-  if (loading) return <div className="text-[10px] text-muted/50 p-2 animate-pulse bg-panel/50 rounded">Loading snippet...</div>;
+  if (loading)
+    return <div className="text-[10px] text-muted/50 p-2 animate-pulse bg-panel/50 rounded">Loading snippet...</div>;
   if (!code) return null;
 
   return (
     <div className="mt-2 rounded overflow-hidden border border-border/50 bg-surface">
-      <button 
+      <button
         onClick={() => setIsExpanded(o => !o)}
         className="w-full bg-panel hover:bg-surface/80 transition-colors px-3 py-1.5 flex justify-between items-center border-b border-border/50"
       >
@@ -98,7 +115,9 @@ const CodePeek = ({ repoId, filePath, startLine, endLine }) => {
           {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
           <File className="w-3 h-3" /> Code Peek
         </span>
-        <span className="text-[9px] text-muted/60 font-mono">Lines {code.startLine}-{code.startLine + code.snippet.split('\n').length - 1}</span>
+        <span className="text-[9px] text-muted/60 font-mono">
+          Lines {code.startLine}-{code.startLine + code.snippet.split('\n').length - 1}
+        </span>
       </button>
       {isExpanded && (
         <pre className="p-3 overflow-auto max-h-[300px] custom-scrollbar text-[11px] font-mono leading-relaxed text-text bg-surface">
@@ -111,7 +130,7 @@ const CodePeek = ({ repoId, filePath, startLine, endLine }) => {
 
 // ── Candidate Card ────────────────────────────────────────────────────────────
 /**
- * It evaluates the priority level, then extracts the specific styling metadata, 
+ * It evaluates the priority level, then extracts the specific styling metadata,
  * and then it applies them to render the interactive list item.
  */
 const CandidateCard = ({ candidate, isSelected, onSelect, priorityLevel }) => {
@@ -120,22 +139,15 @@ const CandidateCard = ({ candidate, isSelected, onSelect, priorityLevel }) => {
     <button
       onClick={() => onSelect(candidate.id)}
       className={`w-full text-left px-3 py-2.5 rounded border transition-all duration-150
-        ${isSelected
-          ? `${meta.selectedBg} ${meta.selectedBorder} border`
-          : `border-transparent ${meta.bg}`
-        }
+        ${isSelected ? `${meta.selectedBg} ${meta.selectedBorder} border` : `border-transparent ${meta.bg}`}
       `}
     >
       <div className="flex items-center justify-between mb-1.5">
-        <span className=" text-[10px] font-semibold text-muted tracking-wide">
-          Score {candidate.priorityScore}
-        </span>
-        <span className="text-[9px] uppercase tracking-widest text-muted/60">
-          {formatCategory(candidate.type)}
-        </span>
+        <span className=" text-[10px] font-semibold text-muted tracking-wide">Score {candidate.priorityScore}</span>
+        <span className="text-[9px] uppercase tracking-widest text-muted/60">{formatCategory(candidate.type)}</span>
       </div>
       {candidate.files?.length > 0 && (
-        <div className="flex items-center gap-1.5 mb-1" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-1.5 mb-1" onClick={e => e.stopPropagation()}>
           <OpenSourceButton
             ref={makeSourceRef({ filePath: candidate.files[0] })}
             label={candidate.files[0].split('/').pop()}
@@ -146,18 +158,14 @@ const CandidateCard = ({ candidate, isSelected, onSelect, priorityLevel }) => {
           )}
         </div>
       )}
-      {candidate.summary && (
-        <p className="text-[11px] text-muted leading-relaxed line-clamp-2">
-          {candidate.summary}
-        </p>
-      )}
+      {candidate.summary && <p className="text-[11px] text-muted leading-relaxed line-clamp-2">{candidate.summary}</p>}
     </button>
   );
 };
 
 // ── Issue Group ───────────────────────────────────────────────────────────────
 /**
- * It sorts the candidate array, then extracts the grouped issues, 
+ * It sorts the candidate array, then extracts the grouped issues,
  * and then it applies a collapsible UI section for navigation.
  */
 const IssueGroup = ({ issueTitle, issueData, priorityLevel, selectedCandidateId, setSelectedCandidateId }) => {
@@ -171,10 +179,7 @@ const IssueGroup = ({ issueTitle, issueData, priorityLevel, selectedCandidateId,
         onClick={() => setIsOpen(o => !o)}
         title={issueTitle}
       >
-        {isOpen
-          ? <ChevronDown className="w-3 h-3 shrink-0" />
-          : <ChevronRight className="w-3 h-3 shrink-0" />
-        }
+        {isOpen ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
         <span className="truncate font-medium">{issueTitle}</span>
         <span className="ml-auto text-[10px] shrink-0 text-muted/50">({sorted.length})</span>
       </button>
@@ -198,7 +203,7 @@ const IssueGroup = ({ issueTitle, issueData, priorityLevel, selectedCandidateId,
 
 // ── Priority Section ──────────────────────────────────────────────────────────
 /**
- * It maps over the priority clusters, then extracts maximum severity scores, 
+ * It maps over the priority clusters, then extracts maximum severity scores,
  * and then it applies a descending sort for the sidebar groups.
  */
 const PrioritySection = ({ priorityLevel, group, selectedCandidateId, setSelectedCandidateId }) => {
@@ -215,17 +220,9 @@ const PrioritySection = ({ priorityLevel, group, selectedCandidateId, setSelecte
 
   return (
     <div className="flex flex-col">
-      <button
-        onClick={() => setIsOpen(o => !o)}
-        className="flex items-center gap-2 px-1 py-2 text-left group"
-      >
-        <span
-          className="w-1.5 h-1.5 rounded-full shrink-0"
-          style={{ background: meta.dot }}
-        />
-        <span className={`text-[11px] font-semibold uppercase tracking-wider ${meta.text}`}>
-          {meta.label}
-        </span>
+      <button onClick={() => setIsOpen(o => !o)} className="flex items-center gap-2 px-1 py-2 text-left group">
+        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: meta.dot }} />
+        <span className={`text-[11px] font-semibold uppercase tracking-wider ${meta.text}`}>{meta.label}</span>
         <span className="ml-1 text-[10px] text-muted/60">({group.length})</span>
         <span className="ml-auto text-muted/40 group-hover:text-muted transition-colors">
           {isOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
@@ -252,13 +249,13 @@ const PrioritySection = ({ priorityLevel, group, selectedCandidateId, setSelecte
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 /**
- * It triggers the offline refactoring intelligence endpoint, then extracts the deterministic candidates, 
+ * It triggers the offline refactoring intelligence endpoint, then extracts the deterministic candidates,
  * and then it applies them to the resizable triage layout.
  */
 export default function RefactoringPage() {
   const { repoId } = useParams();
   const navigate = useNavigate();
-  
+
   const [intel, setIntel] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -271,7 +268,7 @@ export default function RefactoringPage() {
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(!selectedCandidateId);
   const [mobileTab, setMobileTab] = useState('details');
 
-  const setSelectedCandidateId = (val) => {
+  const setSelectedCandidateId = val => {
     setSearchParams(prev => {
       const next = new URLSearchParams(prev);
       if (val) next.set('candidate', val);
@@ -282,16 +279,17 @@ export default function RefactoringPage() {
   };
 
   const searchQuery = searchParams.get('search') || '';
-  const setSearchQuery = (val) => {
-    setSearchParams(prev => {
-      const next = new URLSearchParams(prev);
-      if (val) next.set('search', val);
-      else next.delete('search');
-      return next;
-    }, { replace: true });
+  const setSearchQuery = val => {
+    setSearchParams(
+      prev => {
+        const next = new URLSearchParams(prev);
+        if (val) next.set('search', val);
+        else next.delete('search');
+        return next;
+      },
+      { replace: true }
+    );
   };
-
-
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -307,11 +305,14 @@ export default function RefactoringPage() {
         const currentCandidate = new URLSearchParams(window.location.search).get('candidate');
         // Do not auto-select on mobile so they can see the list first
         if (data.data?.candidates?.length > 0 && !currentCandidate && window.innerWidth >= 1024) {
-          setSearchParams(prev => {
-            const next = new URLSearchParams(prev);
-            next.set('candidate', data.data.candidates[0].id);
-            return next;
-          }, { replace: true });
+          setSearchParams(
+            prev => {
+              const next = new URLSearchParams(prev);
+              next.set('candidate', data.data.candidates[0].id);
+              return next;
+            },
+            { replace: true }
+          );
         }
       } catch (err) {
         setError(err?.response?.data?.error || err.message);
@@ -329,10 +330,11 @@ export default function RefactoringPage() {
     if (!intel?.candidates) return [];
     if (!searchQuery.trim()) return intel.candidates;
     const q = searchQuery.toLowerCase();
-    return intel.candidates.filter(c =>
-      c.title?.toLowerCase().includes(q) ||
-      c.summary?.toLowerCase().includes(q) ||
-      c.files?.some(f => f.toLowerCase().includes(q))
+    return intel.candidates.filter(
+      c =>
+        c.title?.toLowerCase().includes(q) ||
+        c.summary?.toLowerCase().includes(q) ||
+        c.files?.some(f => f.toLowerCase().includes(q))
     );
   }, [intel?.candidates, searchQuery]);
 
@@ -347,14 +349,18 @@ export default function RefactoringPage() {
 
   if (error) {
     const isNotReady = error.toLowerCase().includes('not ready') || error.toLowerCase().includes('pending');
-    
+
     const handleReanalyze = async () => {
       setIsReanalyzing(true);
       try {
         await repositoryApi.reanalyze(repoId);
         navigate(`/explore/${repoId}`);
       } catch (err) {
-        addToast({ title: 'Reanalysis Failed', description: err.message || 'An error occurred while trying to reanalyze.', type: 'error' });
+        addToast({
+          title: 'Reanalysis Failed',
+          description: err.message || 'An error occurred while trying to reanalyze.',
+          type: 'error',
+        });
         setIsReanalyzing(false);
       }
     };
@@ -365,29 +371,33 @@ export default function RefactoringPage() {
           <AlertCircle className="w-10 h-10 text-danger mx-auto mb-4 opacity-80" />
           <h2 className="text-lg font-medium text-text mb-2">Analysis Error</h2>
           <p className="text-muted mb-6 text-sm leading-relaxed">{error}</p>
-          
+
           <div className="flex items-center justify-center gap-3">
-            <button 
-              onClick={() => navigate(-1)} 
+            <button
+              onClick={() => navigate(-1)}
               className="px-4 py-2 text-sm text-text bg-panel hover:bg-text/5 border border-border rounded-lg transition-colors"
             >
               Go Back
             </button>
             {!isNotReady && (
-              <button 
+              <button
                 onClick={handleReanalyze}
                 disabled={isReanalyzing}
                 className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isReanalyzing ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Starting...</>
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Starting...
+                  </>
                 ) : (
-                  <><RefreshCw className="w-4 h-4" /> Re-analyze Repo</>
+                  <>
+                    <RefreshCw className="w-4 h-4" /> Re-analyze Repo
+                  </>
                 )}
               </button>
             )}
             {isNotReady && (
-              <button 
+              <button
                 onClick={async () => {
                   await repositoryApi.analyze(repoId);
                   navigate(`/explore/${repoId}`);
@@ -402,8 +412,6 @@ export default function RefactoringPage() {
       </div>
     );
   }
-
-
 
   const candidatesList = (
     <aside className="flex-1 overflow-y-auto p-3 flex flex-col custom-scrollbar bg-panel h-full">
@@ -429,10 +437,17 @@ export default function RefactoringPage() {
 
       {filteredCandidates.length === 0 ? (
         <div className="flex flex-col items-center justify-center p-6 mt-10 text-center gap-3">
-          {searchQuery
-            ? <><Search className="w-8 h-8 text-muted/30" /><p className="text-sm text-muted">No candidates match "{searchQuery}"</p></>
-            : <><CheckCircle className="w-8 h-8 text-success/30 opacity-80" /><p className="text-sm text-muted">No refactoring candidates found.</p></>
-          }
+          {searchQuery ? (
+            <>
+              <Search className="w-8 h-8 text-muted/30" />
+              <p className="text-sm text-muted">No candidates match "{searchQuery}"</p>
+            </>
+          ) : (
+            <>
+              <CheckCircle className="w-8 h-8 text-success/30 opacity-80" />
+              <p className="text-sm text-muted">No refactoring candidates found.</p>
+            </>
+          )}
         </div>
       ) : (
         <div className="flex flex-col divide-y divide-border/30">
@@ -458,15 +473,20 @@ export default function RefactoringPage() {
   const detailsContent = (
     <>
       <div className="px-6 pt-6 shrink-0">
-        <PageHeader 
-          title="Refactoring Intelligence" 
+        <PageHeader
+          title="Refactoring Intelligence"
           description="Automatically prioritize technical debt into actionable candidates. Select a candidate to see its blast radius and request an AI rewrite."
           icon={Wrench}
         />
       </div>
       <div className="flex-1 p-6 pt-3">
         {selectedCandidate ? (
-          <CandidateDetail candidate={selectedCandidate} repoId={repoId} allCandidates={intel.candidates} onSelectCandidate={setSelectedCandidateId} />
+          <CandidateDetail
+            candidate={selectedCandidate}
+            repoId={repoId}
+            allCandidates={intel.candidates}
+            onSelectCandidate={setSelectedCandidateId}
+          />
         ) : (
           <div className="h-full flex items-center justify-center text-muted text-sm">
             Select a candidate from the sidebar to view details
@@ -477,46 +497,41 @@ export default function RefactoringPage() {
   );
 
   const detailsPane = (
-    <main className="flex-1 overflow-y-auto custom-scrollbar flex flex-col bg-surface h-full">
-      {detailsContent}
-    </main>
+    <main className="flex-1 overflow-y-auto custom-scrollbar flex flex-col bg-surface h-full">{detailsContent}</main>
   );
 
   const advisorPane = (
     <aside className="flex-1 overflow-y-auto custom-scrollbar flex flex-col bg-panel h-full">
-      {selectedCandidate && (
-        <AiAdvisor candidate={selectedCandidate} repoId={repoId} />
-      )}
+      {selectedCandidate && <AiAdvisor candidate={selectedCandidate} repoId={repoId} />}
     </aside>
   );
 
   if (isMobile) {
     return (
       <div className="relative flex flex-col h-full bg-surface overflow-hidden">
-        
         {/* Main Scrolling View */}
         <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col">
           <div className="px-6 pt-6 shrink-0">
-            <button 
+            <button
               onClick={() => setMobileDrawerOpen(true)}
               className="mb-4 flex items-center gap-2 px-3 py-1.5 bg-panel border border-border hover:bg-surface text-text rounded text-xs transition-colors w-fit shadow-sm"
             >
               <Layers className="w-4 h-4" /> View Candidates
             </button>
-            <PageHeader 
-              title="Refactoring Intelligence" 
+            <PageHeader
+              title="Refactoring Intelligence"
               description="Automatically prioritize technical debt into actionable candidates."
               icon={Wrench}
             />
             {selectedCandidate && (
               <div className="flex items-center gap-6 border-b border-border mt-4">
-                <button 
+                <button
                   onClick={() => setMobileTab('details')}
                   className={`pb-3 text-sm font-medium transition-colors border-b-2 ${mobileTab === 'details' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-text'}`}
                 >
                   Details
                 </button>
-                <button 
+                <button
                   onClick={() => setMobileTab('advisor')}
                   className={`pb-3 text-sm font-medium transition-colors border-b-2 flex items-center gap-1.5 ${mobileTab === 'advisor' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-text'}`}
                 >
@@ -532,7 +547,12 @@ export default function RefactoringPage() {
                 Select a candidate from the sidebar to view details
               </div>
             ) : mobileTab === 'details' ? (
-              <CandidateDetail candidate={selectedCandidate} repoId={repoId} allCandidates={intel.candidates} onSelectCandidate={setSelectedCandidateId} />
+              <CandidateDetail
+                candidate={selectedCandidate}
+                repoId={repoId}
+                allCandidates={intel.candidates}
+                onSelectCandidate={setSelectedCandidateId}
+              />
             ) : (
               <div className="flex-1 min-h-[500px] bg-panel rounded-lg border border-border overflow-hidden">
                 <AiAdvisor candidate={selectedCandidate} repoId={repoId} />
@@ -543,14 +563,16 @@ export default function RefactoringPage() {
 
         {/* Drawer Backdrop */}
         {mobileDrawerOpen && (
-          <div 
+          <div
             className="absolute inset-0 z-40 bg-black/50 backdrop-blur-[2px] transition-opacity"
             onClick={() => setMobileDrawerOpen(false)}
           />
         )}
 
         {/* Drawer Panel */}
-        <div className={`absolute top-0 bottom-0 left-0 z-50 w-[85%] max-w-[320px] bg-panel border-r border-border shadow-2xl transition-transform duration-300 ease-in-out ${mobileDrawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div
+          className={`absolute top-0 bottom-0 left-0 z-50 w-[85%] max-w-[320px] bg-panel border-r border-border shadow-2xl transition-transform duration-300 ease-in-out ${mobileDrawerOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        >
           {candidatesList}
         </div>
       </div>
@@ -569,14 +591,14 @@ export default function RefactoringPage() {
             collapseDirection: 'left',
             title: 'Candidates',
             icon: <Wrench />,
-            content: candidatesList
+            content: candidatesList,
           },
           {
             id: 'details',
             defaultSize: 48,
             minWidth: 300,
             collapsible: false,
-            content: detailsPane
+            content: detailsPane,
           },
           {
             id: 'advisor',
@@ -586,8 +608,8 @@ export default function RefactoringPage() {
             collapseDirection: 'right',
             title: 'AI Advisor',
             icon: <Sparkles />,
-            content: advisorPane
-          }
+            content: advisorPane,
+          },
         ]}
       />
     </div>
@@ -596,7 +618,7 @@ export default function RefactoringPage() {
 
 // ── Center Panel ──────────────────────────────────────────────────────────────
 /**
- * It fetches the change impact payload, then extracts the directly affected files, 
+ * It fetches the change impact payload, then extracts the directly affected files,
  * and then it applies them alongside the suggested strategies for manual or AI review.
  */
 function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }) {
@@ -606,11 +628,11 @@ function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }
   const [fixing, setFixing] = useState(false);
   const [fixResult, setFixResult] = useState(null);
   const [fixError, setFixError] = useState(null);
-  
+
   const [generatingTests, setGeneratingTests] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [testError, setTestError] = useState(null);
-  
+
   const { aiState } = useAIState();
 
   useEffect(() => {
@@ -678,11 +700,21 @@ function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }
                   setGeneratingTests(false);
                 }
               }}
-              disabled={generatingTests || !!testResult || aiState.status === 'loading' || (aiState.authState !== 'unauthenticated' && (aiState.status === 'offline' || aiState.quotaStatus === 'exhausted'))}
+              disabled={
+                generatingTests ||
+                !!testResult ||
+                aiState.status === 'loading' ||
+                (aiState.authState !== 'unauthenticated' &&
+                  (aiState.status === 'offline' || aiState.quotaStatus === 'exhausted'))
+              }
               title="Generate a baseline test suite before refactoring"
               className="flex items-center gap-2 px-3 py-1.5 bg-surface border border-border hover:bg-panel disabled:opacity-40 text-text rounded text-sm font-medium transition-colors"
             >
-              {generatingTests ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4 text-accent" />}
+              {generatingTests ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Database className="w-4 h-4 text-accent" />
+              )}
               {generatingTests ? 'Writing Tests...' : 'Generate Tests First'}
             </button>
             <button
@@ -702,16 +734,29 @@ function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }
                   setFixing(false);
                 }
               }}
-              
-              disabled={fixing || !!fixResult || aiState.status === 'loading' || (aiState.authState !== 'unauthenticated' && (aiState.status === 'offline' || aiState.quotaStatus === 'exhausted'))}
+
+              disabled={
+                fixing ||
+                !!fixResult ||
+                aiState.status === 'loading' ||
+                (aiState.authState !== 'unauthenticated' &&
+                  (aiState.status === 'offline' || aiState.quotaStatus === 'exhausted'))
+              }
               title={
-                aiState.status === 'offline' ? 'No AI provider configured' :
-                aiState.quotaStatus === 'exhausted' ? 'AI quota exceeded' : ''
+                aiState.status === 'offline'
+                  ? 'No AI provider configured'
+                  : aiState.quotaStatus === 'exhausted'
+                    ? 'AI quota exceeded'
+                    : ''
               }
               className="flex items-center gap-2 px-3 py-1.5 bg-accent hover:bg-accent/80 disabled:opacity-40 text-text rounded text-sm font-medium transition-colors"
             >
               {fixing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-              {fixing ? 'Auto-Fixing...' : aiState.authState === 'unauthenticated' ? 'Sign in to Auto-Fix' : 'Auto-Fix with AI'}
+              {fixing
+                ? 'Auto-Fixing...'
+                : aiState.authState === 'unauthenticated'
+                  ? 'Sign in to Auto-Fix'
+                  : 'Auto-Fix with AI'}
             </button>
           </div>
         </div>
@@ -739,7 +784,7 @@ function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }
                 <div className="text-xs  text-muted">Target: {testResult.file}</div>
               </div>
             </div>
-            <button 
+            <button
               onClick={() => {
                 navigator.clipboard.writeText(testResult.testCode);
               }}
@@ -782,7 +827,7 @@ function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }
                 renderSideBySide: true,
                 fontSize: 12,
                 scrollBeyondLastLine: false,
-                lineNumbersMinChars: 3
+                lineNumbersMinChars: 3,
               }}
             />
           </div>
@@ -792,121 +837,180 @@ function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }
       {/* Info Grid */}
       <div className="grid grid-cols-2 gap-3">
         <div className="border border-border rounded p-4 min-w-0">
-          <h3 className="text-[11px] font-medium text-muted uppercase tracking-wider mb-3">Affected Files & Evidence</h3>
+          <h3 className="text-[11px] font-medium text-muted uppercase tracking-wider mb-3">
+            Affected Files & Evidence
+          </h3>
           <div className="space-y-3">
-            {[...(candidate.files || [])].filter(Boolean).sort((a, b) => {
-              if (a === candidate.mainFile) return -1;
-              if (b === candidate.mainFile) return 1;
-              return a.localeCompare(b);
-            }).map(f => {
-              const range = candidate.fileRanges && candidate.fileRanges[f];
-              const isMain = candidate.mainFile === f;
-              const ref = tryMakeSourceRef({ filePath: f, startLine: range?.startLine, endLine: range?.endLine });
-              const ev = candidate.evidence;
-              console.log('Rendering candidate file:', f, 'isMain:', isMain, 'type:', candidate.type, 'evidence:', ev);
-              
-              return (
-                <div key={f} className="flex flex-col gap-2 min-w-0 p-3 bg-panel border border-border/50 rounded-lg">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <File className="w-3.5 h-3.5 text-muted shrink-0" />
-                    {ref
-                      ? <OpenSourceButton ref={ref} variant="button" className="flex-1 truncate text-xs justify-start hover:text-accent transition-colors" />
-                      : <span className="text-xs font-mono text-muted truncate flex-1">{f}</span>
-                    }
-                    {isMain && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent/10 text-accent font-semibold uppercase tracking-wider shrink-0 border border-accent/20">
-                        Target
-                      </span>
+            {[...(candidate.files || [])]
+              .filter(Boolean)
+              .sort((a, b) => {
+                if (a === candidate.mainFile) return -1;
+                if (b === candidate.mainFile) return 1;
+                return a.localeCompare(b);
+              })
+              .map(f => {
+                const range = candidate.fileRanges && candidate.fileRanges[f];
+                const isMain = candidate.mainFile === f;
+                const ref = tryMakeSourceRef({ filePath: f, startLine: range?.startLine, endLine: range?.endLine });
+                const ev = candidate.evidence;
+                console.log(
+                  'Rendering candidate file:',
+                  f,
+                  'isMain:',
+                  isMain,
+                  'type:',
+                  candidate.type,
+                  'evidence:',
+                  ev
+                );
+
+                return (
+                  <div key={f} className="flex flex-col gap-2 min-w-0 p-3 bg-panel border border-border/50 rounded-lg">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <File className="w-3.5 h-3.5 text-muted shrink-0" />
+                      {ref ? (
+                        <OpenSourceButton
+                          ref={ref}
+                          variant="button"
+                          className="flex-1 truncate text-xs justify-start hover:text-accent transition-colors"
+                        />
+                      ) : (
+                        <span className="text-xs font-mono text-muted truncate flex-1">{f}</span>
+                      )}
+                      {isMain && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent/10 text-accent font-semibold uppercase tracking-wider shrink-0 border border-accent/20">
+                          Target
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Evidence Block */}
+                    {ev && (isMain || candidate.type === 'DEPENDENCY' || candidate.type === 'QUALITY') && (
+                      <div className="mt-1 pl-5">
+                        {candidate.type === 'QUALITY' && ev.instances && isMain && (
+                          <div className="space-y-1.5">
+                            {ev.instances.map((inst, i) => (
+                              <div
+                                key={i}
+                                className="text-[11px] bg-surface/80 border border-border/50 px-2 py-1.5 rounded flex items-center justify-between"
+                              >
+                                <div className="flex items-center gap-2 truncate">
+                                  <span className="text-muted/80">{inst.kind}:</span>
+                                  <span className="font-mono text-text truncate">{inst.name}</span>
+                                </div>
+                                {inst.complexity && (
+                                  <span className="text-warning font-medium shrink-0 ml-3">
+                                    Score: {inst.complexity}
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {candidate.type === 'QUALITY' &&
+                          ev.count &&
+                          ev.instances &&
+                          !isMain &&
+                          candidate.title.includes('Clone') && (
+                            <div className="text-[11px] text-muted bg-surface/50 px-2 py-1.5 rounded border border-border/30">
+                              Clone detected in this file.
+                            </div>
+                          )}
+
+                        {candidate.type === 'SIZE' && isMain && (
+                          <div className="text-[11px] bg-surface/80 border border-border/50 px-2 py-1.5 rounded grid grid-cols-2 gap-2">
+                            {ev.lineCount && (
+                              <div>
+                                <span className="text-muted">Lines:</span>{' '}
+                                <span className="text-warning font-medium">{ev.lineCount}</span>
+                              </div>
+                            )}
+                            {ev.complexity && (
+                              <div>
+                                <span className="text-muted">Complexity:</span>{' '}
+                                <span className="text-warning font-medium">{ev.complexity}</span>
+                              </div>
+                            )}
+                            {ev.exportCount && (
+                              <div>
+                                <span className="text-muted">Exports:</span>{' '}
+                                <span className="text-warning font-medium">{ev.exportCount}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {candidate.type === 'COUPLING' && isMain && (
+                          <div className="text-[11px] bg-surface/80 border border-border/50 px-2 py-1.5 rounded flex gap-4">
+                            {ev.fanIn && (
+                              <div>
+                                <span className="text-muted">Dependent Files (Fan-In):</span>{' '}
+                                <span className="text-warning font-medium ml-1">{ev.fanIn}</span>
+                              </div>
+                            )}
+                            {ev.fanOut && (
+                              <div>
+                                <span className="text-muted">Dependencies (Fan-Out):</span>{' '}
+                                <span className="text-warning font-medium ml-1">{ev.fanOut}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {candidate.type === 'DEPENDENCY' && ev.cyclePath && isMain && (
+                          <div className="text-[10px] bg-danger/5 border border-danger/20 px-2 py-1.5 rounded text-danger font-mono break-all leading-relaxed">
+                            {ev.cyclePath.join(' → ')}
+                          </div>
+                        )}
+
+                        {candidate.type === 'ARCHITECTURE' && isMain && (
+                          <div className="text-[11px] bg-surface/80 border border-border/50 px-2 py-1.5 rounded">
+                            <span className="text-muted">Violated Rule:</span>{' '}
+                            <span className="text-warning font-mono ml-1">{ev.ruleId}</span>
+                          </div>
+                        )}
+
+                        {candidate.type === 'CHURN' && isMain && (
+                          <div className="text-[11px] bg-surface/80 border border-border/50 px-2 py-1.5 rounded flex gap-4">
+                            {ev.churnScore && (
+                              <div>
+                                <span className="text-muted">Churn Score:</span>{' '}
+                                <span className="text-warning font-medium ml-1">{ev.churnScore.toFixed(1)}/100</span>
+                              </div>
+                            )}
+                            {ev.commitsModified && (
+                              <div>
+                                <span className="text-muted">Commits:</span>{' '}
+                                <span className="text-text font-medium ml-1">{ev.commitsModified}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {range?.startLine && !ev?.instances && (
+                      <div className="mt-2 pl-5">
+                        <CodePeek repoId={repoId} filePath={f} startLine={range.startLine} endLine={range.endLine} />
+                      </div>
+                    )}
+                    {candidate.type === 'QUALITY' && ev?.instances && isMain && (
+                      <div className="mt-2 pl-5 flex flex-col gap-2">
+                        {ev.instances.slice(0, 3).map((inst, i) => (
+                          <CodePeek
+                            key={i}
+                            repoId={repoId}
+                            filePath={f}
+                            startLine={inst.location?.startLine || range?.startLine}
+                            endLine={inst.location?.endLine || range?.endLine}
+                          />
+                        ))}
+                      </div>
                     )}
                   </div>
-                  
-                  {/* Evidence Block */}
-                  {ev && (isMain || candidate.type === 'DEPENDENCY' || candidate.type === 'QUALITY') && (
-                    <div className="mt-1 pl-5">
-                      {candidate.type === 'QUALITY' && ev.instances && isMain && (
-                        <div className="space-y-1.5">
-                          {ev.instances.map((inst, i) => (
-                            <div key={i} className="text-[11px] bg-surface/80 border border-border/50 px-2 py-1.5 rounded flex items-center justify-between">
-                              <div className="flex items-center gap-2 truncate">
-                                <span className="text-muted/80">{inst.kind}:</span>
-                                <span className="font-mono text-text truncate">{inst.name}</span>
-                              </div>
-                              {inst.complexity && (
-                                <span className="text-warning font-medium shrink-0 ml-3">Score: {inst.complexity}</span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      
-                      {candidate.type === 'QUALITY' && ev.count && ev.instances && !isMain && candidate.title.includes('Clone') && (
-                        <div className="text-[11px] text-muted bg-surface/50 px-2 py-1.5 rounded border border-border/30">
-                          Clone detected in this file.
-                        </div>
-                      )}
-
-                      {candidate.type === 'SIZE' && isMain && (
-                        <div className="text-[11px] bg-surface/80 border border-border/50 px-2 py-1.5 rounded grid grid-cols-2 gap-2">
-                          {ev.lineCount && <div><span className="text-muted">Lines:</span> <span className="text-warning font-medium">{ev.lineCount}</span></div>}
-                          {ev.complexity && <div><span className="text-muted">Complexity:</span> <span className="text-warning font-medium">{ev.complexity}</span></div>}
-                          {ev.exportCount && <div><span className="text-muted">Exports:</span> <span className="text-warning font-medium">{ev.exportCount}</span></div>}
-                        </div>
-                      )}
-
-                      {candidate.type === 'COUPLING' && isMain && (
-                        <div className="text-[11px] bg-surface/80 border border-border/50 px-2 py-1.5 rounded flex gap-4">
-                          {ev.fanIn && <div><span className="text-muted">Dependent Files (Fan-In):</span> <span className="text-warning font-medium ml-1">{ev.fanIn}</span></div>}
-                          {ev.fanOut && <div><span className="text-muted">Dependencies (Fan-Out):</span> <span className="text-warning font-medium ml-1">{ev.fanOut}</span></div>}
-                        </div>
-                      )}
-
-                      {candidate.type === 'DEPENDENCY' && ev.cyclePath && isMain && (
-                        <div className="text-[10px] bg-danger/5 border border-danger/20 px-2 py-1.5 rounded text-danger font-mono break-all leading-relaxed">
-                          {ev.cyclePath.join(' → ')}
-                        </div>
-                      )}
-
-                      {candidate.type === 'ARCHITECTURE' && isMain && (
-                        <div className="text-[11px] bg-surface/80 border border-border/50 px-2 py-1.5 rounded">
-                          <span className="text-muted">Violated Rule:</span> <span className="text-warning font-mono ml-1">{ev.ruleId}</span>
-                        </div>
-                      )}
-
-                      {candidate.type === 'CHURN' && isMain && (
-                        <div className="text-[11px] bg-surface/80 border border-border/50 px-2 py-1.5 rounded flex gap-4">
-                          {ev.churnScore && <div><span className="text-muted">Churn Score:</span> <span className="text-warning font-medium ml-1">{ev.churnScore.toFixed(1)}/100</span></div>}
-                          {ev.commitsModified && <div><span className="text-muted">Commits:</span> <span className="text-text font-medium ml-1">{ev.commitsModified}</span></div>}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {range?.startLine && !ev?.instances && (
-                    <div className="mt-2 pl-5">
-                      <CodePeek 
-                        repoId={repoId} 
-                        filePath={f} 
-                        startLine={range.startLine} 
-                        endLine={range.endLine} 
-                      />
-                    </div>
-                  )}
-                  {candidate.type === 'QUALITY' && ev?.instances && isMain && (
-                    <div className="mt-2 pl-5 flex flex-col gap-2">
-                      {ev.instances.slice(0, 3).map((inst, i) => (
-                        <CodePeek 
-                          key={i}
-                          repoId={repoId}
-                          filePath={f}
-                          startLine={inst.location?.startLine || range?.startLine}
-                          endLine={inst.location?.endLine || range?.endLine}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                );
+              })}
           </div>
         </div>
 
@@ -923,14 +1027,25 @@ function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }
               <div>
                 <div className="flex justify-between items-baseline mb-1">
                   <span className="text-xs text-muted">Direct Dependencies</span>
-                  <span className="text-sm font-medium text-text">{impact?.directlyAffectedFiles?.length || 0} files</span>
+                  <span className="text-sm font-medium text-text">
+                    {impact?.directlyAffectedFiles?.length || 0} files
+                  </span>
                 </div>
                 {impact?.directlyAffectedFiles?.length > 0 && (
                   <div className="max-h-[120px] overflow-auto custom-scrollbar bg-surface/50 rounded border border-border/40 p-2 flex flex-col items-start">
                     {impact.directlyAffectedFiles.map(f => {
                       const ref = tryMakeSourceRef({ filePath: f });
                       if (ref) {
-                        return <OpenSourceButton key={f} ref={ref} label={f.split('/').pop()} variant="button" className="text-[10px] font-mono text-muted/80 truncate mb-1 last:mb-0 hover:text-accent transition-colors text-left" title={f} />;
+                        return (
+                          <OpenSourceButton
+                            key={f}
+                            ref={ref}
+                            label={f.split('/').pop()}
+                            variant="button"
+                            className="text-[10px] font-mono text-muted/80 truncate mb-1 last:mb-0 hover:text-accent transition-colors text-left"
+                            title={f}
+                          />
+                        );
                       }
                       return (
                         <div key={f} className="text-[10px] font-mono text-muted/80 truncate mb-1 last:mb-0" title={f}>
@@ -941,18 +1056,29 @@ function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }
                   </div>
                 )}
               </div>
-              
+
               <div>
                 <div className="flex justify-between items-baseline mb-1">
                   <span className="text-xs text-muted">Transitive (Indirect)</span>
-                  <span className="text-sm font-medium text-text">{impact?.transitivelyAffectedFiles?.length || 0} files</span>
+                  <span className="text-sm font-medium text-text">
+                    {impact?.transitivelyAffectedFiles?.length || 0} files
+                  </span>
                 </div>
                 {impact?.transitivelyAffectedFiles?.length > 0 && (
                   <div className="max-h-[120px] overflow-auto custom-scrollbar bg-surface/50 rounded border border-border/40 p-2 flex flex-col items-start">
                     {impact.transitivelyAffectedFiles.map(f => {
                       const ref = tryMakeSourceRef({ filePath: f });
                       if (ref) {
-                        return <OpenSourceButton key={f} ref={ref} label={f.split('/').pop()} variant="button" className="text-[10px] font-mono text-muted/80 truncate mb-1 last:mb-0 hover:text-accent transition-colors text-left" title={f} />;
+                        return (
+                          <OpenSourceButton
+                            key={f}
+                            ref={ref}
+                            label={f.split('/').pop()}
+                            variant="button"
+                            className="text-[10px] font-mono text-muted/80 truncate mb-1 last:mb-0 hover:text-accent transition-colors text-left"
+                            title={f}
+                          />
+                        );
                       }
                       return (
                         <div key={f} className="text-[10px] font-mono text-muted/80 truncate mb-1 last:mb-0" title={f}>
@@ -968,7 +1094,12 @@ function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }
                   <span className="text-xs text-muted block mb-1.5">Components</span>
                   <div className="flex flex-wrap gap-1">
                     {impact.affectedComponents.map(c => (
-                      <span key={c} className="text-[10px] px-1.5 py-0.5 bg-surface rounded border border-border text-muted">{c}</span>
+                      <span
+                        key={c}
+                        className="text-[10px] px-1.5 py-0.5 bg-surface rounded border border-border text-muted"
+                      >
+                        {c}
+                      </span>
                     ))}
                   </div>
                 </div>
@@ -988,7 +1119,10 @@ function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }
           </h3>
           <div className="grid grid-cols-1 gap-4">
             {candidate.suggestedStrategies.map((strat, idx) => (
-              <div key={idx} className="bg-panel border border-border/50 rounded-xl overflow-hidden shadow-sm group hover:border-accent/30 transition-colors">
+              <div
+                key={idx}
+                className="bg-panel border border-border/50 rounded-xl overflow-hidden shadow-sm group hover:border-accent/30 transition-colors"
+              >
                 <div className="bg-surface/50 px-4 py-3 border-b border-border/50 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-6 h-6 rounded-full bg-accent/10 text-accent flex items-center justify-center text-xs font-bold shrink-0">
@@ -997,12 +1131,10 @@ function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }
                     <h4 className="text-sm font-semibold text-text">{strat.action}</h4>
                   </div>
                 </div>
-                
+
                 <div className="p-4">
-                  <p className="text-[13px] text-muted mb-4 leading-relaxed">
-                    {strat.description}
-                  </p>
-                  
+                  <p className="text-[13px] text-muted mb-4 leading-relaxed">{strat.description}</p>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-[11px]">
                     <div className="bg-success/5 border border-success/10 rounded-lg p-3">
                       <span className="text-success font-medium mb-2 flex items-center gap-1.5 uppercase tracking-wider text-[10px]">
@@ -1017,7 +1149,7 @@ function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }
                         ))}
                       </ul>
                     </div>
-                    
+
                     <div className="bg-warning/5 border border-warning/10 rounded-lg p-3">
                       <span className="text-warning font-medium mb-2 flex items-center gap-1.5 uppercase tracking-wider text-[10px]">
                         <AlertTriangle className="w-3 h-3" /> Potential Risks
@@ -1041,23 +1173,27 @@ function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }
 
       {/* Footer meta */}
       <div className="flex items-center gap-6 text-xs text-muted pt-2 border-t border-border mt-2">
-        <span>Severity: <span className="text-text uppercase">{candidate.severity}</span></span>
-        <span>Confidence: <span className="text-text uppercase">{candidate.confidence}</span></span>
+        <span>
+          Severity: <span className="text-text uppercase">{candidate.severity}</span>
+        </span>
+        <span>
+          Confidence: <span className="text-text uppercase">{candidate.confidence}</span>
+        </span>
       </div>
 
       {/* Other Issues in this File */}
-      {allCandidates && candidate.mainFile && (
+      {allCandidates &&
+        candidate.mainFile &&
         (() => {
-          const otherIssues = allCandidates.filter(c => 
-            c.id !== candidate.id && 
-            c.files?.includes(candidate.mainFile)
-          );
-          
+          const otherIssues = allCandidates.filter(c => c.id !== candidate.id && c.files?.includes(candidate.mainFile));
+
           if (otherIssues.length === 0) return null;
-          
+
           return (
             <div className="mt-6 border-t border-border pt-6">
-              <h3 className="text-[11px] font-medium text-muted uppercase tracking-wider mb-3">Other Issues in {candidate.mainFile.split('/').pop()}</h3>
+              <h3 className="text-[11px] font-medium text-muted uppercase tracking-wider mb-3">
+                Other Issues in {candidate.mainFile.split('/').pop()}
+              </h3>
               <div className="flex flex-col gap-2">
                 {otherIssues.map(other => (
                   <button
@@ -1066,7 +1202,9 @@ function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }
                     className="flex items-center justify-between p-3 bg-panel border border-border/50 rounded-lg hover:border-accent/40 transition-colors text-left group"
                   >
                     <div>
-                      <div className="text-sm font-semibold text-text group-hover:text-accent transition-colors">{other.title}</div>
+                      <div className="text-sm font-semibold text-text group-hover:text-accent transition-colors">
+                        {other.title}
+                      </div>
                       <div className="text-[11px] text-muted line-clamp-1 mt-0.5">{other.summary}</div>
                     </div>
                     <div className="flex flex-col items-end shrink-0 ml-4">
@@ -1078,15 +1216,14 @@ function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }
               </div>
             </div>
           );
-        })()
-      )}
+        })()}
     </div>
   );
 }
 
 // ── Right Panel ───────────────────────────────────────────────────────────────
 /**
- * It queries the AI proxy, then extracts the generated refactoring strategy, 
+ * It queries the AI proxy, then extracts the generated refactoring strategy,
  * and then it applies the markdown response to the advisor panel.
  */
 function AiAdvisor({ candidate, repoId }) {
@@ -1132,10 +1269,17 @@ function AiAdvisor({ candidate, repoId }) {
                 }
                 loadInsights();
               }}
-              disabled={aiState.status === 'loading' || (aiState.authState !== 'unauthenticated' && (aiState.status === 'offline' || aiState.quotaStatus === 'exhausted'))}
+              disabled={
+                aiState.status === 'loading' ||
+                (aiState.authState !== 'unauthenticated' &&
+                  (aiState.status === 'offline' || aiState.quotaStatus === 'exhausted'))
+              }
               title={
-                aiState.status === 'offline' ? 'No AI provider configured' :
-                aiState.quotaStatus === 'exhausted' ? 'AI quota exceeded' : ''
+                aiState.status === 'offline'
+                  ? 'No AI provider configured'
+                  : aiState.quotaStatus === 'exhausted'
+                    ? 'AI quota exceeded'
+                    : ''
               }
               className="px-4 py-2 border border-accent/30 text-accent hover:bg-accent/8 rounded transition-colors text-sm disabled:opacity-50"
             >
@@ -1152,9 +1296,7 @@ function AiAdvisor({ candidate, repoId }) {
         )}
 
         {!loading && insights?.error && (
-          <div className="text-xs text-danger p-3 bg-danger/8 border border-danger/20 rounded">
-            {insights.error}
-          </div>
+          <div className="text-xs text-danger p-3 bg-danger/8 border border-danger/20 rounded">{insights.error}</div>
         )}
 
         {!loading && insights && !insights.error && (
@@ -1163,15 +1305,16 @@ function AiAdvisor({ candidate, repoId }) {
             chatId={`refactor-${candidate.id}`}
             data={{
               summary: insights.summary,
-              recommendations: insights.recommendations?.map(rec => {
-                let md = `**${rec.strategy}**\n${rec.reasoning}`;
-                if (rec.steps?.length > 0) {
-                  md += `\n\n*Execution Steps:*\n` + rec.steps.map(s => `- ${s}`).join('\n');
-                }
-                return md;
-              }) || [],
+              recommendations:
+                insights.recommendations?.map(rec => {
+                  let md = `**${rec.strategy}**\n${rec.reasoning}`;
+                  if (rec.steps?.length > 0) {
+                    md += `\n\n*Execution Steps:*\n` + rec.steps.map(s => `- ${s}`).join('\n');
+                  }
+                  return md;
+                }) || [],
               risks: insights.limitations || [],
-              references: insights.recommendations?.flatMap(r => r.references || []) || []
+              references: insights.recommendations?.flatMap(r => r.references || []) || [],
             }}
             title={null}
           />

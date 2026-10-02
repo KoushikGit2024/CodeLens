@@ -33,7 +33,7 @@ server/
 
 ## The "Deterministic First" Principle
 
-The backend is strictly divided between deterministic domains (e.g., `parsing/`, `dependencies/`) and AI generation (e.g., `assistant/generators/`). 
+The backend is strictly divided between deterministic domains (e.g., `parsing/`, `dependencies/`) and AI generation (e.g., `assistant/generators/`).
 The core domains contain zero AI logic. They compute absolute, deterministic facts about the codebase.
 The `assistant/context/` builders take the deterministic output of the domains and pass it to the AI provider as structured JSON context. **Code is never blindly dumped into the LLM.**
 

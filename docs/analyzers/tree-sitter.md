@@ -10,9 +10,10 @@ See [ADR-001](../adr/ADR-001-tree-sitter.md) for more details.
 
 ## The Parser Registry
 
-`server/src/analyzers/parserRegistry.js` handles loading the WASM binaries and mapping file extensions to the appropriate parser. 
+`server/src/analyzers/parserRegistry.js` handles loading the WASM binaries and mapping file extensions to the appropriate parser.
 
 Currently supported languages:
+
 - JavaScript / JSX
 - TypeScript / TSX
 - Python
@@ -24,6 +25,7 @@ Currently supported languages:
 For each language, a specific parser class (e.g., `JavaScriptParser.js`, `PythonParser.js`) is responsible for traversing the Tree-sitter AST and mapping it to the CodeLens canonical symbol schema (`symbols.js`).
 
 ### Supported Extractions
+
 - Classes and Methods
 - Functions (Async, Generators, Arrow)
 - Imports (ESM, CommonJS, Python imports, Java imports)

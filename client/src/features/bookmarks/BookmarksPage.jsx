@@ -9,10 +9,14 @@ function highlightMatch(text, query) {
   const parts = text.split(new RegExp(`(${query})`, 'gi'));
   return (
     <>
-      {parts.map((part, i) => 
-        part.toLowerCase() === query.toLowerCase() 
-          ? <span key={i} className="bg-accent/40 text-text font-semibold rounded-sm px-0.5">{part}</span> 
-          : part
+      {parts.map((part, i) =>
+        part.toLowerCase() === query.toLowerCase() ? (
+          <span key={i} className="bg-accent/40 text-text font-semibold rounded-sm px-0.5">
+            {part}
+          </span>
+        ) : (
+          part
+        )
       )}
     </>
   );
@@ -26,20 +30,30 @@ function BookmarkNote({ bookmark, editingPath, editNote, setEditNote, setEditing
     <div className="bg-surface/50 rounded p-2 sm:p-3 text-sm ml-0 sm:ml-8 mt-2 sm:mt-0">
       {isEditing ? (
         <div className="flex gap-2">
-          <input 
+          <input
             type="text"
             value={editNote}
-            onChange={(e) => setEditNote(e.target.value)}
+            onChange={e => setEditNote(e.target.value)}
             placeholder="Add a note..."
             className="flex-1 min-w-0 bg-surface border border-border rounded px-2 py-1.5 text-xs text-text focus:outline-none focus:border-accent"
             autoFocus
-            onKeyDown={(e) => {
+            onKeyDown={e => {
               if (e.key === 'Enter') saveNote(bookmark.filePath);
               if (e.key === 'Escape') setEditingPath(null);
             }}
           />
-          <button onClick={() => saveNote(bookmark.filePath)} className="px-2 sm:px-3 py-1 bg-accent/10 text-accent rounded hover:bg-accent/20 text-xs font-medium shrink-0">Save</button>
-          <button onClick={() => setEditingPath(null)} className="px-2 sm:px-3 py-1 text-muted hover:text-text text-xs shrink-0">Cancel</button>
+          <button
+            onClick={() => saveNote(bookmark.filePath)}
+            className="px-2 sm:px-3 py-1 bg-accent/10 text-accent rounded hover:bg-accent/20 text-xs font-medium shrink-0"
+          >
+            Save
+          </button>
+          <button
+            onClick={() => setEditingPath(null)}
+            className="px-2 sm:px-3 py-1 text-muted hover:text-text text-xs shrink-0"
+          >
+            Cancel
+          </button>
         </div>
       ) : (
         <div className="flex flex-col gap-1.5">
@@ -53,7 +67,7 @@ function BookmarkNote({ bookmark, editingPath, editNote, setEditNote, setEditing
                 <p className="text-muted italic opacity-50">No note added.</p>
               )}
             </div>
-            <button 
+            <button
               onClick={() => {
                 setEditingPath(bookmark.filePath);
               }}
@@ -63,8 +77,8 @@ function BookmarkNote({ bookmark, editingPath, editNote, setEditNote, setEditing
             </button>
           </div>
           {bookmark.note && bookmark.note.length > 80 && (
-            <button 
-              onClick={() => setExpanded(!expanded)} 
+            <button
+              onClick={() => setExpanded(!expanded)}
               className="text-[11px] text-muted hover:text-text self-start mt-0.5"
             >
               {expanded ? 'Show less' : 'Read more'}
@@ -89,23 +103,22 @@ export default function BookmarksPage() {
   // Convert map to sorted array (newest first) and filter by search query
   const bookmarks = useMemo(() => {
     let list = Object.entries(bookmarksMap).map(([filePath, data]) => ({ filePath, ...data }));
-    
+
     if (searchQuery.trim()) {
       const lowerQuery = searchQuery.toLowerCase();
-      list = list.filter(b => 
-        b.filePath.toLowerCase().includes(lowerQuery) || 
-        (b.note && b.note.toLowerCase().includes(lowerQuery))
+      list = list.filter(
+        b => b.filePath.toLowerCase().includes(lowerQuery) || (b.note && b.note.toLowerCase().includes(lowerQuery))
       );
     }
-    
+
     return list.sort((a, b) => new Date(b.bookmarkedAt) - new Date(a.bookmarkedAt));
   }, [bookmarksMap, searchQuery]);
 
-  const handleGoToFile = (filePath) => {
+  const handleGoToFile = filePath => {
     navigate(`/explore/${repoId}/source?path=${encodeURIComponent(filePath)}`);
   };
 
-  const handleRemove = (filePath) => {
+  const handleRemove = filePath => {
     removeBookmark(repoId, filePath);
     if (editingPath === filePath) setEditingPath(null);
     if (selectedPaths.has(filePath)) {
@@ -124,7 +137,7 @@ export default function BookmarksPage() {
     }
   };
 
-  const toggleSelection = (filePath) => {
+  const toggleSelection = filePath => {
     const newSet = new Set(selectedPaths);
     if (newSet.has(filePath)) {
       newSet.delete(filePath);
@@ -142,12 +155,12 @@ export default function BookmarksPage() {
     }
   };
 
-  const startEditing = (bookmark) => {
+  const startEditing = bookmark => {
     setEditingPath(bookmark.filePath);
     setEditNote(bookmark.note || '');
   };
 
-  const saveNote = (filePath) => {
+  const saveNote = filePath => {
     updateNote(repoId, filePath, editNote);
     setEditingPath(null);
   };
@@ -167,12 +180,12 @@ export default function BookmarksPage() {
               {repo ? `Manage pinned files and notes for ${repo.name}` : 'Manage your pinned files'}
             </p>
           </div>
-          
+
           <div className="flex items-center gap-3 w-full md:w-72 shrink-0">
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2" />
-              <input 
-                type="text" 
+              <input
+                type="text"
                 placeholder="Search bookmarks..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
@@ -181,20 +194,20 @@ export default function BookmarksPage() {
             </div>
           </div>
         </div>
-        
+
         {/* Bulk actions bar */}
         {(bookmarks.length > 0 || searchQuery) && (
           <div className="mt-6 flex items-center justify-between">
-            <button 
+            <button
               onClick={toggleSelectAll}
               className="flex items-center gap-2 text-sm text-muted hover:text-text transition-colors"
             >
               {isAllSelected ? <CheckSquare className="w-4 h-4 text-accent" /> : <Square className="w-4 h-4" />}
               {isAllSelected ? 'Deselect All' : 'Select All'}
             </button>
-            
+
             {selectedPaths.size > 0 && (
-              <button 
+              <button
                 onClick={handleMassDelete}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-danger/10 text-danger rounded hover:bg-danger/20 transition-colors text-xs font-medium"
               >
@@ -215,7 +228,7 @@ export default function BookmarksPage() {
               <p className="text-sm text-muted max-w-sm mx-auto">
                 Pin important files from the Explorer to keep track of them here and add personal notes.
               </p>
-              <button 
+              <button
                 onClick={() => navigate(`/explore/${repoId}/source`)}
                 className="mt-6 px-4 py-2 bg-accent/10 text-accent rounded hover:bg-accent/20 transition-colors text-sm font-medium"
               >
@@ -229,28 +242,32 @@ export default function BookmarksPage() {
           ) : (
             <div className="grid gap-4">
               {bookmarks.map(bookmark => (
-                <div 
-                  key={bookmark.filePath} 
+                <div
+                  key={bookmark.filePath}
                   className={`bg-panel border rounded-lg p-3 sm:p-5 flex flex-col gap-2 sm:gap-4 group transition-colors shadow-sm ${
                     selectedPaths.has(bookmark.filePath) ? 'border-accent/50' : 'border-border hover:border-accent/30'
                   }`}
                 >
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
                     <div className="flex-1 min-w-0 flex items-start gap-3">
-                      <button 
+                      <button
                         onClick={() => toggleSelection(bookmark.filePath)}
                         className="mt-0.5 text-muted hover:text-text transition-colors shrink-0"
                       >
-                        {selectedPaths.has(bookmark.filePath) 
-                          ? <CheckSquare className="w-5 h-5 text-accent" /> 
-                          : <Square className="w-5 h-5" />
-                        }
+                        {selectedPaths.has(bookmark.filePath) ? (
+                          <CheckSquare className="w-5 h-5 text-accent" />
+                        ) : (
+                          <Square className="w-5 h-5" />
+                        )}
                       </button>
                       <div className="mt-1 p-1.5 bg-surface rounded text-accent shrink-0">
                         <File className="w-3.5 h-3.5" />
                       </div>
                       <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleGoToFile(bookmark.filePath)}>
-                        <h3 className="text-sm font-medium text-text truncate hover:text-accent transition-colors" title={bookmark.filePath.split('/').pop()}>
+                        <h3
+                          className="text-sm font-medium text-text truncate hover:text-accent transition-colors"
+                          title={bookmark.filePath.split('/').pop()}
+                        >
                           {highlightMatch(bookmark.filePath.split('/').pop(), searchQuery)}
                         </h3>
                         <p className="text-xs text-muted truncate mt-0.5" title={bookmark.filePath}>
@@ -259,14 +276,14 @@ export default function BookmarksPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 sm:opacity-0 group-hover:opacity-100 transition-opacity self-end sm:self-auto">
-                      <button 
+                      <button
                         onClick={() => handleRemove(bookmark.filePath)}
                         className="p-1.5 text-muted hover:text-danger hover:bg-danger/10 rounded transition-colors"
                         title="Remove bookmark"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
-                      <button 
+                      <button
                         onClick={() => handleGoToFile(bookmark.filePath)}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-accent text-text rounded text-xs font-medium hover:bg-accent/90 transition-colors"
                       >
@@ -276,7 +293,7 @@ export default function BookmarksPage() {
                     </div>
                   </div>
 
-                  <BookmarkNote 
+                  <BookmarkNote
                     bookmark={bookmark}
                     editingPath={editingPath}
                     editNote={editNote}
@@ -285,7 +302,7 @@ export default function BookmarksPage() {
                     saveNote={saveNote}
                     searchQuery={searchQuery}
                   />
-                  
+
                   <div className="text-[10px] text-muted flex justify-end">
                     Bookmarked on {new Date(bookmark.bookmarkedAt).toLocaleDateString()}
                   </div>

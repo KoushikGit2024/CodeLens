@@ -11,9 +11,12 @@
     "dev": "concurrently \"npm run dev --workspace=server\" \"npm run dev --workspace=client\"",
     "install:all": "npm install && npm install --workspace=server && npm install --workspace=client",
     "test": "cd server && npm test && cd ../client && npm run test:unit",
-    "docs:check": "node scripts/check-docs.js"
+    "docs:check": "node scripts/check-docs.js",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "prettier": "^3.9.9"
   }
 }

@@ -5,6 +5,7 @@ CodeLens Step 7 introduces the Automated Documentation Intelligence layer. This 
 ## Purpose
 
 Automated documentation answers high-level questions like:
+
 - What does this project do?
 - How is it architected?
 - What is the primary responsibility of a given file?
@@ -23,12 +24,16 @@ Instead of dumping raw source code into an LLM and hoping for an accurate summar
 ## Documentation Types
 
 ### 1. Repository Overview (`/overview`)
+
 Provides a high-level summary of the repository.
+
 - **Deterministic Facts:** Total files, entry points, key external packages, architectural components.
 - **AI Interpretation:** Project summary, technology stack inferred, architectural observations.
 
 ### 2. Module / File Documentation (`/file?path=...`)
+
 Provides detailed documentation for a specific file.
+
 - **Deterministic Facts:** Component, layer, exports, dependencies, dependents, API boundary status.
 - **AI Interpretation:** Module responsibility, architectural role, API notes, inferred dependency purpose.
 
@@ -66,4 +71,4 @@ Documentation context strictly only includes filenames, component names, and sym
 - `GET /api/repository/:id/documentation/overview` — Retrieves the repository-wide documentation.
 - `GET /api/repository/:id/documentation/file?path=...` — Retrieves documentation for a specific file.
 
-*Note: Documentation generation can take a few seconds on the first request. The backend caches results in memory to ensure fast subsequent fetches.*
+_Note: Documentation generation can take a few seconds on the first request. The backend caches results in memory to ensure fast subsequent fetches._

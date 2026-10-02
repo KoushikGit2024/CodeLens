@@ -11,7 +11,7 @@ export default function UserAvatarWidget() {
 
   if (!user) {
     return (
-      <div 
+      <div
         className="relative rounded-full p-0.5 cursor-pointer border-2 border-border/50 hover:border-accent transition-colors"
         onClick={() => navigate('/auth/signin')}
         title="Sign In"
@@ -42,16 +42,16 @@ export default function UserAvatarWidget() {
   }
 
   return (
-    <div 
+    <div
       className={`relative rounded-full p-0.5 cursor-pointer border-2 transition-colors ${borderColorClass}`}
       onClick={() => navigate('/account')}
       title="Go to Account & Usage"
     >
       <div className="w-8 h-8 rounded-full overflow-hidden bg-surface flex items-center justify-center">
-        {(user?.user_metadata?.custom_avatar_url || user?.user_metadata?.avatar_url) ? (
-          <img 
-            src={user.user_metadata.custom_avatar_url || user.user_metadata.avatar_url} 
-            alt="User Avatar" 
+        {user?.user_metadata?.custom_avatar_url || user?.user_metadata?.avatar_url ? (
+          <img
+            src={user.user_metadata.custom_avatar_url || user.user_metadata.avatar_url}
+            alt="User Avatar"
             className="w-full h-full object-cover"
           />
         ) : (

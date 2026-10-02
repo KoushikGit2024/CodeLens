@@ -1,23 +1,23 @@
 /**
  * base.context.js
  *
- * It initiates the grounding pipeline, then extracts deterministic code segments, 
+ * It initiates the grounding pipeline, then extracts deterministic code segments,
  * and then it applies hard token limits to structure a safe prompt for the LLM.
  */
 
 import { buildDependencyGraph, getFileDependencies } from '../dependencies/dependency.analyzer.js';
 
 export const DEFAULTS = {
-  maxFiles:          8,
-  maxSourceChars:    24_000,
+  maxFiles: 8,
+  maxSourceChars: 24_000,
   maxSymbolsPerFile: 20,
-  snippetLines:      40,
+  snippetLines: 40,
 };
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
- * It orchestrates file scoring, then extracts context snippets via the loader callback, 
+ * It orchestrates file scoring, then extracts context snippets via the loader callback,
  * and then it applies length truncations to build the final AiContext object.
  */
 export async function buildContext(analysis, question, fileLoaderCallback, opts = {}) {
@@ -26,8 +26,8 @@ export async function buildContext(analysis, question, fileLoaderCallback, opts 
 
   const graph = buildDependencyGraph(analysis);
 
-  const terms   = extractQueryTerms(question);
-  const scored  = scoreFiles(analysis, graph, terms, activeContext);
+  const terms = extractQueryTerms(question);
+  const scored = scoreFiles(analysis, graph, terms, activeContext);
 
   expandWithDeps(scored, graph, cfg.maxFiles);
 
@@ -51,45 +51,53 @@ export async function buildContext(analysis, question, fileLoaderCallback, opts 
     : selected;
 
   let totalChars = 0;
-  let truncated  = false;
-  const files    = [];
+  let truncated = false;
+  const files = [];
 
   for (const candidate of candidates) {
     const fileAnalysis = analysis.files.find(f => f.filePath === candidate.filePath);
-    const depInfo      = getFileDependencies(graph, candidate.filePath);
+    const depInfo = getFileDependencies(graph, candidate.filePath);
 
     const isContextFile = activeContext && candidate.filePath === activeContext.filePath;
     const startLine = isContextFile && activeContext.startLine ? Math.max(1, activeContext.startLine - 10) : null;
     const endLine = isContextFile && activeContext.endLine ? activeContext.endLine + 10 : null;
-    
+
     const candidateItem = { path: candidate.filePath };
-    const charsRead = await loadSourceSnippet(candidateItem, fileLoaderCallback, terms, fileAnalysis, cfg, startLine, endLine);
-    
+    const charsRead = await loadSourceSnippet(
+      candidateItem,
+      fileLoaderCallback,
+      terms,
+      fileAnalysis,
+      cfg,
+      startLine,
+      endLine
+    );
+
     if (totalChars + charsRead > cfg.maxSourceChars && !isContextFile) {
-        candidateItem.source = null;
-        truncated = true;
+      candidateItem.source = null;
+      truncated = true;
     } else {
-        totalChars += charsRead;
+      totalChars += charsRead;
     }
 
     files.push({
-      path:         candidate.filePath,
-      reason:       candidate.reason,
-      score:        candidate.score,
-      symbols:      (candidate.symbols || []).slice(0, cfg.maxSymbolsPerFile),
+      path: candidate.filePath,
+      reason: candidate.reason,
+      score: candidate.score,
+      symbols: (candidate.symbols || []).slice(0, cfg.maxSymbolsPerFile),
       dependencies: depInfo.dependencies.filter(d => d.filePath).map(d => d.filePath),
-      dependents:   depInfo.dependents.map(d => d.filePath),
-      source:       candidateItem.source || null,
-      language:     fileAnalysis.language,
+      dependents: depInfo.dependents.map(d => d.filePath),
+      source: candidateItem.source || null,
+      language: fileAnalysis.language,
     });
   }
 
   return {
     question,
     repository: {
-      name:       analysis.name || 'unknown',
+      name: analysis.name || 'unknown',
       totalFiles: analysis.analyzedFiles || analysis.files?.length || 0,
-      languages:  analysis.languageSummary || {},
+      languages: analysis.languageSummary || {},
     },
     files,
     totalSourceChars: totalChars,
@@ -100,28 +108,88 @@ export async function buildContext(analysis, question, fileLoaderCallback, opts 
 // ── Relevance scoring ─────────────────────────────────────────────────────────
 
 /**
- * It splits the text query, then extracts meaningful keywords, 
+ * It splits the text query, then extracts meaningful keywords,
  * and then it applies a strict stop-word filter to return unique targets.
  */
 export function extractQueryTerms(question) {
   const STOP_WORDS = new Set([
-    'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-    'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'shall',
-    'should', 'may', 'might', 'must', 'can', 'could', 'to', 'of', 'in',
-    'on', 'at', 'by', 'for', 'with', 'about', 'into', 'from', 'and', 'or',
-    'but', 'not', 'how', 'what', 'where', 'when', 'which', 'who', 'does',
-    'this', 'that', 'it', 'its', 'file', 'files', 'code', 'function',
-    'functions', 'method', 'methods', 'class', 'classes', 'work', 'works',
-    'use', 'used', 'using',
+    'a',
+    'an',
+    'the',
+    'is',
+    'are',
+    'was',
+    'were',
+    'be',
+    'been',
+    'being',
+    'have',
+    'has',
+    'had',
+    'do',
+    'does',
+    'did',
+    'will',
+    'would',
+    'shall',
+    'should',
+    'may',
+    'might',
+    'must',
+    'can',
+    'could',
+    'to',
+    'of',
+    'in',
+    'on',
+    'at',
+    'by',
+    'for',
+    'with',
+    'about',
+    'into',
+    'from',
+    'and',
+    'or',
+    'but',
+    'not',
+    'how',
+    'what',
+    'where',
+    'when',
+    'which',
+    'who',
+    'does',
+    'this',
+    'that',
+    'it',
+    'its',
+    'file',
+    'files',
+    'code',
+    'function',
+    'functions',
+    'method',
+    'methods',
+    'class',
+    'classes',
+    'work',
+    'works',
+    'use',
+    'used',
+    'using',
   ]);
 
-  const raw = question.toLowerCase().replace(/[^a-z0-9_]/g, ' ').split(/\s+/);
+  const raw = question
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, ' ')
+    .split(/\s+/);
   const unique = new Set(raw.filter(t => t.length >= 2 && !STOP_WORDS.has(t)));
   return Array.from(unique);
 }
 
 /**
- * It evaluates each file AST against the query terms, then extracts substring matches, 
+ * It evaluates each file AST against the query terms, then extracts substring matches,
  * and then it applies numeric scoring points for structural relevance.
  */
 function scoreFiles(analysis, graph, terms, activeContext = null) {
@@ -129,7 +197,7 @@ function scoreFiles(analysis, graph, terms, activeContext = null) {
   if (!analysis?.files) return scored;
 
   for (const fileAnalysis of analysis.files) {
-    const fp        = fileAnalysis.filePath;
+    const fp = fileAnalysis.filePath;
     let score = 0;
     const reasons = [];
 
@@ -138,20 +206,24 @@ function scoreFiles(analysis, graph, terms, activeContext = null) {
       reasons.push('active file');
     }
 
-    const basename  = fp.split('/').pop();
-    const stemRaw   = basename.replace(/\.[^.]+$/, '');
-    const stem      = stemRaw.toLowerCase();
-    const fpLower   = fp.toLowerCase();
-    const stemParts = stemRaw.split(/(?=[A-Z])|[-_]/).map(p => p.toLowerCase()).filter(p => p.length >= 3);
-    const symbols   = extractSymbolNames(fileAnalysis);
-    const symLower  = symbols.map(s => s.toLowerCase());
-    const imports   = extractImportSources(fileAnalysis);
+    const basename = fp.split('/').pop();
+    const stemRaw = basename.replace(/\.[^.]+$/, '');
+    const stem = stemRaw.toLowerCase();
+    const fpLower = fp.toLowerCase();
+    const stemParts = stemRaw
+      .split(/(?=[A-Z])|[-_]/)
+      .map(p => p.toLowerCase())
+      .filter(p => p.length >= 3);
+    const symbols = extractSymbolNames(fileAnalysis);
+    const symLower = symbols.map(s => s.toLowerCase());
+    const imports = extractImportSources(fileAnalysis);
 
     for (const term of terms) {
-      const filenameMatch = stem.includes(term)
-        || term.includes(stem)
-        || fpLower.includes(term)
-        || stemParts.some(p => p.length >= 3 && term.includes(p));
+      const filenameMatch =
+        stem.includes(term) ||
+        term.includes(stem) ||
+        fpLower.includes(term) ||
+        stemParts.some(p => p.length >= 3 && term.includes(p));
       if (filenameMatch) {
         score += 3;
         reasons.push(`filename matches "${term}"`);
@@ -171,7 +243,7 @@ function scoreFiles(analysis, graph, terms, activeContext = null) {
     if (score > 0 || terms.length === 0) {
       scored.set(fp, {
         score,
-        reason:  reasons.length > 0 ? reasons.slice(0, 3).join('; ') : 'general match',
+        reason: reasons.length > 0 ? reasons.slice(0, 3).join('; ') : 'general match',
         symbols,
       });
     } else {
@@ -183,7 +255,7 @@ function scoreFiles(analysis, graph, terms, activeContext = null) {
 }
 
 /**
- * It queries the dependency graph, then extracts neighboring modules, 
+ * It queries the dependency graph, then extracts neighboring modules,
  * and then it applies a secondary relevance boost based on coupling.
  */
 function expandWithDeps(scored, graph, maxFiles) {
@@ -198,16 +270,16 @@ function expandWithDeps(scored, graph, maxFiles) {
       if (!dep.filePath) continue;
       const existing = scored.get(dep.filePath);
       if (existing && existing.score === 0) {
-        existing.score  += 1;
-        existing.reason  = `dependency of ${fp.split('/').pop()}`;
+        existing.score += 1;
+        existing.reason = `dependency of ${fp.split('/').pop()}`;
       }
     }
 
     for (const dep of depInfo.dependents) {
       const existing = scored.get(dep.filePath);
       if (existing && existing.score === 0) {
-        existing.score  += 1;
-        existing.reason  = `dependent of ${fp.split('/').pop()}`;
+        existing.score += 1;
+        existing.reason = `dependent of ${fp.split('/').pop()}`;
       }
     }
   }
@@ -216,7 +288,7 @@ function expandWithDeps(scored, graph, maxFiles) {
 // ── Source loading ────────────────────────────────────────────────────────────
 
 /**
- * It triggers the frontend loader callback, then extracts specific lines matching AST targets, 
+ * It triggers the frontend loader callback, then extracts specific lines matching AST targets,
  * and then it applies string truncation to return a clean snippet.
  */
 async function loadSourceSnippet(item, fileLoaderCallback, terms, fileAnalysis, cfg, startLine = null, endLine = null) {
@@ -242,8 +314,8 @@ async function loadSourceSnippet(item, fileLoaderCallback, terms, fileAnalysis, 
 
     if (fileAnalysis && fileAnalysis.symbols && terms.length > 0) {
       const termsLower = terms.map(t => t.toLowerCase());
-      const match = fileAnalysis.symbols.find(sym =>
-        sym.name && termsLower.some(t => sym.name.toLowerCase().includes(t))
+      const match = fileAnalysis.symbols.find(
+        sym => sym.name && termsLower.some(t => sym.name.toLowerCase().includes(t))
       );
 
       if (match && match.location) {
@@ -266,38 +338,34 @@ async function loadSourceSnippet(item, fileLoaderCallback, terms, fileAnalysis, 
 // ── Symbol helpers ────────────────────────────────────────────────────────────
 
 /**
- * It filters the symbol structures, then extracts the display identifiers, 
+ * It filters the symbol structures, then extracts the display identifiers,
  * and then it applies them into a flattened string array.
  */
 export function extractSymbolNames(fileAnalysis) {
   if (!fileAnalysis || !fileAnalysis.symbols) return [];
-  return fileAnalysis.symbols
-    .filter(s => s.kind !== 'import' && s.kind !== 'export' && s.name)
-    .map(s => s.name);
+  return fileAnalysis.symbols.filter(s => s.kind !== 'import' && s.kind !== 'export' && s.name).map(s => s.name);
 }
 
 /**
- * It identifies AST import nodes, then extracts the literal source strings, 
+ * It identifies AST import nodes, then extracts the literal source strings,
  * and then it applies them into a string array.
  */
 function extractImportSources(fileAnalysis) {
   if (!fileAnalysis || !fileAnalysis.symbols) return [];
-  return fileAnalysis.symbols
-    .filter(s => s.kind === 'import' && s.source)
-    .map(s => s.source);
+  return fileAnalysis.symbols.filter(s => s.kind === 'import' && s.source).map(s => s.source);
 }
 
 // ── Prompt assembly ───────────────────────────────────────────────────────────
 
 /**
- * It gathers the formatted repository metrics, then extracts the fetched source fragments, 
+ * It gathers the formatted repository metrics, then extracts the fetched source fragments,
  * and then it applies rigid guardrails to build the final LLM instructions.
  */
 export function buildPrompt(context) {
   const lines = [];
 
   lines.push('You are CodeLens, a code intelligence assistant.');
-  lines.push('Answer the developer\'s question using ONLY the repository context provided below.');
+  lines.push("Answer the developer's question using ONLY the repository context provided below.");
   lines.push('Rules:');
   lines.push('- Do not invent files, functions, classes, or dependencies that are not shown.');
   lines.push('- If the provided context is insufficient to answer fully, say so explicitly.');

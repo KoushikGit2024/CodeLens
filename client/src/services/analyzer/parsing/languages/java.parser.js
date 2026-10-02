@@ -1,7 +1,7 @@
 /**
  * JavaParser.js
  *
- * It initializes the Java Tree-sitter parser, then extracts object-oriented symbols, 
+ * It initializes the Java Tree-sitter parser, then extracts object-oriented symbols,
  * and then it applies the canonical schemas to build intelligence structures.
  *
  * How this file is structured:
@@ -18,7 +18,7 @@ import {
   createClass,
   createMethod,
   createInterface,
-  createConstructor
+  createConstructor,
 } from '../symbols.js';
 import { calculateComplexity } from '../../advanced/complexity.analyzer.js';
 import { generateStructuralHash } from '../../advanced/clone.analyzer.js';
@@ -40,7 +40,7 @@ export class JavaParser extends BaseParser {
   }
 
   /**
-   * It receives the parsed AST root, then extracts the advanced static findings using S-expression queries, 
+   * It receives the parsed AST root, then extracts the advanced static findings using S-expression queries,
    * and then it applies the canonical AnalysisFinding schema for the frontend intelligence dashboard.
    */
   extractAdvancedFindings(rootNode, filePath) {
@@ -50,21 +50,37 @@ export class JavaParser extends BaseParser {
     const sinkQuery = `
       (method_invocation name: (identifier) @func (#match? @func "^(exec|start)$"))
     `;
-    findings.push(...this.extractFindings(
-      rootNode, sinkQuery, filePath, 'security', 'OS_COMMAND_INJECTION', 'security', 'critical',
-      'Potential OS Command Injection',
-      'Execution of system commands via `{text}` detected. Ensure inputs are highly sanitized.'
-    ));
+    findings.push(
+      ...this.extractFindings(
+        rootNode,
+        sinkQuery,
+        filePath,
+        'security',
+        'OS_COMMAND_INJECTION',
+        'security',
+        'critical',
+        'Potential OS Command Injection',
+        'Execution of system commands via `{text}` detected. Ensure inputs are highly sanitized.'
+      )
+    );
 
     // It specifies the JUnit annotation query, then extracts test method nodes, and then it applies the architectural info schema.
     const testQuery = `
       (method_declaration (modifiers (marker_annotation name: (identifier) @anno (#eq? @anno "Test")))) @test_method
     `;
-    findings.push(...this.extractFindings(
-      rootNode, testQuery, filePath, 'architecture', 'TEST_BLOCK', 'reliability', 'info',
-      'JUnit Test Method',
-      'Test method identified via @Test annotation.'
-    ));
+    findings.push(
+      ...this.extractFindings(
+        rootNode,
+        testQuery,
+        filePath,
+        'architecture',
+        'TEST_BLOCK',
+        'reliability',
+        'info',
+        'JUnit Test Method',
+        'Test method identified via @Test annotation.'
+      )
+    );
 
     return findings;
   }
@@ -145,16 +161,18 @@ export class JavaParser extends BaseParser {
   _extractPackage(node, source, symbols) {
     let name = '';
     for (const child of node.namedChildren) {
-        if (child.type === 'scoped_identifier' || child.type === 'identifier') {
-            name = nodeText(child, source);
-            break;
-        }
+      if (child.type === 'scoped_identifier' || child.type === 'identifier') {
+        name = nodeText(child, source);
+        break;
+      }
     }
     if (name) {
-      symbols.push(createPackage({
-        name,
-        location: locationFromNode(node),
-      }));
+      symbols.push(
+        createPackage({
+          name,
+          location: locationFromNode(node),
+        })
+      );
     }
   }
 
@@ -164,30 +182,32 @@ export class JavaParser extends BaseParser {
   _extractImport(node, source, symbols) {
     let isAsterisk = false;
     let moduleName = '';
-    
+
     for (const child of node.namedChildren) {
       if (child.type === 'scoped_identifier' || child.type === 'identifier') {
-          moduleName = nodeText(child, source);
+        moduleName = nodeText(child, source);
       } else if (child.type === 'asterisk') {
-          isAsterisk = true;
+        isAsterisk = true;
       }
     }
 
     if (moduleName) {
       const isStatic = nodeText(node, source).includes('static ');
-      
+
       let specifiers;
       if (isAsterisk) {
-          specifiers = [{ name: '*', alias: null, type: 'namespace' }];
+        specifiers = [{ name: '*', alias: null, type: 'namespace' }];
       } else {
-          specifiers = [{ name: moduleName, alias: null, type: isStatic ? 'named' : 'default' }];
+        specifiers = [{ name: moduleName, alias: null, type: isStatic ? 'named' : 'default' }];
       }
 
-      symbols.push(createImport({
-        source: moduleName,
-        specifiers,
-        location: locationFromNode(node),
-      }));
+      symbols.push(
+        createImport({
+          source: moduleName,
+          specifiers,
+          location: locationFromNode(node),
+        })
+      );
     }
   }
 
@@ -197,18 +217,20 @@ export class JavaParser extends BaseParser {
   _extractClass(node, source, symbols) {
     const name = this._classNameFromNode(node, source);
     let superClass = null;
-    
+
     const superclassNode = node.childForFieldName('superclass');
     if (superclassNode) {
       const typeIdentifier = superclassNode.namedChildren[0];
       if (typeIdentifier) superClass = nodeText(typeIdentifier, source);
     }
 
-    symbols.push(createClass({
-      name,
-      superClass,
-      location: locationFromNode(node),
-    }));
+    symbols.push(
+      createClass({
+        name,
+        superClass,
+        location: locationFromNode(node),
+      })
+    );
   }
 
   /**
@@ -216,10 +238,12 @@ export class JavaParser extends BaseParser {
    */
   _extractInterface(node, source, symbols) {
     const name = this._classNameFromNode(node, source);
-    symbols.push(createInterface({
-      name,
-      location: locationFromNode(node),
-    }));
+    symbols.push(
+      createInterface({
+        name,
+        location: locationFromNode(node),
+      })
+    );
   }
 
   /**
@@ -229,24 +253,26 @@ export class JavaParser extends BaseParser {
     const nameNode = node.childForFieldName('name');
     if (!nameNode) return;
 
-    const name       = nodeText(nameNode, source);
-    const modifiers  = this._extractModifiers(node, source);
-    const params     = this._extractParams(node, source);
+    const name = nodeText(nameNode, source);
+    const modifiers = this._extractModifiers(node, source);
+    const params = this._extractParams(node, source);
     const complexity = calculateComplexity(node);
-    const hash       = generateStructuralHash(node);
+    const hash = generateStructuralHash(node);
 
-    symbols.push(createMethod({
-      name,
-      className,
-      static: modifiers.includes('static'),
-      visibility: this._getVisibility(modifiers),
-      async: false,
-      generator: false,
-      params,
-      complexity,
-      hash,
-      location: locationFromNode(node),
-    }));
+    symbols.push(
+      createMethod({
+        name,
+        className,
+        static: modifiers.includes('static'),
+        visibility: this._getVisibility(modifiers),
+        async: false,
+        generator: false,
+        params,
+        complexity,
+        hash,
+        location: locationFromNode(node),
+      })
+    );
   }
 
   /**
@@ -257,14 +283,16 @@ export class JavaParser extends BaseParser {
     if (!nameNode) return;
 
     const modifiers = this._extractModifiers(node, source);
-    const params    = this._extractParams(node, source);
+    const params = this._extractParams(node, source);
 
-    symbols.push(createConstructor({
-      className,
-      visibility: this._getVisibility(modifiers),
-      params,
-      location: locationFromNode(node),
-    }));
+    symbols.push(
+      createConstructor({
+        className,
+        visibility: this._getVisibility(modifiers),
+        params,
+        location: locationFromNode(node),
+      })
+    );
   }
 
   // ── Utilities ────────────────────────────────────────────────────────────────
@@ -278,12 +306,12 @@ export class JavaParser extends BaseParser {
     if (paramsNode) {
       for (const p of paramsNode.namedChildren) {
         if (p.type === 'formal_parameter' || p.type === 'spread_parameter') {
-            const nameNode = p.childForFieldName('name');
-            if (nameNode) {
-                params.push(nodeText(nameNode, source));
-            } else {
-                params.push('_');
-            }
+          const nameNode = p.childForFieldName('name');
+          if (nameNode) {
+            params.push(nodeText(nameNode, source));
+          } else {
+            params.push('_');
+          }
         }
       }
     }
@@ -297,9 +325,9 @@ export class JavaParser extends BaseParser {
     const modifiers = [];
     const modifiersNode = node.childForFieldName('modifiers');
     if (modifiersNode) {
-        for (const mod of modifiersNode.namedChildren) {
-            modifiers.push(nodeText(mod, source));
-        }
+      for (const mod of modifiersNode.namedChildren) {
+        modifiers.push(nodeText(mod, source));
+      }
     }
     return modifiers;
   }
@@ -308,10 +336,10 @@ export class JavaParser extends BaseParser {
    * It evaluates the modifier array, then extracts the matching visibility string, and then it applies package-private as the fallback.
    */
   _getVisibility(modifiers) {
-      if (modifiers.includes('public')) return 'public';
-      if (modifiers.includes('private')) return 'private';
-      if (modifiers.includes('protected')) return 'protected';
-      return 'package-private';
+    if (modifiers.includes('public')) return 'public';
+    if (modifiers.includes('private')) return 'private';
+    if (modifiers.includes('protected')) return 'protected';
+    return 'package-private';
   }
 
   /**

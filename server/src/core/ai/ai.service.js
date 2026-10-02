@@ -27,7 +27,7 @@ function isAIAvailable() {
 /**
  * Generates a structured JSON response from the AI provider.
  * Enforces timeout, extracts JSON from markdown, and handles retries.
- * 
+ *
  * @param {string} prompt The full prompt string
  * @param {object} schema Optional JSON schema for validation
  * @param {object} options Override timeout, retries, etc.
@@ -36,12 +36,12 @@ function isAIAvailable() {
 async function generateStructuredResponse(prompt, schema = null, options = {}) {
   const timeoutMs = options.timeoutMs || DEFAULT_TIMEOUT_MS;
   const maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
-  
+
   // Ask the model to reply in JSON
-  const schemaInstruction = schema 
-    ? `\n\nReturn your response as raw, valid JSON matching this schema:\n${JSON.stringify(schema, null, 2)}\nDo not include markdown blocks, just the JSON.` 
+  const schemaInstruction = schema
+    ? `\n\nReturn your response as raw, valid JSON matching this schema:\n${JSON.stringify(schema, null, 2)}\nDo not include markdown blocks, just the JSON.`
     : `\n\nReturn your response as raw, valid JSON.`;
-    
+
   const finalPrompt = prompt + schemaInstruction;
 
   let attempt = 0;
@@ -51,31 +51,27 @@ async function generateStructuredResponse(prompt, schema = null, options = {}) {
     attempt++;
     try {
       // Execute with timeout
-      const result = await executeWithTimeout(
-        () => generateAnswer(finalPrompt), 
-        timeoutMs
-      );
-      
+      const result = await executeWithTimeout(() => generateAnswer(finalPrompt), timeoutMs);
+
       // Parse JSON
       const json = extractAndParseJSON(result.text);
       json.__usage = result.usage;
-      
+
       // Validate schema if provided
       if (schema) {
         validateBasicSchema(json, schema);
       }
-      
+
       return json;
-      
     } catch (error) {
       lastError = error;
       console.warn(`[aiService] Attempt ${attempt}/${maxRetries + 1} failed: ${error.message}`);
-      
+
       // Do not retry if provider is completely unavailable or authentication failed (e.g. 401/403)
       if (error.statusCode === 503 || error.message.includes('401') || error.message.includes('403')) {
-        break; 
+        break;
       }
-      
+
       // Wait a bit before retrying
       if (attempt <= maxRetries) {
         await new Promise(r => setTimeout(r, 1000 * attempt));
@@ -93,7 +89,7 @@ async function executeWithTimeout(asyncFn, timeoutMs) {
   const timeoutPromise = new Promise((_, reject) => {
     timeoutId = setTimeout(() => reject(new Error(`AI request timed out after ${timeoutMs}ms`)), timeoutMs);
   });
-  
+
   try {
     return await Promise.race([asyncFn(), timeoutPromise]);
   } finally {
@@ -103,7 +99,7 @@ async function executeWithTimeout(asyncFn, timeoutMs) {
 
 function extractAndParseJSON(rawText) {
   let text = rawText.trim();
-  
+
   // Strip markdown code blocks
   if (text.startsWith('```json')) {
     text = text.replace(/^```json\s*/, '');
@@ -113,7 +109,7 @@ function extractAndParseJSON(rawText) {
   if (text.endsWith('```')) {
     text = text.replace(/\s*```$/, '');
   }
-  
+
   // Attempt to parse
   try {
     return JSON.parse(text);
@@ -123,14 +119,14 @@ function extractAndParseJSON(rawText) {
     const lastBrace = text.lastIndexOf('}');
     const firstBracket = text.indexOf('[');
     const lastBracket = text.lastIndexOf(']');
-    
+
     let extracted = text;
     if (firstBrace >= 0 && lastBrace >= 0 && (firstBracket === -1 || firstBrace < firstBracket)) {
       extracted = text.substring(firstBrace, lastBrace + 1);
     } else if (firstBracket >= 0 && lastBracket >= 0) {
       extracted = text.substring(firstBracket, lastBracket + 1);
     }
-    
+
     try {
       return JSON.parse(extracted);
     } catch (fallbackError) {
@@ -147,7 +143,7 @@ function validateBasicSchema(data, schema) {
   if (!data || typeof data !== 'object') {
     throw new Error('AI response is not a JSON object/array');
   }
-  
+
   if (schema.required && Array.isArray(schema.required)) {
     for (const field of schema.required) {
       if (data[field] === undefined) {
@@ -164,24 +160,21 @@ function validateBasicSchema(data, schema) {
 async function generateAnswerService(prompt, options = {}) {
   const timeoutMs = options.timeoutMs || DEFAULT_TIMEOUT_MS;
   const maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
-  
+
   let attempt = 0;
   let lastError = null;
 
   while (attempt <= maxRetries) {
     attempt++;
     try {
-      const result = await executeWithTimeout(
-        () => generateAnswer(prompt), 
-        timeoutMs
-      );
+      const result = await executeWithTimeout(() => generateAnswer(prompt), timeoutMs);
       return result;
     } catch (error) {
       lastError = error;
       console.warn(`[aiService] Plain answer attempt ${attempt}/${maxRetries + 1} failed: ${error.message}`);
-      
+
       if (error.statusCode === 503 || error.message.includes('401') || error.message.includes('403')) {
-        break; 
+        break;
       }
       if (attempt <= maxRetries) {
         await new Promise(r => setTimeout(r, 1000 * attempt));
@@ -195,5 +188,5 @@ async function generateAnswerService(prompt, options = {}) {
 module.exports = {
   isAIAvailable,
   generateStructuredResponse,
-  generateAnswer: generateAnswerService
+  generateAnswer: generateAnswerService,
 };

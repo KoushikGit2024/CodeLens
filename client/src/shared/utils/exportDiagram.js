@@ -23,11 +23,14 @@ const downloadFile = (dataUrl, filename) => {
   link.click();
 };
 
-const getReactFlowBounds = (element) => {
+const getReactFlowBounds = element => {
   const nodes = element.querySelectorAll('.react-flow__node');
   if (!nodes.length) return null;
 
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
 
   nodes.forEach(node => {
     const transform = node.style.transform;
@@ -37,7 +40,7 @@ const getReactFlowBounds = (element) => {
       const y = parseFloat(match[2]);
       const w = node.offsetWidth;
       const h = node.offsetHeight;
-      
+
       minX = Math.min(minX, x);
       minY = Math.min(minY, y);
       maxX = Math.max(maxX, x + w);
@@ -51,15 +54,15 @@ const getReactFlowBounds = (element) => {
   return {
     x: minX - padding,
     y: minY - padding,
-    width: (maxX - minX) + padding * 2,
-    height: (maxY - minY) + padding * 2
+    width: maxX - minX + padding * 2,
+    height: maxY - minY + padding * 2,
   };
 };
 
 // Safe Pixel Ratio Calculation
 // We push the limit all the way up to Chrome's physical max limit (~260 Megapixels).
 // This guarantees the absolute maximum possible resolution for the PNG export.
-const MAX_CANVAS_AREA = 260_000_000; 
+const MAX_CANVAS_AREA = 260_000_000;
 
 const getSafePixelRatio = (width, height, requestedRatio) => {
   const baseArea = width * height;
@@ -78,18 +81,18 @@ const getExportConfig = (elementRef, options) => {
   const {
     includeBackground = true,
     captureArea = 'full',
-    excludedFeatures = new Set(['breadcrumbs', 'legend', 'controls', 'minimap', 'attribution'])
+    excludedFeatures = new Set(['breadcrumbs', 'legend', 'controls', 'minimap', 'attribution']),
   } = options || {};
 
   // We explicitly target the inner viewport to get just the graph nodes and edges
   const viewport = el.querySelector('.react-flow__viewport');
   const isReactFlow = !!viewport;
   const targetEl = isReactFlow ? viewport : el;
-  
+
   let width = el.offsetWidth;
   let height = el.offsetHeight;
   let customStyle = { overflow: 'visible' };
-  
+
   const backgroundColor = includeBackground ? '#0C0E14' : 'transparent';
 
   if (captureArea === 'full' && isReactFlow) {
@@ -104,8 +107,8 @@ const getExportConfig = (elementRef, options) => {
     width = el.scrollWidth || el.offsetWidth;
     height = el.scrollHeight || el.offsetHeight;
   }
-  
-  // Request a massive pixelRatio (3) and let the safety math clamp it precisely 
+
+  // Request a massive pixelRatio (3) and let the safety math clamp it precisely
   // to the absolute highest decimal point the browser can handle without blanking out!
   const safePixelRatio = getSafePixelRatio(width, height, 3);
 
@@ -121,16 +124,21 @@ const getExportConfig = (elementRef, options) => {
     customStyle,
     backgroundColor,
     excludedFeatures,
-    pixelRatio: safePixelRatio
+    pixelRatio: safePixelRatio,
   };
 };
 
 export const exportToPng = async (elementRef, filename = 'diagram.png', options = {}) => {
   try {
-    const { targetEl, width, height, customStyle, backgroundColor, excludedFeatures, pixelRatio } = getExportConfig(elementRef, options);
+    const { targetEl, width, height, customStyle, backgroundColor, excludedFeatures, pixelRatio } = getExportConfig(
+      elementRef,
+      options
+    );
 
     if (pixelRatio < 2) {
-      console.warn(`[export] Reduced pixelRatio to ${pixelRatio.toFixed(2)} to prevent blank image silent failure on massive graph.`);
+      console.warn(
+        `[export] Reduced pixelRatio to ${pixelRatio.toFixed(2)} to prevent blank image silent failure on massive graph.`
+      );
     }
 
     const dataUrl = await toPng(targetEl, {
@@ -140,7 +148,7 @@ export const exportToPng = async (elementRef, filename = 'diagram.png', options 
       width,
       height,
       style: customStyle,
-      filter: (node) => !isExcluded(node, excludedFeatures),
+      filter: node => !isExcluded(node, excludedFeatures),
     });
 
     if (dataUrl === 'data:,') {
@@ -157,7 +165,10 @@ export const exportToPng = async (elementRef, filename = 'diagram.png', options 
 
 export const exportToSvg = async (elementRef, filename = 'diagram.svg', options = {}) => {
   try {
-    const { targetEl, width, height, customStyle, backgroundColor, excludedFeatures } = getExportConfig(elementRef, options);
+    const { targetEl, width, height, customStyle, backgroundColor, excludedFeatures } = getExportConfig(
+      elementRef,
+      options
+    );
 
     const dataUrl = await toSvg(targetEl, {
       cacheBust: true,
@@ -165,7 +176,7 @@ export const exportToSvg = async (elementRef, filename = 'diagram.svg', options 
       width,
       height,
       style: customStyle,
-      filter: (node) => !isExcluded(node, excludedFeatures),
+      filter: node => !isExcluded(node, excludedFeatures),
     });
 
     downloadFile(dataUrl, filename);

@@ -8,17 +8,20 @@ export default function ModuleDocumentation({ docs, repoId, onGenerateAi, isGene
   const { aiState } = useAIState();
   const [copied, setCopied] = useState(false);
 
-  if (!docs) return <div className="text-muted text-sm flex items-center justify-center h-full">Loading documentation...</div>;
+  if (!docs)
+    return <div className="text-muted text-sm flex items-center justify-center h-full">Loading documentation...</div>;
 
   const handleCopyAi = () => {
     if (!ai) return;
     let textToCopy = '';
-    const summary = typeof ai.responsibility === 'string' ? ai.responsibility : JSON.stringify(ai.responsibility, null, 2);
-    const explanation = typeof ai.architectureRole === 'string' ? ai.architectureRole : JSON.stringify(ai.architectureRole, null, 2);
-    
+    const summary =
+      typeof ai.responsibility === 'string' ? ai.responsibility : JSON.stringify(ai.responsibility, null, 2);
+    const explanation =
+      typeof ai.architectureRole === 'string' ? ai.architectureRole : JSON.stringify(ai.architectureRole, null, 2);
+
     if (summary) textToCopy += summary;
     if (explanation) textToCopy += `\n\n${explanation}`;
-    
+
     navigator.clipboard.writeText(textToCopy);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -29,7 +32,11 @@ export default function ModuleDocumentation({ docs, repoId, onGenerateAi, isGene
       <div className="space-y-4 animate-fade-in max-w-3xl mx-auto mt-8">
         <div className="flex items-center gap-2 p-4 bg-warning/10 border border-warning/20 rounded-lg text-warning text-sm">
           <AlertTriangle className="w-5 h-5 shrink-0" />
-          <p><strong>{docs.reason || "This file type is not parsed for architectural insights."}</strong><br/>Switch to the 'Source Code' tab to view its raw contents.</p>
+          <p>
+            <strong>{docs.reason || 'This file type is not parsed for architectural insights.'}</strong>
+            <br />
+            Switch to the 'Source Code' tab to view its raw contents.
+          </p>
         </div>
       </div>
     );
@@ -64,30 +71,38 @@ export default function ModuleDocumentation({ docs, repoId, onGenerateAi, isGene
       {/* Dependencies Grid */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-surface border border-border rounded-lg p-5">
-           <h3 className="text-sm font-semibold text-text mb-3 flex items-center gap-2">
-             <LinkIcon className="w-4 h-4 text-accent" />
-             Outgoing Dependencies
-           </h3>
-           {facts.dependencies?.length > 0 ? (
-             <ul className="space-y-2 max-h-48 overflow-auto custom-scrollbar pr-2">
-               {facts.dependencies.map((dep, i) => (
-                 <li key={i} className="text-xs text-muted break-all bg-panel p-2 rounded border border-border/50">{dep}</li>
-               ))}
-             </ul>
-           ) : <p className="text-xs text-muted italic">No internal dependencies.</p>}
+          <h3 className="text-sm font-semibold text-text mb-3 flex items-center gap-2">
+            <LinkIcon className="w-4 h-4 text-accent" />
+            Outgoing Dependencies
+          </h3>
+          {facts.dependencies?.length > 0 ? (
+            <ul className="space-y-2 max-h-48 overflow-auto custom-scrollbar pr-2">
+              {facts.dependencies.map((dep, i) => (
+                <li key={i} className="text-xs text-muted break-all bg-panel p-2 rounded border border-border/50">
+                  {dep}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-xs text-muted italic">No internal dependencies.</p>
+          )}
         </div>
         <div className="bg-surface border border-border rounded-lg p-5">
-           <h3 className="text-sm font-semibold text-text mb-3 flex items-center gap-2">
-             <LinkIcon className="w-4 h-4 text-accent" />
-             Incoming Dependents
-           </h3>
-           {facts.dependents?.length > 0 ? (
-             <ul className="space-y-2 max-h-48 overflow-auto custom-scrollbar pr-2">
-               {facts.dependents.map((dep, i) => (
-                 <li key={i} className="text-xs text-muted break-all bg-panel p-2 rounded border border-border/50">{dep}</li>
-               ))}
-             </ul>
-           ) : <p className="text-xs text-muted italic">No dependents.</p>}
+          <h3 className="text-sm font-semibold text-text mb-3 flex items-center gap-2">
+            <LinkIcon className="w-4 h-4 text-accent" />
+            Incoming Dependents
+          </h3>
+          {facts.dependents?.length > 0 ? (
+            <ul className="space-y-2 max-h-48 overflow-auto custom-scrollbar pr-2">
+              {facts.dependents.map((dep, i) => (
+                <li key={i} className="text-xs text-muted break-all bg-panel p-2 rounded border border-border/50">
+                  {dep}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-xs text-muted italic">No dependents.</p>
+          )}
         </div>
       </section>
 
@@ -99,7 +114,7 @@ export default function ModuleDocumentation({ docs, repoId, onGenerateAi, isGene
             Architectural Role
           </h2>
           {ai && (
-            <button 
+            <button
               onClick={handleCopyAi}
               className="flex items-center gap-1 text-xs text-muted hover:text-text transition-colors cursor-pointer"
               title="Copy Architectural Role"
@@ -109,19 +124,21 @@ export default function ModuleDocumentation({ docs, repoId, onGenerateAi, isGene
             </button>
           )}
         </div>
-        
+
         {ai ? (
           <div className="bg-panel border border-border rounded-xl shadow-lg p-6">
-            <AiResponse 
+            <AiResponse
               repoId={repoId}
               chatId={`docs-module-${repoId}-${(facts.filePath || '').replace(/[^a-zA-Z0-9]/g, '-')}`}
               data={{
                 summary: ai.responsibility,
                 explanation: ai.architectureRole,
-                facts: (ai.apiNotes && facts.isApiBoundary) ? [`**API Notes:**\n${ai.apiNotes}`] : [],
-                inferences: ai.inferredDependenciesPurpose ? [`**Dependency Context:**\n${ai.inferredDependenciesPurpose}`] : []
+                facts: ai.apiNotes && facts.isApiBoundary ? [`**API Notes:**\n${ai.apiNotes}`] : [],
+                inferences: ai.inferredDependenciesPurpose
+                  ? [`**Dependency Context:**\n${ai.inferredDependenciesPurpose}`]
+                  : [],
               }}
-              title={null} 
+              title={null}
             />
           </div>
         ) : (
@@ -129,19 +146,33 @@ export default function ModuleDocumentation({ docs, repoId, onGenerateAi, isGene
             <Cpu className="w-8 h-8 text-muted" />
             <div>
               <h3 className="text-text font-medium mb-1">AI Architectural Summary</h3>
-              <p className="text-sm text-muted mb-4 max-w-md">Generate a human-readable summary of this file's role in the architecture, backed by AI.</p>
+              <p className="text-sm text-muted mb-4 max-w-md">
+                Generate a human-readable summary of this file's role in the architecture, backed by AI.
+              </p>
             </div>
             <button
               onClick={onGenerateAi}
-              disabled={isGeneratingAi || aiState.status === 'offline' || aiState.status === 'loading' || aiState.quotaStatus === 'exhausted'}
+              disabled={
+                isGeneratingAi ||
+                aiState.status === 'offline' ||
+                aiState.status === 'loading' ||
+                aiState.quotaStatus === 'exhausted'
+              }
               title={
-                aiState.status === 'offline' ? 'No AI provider configured' :
-                aiState.quotaStatus === 'exhausted' ? 'AI quota exceeded' : ''
+                aiState.status === 'offline'
+                  ? 'No AI provider configured'
+                  : aiState.quotaStatus === 'exhausted'
+                    ? 'AI quota exceeded'
+                    : ''
               }
               className="flex items-center gap-2 px-4 py-2 bg-accent/10 border border-accent/30 hover:bg-accent/20 text-accent rounded font-medium transition-colors disabled:opacity-50"
             >
               {isGeneratingAi ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-              {isGeneratingAi ? 'Generating...' : aiState.authState === 'unauthenticated' ? 'Sign in to Generate' : 'Generate Summary'}
+              {isGeneratingAi
+                ? 'Generating...'
+                : aiState.authState === 'unauthenticated'
+                  ? 'Sign in to Generate'
+                  : 'Generate Summary'}
             </button>
           </div>
         )}

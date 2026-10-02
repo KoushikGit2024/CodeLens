@@ -46,43 +46,51 @@ flowchart TD
 ## Module Responsibilities
 
 ### `languageDetector.js`
+
 - Maps file extensions to language IDs (`'.ts'` → `'typescript'`)
 - Pure data lookup, no side-effects
 - Returns `null` for unsupported extensions (callers skip those files)
 
 ### `parserRegistry.js`
+
 - Initialises `web-tree-sitter` once on first use in the browser.
 - Loads and caches grammar WASMs per language.
 - Returns a configured `Parser` instance via `getParser(languageId)`.
 - Adding a language requires only a one-line WASM map entry.
 
 ### `symbols.js`
+
 - Defines the canonical data model for all symbol types
 - Factory functions: `createFunction`, `createClass`, `createMethod`, etc.
 - `locationFromNode()`: converts tree-sitter 0-based rows to 1-based lines
 - No parsing logic — pure data structure definitions
 
 ### `BaseParser.js`
+
 - Abstract base class for all language parsers
 - `parseFile(source, filePath)`: safe entry point — never throws
 - Catches tree-sitter crashes and symbol extraction errors per file
 - `extractSymbols()`: abstract method that subclasses must implement
 
 ### `JavaScriptParser.js` & `TypeScriptParser.js`
+
 - Extracts symbols from source code via AST traversal.
 - Handles: functions, classes, imports, exports, interfaces, type aliases.
 - Extracts parameters and access modifiers.
 
 ### `analyzer.worker.js`
+
 - The core Web Worker that orchestrates the analysis off the main UI thread.
 - Builds the RepositoryAnalysis, Dependency Graph, Architecture Model, and Risk Models.
 - Communicates progress back to the UI via postMessage.
 
 ### `moduleResolver.js`
+
 - Classifies import specifiers: `relative` vs `external`
 - Resolves relative specifiers to actual file paths using a 4-step algorithm.
 
 ### `contextBuilder.js`
+
 - Assembles the extracted symbols and dependency graph into a structured context payload to send to the server's AI proxy.
 
 ## Performance Characteristics

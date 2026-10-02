@@ -20,20 +20,17 @@ export default function AccountPage() {
   }
 
   const { usage } = aiState;
-  
-  const tokenPct = usage && usage.tokenLimit > 0 
-    ? Math.min(100, Math.round((usage.tokens / usage.tokenLimit) * 100))
-    : 0;
 
-  const reqPct = usage && usage.requestLimit > 0
-    ? Math.min(100, Math.round((usage.requests / usage.requestLimit) * 100))
-    : 0;
+  const tokenPct =
+    usage && usage.tokenLimit > 0 ? Math.min(100, Math.round((usage.tokens / usage.tokenLimit) * 100)) : 0;
+
+  const reqPct =
+    usage && usage.requestLimit > 0 ? Math.min(100, Math.round((usage.requests / usage.requestLimit) * 100)) : 0;
 
   return (
     <div className="flex h-screen bg-surface text-text">
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto px-6 py-12">
-          
           <div className="flex items-center gap-4 mb-8">
             <Link to="/" className="p-2 hover:bg-panel rounded-full transition-colors">
               <ArrowLeft className="w-5 h-5 text-muted hover:text-text" />
@@ -42,12 +39,15 @@ export default function AccountPage() {
           </div>
 
           <div className="flex flex-col gap-6">
-            
             {/* Profile Card */}
             <div className="bg-panel border border-border rounded-xl p-6 sm:p-8 flex flex-col sm:flex-row items-center sm:items-start gap-6 relative overflow-hidden">
               <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-surface shadow-xl bg-surface-light flex items-center justify-center shrink-0 relative z-10 overflow-hidden">
-                {(user.user_metadata?.custom_avatar_url || user.user_metadata?.avatar_url) ? (
-                  <img src={user.user_metadata.custom_avatar_url || user.user_metadata.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                {user.user_metadata?.custom_avatar_url || user.user_metadata?.avatar_url ? (
+                  <img
+                    src={user.user_metadata.custom_avatar_url || user.user_metadata.avatar_url}
+                    alt="Avatar"
+                    className="w-full h-full object-cover"
+                  />
                 ) : (
                   <User className="w-10 h-10 text-muted" />
                 )}
@@ -74,8 +74,8 @@ export default function AccountPage() {
                   </span>
                 </div>
               </div>
-              
-              <button 
+
+              <button
                 onClick={handleSignOut}
                 className="absolute top-4 right-4 sm:top-6 sm:right-6 p-2 text-muted hover:text-text hover:bg-surface rounded-lg transition-colors flex items-center gap-2 text-sm z-10"
                 title="Sign out"
@@ -113,12 +113,13 @@ export default function AccountPage() {
                         <div className="flex justify-between text-sm mb-2">
                           <span className="text-gray-300 font-medium">AI Tokens</span>
                           <span className="text-muted">
-                            {usage.tokens.toLocaleString()} / {usage.tokenLimit > 0 ? usage.tokenLimit.toLocaleString() : 'Unlimited'}
+                            {usage.tokens.toLocaleString()} /{' '}
+                            {usage.tokenLimit > 0 ? usage.tokenLimit.toLocaleString() : 'Unlimited'}
                           </span>
                         </div>
                         <div className="h-2 w-full bg-surface rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full ${tokenPct > 90 ? 'bg-danger' : 'bg-accent'}`} 
+                          <div
+                            className={`h-full ${tokenPct > 90 ? 'bg-danger' : 'bg-accent'}`}
                             style={{ width: `${tokenPct}%` }}
                           />
                         </div>
@@ -132,12 +133,13 @@ export default function AccountPage() {
                         <div className="flex justify-between text-sm mb-2">
                           <span className="text-gray-300 font-medium">AI Requests</span>
                           <span className="text-muted">
-                            {usage.requests.toLocaleString()} / {usage.requestLimit > 0 ? usage.requestLimit.toLocaleString() : 'Unlimited'}
+                            {usage.requests.toLocaleString()} /{' '}
+                            {usage.requestLimit > 0 ? usage.requestLimit.toLocaleString() : 'Unlimited'}
                           </span>
                         </div>
                         <div className="h-2 w-full bg-surface rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full ${reqPct > 90 ? 'bg-danger' : 'bg-accent'}`} 
+                          <div
+                            className={`h-full ${reqPct > 90 ? 'bg-danger' : 'bg-accent'}`}
                             style={{ width: `${reqPct}%` }}
                           />
                         </div>
@@ -145,7 +147,7 @@ export default function AccountPage() {
                           Total number of prompts sent to the AI this billing cycle.
                         </p>
                       </div>
-                      
+
                       <div className="pt-4 border-t border-border flex justify-between items-center">
                         <span className="text-sm text-muted">
                           Current Plan: <strong className="text-text">Free Tier</strong>
@@ -154,13 +156,11 @@ export default function AccountPage() {
                           Resets: {new Date(usage.periodEnd).toLocaleDateString()}
                         </span>
                       </div>
-
                     </div>
                   )}
                 </div>
               </div>
             </div>
-
           </div>
         </div>
       </div>

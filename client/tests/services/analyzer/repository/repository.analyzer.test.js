@@ -61,7 +61,12 @@ describe('repository.analyzer.js', () => {
 
       const mainFile = analysis.files.find(f => f.filePath === 'main.ts');
       expect(mainFile.symbols).toContainEqual(expect.objectContaining({ name: 'Runner', kind: SymbolKind.CLASS }));
-      expect(mainFile.symbols).toContainEqual(expect.objectContaining({ specifiers: expect.arrayContaining([expect.objectContaining({ name: 'add' })]), kind: SymbolKind.IMPORT }));
+      expect(mainFile.symbols).toContainEqual(
+        expect.objectContaining({
+          specifiers: expect.arrayContaining([expect.objectContaining({ name: 'add' })]),
+          kind: SymbolKind.IMPORT,
+        })
+      );
     } finally {
       await cleanup();
     }
@@ -80,7 +85,7 @@ describe('repository.analyzer.js', () => {
       // Even with parse errors, Tree-sitter recovers and returns an AST with errors.
       // So the file is still 'analyzed'.
       expect(analysis.analyzedFiles).toBe(2);
-      
+
       const badFile = analysis.files.find(f => f.filePath === 'bad.js');
       expect(badFile.error).toBeNull();
       // It might extract some symbols or none depending on recovery

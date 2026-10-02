@@ -19,30 +19,33 @@ describe('ADR Generation API', () => {
       category: 'ARCHITECTURE',
       severity: 'critical',
       description: 'UI components should not access the database directly.',
-      file: 'src/ui/Component.jsx'
+      file: 'src/ui/Component.jsx',
     };
 
     const mockAiResponse = {
-      title: "Introduce Data Access Layer",
-      status: "Proposed",
-      context: "UI directly accesses DB.",
-      decision: "Create a service layer.",
-      consequences: "Better separation, more files.",
-      alternatives: "GraphQL API",
-      evidence: "src/ui/Component.jsx"
+      title: 'Introduce Data Access Layer',
+      status: 'Proposed',
+      context: 'UI directly accesses DB.',
+      decision: 'Create a service layer.',
+      consequences: 'Better separation, more files.',
+      alternatives: 'GraphQL API',
+      evidence: 'src/ui/Component.jsx',
     };
 
     api.post.mockResolvedValueOnce({
-      data: { response: JSON.stringify(mockAiResponse) }
+      data: { response: JSON.stringify(mockAiResponse) },
     });
 
     const res = await repositoryApi.generateADR('repo-123-unique', mockFinding);
-    
+
     expect(api.post).toHaveBeenCalledTimes(1);
-    expect(api.post).toHaveBeenCalledWith('/ai/chat', expect.objectContaining({
-      jsonMode: true,
-      prompt: expect.stringContaining('Direct Database Access from UI')
-    }));
+    expect(api.post).toHaveBeenCalledWith(
+      '/ai/chat',
+      expect.objectContaining({
+        jsonMode: true,
+        prompt: expect.stringContaining('Direct Database Access from UI'),
+      })
+    );
 
     expect(res.data).toBeDefined();
     expect(res.data.id).toBeDefined();
@@ -52,10 +55,12 @@ describe('ADR Generation API', () => {
 
   it('handles invalid AI responses', async () => {
     api.post.mockResolvedValueOnce({
-      data: { response: "I'm sorry, I cannot fulfill this request." }
+      data: { response: "I'm sorry, I cannot fulfill this request." },
     });
 
-    await expect(repositoryApi.generateADR('repo-999-unique', {})).rejects.toThrow('Failed to generate ADR: Invalid AI response format');
+    await expect(repositoryApi.generateADR('repo-999-unique', {})).rejects.toThrow(
+      'Failed to generate ADR: Invalid AI response format'
+    );
   });
 
   it('returns a cached ADR on second call with same finding (cache hit skips API)', async () => {
@@ -68,13 +73,13 @@ describe('ADR Generation API', () => {
     };
 
     const mockAiResponse = {
-      title: "Cache-Hit ADR",
-      status: "Proposed",
-      context: "test",
-      decision: "test",
-      consequences: "test",
-      alternatives: "none",
-      evidence: "none"
+      title: 'Cache-Hit ADR',
+      status: 'Proposed',
+      context: 'test',
+      decision: 'test',
+      consequences: 'test',
+      alternatives: 'none',
+      evidence: 'none',
     };
 
     // First call — cache miss, hits the API

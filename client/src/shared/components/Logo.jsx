@@ -1,6 +1,6 @@
 import React from 'react';
 
-export function Logo({ className = "w-14 h-14", textClass = "text-xl", showText = true }) {
+export function Logo({ className = 'w-14 h-14', textClass = 'text-xl', showText = true }) {
   return (
     <div className="group flex items-center gap-2.5 cursor-pointer transition-transform duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:-translate-y-0.5">
       <svg
@@ -81,7 +81,9 @@ export function Logo({ className = "w-14 h-14", textClass = "text-xl", showText 
 
       {showText && (
         // 9. cinematic text
-        <span className={`font-bold flex items-center transition-all duration-[600ms] ease-out group-hover:tracking-[0.03em] ${textClass}`}>
+        <span
+          className={`font-bold flex items-center transition-all duration-[600ms] ease-out group-hover:tracking-[0.03em] ${textClass}`}
+        >
           <span className="text-text transition-colors duration-[600ms] group-hover:text-accent">Code</span>
           <span className="text-accent transition-colors duration-[600ms] group-hover:text-text">Lens</span>
         </span>

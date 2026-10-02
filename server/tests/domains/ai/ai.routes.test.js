@@ -18,7 +18,7 @@ jest.mock('../../../src/core/ai/ai.service', () => ({
 }));
 
 const aiProvider = require('../../../src/core/ai/ai.provider');
-const aiService  = require('../../../src/core/ai/ai.service');
+const aiService = require('../../../src/core/ai/ai.service');
 const { generateChat, healthCheck } = require('../../../src/domains/ai/ai.controller');
 
 // ── Test App ──────────────────────────────────────────────────────────────────
@@ -55,9 +55,7 @@ describe('POST /ai/chat', () => {
   });
 
   it('returns 202 Accepted and a jobId for a plain prompt', async () => {
-    const res = await request(buildApp())
-      .post('/ai/chat')
-      .send({ prompt: 'What is CodeLens?' });
+    const res = await request(buildApp()).post('/ai/chat').send({ prompt: 'What is CodeLens?' });
     expect(res.status).toBe(202);
     expect(res.body.jobId).toBeDefined();
     expect(res.body.status).toBe('processing');
@@ -68,9 +66,7 @@ describe('POST /ai/chat', () => {
       { role: 'user', content: 'What is this repo about?' },
       { role: 'assistant', content: 'It is a code intelligence system.' },
     ];
-    await request(buildApp())
-      .post('/ai/chat')
-      .send({ prompt: 'Tell me more.', history });
+    await request(buildApp()).post('/ai/chat').send({ prompt: 'Tell me more.', history });
 
     // The job process is async, so we just verify it accepted the request.
     // Deep verification of the async background process is better suited for a service-level unit test.
@@ -86,4 +82,3 @@ describe('GET /ai/job/:jobId', () => {
     expect(res.status).toBe(404);
   });
 });
-

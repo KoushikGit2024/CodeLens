@@ -26,16 +26,16 @@ export default function ResetPasswordPage() {
   const strengthLabels = ['Very Weak', 'Weak', 'Fair', 'Good', 'Strong'];
   const strengthColors = ['bg-danger', 'bg-orange-500', 'bg-yellow-500', 'bg-green-400', 'bg-success'];
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async e => {
     e.preventDefault();
     if (strength < 2) {
       setError('Password is too weak. Please include letters, numbers, and symbols.');
       return;
     }
-    
+
     setLoading(true);
     setError(null);
-    
+
     const { error: resetError } = await updateUserPassword(password);
     if (resetError) {
       setError(resetError.message);
@@ -49,9 +49,20 @@ export default function ResetPasswordPage() {
     <>
       <div className="w-full max-w-[420px]">
         <div className="flex flex-col items-start mb-8">
-          <Logo className="w-10 h-10 mb-6 lg:hidden animate-in fade-in zoom-in-95 duration-700" style={{ animationFillMode: 'both' }} />
-          <h1 className="text-3xl font-semibold text-text tracking-tight animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '150ms', animationFillMode: 'both' }}>New Password</h1>
-          <p className="text-muted mt-2 text-sm animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '250ms', animationFillMode: 'both' }}>
+          <Logo
+            className="w-10 h-10 mb-6 lg:hidden animate-in fade-in zoom-in-95 duration-700"
+            style={{ animationFillMode: 'both' }}
+          />
+          <h1
+            className="text-3xl font-semibold text-text tracking-tight animate-in fade-in slide-in-from-bottom-4 duration-700"
+            style={{ animationDelay: '150ms', animationFillMode: 'both' }}
+          >
+            New Password
+          </h1>
+          <p
+            className="text-muted mt-2 text-sm animate-in fade-in slide-in-from-bottom-4 duration-700"
+            style={{ animationDelay: '250ms', animationFillMode: 'both' }}
+          >
             Enter your new password below.
           </p>
         </div>
@@ -63,63 +74,65 @@ export default function ResetPasswordPage() {
           </div>
         )}
 
-
-
-          <form onSubmit={handleSubmit} className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-700" style={{ animationDelay: '350ms', animationFillMode: 'both' }}>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-text/90">New Password</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="new-password"
-                  className="w-full bg-panel border border-border rounded-lg pl-4 pr-11 py-2.5 text-text focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all placeholder:text-muted/70"
-                  placeholder="••••••••"
-                  minLength={6}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted hover:text-text transition-colors"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-              
-              {/* Password Strength Indicator */}
-              {password.length > 0 && (
-                <div className="pt-2 animate-in fade-in duration-300">
-                  <div className="flex gap-1 mb-1">
-                    {[0, 1, 2, 3].map((index) => (
-                      <div 
-                        key={index} 
-                        className={`h-1 flex-1 rounded-full transition-all duration-300 ${
-                          index < strength ? strengthColors[strength] : 'bg-surface'
-                        }`} 
-                      />
-                    ))}
-                  </div>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-muted">Password strength:</span>
-                    <span className={`${strengthColors[strength].replace('bg-', 'text-')} font-medium transition-colors`}>
-                      {strengthLabels[strength]}
-                    </span>
-                  </div>
-                </div>
-              )}
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-700"
+          style={{ animationDelay: '350ms', animationFillMode: 'both' }}
+        >
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-text/90">New Password</label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                autoComplete="new-password"
+                className="w-full bg-panel border border-border rounded-lg pl-4 pr-11 py-2.5 text-text focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all placeholder:text-muted/70"
+                placeholder="••••••••"
+                minLength={6}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted hover:text-text transition-colors"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
 
-            <button
-              type="submit"
-              disabled={loading || (password.length > 0 && strength < 2)}
-              className="w-full bg-accent hover:bg-accent-hover text-text font-medium rounded-lg py-2.5 flex items-center justify-center transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed mt-4 shadow-lg shadow-accent/20"
-            >
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Save New Password'}
-            </button>
-          </form>
-        </div>
+            {/* Password Strength Indicator */}
+            {password.length > 0 && (
+              <div className="pt-2 animate-in fade-in duration-300">
+                <div className="flex gap-1 mb-1">
+                  {[0, 1, 2, 3].map(index => (
+                    <div
+                      key={index}
+                      className={`h-1 flex-1 rounded-full transition-all duration-300 ${
+                        index < strength ? strengthColors[strength] : 'bg-surface'
+                      }`}
+                    />
+                  ))}
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-muted">Password strength:</span>
+                  <span className={`${strengthColors[strength].replace('bg-', 'text-')} font-medium transition-colors`}>
+                    {strengthLabels[strength]}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading || (password.length > 0 && strength < 2)}
+            className="w-full bg-accent hover:bg-accent-hover text-text font-medium rounded-lg py-2.5 flex items-center justify-center transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed mt-4 shadow-lg shadow-accent/20"
+          >
+            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Save New Password'}
+          </button>
+        </form>
+      </div>
     </>
   );
 }

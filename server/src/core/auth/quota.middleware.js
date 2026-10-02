@@ -65,7 +65,7 @@ async function quotaMiddleware(req, res, next) {
       .single();
 
     let userRowData = userRow;
-    
+
     if (userErr || !userRowData) {
       // Auto-provision a public.users row if Supabase Auth Trigger didn't do it
       const { data: newUser, error: insertErr } = await supabase
@@ -73,7 +73,7 @@ async function quotaMiddleware(req, res, next) {
         .insert({ id: userId, plan_id: 'free', status: 'active' })
         .select('plan_id, status')
         .single();
-        
+
       if (insertErr || !newUser) {
         throw new Error(`Auto-provisioning failed: ${insertErr?.message || 'Unknown error'}`);
       }
@@ -96,7 +96,7 @@ async function quotaMiddleware(req, res, next) {
       planData = {
         id: userRowData.plan_id,
         ai_requests_per_month: 1000,
-        ai_tokens_per_month: 1000000
+        ai_tokens_per_month: 1000000,
       };
     }
 
@@ -104,8 +104,7 @@ async function quotaMiddleware(req, res, next) {
 
     const requestsExceeded =
       planData.ai_requests_per_month !== -1 && period.ai_requests >= planData.ai_requests_per_month;
-    const tokensExceeded =
-      planData.ai_tokens_per_month !== -1 && period.ai_tokens >= planData.ai_tokens_per_month;
+    const tokensExceeded = planData.ai_tokens_per_month !== -1 && period.ai_tokens >= planData.ai_tokens_per_month;
 
     if (requestsExceeded || tokensExceeded) {
       return res.status(429).json({
@@ -123,18 +122,21 @@ async function quotaMiddleware(req, res, next) {
     req.quota = { plan: planData, period };
     return next();
   } catch (err) {
-    console.warn('[quotaMiddleware] Failed to evaluate quota, falling back to generous mock to unblock AI:', err.message);
+    console.warn(
+      '[quotaMiddleware] Failed to evaluate quota, falling back to generous mock to unblock AI:',
+      err.message
+    );
     req.quota = {
       plan: {
         id: 'free',
         ai_requests_per_month: 10000,
-        ai_tokens_per_month: 10000000
+        ai_tokens_per_month: 10000000,
       },
       period: {
         ai_requests: 0,
         ai_tokens: 0,
-        period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-      }
+        period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      },
     };
     return next();
   }

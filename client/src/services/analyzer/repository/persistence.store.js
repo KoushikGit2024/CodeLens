@@ -1,7 +1,7 @@
 /**
  * persistence.store.js
  *
- * It initiates the browser's native IndexedDB, then extracts asynchronous data layers, 
+ * It initiates the browser's native IndexedDB, then extracts asynchronous data layers,
  * and then it applies CRUD operations to persist repository ASTs entirely client-side.
  */
 
@@ -11,13 +11,13 @@ const DB_NAME = 'CodeLensDB';
 const DB_VERSION = 6; // bumped: adds ignored_risks store
 
 /**
- * It requests an IndexedDB connection, then extracts object store requirements, 
+ * It requests an IndexedDB connection, then extracts object store requirements,
  * and then it applies version-safe schema upgrades.
  */
 let cachedDBPromise = null;
 
 export async function getDB() {
-  const env = typeof window !== 'undefined' ? window : (typeof self !== 'undefined' ? self : null);
+  const env = typeof window !== 'undefined' ? window : typeof self !== 'undefined' ? self : null;
   if (!env || !env.indexedDB) {
     throw new Error('IndexedDB is not supported or is blocked in this environment.');
   }
@@ -28,7 +28,15 @@ export async function getDB() {
 
   // Promise race to prevent silent hangs in iframes / private mode where openDB never resolves
   const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error('IndexedDB initialization timed out. This is usually caused by browser privacy settings or opening the app in an iframe (e.g., Vercel Preview).')), 3000);
+    setTimeout(
+      () =>
+        reject(
+          new Error(
+            'IndexedDB initialization timed out. This is usually caused by browser privacy settings or opening the app in an iframe (e.g., Vercel Preview).'
+          )
+        ),
+      3000
+    );
   });
 
   const dbPromise = openDB(DB_NAME, DB_VERSION, {
@@ -57,7 +65,7 @@ export async function getDB() {
       if (!db.objectStoreNames.contains('ignored_risks')) {
         db.createObjectStore('ignored_risks', { keyPath: ['repoId', 'riskId'] });
       }
-      
+
       if (oldVersion < 2 && db.objectStoreNames.contains('repos')) {
         const repoStore = transaction.objectStore('repos');
         const analysisStore = transaction.objectStore('analysis');
@@ -82,7 +90,7 @@ export async function getDB() {
     blocked(currentVersion, blockedVersion, event) {
       console.warn(
         `[CodeLens] IndexedDB upgrade from v${currentVersion} to v${blockedVersion} is blocked by another tab. ` +
-        'Reloading to apply the latest schema...'
+          'Reloading to apply the latest schema...'
       );
       // Give the user a moment to see any pending work, then reload
       setTimeout(() => window.location.reload(), 1500);
@@ -94,9 +102,7 @@ export async function getDB() {
      * the newer tab can upgrade successfully.
      */
     blocking(currentVersion, blockedVersion, event) {
-      console.warn(
-        `[CodeLens] This tab is blocking a DB upgrade to v${blockedVersion}. Closing connection.`
-      );
+      console.warn(`[CodeLens] This tab is blocking a DB upgrade to v${blockedVersion}. Closing connection.`);
       // Close our connection — the IDB upgrade in the other tab will then proceed
       event.target.close();
       cachedDBPromise = null;
@@ -108,7 +114,7 @@ export async function getDB() {
 }
 
 /**
- * It reads the overarching record, then extracts lightweight metadata, 
+ * It reads the overarching record, then extracts lightweight metadata,
  * and then it applies a storage put operation to save status flags.
  */
 export async function saveMeta(record) {
@@ -123,16 +129,16 @@ export async function saveMeta(record) {
     error: record.error,
     analysisVersion: record.analysisVersion,
   };
-  
+
   const tx = db.transaction('repos', 'readwrite');
   const store = tx.objectStore('repos');
-  const existing = await store.get(record.id) || {};
+  const existing = (await store.get(record.id)) || {};
   await store.put({ ...existing, ...meta });
   await tx.done;
 }
 
 /**
- * It checks for analysis payloads, then extracts the AST JSON, 
+ * It checks for analysis payloads, then extracts the AST JSON,
  * and then it applies it to the dedicated analysis storage table.
  */
 export async function saveAnalysis(record) {
@@ -145,7 +151,7 @@ export async function saveAnalysis(record) {
 }
 
 /**
- * It intercepts save calls, then extracts meta and analysis fragments, 
+ * It intercepts save calls, then extracts meta and analysis fragments,
  * and then it applies them sequentially to the database.
  */
 export async function save(record) {
@@ -154,14 +160,14 @@ export async function save(record) {
 }
 
 /**
- * It targets a specific repository ID, then extracts the metadata and heavy AST payload, 
+ * It targets a specific repository ID, then extracts the metadata and heavy AST payload,
  * and then it applies a unified object reconstruction.
  */
 export async function load(id) {
   const db = await getDB();
   const meta = await db.get('repos', id);
   if (!meta) return null;
-  
+
   const analysisDoc = await db.get('analysis', id);
   if (analysisDoc && analysisDoc.analysis) {
     meta.analysis = analysisDoc.analysis;
@@ -170,7 +176,7 @@ export async function load(id) {
 }
 
 /**
- * It queries the repos table, then extracts all stored configurations, 
+ * It queries the repos table, then extracts all stored configurations,
  * and then it applies a flat array return.
  */
 export async function loadAll() {
@@ -179,20 +185,20 @@ export async function loadAll() {
 }
 
 /**
- * It initiates multiple write transactions, then extracts matching keys across all stores, 
+ * It initiates multiple write transactions, then extracts matching keys across all stores,
  * and then it applies deletion commands to wipe a repository cleanly.
  */
 export async function remove(id) {
   const db = await getDB();
-  
+
   const txRepos = db.transaction('repos', 'readwrite');
   await txRepos.objectStore('repos').delete(id);
   await txRepos.done;
-  
+
   const txAnalysis = db.transaction('analysis', 'readwrite');
   await txAnalysis.objectStore('analysis').delete(id);
   await txAnalysis.done;
-  
+
   const txFiles = db.transaction('files', 'readwrite');
   const store = txFiles.objectStore('files');
   let cursor = await store.openCursor();
@@ -217,7 +223,7 @@ export async function remove(id) {
 }
 
 /**
- * It targets the analysis store, then extracts the specified ID payload, 
+ * It targets the analysis store, then extracts the specified ID payload,
  * and then it applies deletion to clear large AST data without losing metadata.
  */
 export async function removeAnalysis(id) {
@@ -231,7 +237,7 @@ export async function removeAnalysis(id) {
 // ── File Storage API ──────────────────────────────────────────────────────────
 
 /**
- * It receives source code, then extracts the repository and file path bounds, 
+ * It receives source code, then extracts the repository and file path bounds,
  * and then it applies an IndexedDB insertion for the virtual file system.
  */
 export async function saveFile(repoId, filePath, content) {
@@ -240,7 +246,7 @@ export async function saveFile(repoId, filePath, content) {
 }
 
 /**
- * It queries the file store, then extracts the specific text buffer, 
+ * It queries the file store, then extracts the specific text buffer,
  * and then it applies a string return or null fallback.
  */
 export async function loadFile(repoId, filePath) {
@@ -250,7 +256,7 @@ export async function loadFile(repoId, filePath) {
 }
 
 /**
- * It accesses the files table, then extracts all records matching the repoId, 
+ * It accesses the files table, then extracts all records matching the repoId,
  * and then it applies them into a complete source code array.
  */
 export async function loadAllFiles(repoId) {
@@ -269,7 +275,7 @@ export async function loadAllFiles(repoId) {
 }
 
 /**
- * It traverses the file cursor, then extracts just the file path string keys, 
+ * It traverses the file cursor, then extracts just the file path string keys,
  * and then it applies them to a lightweight directory manifest.
  */
 export async function listFilePaths(repoId) {
@@ -354,7 +360,7 @@ export async function ignoreRisk(repoId, riskId) {
 }
 
 /**
- * It receives a repository ID and a risk ID, then extracts the matching record, 
+ * It receives a repository ID and a risk ID, then extracts the matching record,
  * and then it applies deletion so the risk is treated as active again.
  */
 export async function restoreRisk(repoId, riskId) {

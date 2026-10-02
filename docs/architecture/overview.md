@@ -40,6 +40,7 @@ The server is intentionally minimal and strictly stateless. It has exactly one j
 1. **AI Proxy**: Receive a fully pre-built context prompt from the client and forward it to the configured AI API. Return the AI response verbatim.
 
 The server does **NOT**:
+
 - Parse ASTs
 - Build dependency graphs
 - Compute complexity scores

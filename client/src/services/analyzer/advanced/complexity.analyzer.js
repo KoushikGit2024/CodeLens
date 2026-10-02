@@ -1,13 +1,13 @@
 /**
  * complexity.analyzer.js
  *
- * It receives a given AST node, then extracts cyclomatic branching logic, 
+ * It receives a given AST node, then extracts cyclomatic branching logic,
  * and then it applies a base score calculation to output a final structural metric.
  */
 
 const COMPLEXITY_NODE_TYPES = new Set([
   'if_statement',
-  'if_expression',       // Used in Kotlin/Rust
+  'if_expression', // Used in Kotlin/Rust
   'for_statement',
   'for_in_statement',
   'while_statement',
@@ -15,12 +15,12 @@ const COMPLEXITY_NODE_TYPES = new Set([
   'catch_clause',
   'ternary_expression',
   'switch_case',
-  'when_expression',     // Used in Kotlin
-  'binary_expression'
+  'when_expression', // Used in Kotlin
+  'binary_expression',
 ]);
 
 /**
- * It walks the AST children, then extracts matching branch node types, 
+ * It walks the AST children, then extracts matching branch node types,
  * and then it applies an incremental counter to return the total cyclomatic score.
  */
 function calculateComplexity(node) {

@@ -1,7 +1,7 @@
 const quotaMiddleware = require('../../../src/core/auth/quota.middleware');
 
 jest.mock('../../../src/core/db/supabase.client', () => ({
-  getSupabaseClient: jest.fn()
+  getSupabaseClient: jest.fn(),
 }));
 
 const { getSupabaseClient } = require('../../../src/core/db/supabase.client');
@@ -14,15 +14,15 @@ describe('Quota Middleware', () => {
 
   beforeEach(() => {
     mockReq = {
-      user: { id: 'user-123' }
+      user: { id: 'user-123' },
     };
     mockRes = {
       status: jest.fn().mockReturnThis(),
-      json: jest.fn()
+      json: jest.fn(),
     };
     nextFunction = jest.fn();
     mockSupabase = {
-      from: jest.fn()
+      from: jest.fn(),
     };
     getSupabaseClient.mockReturnValue(mockSupabase);
   });
@@ -40,24 +40,24 @@ describe('Quota Middleware', () => {
     expect(nextFunction).not.toHaveBeenCalled();
   });
 
-  const setupMocks = (mockUsage) => {
-    mockSupabase.from = jest.fn().mockImplementation((table) => {
+  const setupMocks = mockUsage => {
+    mockSupabase.from = jest.fn().mockImplementation(table => {
       if (table === 'users') {
         return {
           select: jest.fn().mockReturnValue({
             eq: jest.fn().mockReturnValue({
-              single: jest.fn().mockResolvedValue({ data: { plan_id: 'plan-1', status: 'active' } })
-            })
-          })
+              single: jest.fn().mockResolvedValue({ data: { plan_id: 'plan-1', status: 'active' } }),
+            }),
+          }),
         };
       }
       if (table === 'plans') {
         return {
           select: jest.fn().mockReturnValue({
             eq: jest.fn().mockReturnValue({
-              single: jest.fn().mockResolvedValue({ data: { ai_requests_per_month: 100, ai_tokens_per_month: 1000 } })
-            })
-          })
+              single: jest.fn().mockResolvedValue({ data: { ai_requests_per_month: 100, ai_tokens_per_month: 1000 } }),
+            }),
+          }),
         };
       }
       if (table === 'usage_periods') {
@@ -65,10 +65,10 @@ describe('Quota Middleware', () => {
           select: jest.fn().mockReturnValue({
             eq: jest.fn().mockReturnValue({
               order: jest.fn().mockReturnValue({
-                limit: jest.fn().mockResolvedValue({ data: [mockUsage] })
-              })
-            })
-          })
+                limit: jest.fn().mockResolvedValue({ data: [mockUsage] }),
+              }),
+            }),
+          }),
         };
       }
     });

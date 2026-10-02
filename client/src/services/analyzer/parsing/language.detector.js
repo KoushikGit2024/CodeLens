@@ -12,19 +12,19 @@
  */
 export const EXTENSION_MAP = new Map([
   // JavaScript
-  ['.js',   'javascript'],
-  ['.mjs',  'javascript'],
-  ['.cjs',  'javascript'],
-  ['.jsx',  'javascript'],
+  ['.js', 'javascript'],
+  ['.mjs', 'javascript'],
+  ['.cjs', 'javascript'],
+  ['.jsx', 'javascript'],
 
   // TypeScript
-  ['.ts',   'typescript'],
-  ['.tsx',  'tsx'],
-  ['.mts',  'typescript'],
-  ['.cts',  'typescript'],
+  ['.ts', 'typescript'],
+  ['.tsx', 'tsx'],
+  ['.mts', 'typescript'],
+  ['.cts', 'typescript'],
 
   // Python
-  ['.py',   'python'],
+  ['.py', 'python'],
 
   // Java
   ['.java', 'java'],
@@ -33,15 +33,15 @@ export const EXTENSION_MAP = new Map([
   ['.c', 'c'],
 
   // C++
-  ['.cpp',  'cpp'],
-  ['.cc',   'cpp'],
-  ['.cxx',  'cpp'],
-  ['.h',    'cpp'],
-  ['.hpp',  'cpp'],
+  ['.cpp', 'cpp'],
+  ['.cc', 'cpp'],
+  ['.cxx', 'cpp'],
+  ['.h', 'cpp'],
+  ['.hpp', 'cpp'],
 
   // Kotlin
-  ['.kt',   'kotlin'],
-  ['.kts',  'kotlin'],
+  ['.kt', 'kotlin'],
+  ['.kts', 'kotlin'],
 
   // Go
   ['.go', 'go'],
@@ -60,7 +60,7 @@ export function detectLanguage(filename) {
   if (!filename) return null;
   const lastDot = filename.lastIndexOf('.');
   if (lastDot === -1) return null;
-  
+
   const ext = filename.slice(lastDot).toLowerCase();
   return EXTENSION_MAP.get(ext) ?? null;
 }

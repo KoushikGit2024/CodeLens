@@ -20,20 +20,18 @@ class SemanticPipeline {
   }
 }
 
-self.addEventListener('message', async (event) => {
+self.addEventListener('message', async event => {
   const { type, repoId, files, query, analysis } = event.data;
 
   try {
     if (type === 'init') {
-      await SemanticPipeline.getInstance(event.data.model, event.data.useBrowserCache, (progress) => {
+      await SemanticPipeline.getInstance(event.data.model, event.data.useBrowserCache, progress => {
         self.postMessage({ type: 'progress', payload: progress });
       });
       self.postMessage({ type: 'init_done' });
-    } 
-    
-    else if (type === 'index_repo') {
+    } else if (type === 'index_repo') {
       const extractor = await SemanticPipeline.getInstance();
-      
+
       const total = files.length;
       const embeddings = [];
 
@@ -50,12 +48,12 @@ self.addEventListener('message', async (event) => {
         // If we have AST analysis for this file, use Smart Chunking
         const fileAnalysis = analysis ? analysis[file.filePath] : null;
         const symbols = fileAnalysis?.symbols || [];
-        
+
         const chunksToEmbed = [];
         const indexableTypes = ['Function', 'Method', 'Class', 'Component'];
-        
+
         const semanticSymbols = symbols.filter(sym => indexableTypes.includes(sym.type));
-        
+
         if (semanticSymbols.length > 0) {
           // Embed each relevant symbol individually
           for (const sym of semanticSymbols) {
@@ -65,12 +63,12 @@ self.addEventListener('message', async (event) => {
             const startIdx = Math.max(0, sym.startLine - 1);
             const endIdx = Math.min(lines.length, sym.endLine);
             const symbolCode = lines.slice(startIdx, endIdx).join('\\n');
-            
+
             // Limit each symbol chunk to 2000 chars to avoid OOM, but it's much better scoped
             chunksToEmbed.push({
               text: `File: ${file.filePath}\\nSymbol: ${sym.name} (${sym.type})\\n\\n${symbolCode.substring(0, 2000)}`,
               symbolName: sym.name,
-              startLine: sym.startLine
+              startLine: sym.startLine,
             });
           }
         } else {
@@ -78,24 +76,24 @@ self.addEventListener('message', async (event) => {
           chunksToEmbed.push({
             text: `File: ${file.filePath}\\n\\n${file.content.substring(0, 1500)}`,
             symbolName: null,
-            startLine: 1
+            startLine: 1,
           });
         }
-        
+
         const fileChunks = [];
         for (const chunk of chunksToEmbed) {
           const output = await extractor(chunk.text, { pooling: 'mean', normalize: true });
           fileChunks.push({
             symbolName: chunk.symbolName,
             startLine: chunk.startLine,
-            embedding: Array.from(output.data)
+            embedding: Array.from(output.data),
           });
         }
-        
+
         embeddings.push({
           repoId,
           filePath: file.filePath,
-          chunks: fileChunks
+          chunks: fileChunks,
         });
 
         // Report progress every 5 files or on last file
@@ -105,14 +103,11 @@ self.addEventListener('message', async (event) => {
       }
 
       self.postMessage({ type: 'index_done', embeddings });
-    }
-
-    else if (type === 'search') {
+    } else if (type === 'search') {
       const extractor = await SemanticPipeline.getInstance();
       const output = await extractor(query, { pooling: 'mean', normalize: true });
       self.postMessage({ type: 'search_done', embedding: Array.from(output.data) });
     }
-
   } catch (error) {
     self.postMessage({ type: 'error', error: error.message });
   }

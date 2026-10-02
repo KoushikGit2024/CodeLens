@@ -14,12 +14,12 @@ All types are defined in `client/src/services/analyzer/parsing/symbols.js`.
 
 All symbol types embed a `location` object.
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `startLine` | number | ✓ | 1-based line number of the first character |
-| `startColumn` | number | ✓ | 0-based column of the first character |
-| `endLine` | number | ✓ | 1-based line number of the last character |
-| `endColumn` | number | ✓ | 0-based column after the last character |
+| Field         | Type   | Required | Description                                |
+| ------------- | ------ | -------- | ------------------------------------------ |
+| `startLine`   | number | ✓        | 1-based line number of the first character |
+| `startColumn` | number | ✓        | 0-based column of the first character      |
+| `endLine`     | number | ✓        | 1-based line number of the last character  |
+| `endColumn`   | number | ✓        | 0-based column after the last character    |
 
 > tree-sitter uses 0-based rows internally. `locationFromNode()` converts to 1-based lines.
 
@@ -31,15 +31,15 @@ All symbol types embed a `location` object.
 
 A named function declaration (`function foo() {}`).
 
-| Field | Type | Required | Description | Example |
-|-------|------|----------|-------------|---------|
-| `kind` | `'function'` | ✓ | Discriminant | `"function"` |
-| `name` | string | ✓ | Function name | `"greet"` |
-| `async` | boolean | ✓ | Declared with `async` | `false` |
-| `generator` | boolean | ✓ | Declared with `*` | `false` |
-| `params` | string[] | ✓ | Parameter names | `["name", "opts"]` |
-| `location` | Location | ✓ | Source position | see above |
-| `tsKind` | `'type'` | — | Set only for TypeScript type aliases | `"type"` |
+| Field       | Type         | Required | Description                          | Example            |
+| ----------- | ------------ | -------- | ------------------------------------ | ------------------ |
+| `kind`      | `'function'` | ✓        | Discriminant                         | `"function"`       |
+| `name`      | string       | ✓        | Function name                        | `"greet"`          |
+| `async`     | boolean      | ✓        | Declared with `async`                | `false`            |
+| `generator` | boolean      | ✓        | Declared with `*`                    | `false`            |
+| `params`    | string[]     | ✓        | Parameter names                      | `["name", "opts"]` |
+| `location`  | Location     | ✓        | Source position                      | see above          |
+| `tsKind`    | `'type'`     | —        | Set only for TypeScript type aliases | `"type"`           |
 
 ```json
 {
@@ -58,13 +58,13 @@ A named function declaration (`function foo() {}`).
 
 An arrow function assigned to a variable (`const foo = () => {}`).
 
-| Field | Type | Required | Description | Example |
-|-------|------|----------|-------------|---------|
-| `kind` | `'arrow'` | ✓ | Discriminant | `"arrow"` |
-| `name` | string | ✓ | Variable name | `"handler"` |
-| `async` | boolean | ✓ | Declared with `async` | `true` |
-| `params` | string[] | ✓ | Parameter names | `["req", "res"]` |
-| `location` | Location | ✓ | Source position | |
+| Field      | Type      | Required | Description           | Example          |
+| ---------- | --------- | -------- | --------------------- | ---------------- |
+| `kind`     | `'arrow'` | ✓        | Discriminant          | `"arrow"`        |
+| `name`     | string    | ✓        | Variable name         | `"handler"`      |
+| `async`    | boolean   | ✓        | Declared with `async` | `true`           |
+| `params`   | string[]  | ✓        | Parameter names       | `["req", "res"]` |
+| `location` | Location  | ✓        | Source position       |                  |
 
 ```json
 {
@@ -82,13 +82,13 @@ An arrow function assigned to a variable (`const foo = () => {}`).
 
 A class declaration (`class Foo extends Bar {}`).
 
-| Field | Type | Required | Description | Example |
-|-------|------|----------|-------------|---------|
-| `kind` | `'class'` | ✓ | Discriminant | `"class"` |
-| `name` | string | ✓ | Class name (`'<anonymous>'` if unnamed) | `"UserService"` |
-| `superClass` | string\|null | ✓ | Extended class, or `null` | `"BaseService"` |
-| `location` | Location | ✓ | Source position | |
-| `tsKind` | `'interface'` | — | Set only for TypeScript interfaces | `"interface"` |
+| Field        | Type          | Required | Description                             | Example         |
+| ------------ | ------------- | -------- | --------------------------------------- | --------------- |
+| `kind`       | `'class'`     | ✓        | Discriminant                            | `"class"`       |
+| `name`       | string        | ✓        | Class name (`'<anonymous>'` if unnamed) | `"UserService"` |
+| `superClass` | string\|null  | ✓        | Extended class, or `null`               | `"BaseService"` |
+| `location`   | Location      | ✓        | Source position                         |                 |
+| `tsKind`     | `'interface'` | —        | Set only for TypeScript interfaces      | `"interface"`   |
 
 ```json
 {
@@ -105,17 +105,17 @@ A class declaration (`class Foo extends Bar {}`).
 
 A method inside a class body.
 
-| Field | Type | Required | Description | Example |
-|-------|------|----------|-------------|---------|
-| `kind` | `'method'` | ✓ | Discriminant | `"method"` |
-| `name` | string | ✓ | Method name | `"findById"` |
-| `className` | string | ✓ | Enclosing class name | `"UserService"` |
-| `static` | boolean | ✓ | Is static method | `false` |
-| `async` | boolean | ✓ | Is async | `true` |
-| `generator` | boolean | ✓ | Is generator | `false` |
-| `visibility` | `'public'\|'private'\|'protected'` | ✓ | Access modifier (JS defaults to `'public'`) | `"private"` |
-| `params` | string[] | ✓ | Parameter names | `["id"]` |
-| `location` | Location | ✓ | Source position | |
+| Field        | Type                               | Required | Description                                 | Example         |
+| ------------ | ---------------------------------- | -------- | ------------------------------------------- | --------------- |
+| `kind`       | `'method'`                         | ✓        | Discriminant                                | `"method"`      |
+| `name`       | string                             | ✓        | Method name                                 | `"findById"`    |
+| `className`  | string                             | ✓        | Enclosing class name                        | `"UserService"` |
+| `static`     | boolean                            | ✓        | Is static method                            | `false`         |
+| `async`      | boolean                            | ✓        | Is async                                    | `true`          |
+| `generator`  | boolean                            | ✓        | Is generator                                | `false`         |
+| `visibility` | `'public'\|'private'\|'protected'` | ✓        | Access modifier (JS defaults to `'public'`) | `"private"`     |
+| `params`     | string[]                           | ✓        | Parameter names                             | `["id"]`        |
+| `location`   | Location                           | ✓        | Source position                             |                 |
 
 ```json
 {
@@ -137,20 +137,20 @@ A method inside a class body.
 
 An ES module import statement.
 
-| Field | Type | Required | Description | Example |
-|-------|------|----------|-------------|---------|
-| `kind` | `'import'` | ✓ | Discriminant | `"import"` |
-| `source` | string | ✓ | Module specifier (quotes stripped) | `"./auth"`, `"express"` |
-| `specifiers` | ImportSpecifier[] | ✓ | What is imported | see below |
-| `location` | Location | ✓ | Source position | |
+| Field        | Type              | Required | Description                        | Example                 |
+| ------------ | ----------------- | -------- | ---------------------------------- | ----------------------- |
+| `kind`       | `'import'`        | ✓        | Discriminant                       | `"import"`              |
+| `source`     | string            | ✓        | Module specifier (quotes stripped) | `"./auth"`, `"express"` |
+| `specifiers` | ImportSpecifier[] | ✓        | What is imported                   | see below               |
+| `location`   | Location          | ✓        | Source position                    |                         |
 
 **ImportSpecifier:**
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `name` | string | Imported name |
-| `alias` | string\|null | Local alias (`import { foo as bar }` → alias = `'bar'`) |
-| `type` | `'default'\|'named'\|'namespace'\|'side-effect'` | Import kind |
+| Field   | Type                                             | Description                                             |
+| ------- | ------------------------------------------------ | ------------------------------------------------------- |
+| `name`  | string                                           | Imported name                                           |
+| `alias` | string\|null                                     | Local alias (`import { foo as bar }` → alias = `'bar'`) |
+| `type`  | `'default'\|'named'\|'namespace'\|'side-effect'` | Import kind                                             |
 
 ```json
 {
@@ -170,13 +170,13 @@ An ES module import statement.
 
 An export statement.
 
-| Field | Type | Required | Description | Example |
-|-------|------|----------|-------------|---------|
-| `kind` | `'export'` | ✓ | Discriminant | `"export"` |
-| `exportType` | `'named'\|'default'\|'reexport'` | ✓ | Export kind | `"named"` |
-| `name` | string\|null | — | Exported name (`null` for anonymous default exports) | `"greet"` |
-| `source` | string\|null | — | Source module for re-exports | `"./utils"` |
-| `location` | Location | ✓ | Source position | |
+| Field        | Type                             | Required | Description                                          | Example     |
+| ------------ | -------------------------------- | -------- | ---------------------------------------------------- | ----------- |
+| `kind`       | `'export'`                       | ✓        | Discriminant                                         | `"export"`  |
+| `exportType` | `'named'\|'default'\|'reexport'` | ✓        | Export kind                                          | `"named"`   |
+| `name`       | string\|null                     | —        | Exported name (`null` for anonymous default exports) | `"greet"`   |
+| `source`     | string\|null                     | —        | Source module for re-exports                         | `"./utils"` |
+| `location`   | Location                         | ✓        | Source position                                      |             |
 
 ```json
 {
@@ -194,14 +194,14 @@ An export statement.
 
 The complete analysis result for one source file.
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `filePath` | string | ✓ | Relative path within repository (forward slashes) |
-| `language` | string | ✓ | Detected language: `'javascript'` or `'typescript'` |
-| `symbols` | Symbol[] | ✓ | All extracted symbols in source order |
-| `hasErrors` | boolean | ✓ | `true` if the parse tree contained syntax errors |
-| `error` | string\|null | ✓ | Non-null only if analysis was completely aborted |
-| `analyzedAt` | string | ✓ | ISO 8601 timestamp |
+| Field        | Type         | Required | Description                                         |
+| ------------ | ------------ | -------- | --------------------------------------------------- |
+| `filePath`   | string       | ✓        | Relative path within repository (forward slashes)   |
+| `language`   | string       | ✓        | Detected language: `'javascript'` or `'typescript'` |
+| `symbols`    | Symbol[]     | ✓        | All extracted symbols in source order               |
+| `hasErrors`  | boolean      | ✓        | `true` if the parse tree contained syntax errors    |
+| `error`      | string\|null | ✓        | Non-null only if analysis was completely aborted    |
+| `analyzedAt` | string       | ✓        | ISO 8601 timestamp                                  |
 
 ---
 
@@ -209,18 +209,18 @@ The complete analysis result for one source file.
 
 The top-level result of analysing an entire repository.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `status` | `'ready'\|'error'` | Overall status |
-| `error` | string\|null | Set if analysis could not start |
-| `rootDir` | string | Absolute path (not exposed via API) |
-| `analyzedAt` | string | ISO 8601 timestamp |
-| `totalFiles` | number | Source files found |
-| `analyzedFiles` | number | Files successfully analysed (including those with parse errors) |
-| `skippedFiles` | number | Files skipped (unsupported language, too large) |
-| `errorFiles` | number | Files where analysis threw an exception |
-| `files` | FileAnalysis[] | One entry per source file |
-| `languageSummary` | `{[lang]: number}` | File count per language |
+| Field             | Type               | Description                                                     |
+| ----------------- | ------------------ | --------------------------------------------------------------- |
+| `status`          | `'ready'\|'error'` | Overall status                                                  |
+| `error`           | string\|null       | Set if analysis could not start                                 |
+| `rootDir`         | string             | Absolute path (not exposed via API)                             |
+| `analyzedAt`      | string             | ISO 8601 timestamp                                              |
+| `totalFiles`      | number             | Source files found                                              |
+| `analyzedFiles`   | number             | Files successfully analysed (including those with parse errors) |
+| `skippedFiles`    | number             | Files skipped (unsupported language, too large)                 |
+| `errorFiles`      | number             | Files where analysis threw an exception                         |
+| `files`           | FileAnalysis[]     | One entry per source file                                       |
+| `languageSummary` | `{[lang]: number}` | File count per language                                         |
 
 ### Sample output
 
@@ -271,58 +271,70 @@ The dependency graph is built on top of `RepositoryAnalysis` by
 
 ### Node
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | string | Stable unique ID (`file:<path>` or `pkg:<name>`) |
-| `type` | `'file' \| 'package'` | Node type |
-| `filePath` | string | *(file nodes only)* Repository-relative path |
-| `name` | string | *(package nodes only)* Package name |
+| Field      | Type                  | Description                                      |
+| ---------- | --------------------- | ------------------------------------------------ |
+| `id`       | string                | Stable unique ID (`file:<path>` or `pkg:<name>`) |
+| `type`     | `'file' \| 'package'` | Node type                                        |
+| `filePath` | string                | _(file nodes only)_ Repository-relative path     |
+| `name`     | string                | _(package nodes only)_ Package name              |
 
 ### Edge
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `source` | string | Node ID of the importing file |
-| `target` | string | Node ID of the imported file/package |
-| `type` | `'imports' \| 'requires'` | `imports` = ESM, `requires` = CJS |
-| `evidence.specifier` | string | Raw import string as written in source |
-| `evidence.importedNames` | string[] | Bound names from the import clause |
-| `evidence.location` | Location\|null | Source position |
+| Field                    | Type                      | Description                            |
+| ------------------------ | ------------------------- | -------------------------------------- |
+| `source`                 | string                    | Node ID of the importing file          |
+| `target`                 | string                    | Node ID of the imported file/package   |
+| `type`                   | `'imports' \| 'requires'` | `imports` = ESM, `requires` = CJS      |
+| `evidence.specifier`     | string                    | Raw import string as written in source |
+| `evidence.importedNames` | string[]                  | Bound names from the import clause     |
+| `evidence.location`      | Location\|null            | Source position                        |
 
 ### DependencyGraph
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `nodes` | Node[] | All file + package nodes, sorted |
-| `edges` | Edge[] | All import/require edges, deduplicated and sorted |
-| `meta.totalFiles` | number | Count of file nodes |
-| `meta.totalPackages` | number | Count of package nodes |
-| `meta.totalEdges` | number | Count of edges |
-| `meta.unresolvedImports` | number | Imports that couldn't be resolved |
-| `meta.builtAt` | string | ISO timestamp |
-| `cycles` | string[][] | Each entry is a cycle path (array of file paths) |
-| `isolatedFiles` | string[] | File paths with no edges |
+| Field                    | Type       | Description                                       |
+| ------------------------ | ---------- | ------------------------------------------------- |
+| `nodes`                  | Node[]     | All file + package nodes, sorted                  |
+| `edges`                  | Edge[]     | All import/require edges, deduplicated and sorted |
+| `meta.totalFiles`        | number     | Count of file nodes                               |
+| `meta.totalPackages`     | number     | Count of package nodes                            |
+| `meta.totalEdges`        | number     | Count of edges                                    |
+| `meta.unresolvedImports` | number     | Imports that couldn't be resolved                 |
+| `meta.builtAt`           | string     | ISO timestamp                                     |
+| `cycles`                 | string[][] | Each entry is a cycle path (array of file paths)  |
+| `isolatedFiles`          | string[]   | File paths with no edges                          |
 
 ### FileDependencies (from `/graph/file`)
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `filePath` | string | The queried file |
-| `dependencies` | DependencyEntry[] | What this file imports |
-| `dependents` | DependencyEntry[] | Files that import this file |
-| `externalPackages` | string[] | Bare package names imported |
-| `dependencyCount` | number | `dependencies.length` |
-| `dependentCount` | number | `dependents.length` |
+| Field              | Type              | Description                 |
+| ------------------ | ----------------- | --------------------------- |
+| `filePath`         | string            | The queried file            |
+| `dependencies`     | DependencyEntry[] | What this file imports      |
+| `dependents`       | DependencyEntry[] | Files that import this file |
+| `externalPackages` | string[]          | Bare package names imported |
+| `dependencyCount`  | number            | `dependencies.length`       |
+| `dependentCount`   | number            | `dependents.length`         |
 
 ```json
 {
   "filePath": "src/services/authService.js",
   "dependencies": [
-    { "filePath": "src/models/User.js",  "edgeType": "imports", "evidence": { "specifier": "../models/User", "importedNames": ["User"], "location": null } },
-    { "package": "jsonwebtoken",          "edgeType": "imports", "evidence": { "specifier": "jsonwebtoken",   "importedNames": ["sign"],  "location": null } }
+    {
+      "filePath": "src/models/User.js",
+      "edgeType": "imports",
+      "evidence": { "specifier": "../models/User", "importedNames": ["User"], "location": null }
+    },
+    {
+      "package": "jsonwebtoken",
+      "edgeType": "imports",
+      "evidence": { "specifier": "jsonwebtoken", "importedNames": ["sign"], "location": null }
+    }
   ],
   "dependents": [
-    { "filePath": "src/controllers/authController.js", "edgeType": "imports", "evidence": { "specifier": "../services/authService", "importedNames": ["login"], "location": null } }
+    {
+      "filePath": "src/controllers/authController.js",
+      "edgeType": "imports",
+      "evidence": { "specifier": "../services/authService", "importedNames": ["login"], "location": null }
+    }
   ],
   "externalPackages": ["jsonwebtoken"],
   "dependencyCount": 2,

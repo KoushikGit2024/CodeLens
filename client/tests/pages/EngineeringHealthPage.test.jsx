@@ -9,23 +9,26 @@ vi.mock('../../src/shared/api', () => ({
   repositoryApi: {
     get: vi.fn().mockResolvedValue({ data: { status: 'ready', analysis: { graph: {} } } }),
     listFiles: vi.fn().mockResolvedValue({ data: { tree: {} } }),
-    getRisks: vi.fn().mockResolvedValue({ data: { risks: [] } })
+    getRisks: vi.fn().mockResolvedValue({ data: { risks: [] } }),
   },
   getAiHealth: vi.fn().mockResolvedValue({ configured: true }),
-  getAiStatus: vi.fn().mockResolvedValue({ providerConfigured: true, authState: 'authenticated', quotaStatus: 'available' })
+  getAiStatus: vi
+    .fn()
+    .mockResolvedValue({ providerConfigured: true, authState: 'authenticated', quotaStatus: 'available' }),
 }));
 
-const renderWithProviders = (component) => {
+const renderWithProviders = component => {
   return render(
     <MemoryRouter initialEntries={['/explore/123/health']}>
       <Routes>
-        <Route path="/explore/:repoId/health" element={
-          <RepositoryProvider>
-            <AIProvider>
-              {component}
-            </AIProvider>
-          </RepositoryProvider>
-        } />
+        <Route
+          path="/explore/:repoId/health"
+          element={
+            <RepositoryProvider>
+              <AIProvider>{component}</AIProvider>
+            </RepositoryProvider>
+          }
+        />
       </Routes>
     </MemoryRouter>
   );

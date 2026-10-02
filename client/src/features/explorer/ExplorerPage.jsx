@@ -22,7 +22,31 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
-import { ChevronRight, ChevronDown, File, Folder, Code2, Play, Search, Network, Brain, Database, FileText, X, MessageSquare, Send, AlertTriangle, Loader2, RefreshCw, Image as ImageIcon, Copy, Check, FolderTree, Sparkles, Bookmark } from 'lucide-react';
+import {
+  ChevronRight,
+  ChevronDown,
+  File,
+  Folder,
+  Code2,
+  Play,
+  Search,
+  Network,
+  Brain,
+  Database,
+  FileText,
+  X,
+  MessageSquare,
+  Send,
+  AlertTriangle,
+  Loader2,
+  RefreshCw,
+  Image as ImageIcon,
+  Copy,
+  Check,
+  FolderTree,
+  Sparkles,
+  Bookmark,
+} from 'lucide-react';
 import MonacoEditor from '@monaco-editor/react';
 import { repositoryApi } from '../../shared/api';
 import { ResizableLayout } from '../../shared/components/ResizableLayout';
@@ -42,31 +66,31 @@ import { useToast } from '../../shared/context/ToastContext';
 // The analyzer uses 'javascript'/'typescript'; Monaco uses the same strings for
 // .js/.ts but needs distinct IDs for JSX/TSX and other formats.
 const EXT_TO_MONACO = {
-  '.js':   'javascript',
-  '.mjs':  'javascript',
-  '.cjs':  'javascript',
-  '.jsx':  'javascript',
-  '.ts':   'typescript',
-  '.tsx':  'typescript',
-  '.mts':  'typescript',
-  '.cts':  'typescript',
-  '.py':   'python',
+  '.js': 'javascript',
+  '.mjs': 'javascript',
+  '.cjs': 'javascript',
+  '.jsx': 'javascript',
+  '.ts': 'typescript',
+  '.tsx': 'typescript',
+  '.mts': 'typescript',
+  '.cts': 'typescript',
+  '.py': 'python',
   '.java': 'java',
-  '.cpp':  'cpp',
-  '.cc':   'cpp',
-  '.cxx':  'cpp',
-  '.h':    'cpp',
-  '.hpp':  'cpp',
+  '.cpp': 'cpp',
+  '.cc': 'cpp',
+  '.cxx': 'cpp',
+  '.h': 'cpp',
+  '.hpp': 'cpp',
   '.json': 'json',
-  '.md':   'markdown',
-  '.css':  'css',
+  '.md': 'markdown',
+  '.css': 'css',
   '.html': 'html',
-  '.htm':  'html',
-  '.xml':  'xml',
+  '.htm': 'html',
+  '.xml': 'xml',
   '.yaml': 'yaml',
-  '.yml':  'yaml',
-  '.sh':   'shell',
-  '.env':  'ini',
+  '.yml': 'yaml',
+  '.sh': 'shell',
+  '.env': 'ini',
 };
 
 function monacoLanguage(filePath, serverLanguage) {
@@ -78,12 +102,12 @@ function monacoLanguage(filePath, serverLanguage) {
 
 // ── Monaco editor theme config ────────────────────────────────────────────────
 const MONACO_OPTIONS = {
-  readOnly:        true,
-  minimap:         { enabled: true },
-  fontSize:        13,
-  lineNumbers:     'on',
+  readOnly: true,
+  minimap: { enabled: true },
+  fontSize: 13,
+  lineNumbers: 'on',
   scrollBeyondLastLine: false,
-  wordWrap:        'off',
+  wordWrap: 'off',
   renderLineHighlight: 'all',
   scrollbar: {
     verticalScrollbarSize: 8,
@@ -107,10 +131,10 @@ function isDirectory(tree, path) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function ExplorerPage() {
-  const { repoId }        = useParams();
+  const { repoId } = useParams();
   const { repo, fileTree, loading: repoLoading, error: repoError, refetchRepo, livePhase } = useRepository();
   const [reanalyzing, setReanalyzing] = useState(false);
-  const navigate          = useNavigate();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [pageError, setPageError] = useState(null);
@@ -131,11 +155,11 @@ export default function ExplorerPage() {
   const selectedPath = searchParams.get('path');
   const viewMode = searchParams.get('view') || 'source';
 
-  const [fileContent,  setFileContent]   = useState(null);   // { content, language }
-  const [fileLoading,  setFileLoading]   = useState(false);
-  const [fileError,    setFileError]     = useState(null);
+  const [fileContent, setFileContent] = useState(null); // { content, language }
+  const [fileLoading, setFileLoading] = useState(false);
+  const [fileError, setFileError] = useState(null);
 
-  const [moduleDocs,   setModuleDocs]    = useState(null);
+  const [moduleDocs, setModuleDocs] = useState(null);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const { aiState } = useAIState();
 
@@ -144,12 +168,15 @@ export default function ExplorerPage() {
   const decorationsRef = useRef(null); // Holds the active highlight decoration collection
   const [isEditorMounted, setIsEditorMounted] = useState(false);
 
-  const handleSetViewMode = (mode) => {
-    setSearchParams(prev => {
-      const p = new URLSearchParams(prev);
-      p.set('view', mode);
-      return p;
-    }, { replace: true });
+  const handleSetViewMode = mode => {
+    setSearchParams(
+      prev => {
+        const p = new URLSearchParams(prev);
+        p.set('view', mode);
+        return p;
+      },
+      { replace: true }
+    );
   };
 
   const handleIncrementalAnalyze = async () => {
@@ -162,7 +189,7 @@ export default function ExplorerPage() {
       addToast({
         title: 'Analysis Failed',
         description: err.message || 'Failed to analyze incrementally.',
-        type: 'error'
+        type: 'error',
       });
     } finally {
       setReanalyzing(false);
@@ -184,7 +211,7 @@ export default function ExplorerPage() {
       addToast({
         title: 'Generation Failed',
         description: err.message || 'Failed to generate AI documentation.',
-        type: 'error'
+        type: 'error',
       });
     } finally {
       setIsGeneratingAi(false);
@@ -192,21 +219,27 @@ export default function ExplorerPage() {
   };
 
   // ── openFile — central navigation function ─────────────────────────────────
-  const openFile = useCallback(async (filePath, line, endLine) => {
-    if (!filePath) return;
+  const openFile = useCallback(
+    async (filePath, line, endLine) => {
+      if (!filePath) return;
 
-    setSearchParams(prev => {
-      const p = new URLSearchParams(prev);
-      if (p.get('path') !== filePath) {
-        p.delete('line'); // Wipe line if changing files
-      }
-      p.set('path', filePath);
-      if (line) {
-        p.set('line', endLine ? `${line}-${endLine}` : line.toString());
-      }
-      return p;
-    }, { replace: true });
-  }, [setSearchParams]);
+      setSearchParams(
+        prev => {
+          const p = new URLSearchParams(prev);
+          if (p.get('path') !== filePath) {
+            p.delete('line'); // Wipe line if changing files
+          }
+          p.set('path', filePath);
+          if (line) {
+            p.set('line', endLine ? `${line}-${endLine}` : line.toString());
+          }
+          return p;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
 
   // ── File Fetching Effect ───────────────────────────────────────────────────
   useEffect(() => {
@@ -222,9 +255,8 @@ export default function ExplorerPage() {
         decorationsRef.current.clear();
         decorationsRef.current = null;
       }
-      // We intentionally do NOT clear fileContent here to prevent Monaco from unmounting 
+      // We intentionally do NOT clear fileContent here to prevent Monaco from unmounting
       // and causing a flicker/lag while fetching the next file.
-
 
       if (fileTree && isDirectory(fileTree, selectedPath)) {
         setFileError('DIRECTORY');
@@ -235,7 +267,7 @@ export default function ExplorerPage() {
       try {
         const [fileRes, docsRes] = await Promise.allSettled([
           repositoryApi.getFile(repoId, selectedPath),
-          repositoryApi.getModuleDocumentation(repoId, selectedPath)
+          repositoryApi.getModuleDocumentation(repoId, selectedPath),
         ]);
 
         if (!active) return;
@@ -262,7 +294,9 @@ export default function ExplorerPage() {
 
     fetchFile();
 
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [repoId, selectedPath, fileTree]);
 
   // ── Line highlighting Effect ───────────────────────────────────────────────
@@ -272,7 +306,7 @@ export default function ExplorerPage() {
       const parts = lineParam.split('-');
       const start = parseInt(parts[0], 10);
       const end = parts.length > 1 ? parseInt(parts[1], 10) : undefined;
-      
+
       // Delay slightly to ensure editor has fully laid out content
       setTimeout(() => {
         if (end) {
@@ -285,7 +319,7 @@ export default function ExplorerPage() {
   }, [searchParams.get('line'), fileLoading, fileContent, isEditorMounted]);
 
   // ── Monaco editor callbacks ────────────────────────────────────────────────
-  const applyDynamicTheme = useCallback((monaco) => {
+  const applyDynamicTheme = useCallback(monaco => {
     if (!monaco) return;
 
     const root = document.documentElement;
@@ -297,18 +331,18 @@ export default function ExplorerPage() {
     const isLight = Array.from(root.classList).some(c => c.includes('-light'));
     const isDark = !isLight;
 
-    const normalizeColor = (color) => {
+    const normalizeColor = color => {
       // Monaco's internal token parser crashes on 3-digit hex colors (like #fff) and rgb()
       // But we use rgb(r, g, b) variables like 13, 17, 23 or spaced values 13 17 23.
       // So we need to parse them.
       if (!color) return isDark ? '#161b22' : '#ffffff';
-      
+
       const rgbMatch = color.match(/(\d+)[,\s]+(\d+)[,\s]+(\d+)/);
       if (rgbMatch) {
-        const toHex = (n) => parseInt(n, 10).toString(16).padStart(2, '0');
+        const toHex = n => parseInt(n, 10).toString(16).padStart(2, '0');
         return `#${toHex(rgbMatch[1])}${toHex(rgbMatch[2])}${toHex(rgbMatch[3])}`;
       }
-      
+
       if (color.startsWith('#') && color.length === 4) {
         return '#' + color[1] + color[1] + color[2] + color[2] + color[3] + color[3];
       }
@@ -340,21 +374,24 @@ export default function ExplorerPage() {
     monaco.editor.setTheme('codelens-dynamic');
   }, []);
 
-  const handleEditorMount = useCallback((editor, monaco) => {
-    editorRef.current = editor;
-    setIsEditorMounted(true);
-    
-    applyDynamicTheme(monaco);
-    
-    // Listen for theme class changes on document element
-    const observer = new MutationObserver(() => {
+  const handleEditorMount = useCallback(
+    (editor, monaco) => {
+      editorRef.current = editor;
+      setIsEditorMounted(true);
+
       applyDynamicTheme(monaco);
-    });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    
-    // Store observer so it can be disconnected (dirty but works for mount lifecycle here)
-    editorRef.current._themeObserver = observer;
-  }, [applyDynamicTheme]);
+
+      // Listen for theme class changes on document element
+      const observer = new MutationObserver(() => {
+        applyDynamicTheme(monaco);
+      });
+      observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+      // Store observer so it can be disconnected (dirty but works for mount lifecycle here)
+      editorRef.current._themeObserver = observer;
+    },
+    [applyDynamicTheme]
+  );
 
   useEffect(() => {
     return () => {
@@ -402,20 +439,20 @@ export default function ExplorerPage() {
       {
         range: {
           startLineNumber: startLine,
-          startColumn:     1,
-          endLineNumber:   end,
-          endColumn:       model.getLineMaxColumn(end),
+          startColumn: 1,
+          endLineNumber: end,
+          endColumn: model.getLineMaxColumn(end),
         },
         options: {
-          isWholeLine:        true,
-          className:          'codelens-risk-highlight',
+          isWholeLine: true,
+          className: 'codelens-risk-highlight',
           overviewRuler: {
-            color:    '#f59e0b',  // amber-500
-            position: 4           // OverviewRulerLane.Full
+            color: '#f59e0b', // amber-500
+            position: 4, // OverviewRulerLane.Full
           },
           minimap: {
-            color:    '#f59e0b',
-            position: 1           // MinimapPosition.Inline
+            color: '#f59e0b',
+            position: 1, // MinimapPosition.Inline
           },
         },
       },
@@ -429,15 +466,15 @@ export default function ExplorerPage() {
     if (!selectedPath) return null;
     const editor = editorRef.current;
     if (!editor) return { filePath: selectedPath };
-    
+
     const selection = editor.getSelection();
     if (!selection || selection.isEmpty()) {
-       return { filePath: selectedPath };
+      return { filePath: selectedPath };
     }
     return {
       filePath: selectedPath,
       startLine: selection.startLineNumber,
-      endLine: selection.endLineNumber
+      endLine: selection.endLineNumber,
     };
   }, [selectedPath]);
 
@@ -455,7 +492,10 @@ export default function ExplorerPage() {
   if (repo?.status === 'analyzing') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface text-text">
-        <AnalysisProgress currentPhase={livePhase?.phase ?? repo.phase} phaseDetails={livePhase?.details ?? repo.phaseDetails} />
+        <AnalysisProgress
+          currentPhase={livePhase?.phase ?? repo.phase}
+          phaseDetails={livePhase?.details ?? repo.phaseDetails}
+        />
       </div>
     );
   }
@@ -464,7 +504,7 @@ export default function ExplorerPage() {
     return (
       <div className="p-8 text-red-400 flex flex-col items-start gap-4">
         <div>Error loading repository: {displayError}</div>
-        <button 
+        <button
           onClick={handleIncrementalAnalyze}
           disabled={reanalyzing}
           className="px-3 py-1.5 bg-panel border border-border rounded text-sm text-text hover:bg-[#30363d] disabled:opacity-50 flex items-center gap-2"
@@ -514,7 +554,7 @@ export default function ExplorerPage() {
           <div className="flex items-center justify-between mb-2 px-1 shrink-0">
             <p className="text-xs text-muted uppercase tracking-wider">Files</p>
             <div className="flex items-center gap-2">
-              <button 
+              <button
                 onClick={handleIncrementalAnalyze}
                 disabled={reanalyzing}
                 className="text-muted hover:text-text transition-colors p-1"
@@ -523,8 +563,8 @@ export default function ExplorerPage() {
                 <RefreshCw className={`w-3.5 h-3.5 ${reanalyzing ? 'animate-spin' : ''}`} />
               </button>
               {isMobile && (
-                <button 
-                  onClick={() => setMobileTreeOpen(false)} 
+                <button
+                  onClick={() => setMobileTreeOpen(false)}
                   className="xl:hidden p-1 bg-surface/50 rounded text-muted hover:text-text border border-border/50 shrink-0"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -533,11 +573,11 @@ export default function ExplorerPage() {
             </div>
           </div>
           <div className="px-1 mb-3 shrink-0">
-            <input 
+            <input
               type="text"
               placeholder="Search files..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={e => setSearchTerm(e.target.value)}
               className="w-full bg-surface border border-border rounded px-2 py-1.5 text-xs text-text focus:outline-none focus:border-accent"
             />
           </div>
@@ -545,7 +585,7 @@ export default function ExplorerPage() {
             <FileTree
               nodes={fileTree}
               selectedPath={selectedPath}
-              onSelectFile={(p) => {
+              onSelectFile={p => {
                 openFile(p);
                 setMobileTreeOpen(false);
               }}
@@ -553,7 +593,7 @@ export default function ExplorerPage() {
             />
           </div>
         </div>
-      )
+      ),
     },
     {
       id: 'codeViewer',
@@ -579,8 +619,8 @@ export default function ExplorerPage() {
             onOpenMobileAi={() => setMobileAiOpen(true)}
           />
         </div>
-      )
-    }
+      ),
+    },
   ];
 
   if (viewMode !== 'docs') {
@@ -604,7 +644,7 @@ export default function ExplorerPage() {
             onMobileClose={isMobile ? () => setMobileAiOpen(false) : null}
           />
         </div>
-      )
+      ),
     });
   }
 
@@ -614,20 +654,28 @@ export default function ExplorerPage() {
 
       {/* Mobile File Tree Drawer */}
       {isMobile && (
-        <div className={`fixed inset-0 z-[100] transition-opacity ${mobileTreeOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+        <div
+          className={`fixed inset-0 z-[100] transition-opacity ${mobileTreeOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        >
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setMobileTreeOpen(false)} />
-          <div className={`absolute top-0 left-0 bottom-0 w-[85%] max-w-sm bg-panel border-r border-border transform transition-transform duration-300 ${mobileTreeOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col`}>
-             {panels[0].content}
+          <div
+            className={`absolute top-0 left-0 bottom-0 w-[85%] max-w-sm bg-panel border-r border-border transform transition-transform duration-300 ${mobileTreeOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col`}
+          >
+            {panels[0].content}
           </div>
         </div>
       )}
 
       {/* Mobile AI Panel Drawer */}
       {isMobile && viewMode !== 'docs' && (
-        <div className={`fixed inset-0 z-[100] transition-opacity ${mobileAiOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+        <div
+          className={`fixed inset-0 z-[100] transition-opacity ${mobileAiOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        >
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setMobileAiOpen(false)} />
-          <div className={`absolute top-0 right-0 bottom-0 w-[85%] max-w-sm bg-panel border-l border-border transform transition-transform duration-300 ${mobileAiOpen ? 'translate-x-0' : 'translate-x-full'} flex flex-col`}>
-             {panels[panels.length - 1].content}
+          <div
+            className={`absolute top-0 right-0 bottom-0 w-[85%] max-w-sm bg-panel border-l border-border transform transition-transform duration-300 ${mobileAiOpen ? 'translate-x-0' : 'translate-x-full'} flex flex-col`}
+          >
+            {panels[panels.length - 1].content}
           </div>
         </div>
       )}
@@ -644,7 +692,22 @@ export default function ExplorerPage() {
  *   error   — fetch failed
  *   editor  — Monaco
  */
-function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMount, viewMode, setViewMode, moduleDocs, onGenerateAi, isGeneratingAi, isMobile, onOpenMobileTree, onOpenMobileAi }) {
+function CodeViewer({
+  repoId,
+  filePath,
+  fileContent,
+  loading,
+  error,
+  onEditorMount,
+  viewMode,
+  setViewMode,
+  moduleDocs,
+  onGenerateAi,
+  isGeneratingAi,
+  isMobile,
+  onOpenMobileTree,
+  onOpenMobileAi,
+}) {
   const { theme } = useTheme();
   const [copied, setCopied] = useState(false);
   const bookmark = useBookmark(repoId, filePath);
@@ -667,7 +730,7 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
       setShowNoteEditor(true);
     }
   };
-  
+
   const handleSaveNote = () => {
     updateNote(repoId, filePath, editNote);
     setShowNoteEditor(false);
@@ -687,7 +750,7 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
         <File className="w-12 h-12 opacity-30" />
         <p className="text-sm">Select a file from the tree to view its contents</p>
         {isMobile && (
-          <button 
+          <button
             onClick={onOpenMobileTree}
             className="px-4 py-2 bg-accent/10 text-accent rounded hover:bg-accent/20 text-sm font-medium transition-colors flex items-center gap-2"
           >
@@ -711,14 +774,14 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
         )}
       </div>
       <div className="flex items-center gap-2 sm:gap-6 justify-center">
-        <button 
-          onClick={() => setViewMode('source')} 
+        <button
+          onClick={() => setViewMode('source')}
           className={`px-2 sm:px-4 py-2 text-[11px] sm:text-xs font-medium border-b-2 transition-all whitespace-nowrap ${viewMode === 'source' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-text hover:border-border'}`}
         >
           Source Code
         </button>
-        <button 
-          onClick={() => setViewMode('docs')} 
+        <button
+          onClick={() => setViewMode('docs')}
           className={`px-2 sm:px-4 py-2 text-[11px] sm:text-xs font-medium border-b-2 transition-all whitespace-nowrap ${viewMode === 'docs' ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-text hover:border-border'}`}
         >
           Documentation
@@ -728,12 +791,12 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
         <button
           onClick={handleToggleBookmark}
           className={`flex items-center gap-1.5 px-2 py-1 mb-1 rounded text-xs transition-colors ${bookmark ? 'text-accent hover:bg-accent/10' : 'text-muted hover:text-text hover:bg-text/10'}`}
-          title={bookmark ? "Remove bookmark" : "Bookmark this file"}
+          title={bookmark ? 'Remove bookmark' : 'Bookmark this file'}
         >
-          <Bookmark className="w-3.5 h-3.5" fill={bookmark ? "currentColor" : "none"} />
+          <Bookmark className="w-3.5 h-3.5" fill={bookmark ? 'currentColor' : 'none'} />
         </button>
         {viewMode === 'source' && fileContent?.content && !isMobile && (
-          <button 
+          <button
             onClick={handleCopyCode}
             className="flex items-center gap-1.5 px-2 py-1 mb-1 rounded text-xs text-muted hover:text-text hover:bg-text/10 transition-colors"
             title="Copy source code"
@@ -743,7 +806,10 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
           </button>
         )}
         {isMobile && viewMode !== 'docs' && (
-          <button onClick={onOpenMobileAi} className="ml-1 mb-1 text-accent hover:text-accent p-1.5 rounded bg-accent/10">
+          <button
+            onClick={onOpenMobileAi}
+            className="ml-1 mb-1 text-accent hover:text-accent p-1.5 rounded bg-accent/10"
+          >
             <Sparkles className="w-4 h-4" />
           </button>
         )}
@@ -755,7 +821,12 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
   if (viewMode === 'docs') {
     content = (
       <div className="flex-1 overflow-y-auto bg-surface p-6 custom-scrollbar relative">
-        <ModuleDocumentation docs={moduleDocs} repoId={repoId} onGenerateAi={onGenerateAi} isGeneratingAi={isGeneratingAi} />
+        <ModuleDocumentation
+          docs={moduleDocs}
+          repoId={repoId}
+          onGenerateAi={onGenerateAi}
+          isGeneratingAi={isGeneratingAi}
+        />
       </div>
     );
   } else {
@@ -773,7 +844,9 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
           <Folder className="w-16 h-16 text-yellow-400 opacity-80" />
           <div className="text-center">
             <p className="text-sm font-medium text-text mb-1">Folder Selected</p>
-            <p className="text-xs max-w-sm">Select a file within this directory from the tree to view its source code.</p>
+            <p className="text-xs max-w-sm">
+              Select a file within this directory from the tree to view its source code.
+            </p>
           </div>
         </div>
       );
@@ -790,7 +863,11 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
       content = (
         <div className="flex-1 flex flex-col p-8 overflow-auto bg-panel custom-scrollbar relative">
           <div className="flex-1 flex items-center justify-center min-h-[40vh]">
-            <img src={fileContent.content} alt={filePath} className="max-w-full max-h-[70vh] object-contain rounded drop-shadow-2xl border border-border" />
+            <img
+              src={fileContent.content}
+              alt={filePath}
+              className="max-w-full max-h-[70vh] object-contain rounded drop-shadow-2xl border border-border"
+            />
           </div>
         </div>
       );
@@ -799,7 +876,11 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
       content = (
         <div className="flex-1 flex flex-col p-8 overflow-auto bg-panel custom-scrollbar">
           <div className="flex-1 flex items-center justify-center min-h-[40vh]">
-            <img src={svgUrl} alt={filePath} className="max-w-full max-h-[70vh] object-contain rounded drop-shadow-2xl border border-border" />
+            <img
+              src={svgUrl}
+              alt={filePath}
+              className="max-w-full max-h-[70vh] object-contain rounded drop-shadow-2xl border border-border"
+            />
           </div>
         </div>
       );
@@ -811,8 +892,8 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
           <p className="text-sm max-w-sm opacity-80">
             This file appears to be a binary format that cannot be safely displayed in the code editor.
           </p>
-          <button 
-            onClick={() => setForceText(true)} 
+          <button
+            onClick={() => setForceText(true)}
             className="mt-4 px-4 py-2 bg-accent/10 text-accent rounded hover:bg-accent/20 text-xs font-medium transition-colors"
           >
             Load as Text Anyway
@@ -843,17 +924,27 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
     <div className="bg-panel/50 border-b border-border px-4 py-2 shrink-0 text-sm">
       {showNoteEditor ? (
         <div className="flex gap-2">
-          <input 
-            type="text" 
+          <input
+            type="text"
             value={editNote}
             onChange={e => setEditNote(e.target.value)}
             placeholder="Add a personal note about this file..."
             className="flex-1 bg-surface border border-border rounded px-2 py-1 text-xs text-text focus:outline-none focus:border-accent"
             autoFocus
-            onKeyDown={e => { if (e.key === 'Enter') handleSaveNote(); if (e.key === 'Escape') setShowNoteEditor(false); }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') handleSaveNote();
+              if (e.key === 'Escape') setShowNoteEditor(false);
+            }}
           />
-          <button onClick={handleSaveNote} className="px-2 py-1 bg-accent/10 text-accent rounded hover:bg-accent/20 text-xs">Save</button>
-          <button onClick={() => setShowNoteEditor(false)} className="px-2 py-1 text-muted hover:text-text text-xs">Cancel</button>
+          <button
+            onClick={handleSaveNote}
+            className="px-2 py-1 bg-accent/10 text-accent rounded hover:bg-accent/20 text-xs"
+          >
+            Save
+          </button>
+          <button onClick={() => setShowNoteEditor(false)} className="px-2 py-1 text-muted hover:text-text text-xs">
+            Cancel
+          </button>
         </div>
       ) : (
         <div className="flex items-center justify-between group/note">
@@ -861,8 +952,11 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
             <span className="font-medium text-accent mr-2">Note:</span>
             {bookmark.note || <span className="opacity-50 italic">No note added.</span>}
           </p>
-          <button 
-            onClick={() => { setEditNote(bookmark.note || ''); setShowNoteEditor(true); }}
+          <button
+            onClick={() => {
+              setEditNote(bookmark.note || '');
+              setShowNoteEditor(true);
+            }}
             className="text-[10px] text-muted hover:text-text opacity-0 group-hover/note:opacity-100 transition-opacity"
           >
             Edit Note
@@ -884,10 +978,10 @@ function CodeViewer({ repoId, filePath, fileContent, loading, error, onEditorMou
 // ── AI Q&A Panel ──────────────────────────────────────────────────────────────
 
 function AiPanel({ repoId, onOpenFile, onHighlightRange, getActiveContext, onMobileClose }) {
-  const [messages,  setMessages]  = useState([]);
-  const [question,  setQuestion]  = useState('');
-  const [loading,   setLoading]   = useState(false);
-  const bottomRef                 = useRef(null);
+  const [messages, setMessages] = useState([]);
+  const [question, setQuestion] = useState('');
+  const [loading, setLoading] = useState(false);
+  const bottomRef = useRef(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -907,16 +1001,19 @@ function AiPanel({ repoId, onOpenFile, onHighlightRange, getActiveContext, onMob
       // Use the new Step 8 endpoint
       const res = await repositoryApi.askQuestion(repoId, q, activeContext);
       const ans = res.data.answer;
-      
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: ans.summary + (ans.explanation ? `\n\n${ans.explanation}` : ''),
-        references: ans.references || [],
-        facts: ans.facts || [],
-        inferences: ans.inferences || [],
-        intent: res.data.intent,
-        isDeterministic: !res.data.requiresAi
-      }]);
+
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: ans.summary + (ans.explanation ? `\n\n${ans.explanation}` : ''),
+          references: ans.references || [],
+          facts: ans.facts || [],
+          inferences: ans.inferences || [],
+          intent: res.data.intent,
+          isDeterministic: !res.data.requiresAi,
+        },
+      ]);
     } catch (err) {
       const msg = err?.response?.data?.error || err.message || 'Request failed';
       setMessages(prev => [...prev, { role: 'error', content: msg }]);
@@ -930,7 +1027,10 @@ function AiPanel({ repoId, onOpenFile, onHighlightRange, getActiveContext, onMob
       <div className="h-10 flex items-center justify-between px-3 border-b border-border shrink-0">
         <span className="text-xs text-muted uppercase tracking-wider">Ask about this repo</span>
         {onMobileClose && (
-          <button onClick={onMobileClose} className="xl:hidden p-1 bg-surface/50 rounded text-muted hover:text-text border border-border/50 shrink-0">
+          <button
+            onClick={onMobileClose}
+            className="xl:hidden p-1 bg-surface/50 rounded text-muted hover:text-text border border-border/50 shrink-0"
+          >
             <X className="w-3.5 h-3.5" />
           </button>
         )}
@@ -939,7 +1039,8 @@ function AiPanel({ repoId, onOpenFile, onHighlightRange, getActiveContext, onMob
       <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3">
         {messages.length === 0 && (
           <p className="text-xs text-muted text-center mt-6 leading-relaxed">
-            Ask a question about the codebase.<br />
+            Ask a question about the codebase.
+            <br />
             <span className="opacity-60">e.g. "How does authentication work?"</span>
           </p>
         )}
@@ -958,10 +1059,7 @@ function AiPanel({ repoId, onOpenFile, onHighlightRange, getActiveContext, onMob
         <div ref={bottomRef} />
       </div>
 
-      <form
-        onSubmit={handleSubmit}
-        className="border-t border-border p-3 shrink-0 flex gap-2"
-      >
+      <form onSubmit={handleSubmit} className="border-t border-border p-3 shrink-0 flex gap-2">
         <input
           type="text"
           value={question}
@@ -1007,7 +1105,11 @@ function Message({ msg, onOpenFile }) {
           <div className="px-3 py-2 text-xs text-text bg-surface border border-border rounded shadow-sm">
             <AiMarkdown content={msg.content} />
           </div>
-          <button onClick={handleCopy} className="opacity-0 group-hover/msg:opacity-100 text-muted hover:text-text transition-opacity text-[10px] flex items-center gap-1" title="Copy Message">
+          <button
+            onClick={handleCopy}
+            className="opacity-0 group-hover/msg:opacity-100 text-muted hover:text-text transition-opacity text-[10px] flex items-center gap-1"
+            title="Copy Message"
+          >
             {copied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
             {copied ? 'Copied' : 'Copy'}
           </button>
@@ -1030,28 +1132,34 @@ function Message({ msg, onOpenFile }) {
     <div className="flex flex-col gap-2 border-l-2 border-accent pl-3 py-1 mb-2 group/msg">
       <div className="flex items-center justify-between pb-1">
         <span className="text-[10px] font-medium text-text/80 flex items-center gap-1">
-          {msg.isDeterministic ? <Database className="w-3 h-3 text-success" /> : <Brain className="w-3 h-3 text-accent" />}
+          {msg.isDeterministic ? (
+            <Database className="w-3 h-3 text-success" />
+          ) : (
+            <Brain className="w-3 h-3 text-accent" />
+          )}
           {msg.isDeterministic ? 'Deterministic' : 'AI Inference'}
         </span>
         <div className="flex items-center gap-3">
-          {msg.intent && (
-            <span className="text-[9px] text-muted uppercase tracking-wider">{msg.intent}</span>
-          )}
+          {msg.intent && <span className="text-[9px] text-muted uppercase tracking-wider">{msg.intent}</span>}
         </div>
       </div>
 
-      <AiResponse 
+      <AiResponse
         data={{
           summary: msg.summary || msg.content,
           facts: msg.facts,
           inferences: msg.inferences,
-          references: msg.references
-        }} 
-        title={null} 
-        onNavigate={onOpenFile} 
+          references: msg.references,
+        }}
+        title={null}
+        onNavigate={onOpenFile}
       />
       <div className="flex justify-start">
-        <button onClick={handleCopy} className="opacity-0 group-hover/msg:opacity-100 text-muted hover:text-text transition-opacity text-[10px] flex items-center gap-1" title="Copy Response">
+        <button
+          onClick={handleCopy}
+          className="opacity-0 group-hover/msg:opacity-100 text-muted hover:text-text transition-opacity text-[10px] flex items-center gap-1"
+          title="Copy Response"
+        >
           {copied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
           {copied ? 'Copied' : 'Copy'}
         </button>

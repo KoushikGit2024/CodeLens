@@ -11,14 +11,14 @@ import Parser from 'web-tree-sitter';
 const LANGUAGE_WASM_MAP = {
   javascript: 'tree-sitter-javascript.wasm',
   typescript: 'tree-sitter-typescript.wasm',
-  tsx:        'tree-sitter-tsx.wasm',
-  python:     'tree-sitter-python.wasm',
-  java:       'tree-sitter-java.wasm',
-  c:          'tree-sitter-c.wasm',
-  cpp:        'tree-sitter-cpp.wasm',
-  kotlin:     'tree-sitter-kotlin.wasm',
-  go:         'tree-sitter-go.wasm',
-  rust:       'tree-sitter-rust.wasm',
+  tsx: 'tree-sitter-tsx.wasm',
+  python: 'tree-sitter-python.wasm',
+  java: 'tree-sitter-java.wasm',
+  c: 'tree-sitter-c.wasm',
+  cpp: 'tree-sitter-cpp.wasm',
+  kotlin: 'tree-sitter-kotlin.wasm',
+  go: 'tree-sitter-go.wasm',
+  rust: 'tree-sitter-rust.wasm',
 };
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -68,9 +68,9 @@ async function loadLanguage(languageId) {
   // Load the WASM binary over HTTP from our public/parsers folder
   const isTestEnv = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.MODE === 'test';
   const wasmUrl = isTestEnv ? `public/parsers/${wasmFile}` : `/parsers/${wasmFile}`;
-  
+
   const lang = await Parser.Language.load(wasmUrl);
-  
+
   languageCache.set(languageId, lang);
   return lang;
 }
@@ -86,7 +86,7 @@ async function loadLanguage(languageId) {
 export async function getParser(languageId) {
   await ensureInitialised();
   const lang = await loadLanguage(languageId);
-  
+
   const parser = new Parser();
   parser.setLanguage(lang);
   return parser;

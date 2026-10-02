@@ -1,12 +1,12 @@
 /**
  * fingerprint.js
  *
- * It generates deterministic checksums, then extracts binary content signatures, 
+ * It generates deterministic checksums, then extracts binary content signatures,
  * and then it applies them to track incremental cache hits during re-analysis.
  */
 
 /**
- * It evaluates the raw text or buffer, then extracts a Web Crypto SHA-256 digest, 
+ * It evaluates the raw text or buffer, then extracts a Web Crypto SHA-256 digest,
  * and then it applies hexadecimal encoding to return a string signature.
  */
 export async function hashContent(content) {

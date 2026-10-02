@@ -1,0 +1,10 @@
+node_modules
+dist
+build
+.git
+.bob
+.agents
+graphify-out
+coverage
+package-lock.json
+*.log

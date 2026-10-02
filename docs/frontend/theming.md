@@ -4,11 +4,11 @@ CodeLens supports three built-in themes with smooth transitions and keyboard acc
 
 ## Themes
 
-| Theme | Class on `<html>` | Description |
-|---|---|---|
-| **Dark** (default) | *(none)* | Deep graphite-indigo dark theme |
-| **Light** | `theme-light` | Clean off-white light theme |
-| **High Contrast** | `theme-high-contrast` | WCAG AA-compliant, pure black/white |
+| Theme              | Class on `<html>`     | Description                         |
+| ------------------ | --------------------- | ----------------------------------- |
+| **Dark** (default) | _(none)_              | Deep graphite-indigo dark theme     |
+| **Light**          | `theme-light`         | Clean off-white light theme         |
+| **High Contrast**  | `theme-high-contrast` | WCAG AA-compliant, pure black/white |
 
 ## Architecture
 

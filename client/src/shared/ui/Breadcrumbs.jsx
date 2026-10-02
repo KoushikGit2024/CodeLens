@@ -4,30 +4,30 @@ import React from 'react';
 
 const ROUTE_LABELS = {
   '': 'Overview',
-  'source': 'Source Explorer',
-  'architecture': 'Architecture',
-  'graph': 'Dependencies',
-  'health': 'Engineering Health',
-  'refactoring': 'Refactoring',
-  'impact': 'Change Impact',
-  'assistant': 'Repository Assistant'
+  source: 'Source Explorer',
+  architecture: 'Architecture',
+  graph: 'Dependencies',
+  health: 'Engineering Health',
+  refactoring: 'Refactoring',
+  impact: 'Change Impact',
+  assistant: 'Repository Assistant',
 };
 
 export default function Breadcrumbs() {
   const { repoId } = useParams();
   const location = useLocation();
-  
+
   if (!repoId) return null;
 
   // Path starts with /explore/REPO_ID/...
   const pathParts = location.pathname.split('/').filter(Boolean);
-  
+
   // Anything after REPO_ID is a sub-route
   const subRouteIndex = pathParts.indexOf(repoId) + 1;
   const currentSubRoute = pathParts[subRouteIndex] || '';
-  
+
   const label = ROUTE_LABELS[currentSubRoute] || 'Overview';
-  
+
   // If we are in source explorer, we can also extract the file path from search params
   const searchParams = new URLSearchParams(location.search);
   const filePath = searchParams.get('path');
@@ -37,17 +37,18 @@ export default function Breadcrumbs() {
       <Link to={`/explore/${repoId}`} className="hover:text-text transition-colors flex items-center gap-1 shrink-0">
         <Home className="w-3.5 h-3.5" />
       </Link>
-      
+
       <ChevronRight className="w-3.5 h-3.5 opacity-50" />
-      
-      <span className={!filePath ? "text-text/90 font-medium truncate min-w-0" : "truncate min-w-0"}>
-        {label}
-      </span>
+
+      <span className={!filePath ? 'text-text/90 font-medium truncate min-w-0' : 'truncate min-w-0'}>{label}</span>
 
       {filePath && (
         <>
           <ChevronRight className="w-3.5 h-3.5 opacity-50 shrink-0" />
-          <span className="text-text/90 font-medium truncate max-w-[100px] sm:max-w-[200px] md:max-w-[300px] min-w-0" title={filePath}>
+          <span
+            className="text-text/90 font-medium truncate max-w-[100px] sm:max-w-[200px] md:max-w-[300px] min-w-0"
+            title={filePath}
+          >
             {filePath.split('/').pop()}
           </span>
         </>

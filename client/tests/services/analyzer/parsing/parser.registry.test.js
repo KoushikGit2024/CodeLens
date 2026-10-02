@@ -10,7 +10,7 @@ describe('parser.registry (Frontend)', () => {
     const langs = supportedLanguages();
     expect(langs).toContain('javascript');
     expect(langs).toContain('python');
-    
+
     expect(isSupported('javascript')).toBe(true);
     expect(isSupported('cobol')).toBe(false);
   });

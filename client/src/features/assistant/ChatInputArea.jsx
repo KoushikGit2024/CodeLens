@@ -12,9 +12,7 @@
  *  • Image preview in chips; sent as base64 data-URIs in the attachment array
  *  • Keyboard: Enter to send, Shift+Enter for newline, Escape to close mention menu
  */
-import React, {
-  useState, useRef, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle
-} from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { Paperclip, Send, X } from 'lucide-react';
 import SizeIndicator from './SizeIndicator';
 import AttachmentChip from './AttachmentChip';
@@ -22,10 +20,10 @@ import FileMentionMenu from './FileMentionMenu';
 import { loadFile } from '../../services/analyzer/repository/persistence.store';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
-const MAX_PAYLOAD_CHARS = 16_000;   // hard limit for the combined prompt
-const PASTE_THRESHOLD   = 500;      // chars — pastes longer than this become a snippet
-const ACCEPTED_FILES    = '.js,.jsx,.ts,.tsx,.py,.java,.go,.rs,.rb,.md,.txt,.json,.yaml,.yml,.sh,.css,.html,.c,.cpp,.h';
-const ACCEPTED_IMAGES   = '.png,.jpg,.jpeg,.gif,.webp,.svg';
+const MAX_PAYLOAD_CHARS = 16_000; // hard limit for the combined prompt
+const PASTE_THRESHOLD = 500; // chars — pastes longer than this become a snippet
+const ACCEPTED_FILES = '.js,.jsx,.ts,.tsx,.py,.java,.go,.rs,.rb,.md,.txt,.json,.yaml,.yml,.sh,.css,.html,.c,.cpp,.h';
+const ACCEPTED_IMAGES = '.png,.jpg,.jpeg,.gif,.webp,.svg';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function bytesToLabel(n) {
@@ -57,28 +55,35 @@ function readFileAsDataUrl(file) {
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
-const ChatInputArea = forwardRef(function ChatInputArea({
-  repoId,
-  filePaths = [],           // flat list of repository relative paths (for @ menu)
-  disabled = false,
-  onSend,                   // (text, attachments[]) => void
-}, ref) {
+const ChatInputArea = forwardRef(function ChatInputArea(
+  {
+    repoId,
+    filePaths = [], // flat list of repository relative paths (for @ menu)
+    disabled = false,
+    onSend, // (text, attachments[]) => void
+  },
+  ref
+) {
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
   const [dupeId, setDupeId] = useState(null); // id of chip to flash on duplicate
 
   // @ mention state
-  const [mentionQuery, setMentionQuery] = useState(null);  // null = closed, string = open
-  const [mentionStart, setMentionStart] = useState(-1);    // cursor index of the @
+  const [mentionQuery, setMentionQuery] = useState(null); // null = closed, string = open
+  const [mentionStart, setMentionStart] = useState(-1); // cursor index of the @
 
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
   const containerRef = useRef(null);
 
-  useImperativeHandle(ref, () => ({
-    attachFiles: handleFileAttach
-  }), []);
+  useImperativeHandle(
+    ref,
+    () => ({
+      attachFiles: handleFileAttach,
+    }),
+    []
+  );
 
   // ── Payload size calculation ────────────────────────────────────────────────
   const payloadSize = useMemo(() => {
@@ -102,7 +107,7 @@ const ChatInputArea = forwardRef(function ChatInputArea({
   }, [text]);
 
   // ── @ Mention detection ────────────────────────────────────────────────────
-  const handleTextChange = useCallback((e) => {
+  const handleTextChange = useCallback(e => {
     const val = e.target.value;
     const cursor = e.target.selectionStart;
     setText(val);
@@ -112,7 +117,7 @@ const ChatInputArea = forwardRef(function ChatInputArea({
     const atIdx = segment.lastIndexOf('@');
     if (atIdx !== -1) {
       const afterAt = segment.slice(atIdx + 1);
-      
+
       // Newlines break mentions unconditionally
       if (!afterAt.includes('\n')) {
         // If there's a space, verify it's actually matching a file/folder with spaces
@@ -133,48 +138,59 @@ const ChatInputArea = forwardRef(function ChatInputArea({
     setMentionStart(-1);
   }, []);
 
-  const handleMentionSelect = useCallback(async (selectedPath, isDir) => {
-    const ta = textareaRef.current;
-    const cursor = ta?.selectionStart ?? text.length;
-    const before = text.slice(0, mentionStart);
-    const after  = text.slice(cursor);
+  const handleMentionSelect = useCallback(
+    async (selectedPath, isDir) => {
+      const ta = textareaRef.current;
+      const cursor = ta?.selectionStart ?? text.length;
+      const before = text.slice(0, mentionStart);
+      const after = text.slice(cursor);
 
-    if (isDir) {
-      const inserted = '@' + selectedPath;
-      setText(before + inserted + after);
-      setMentionQuery(selectedPath);
-      
-      const newCursor = before.length + inserted.length;
-      setTimeout(() => {
-        if (ta) {
-          ta.focus();
-          ta.setSelectionRange(newCursor, newCursor);
+      if (isDir) {
+        const inserted = '@' + selectedPath;
+        setText(before + inserted + after);
+        setMentionQuery(selectedPath);
+
+        const newCursor = before.length + inserted.length;
+        setTimeout(() => {
+          if (ta) {
+            ta.focus();
+            ta.setSelectionRange(newCursor, newCursor);
+          }
+        }, 0);
+        return;
+      }
+
+      setMentionQuery(null);
+      setMentionStart(-1);
+
+      // Replace @query in the text with empty string (we attached it as a chip)
+      setText(before + after);
+      const newCursor = before.length;
+
+      // Load file content from IndexedDB
+      try {
+        const content = await loadFile(repoId, selectedPath);
+        if (content !== null) {
+          addAttachment({
+            id: uuid(),
+            type: 'file',
+            name: selectedPath.split('/').pop(),
+            path: selectedPath,
+            content,
+            sizeLabel: bytesToLabel(content.length),
+          });
+        } else {
+          // File not cached — attach as path reference only
+          addAttachment({
+            id: uuid(),
+            type: 'file',
+            name: selectedPath.split('/').pop(),
+            path: selectedPath,
+            content: `[File reference: ${selectedPath}]`,
+            sizeLabel: '–',
+          });
         }
-      }, 0);
-      return;
-    }
-
-    setMentionQuery(null);
-    setMentionStart(-1);
-
-    // Replace @query in the text with empty string (we attached it as a chip)
-    setText(before + after);
-    const newCursor = before.length;
-
-    // Load file content from IndexedDB
-    try {
-      const content = await loadFile(repoId, selectedPath);
-      if (content !== null) {
-        addAttachment({
-          id: uuid(),
-          type: 'file',
-          name: selectedPath.split('/').pop(),
-          path: selectedPath,
-          content,
-          sizeLabel: bytesToLabel(content.length),
-        });
-      } else {
-        // File not cached — attach as path reference only
+      } catch {
         addAttachment({
           id: uuid(),
           type: 'file',
@@ -184,28 +200,20 @@ const ChatInputArea = forwardRef(function ChatInputArea({
           sizeLabel: '–',
         });
       }
-    } catch {
-      addAttachment({
-        id: uuid(),
-        type: 'file',
-        name: selectedPath.split('/').pop(),
-        path: selectedPath,
-        content: `[File reference: ${selectedPath}]`,
-        sizeLabel: '–',
-      });
-    }
 
-    // Return focus to textarea and set cursor position
-    setTimeout(() => {
-      if (ta) {
-        ta.focus();
-        ta.setSelectionRange(newCursor, newCursor);
-      }
-    }, 0);
-  }, [text, mentionStart, repoId]);
+      // Return focus to textarea and set cursor position
+      setTimeout(() => {
+        if (ta) {
+          ta.focus();
+          ta.setSelectionRange(newCursor, newCursor);
+        }
+      }, 0);
+    },
+    [text, mentionStart, repoId]
+  );
 
   // ── Paste handler ──────────────────────────────────────────────────────────
-  const handlePaste = useCallback((e) => {
+  const handlePaste = useCallback(e => {
     // Handle image pastes
     const items = Array.from(e.clipboardData?.items || []);
     const imageItem = items.find(i => i.type.startsWith('image/'));
@@ -239,7 +247,7 @@ const ChatInputArea = forwardRef(function ChatInputArea({
       type: 'image',
       name: file.name || 'image.png',
       dataUrl,
-      content: dataUrl,      // sent in prompt
+      content: dataUrl, // sent in prompt
       sizeLabel: bytesToLabel(file.size),
     });
   }
@@ -283,9 +291,7 @@ const ChatInputArea = forwardRef(function ChatInputArea({
   function addAttachment(a) {
     if (isDuplicate(a)) {
       // Find the existing chip and flash it
-      const existing = attachments.find(e =>
-        a.path ? e.path === a.path : e.name === a.name
-      );
+      const existing = attachments.find(e => (a.path ? e.path === a.path : e.name === a.name));
       if (existing) flashDupe(existing.id);
       return;
     }
@@ -296,14 +302,14 @@ const ChatInputArea = forwardRef(function ChatInputArea({
   }
 
   // ── Drag & drop ────────────────────────────────────────────────────────────
-  const handleDragOver = useCallback((e) => {
+  const handleDragOver = useCallback(e => {
     e.preventDefault();
     setIsDragging(true);
   }, []);
-  const handleDragLeave = useCallback((e) => {
+  const handleDragLeave = useCallback(e => {
     if (!containerRef.current?.contains(e.relatedTarget)) setIsDragging(false);
   }, []);
-  const handleDrop = useCallback((e) => {
+  const handleDrop = useCallback(e => {
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer?.files?.length) handleFileAttach(e.dataTransfer.files);
@@ -322,23 +328,26 @@ const ChatInputArea = forwardRef(function ChatInputArea({
 
   const mentionMenuRef = useRef(null);
 
-  const handleKeyDown = useCallback((e) => {
-    if (mentionQuery !== null && mentionMenuRef.current) {
-      if (['Tab', 'Enter', 'ArrowDown', 'ArrowUp'].includes(e.key)) {
-        const handled = mentionMenuRef.current.handleKeyDown(e);
-        if (handled) return;
+  const handleKeyDown = useCallback(
+    e => {
+      if (mentionQuery !== null && mentionMenuRef.current) {
+        if (['Tab', 'Enter', 'ArrowDown', 'ArrowUp'].includes(e.key)) {
+          const handled = mentionMenuRef.current.handleKeyDown(e);
+          if (handled) return;
+        }
       }
-    }
-    
-    if (e.key === 'Escape') {
-      setMentionQuery(null);
-      return;
-    }
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  }, [handleSend, mentionQuery]);
+
+      if (e.key === 'Escape') {
+        setMentionQuery(null);
+        return;
+      }
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+      }
+    },
+    [handleSend, mentionQuery]
+  );
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -348,11 +357,13 @@ const ChatInputArea = forwardRef(function ChatInputArea({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={`relative rounded-xl border transition-colors duration-200
-        ${isDragging
-          ? 'border-accent bg-accent/5 shadow-[0_0_20px_rgba(77,126,255,0.2)]'
-          : isOverLimit
-          ? 'border-danger/60 bg-danger/5'
-          : 'border-border/60 bg-panel/80 hover:border-accent/40 focus-within:border-accent focus-within:shadow-[0_0_14px_rgba(77,126,255,0.15)]'}
+        ${
+          isDragging
+            ? 'border-accent bg-accent/5 shadow-[0_0_20px_rgba(77,126,255,0.2)]'
+            : isOverLimit
+              ? 'border-danger/60 bg-danger/5'
+              : 'border-border/60 bg-panel/80 hover:border-accent/40 focus-within:border-accent focus-within:shadow-[0_0_14px_rgba(77,126,255,0.15)]'
+        }
       `}
       style={{ backdropFilter: 'blur(10px)' }}
     >
@@ -422,7 +433,7 @@ const ChatInputArea = forwardRef(function ChatInputArea({
           multiple
           accept={`${ACCEPTED_FILES},${ACCEPTED_IMAGES}`}
           className="hidden"
-          onChange={(e) => handleFileAttach(e.target.files)}
+          onChange={e => handleFileAttach(e.target.files)}
         />
 
         {/* Spacer */}
@@ -443,11 +454,13 @@ const ChatInputArea = forwardRef(function ChatInputArea({
           disabled={!canSend}
           title={isOverLimit ? 'Payload too large — remove some attachments' : 'Send (Enter)'}
           className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all
-            ${canSend
-              ? 'bg-accent hover:bg-accent/80 text-text shadow-[0_0_10px_rgba(77,126,255,0.3)]'
-              : isOverLimit
-              ? 'bg-danger/30 text-danger cursor-not-allowed'
-              : 'bg-surface text-muted/40 cursor-not-allowed'}
+            ${
+              canSend
+                ? 'bg-accent hover:bg-accent/80 text-text shadow-[0_0_10px_rgba(77,126,255,0.3)]'
+                : isOverLimit
+                  ? 'bg-danger/30 text-danger cursor-not-allowed'
+                  : 'bg-surface text-muted/40 cursor-not-allowed'
+            }
           `}
         >
           <Send className="w-3.5 h-3.5" />

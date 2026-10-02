@@ -9,6 +9,7 @@ Instead of sending raw code to the LLM, Context Builders construct minimal, toke
 ## Example: Question Context Builder
 
 When a user asks a question in the Repository Assistant:
+
 1. `questionRouter.js` classifies the intent of the question (e.g., `FIND_SYMBOL`, `EXPLAIN_DEPENDENCIES`).
 2. `questionContextBuilder.js` extracts only the relevant subsets of the AST and Graph (e.g., if the user asks about "AuthService", it only includes the `AuthService` class and its immediate imports).
 3. The context is JSON.stringified and embedded into the prompt.

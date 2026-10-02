@@ -206,10 +206,7 @@ describe('resolveImport — unresolved imports', () => {
 describe('buildKnownFilesSet', () => {
   test('builds a set from analysis.files', () => {
     const analysis = {
-      files: [
-        { filePath: 'src/app.js' },
-        { filePath: 'src/utils.ts' },
-      ],
+      files: [{ filePath: 'src/app.js' }, { filePath: 'src/utils.ts' }],
     };
     const set = buildKnownFilesSet(analysis);
     expect(set.has('src/app.js')).toBe(true);
@@ -233,8 +230,18 @@ describe('resolveAllImports', () => {
         {
           filePath: 'src/index.js',
           symbols: [
-            { kind: 'import', source: './utils', specifiers: [{ name: 'utils', alias: null, type: 'default' }], location: null },
-            { kind: 'import', source: 'express', specifiers: [{ name: 'express', alias: null, type: 'default' }], location: null },
+            {
+              kind: 'import',
+              source: './utils',
+              specifiers: [{ name: 'utils', alias: null, type: 'default' }],
+              location: null,
+            },
+            {
+              kind: 'import',
+              source: 'express',
+              specifiers: [{ name: 'express', alias: null, type: 'default' }],
+              location: null,
+            },
           ],
         },
         {
@@ -245,7 +252,7 @@ describe('resolveAllImports', () => {
     };
 
     const knownFiles = buildKnownFilesSet(analysis);
-    const resolved   = resolveAllImports(analysis, knownFiles);
+    const resolved = resolveAllImports(analysis, knownFiles);
 
     const indexImports = resolved.get('src/index.js');
     expect(indexImports).toHaveLength(2);
@@ -263,7 +270,7 @@ describe('resolveAllImports', () => {
       files: [{ filePath: 'src/noImports.js', symbols: [] }],
     };
     const knownFiles = buildKnownFilesSet(analysis);
-    const resolved   = resolveAllImports(analysis, knownFiles);
+    const resolved = resolveAllImports(analysis, knownFiles);
     expect(resolved.get('src/noImports.js')).toEqual([]);
   });
 });
@@ -272,6 +279,23 @@ describe('resolveAllImports', () => {
 
 describe('RESOLUTION_EXTENSIONS', () => {
   test('contains all supported extensions', () => {
-    expect(RESOLUTION_EXTENSIONS).toEqual(expect.arrayContaining(['.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.cpp', '.cc', '.cxx', '.h', '.hpp', '.go', '.rs', '.c']));
+    expect(RESOLUTION_EXTENSIONS).toEqual(
+      expect.arrayContaining([
+        '.js',
+        '.jsx',
+        '.ts',
+        '.tsx',
+        '.py',
+        '.java',
+        '.cpp',
+        '.cc',
+        '.cxx',
+        '.h',
+        '.hpp',
+        '.go',
+        '.rs',
+        '.c',
+      ])
+    );
   });
 });

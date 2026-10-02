@@ -44,51 +44,57 @@ export default function App() {
     <ThemeProvider>
       <EnvironmentGuard>
         <ErrorBoundary>
-      <ToastProvider>
-        <AuthProvider>
-          <AIProvider>
-            <Routes>
-              <Route path="/" element={<UploadPage />} />
-              
-              <Route path="/auth/callback" element={<AuthCallback />} />
-              
-              <Route element={<AuthLayout />}>
-                <Route path="/auth/signin" element={<SignInPage />} />
-                <Route path="/auth/signup" element={<SignUpPage />} />
-                <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
-                <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
-              </Route>
-              
-              <Route path="/account" element={<AuthGuard><AccountPage /></AuthGuard>} />
-              
-              {/* The Canonical Repository Routes */}
-              <Route path="/explore/:repoId" element={<RepositoryShell />}>
-                <Route index element={<RepositoryIntelligencePage />} />
-                <Route path="tree" element={<FileTreePage />} />
-                <Route path="source" element={<ExplorerPage />} />
-                <Route path="dependencies" element={<DependencyGraphPage />} />
-                <Route path="architecture" element={<ArchitecturePage />} />
-                {/* <Route path="git" element={<GitHistoryPage />} /> */}
+          <ToastProvider>
+            <AuthProvider>
+              <AIProvider>
+                <Routes>
+                  <Route path="/" element={<UploadPage />} />
 
-                <Route path="assistant" element={<RepositoryAssistantPage />} />
-                <Route path="impact" element={<ImpactPage />} />
-                <Route path="health" element={<EngineeringHealthPage />} />
-                <Route path="refactoring" element={<RefactoringPage />} />
-                <Route path="bookmarks" element={<BookmarksPage />} />
-                <Route path="semantic" element={<SemanticSearchPage />} />
-                
-              </Route>
-              <Route path="/explore/:repoId/about" element={<AboutPage />} />
-              <Route path="/about" element={<AboutPage />} />
+                  <Route path="/auth/callback" element={<AuthCallback />} />
 
-              <Route path="/help" element={<HelpPage />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </AIProvider>
-        </AuthProvider>
-      </ToastProvider>
-      </ErrorBoundary>
-    </EnvironmentGuard>
+                  <Route element={<AuthLayout />}>
+                    <Route path="/auth/signin" element={<SignInPage />} />
+                    <Route path="/auth/signup" element={<SignUpPage />} />
+                    <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+                    <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+                  </Route>
+
+                  <Route
+                    path="/account"
+                    element={
+                      <AuthGuard>
+                        <AccountPage />
+                      </AuthGuard>
+                    }
+                  />
+
+                  {/* The Canonical Repository Routes */}
+                  <Route path="/explore/:repoId" element={<RepositoryShell />}>
+                    <Route index element={<RepositoryIntelligencePage />} />
+                    <Route path="tree" element={<FileTreePage />} />
+                    <Route path="source" element={<ExplorerPage />} />
+                    <Route path="dependencies" element={<DependencyGraphPage />} />
+                    <Route path="architecture" element={<ArchitecturePage />} />
+                    {/* <Route path="git" element={<GitHistoryPage />} /> */}
+
+                    <Route path="assistant" element={<RepositoryAssistantPage />} />
+                    <Route path="impact" element={<ImpactPage />} />
+                    <Route path="health" element={<EngineeringHealthPage />} />
+                    <Route path="refactoring" element={<RefactoringPage />} />
+                    <Route path="bookmarks" element={<BookmarksPage />} />
+                    <Route path="semantic" element={<SemanticSearchPage />} />
+                  </Route>
+                  <Route path="/explore/:repoId/about" element={<AboutPage />} />
+                  <Route path="/about" element={<AboutPage />} />
+
+                  <Route path="/help" element={<HelpPage />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </AIProvider>
+            </AuthProvider>
+          </ToastProvider>
+        </ErrorBoundary>
+      </EnvironmentGuard>
     </ThemeProvider>
   );
 }

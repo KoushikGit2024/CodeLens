@@ -1,7 +1,7 @@
 /**
  * AIStatusIndicator.jsx
  *
- * It monitors the global AI context, then extracts the provider connection status, 
+ * It monitors the global AI context, then extracts the provider connection status,
  * and then it applies deterministic fallback UI configurations when offline.
  */
 import React, { useState } from 'react';
@@ -24,22 +24,29 @@ export default function AIStatusIndicator() {
           title: 'AI Enhanced',
           desc: 'CodeLens is fully operational with an active AI provider.',
           available: [
-            'Repository analysis', 'Dependency graph', 'Architecture', 
-            'Engineering health', 'Refactoring analysis', 'Code viewer',
-            'AI summaries', 'Natural-language Q&A', 'AI recommendations'
+            'Repository analysis',
+            'Dependency graph',
+            'Architecture',
+            'Engineering health',
+            'Refactoring analysis',
+            'Code viewer',
+            'AI summaries',
+            'Natural-language Q&A',
+            'AI recommendations',
           ],
-          unavailable: []
+          unavailable: [],
         };
       case 'unauthenticated':
         return {
           label: 'Sign in for AI',
           icon: <Sparkles className="w-3.5 h-3.5" />,
-          colorClass: 'text-text border-accent bg-accent/20 hover:bg-accent/40 shadow-[0_0_8px_rgba(var(--color-accent),0.3)]',
+          colorClass:
+            'text-text border-accent bg-accent/20 hover:bg-accent/40 shadow-[0_0_8px_rgba(var(--color-accent),0.3)]',
           title: 'Sign In Required',
           desc: 'You must be signed in to access AI-enhanced features.',
           action: { label: 'Sign In', link: '/auth/signin' },
           available: ['Repository analysis', 'Dependency graph', 'Architecture', 'Engineering health', 'Code viewer'],
-          unavailable: ['AI summaries', 'Natural-language Q&A', 'AI recommendations']
+          unavailable: ['AI summaries', 'Natural-language Q&A', 'AI recommendations'],
         };
       case 'quota_exhausted':
         return {
@@ -50,7 +57,7 @@ export default function AIStatusIndicator() {
           desc: 'You have reached your AI usage limit for this billing period.',
           action: { label: 'View Usage', link: '/account' },
           available: ['Repository analysis', 'Dependency graph', 'Architecture', 'Engineering health', 'Code viewer'],
-          unavailable: ['AI summaries', 'Natural-language Q&A', 'AI recommendations']
+          unavailable: ['AI summaries', 'Natural-language Q&A', 'AI recommendations'],
         };
       case 'offline':
         return {
@@ -60,12 +67,15 @@ export default function AIStatusIndicator() {
           title: 'Offline Intelligence',
           desc: 'CodeLens is currently operating without an AI provider configured.',
           available: [
-             'Repository analysis', 'Dependency graph', 'Architecture', 
-            'Engineering health', 'Refactoring analysis', 'Documentation facts', 'Code viewer'
+            'Repository analysis',
+            'Dependency graph',
+            'Architecture',
+            'Engineering health',
+            'Refactoring analysis',
+            'Documentation facts',
+            'Code viewer',
           ],
-          unavailable: [
-            'AI summaries', 'Natural-language Q&A', 'AI recommendations'
-          ]
+          unavailable: ['AI summaries', 'Natural-language Q&A', 'AI recommendations'],
         };
       case 'unavailable':
         return {
@@ -76,12 +86,14 @@ export default function AIStatusIndicator() {
           desc: 'CodeLens is configured for AI, but the provider is temporarily failing or unreachable. Falling back to Offline Intelligence.',
           action: { label: 'Retry Connection', onClick: retryConnection },
           available: [
-             'Repository analysis', 'Dependency graph', 'Architecture', 
-            'Engineering health', 'Refactoring analysis', 'Code viewer'
+            'Repository analysis',
+            'Dependency graph',
+            'Architecture',
+            'Engineering health',
+            'Refactoring analysis',
+            'Code viewer',
           ],
-          unavailable: [
-            'AI summaries', 'Natural-language Q&A', 'AI recommendations'
-          ]
+          unavailable: ['AI summaries', 'Natural-language Q&A', 'AI recommendations'],
         };
       case 'connecting':
         return {
@@ -91,7 +103,7 @@ export default function AIStatusIndicator() {
           title: 'Connecting...',
           desc: 'Attempting to reconnect to AI provider...',
           available: [],
-          unavailable: []
+          unavailable: [],
         };
       case 'error':
         return {
@@ -101,7 +113,7 @@ export default function AIStatusIndicator() {
           title: 'API Error',
           desc: 'Could not fetch AI configuration status.',
           available: [],
-          unavailable: []
+          unavailable: [],
         };
       default:
         return null;
@@ -112,12 +124,12 @@ export default function AIStatusIndicator() {
   if (!config) return null;
 
   /**
-   * It tracks the user click event, then extracts the popover visibility boolean, 
+   * It tracks the user click event, then extracts the popover visibility boolean,
    * and then it applies absolute positioning to render the status dropdown.
    */
   return (
     <div className="relative">
-      <button 
+      <button
         onClick={() => setShowPopover(!showPopover)}
         className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium transition-colors hover:brightness-110 ${config.colorClass}`}
       >
@@ -138,15 +150,15 @@ export default function AIStatusIndicator() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            
-            <p className="text-xs text-muted mb-4 leading-relaxed">
-              {config.desc}
-            </p>
+
+            <p className="text-xs text-muted mb-4 leading-relaxed">{config.desc}</p>
 
             <div className="flex flex-col gap-3">
               {config.available.length > 0 && (
                 <div>
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-muted mb-1 block">Available locally</span>
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-muted mb-1 block">
+                    Available locally
+                  </span>
                   <ul className="text-xs text-text/90 flex flex-col gap-1">
                     {config.available.map(item => (
                       <li key={item} className="flex items-center gap-1.5">
@@ -158,7 +170,9 @@ export default function AIStatusIndicator() {
               )}
               {config.unavailable.length > 0 && (
                 <div>
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-muted mb-1 block">AI-enhanced (Unavailable)</span>
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-muted mb-1 block">
+                    AI-enhanced (Unavailable)
+                  </span>
                   <ul className="text-xs text-muted flex flex-col gap-1">
                     {config.unavailable.map(item => (
                       <li key={item} className="flex items-center gap-1.5">
@@ -173,14 +187,14 @@ export default function AIStatusIndicator() {
             {config.action && (
               <div className="mt-4 pt-3 border-t border-border/50">
                 {config.action.link ? (
-                  <a 
+                  <a
                     href={config.action.link}
                     className="w-full py-1.5 bg-accent hover:bg-accent-hover text-text rounded text-xs font-medium transition-colors text-center block"
                   >
                     {config.action.label}
                   </a>
                 ) : (
-                  <button 
+                  <button
                     onClick={() => {
                       config.action.onClick();
                       setShowPopover(false);

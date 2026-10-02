@@ -1,13 +1,12 @@
 /**
  * context.orchestrator.js
- * 
+ *
  * Orchestrates AI Context by standardizing how CodeLens talks to the LLM.
- * This decoupled layer extracts prompt engineering from the API bridge, paving the way 
+ * This decoupled layer extracts prompt engineering from the API bridge, paving the way
  * for AST-scoped context, graph neighbor injection, and structured outputs.
  */
 
 export class ContextOrchestrator {
-  
   static buildArchitecturePrompt(model) {
     return `You are a software architect analyzing a codebase.
 Provide a clear, 2-3 paragraph architectural evaluation based on these metrics.
@@ -22,14 +21,19 @@ Evaluate the modularity, coupling, and any apparent risks based on the violation
 
   static buildIntelligencePrompt(intelligence) {
     const langs = Object.entries(intelligence.repository.languages || {})
-      .sort((a, b) => b[1] - a[1]).slice(0, 5)
-      .map(([l, n]) => `${l} (${n} files)`).join(', ');
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([l, n]) => `${l} (${n} files)`)
+      .join(', ');
 
-    const hotspotList = (intelligence.hotspots || []).slice(0, 5)
-      .map(h => `  - ${h.filePath} (hotspot score: ${h.score})`).join('\n');
+    const hotspotList = (intelligence.hotspots || [])
+      .slice(0, 5)
+      .map(h => `  - ${h.filePath} (hotspot score: ${h.score})`)
+      .join('\n');
 
     const topCandidates = (intelligence.refactoring.topCandidates || [])
-      .map(c => `  - ${c.title} [${c.priority}]`).join('\n');
+      .map(c => `  - ${c.title} [${c.priority}]`)
+      .join('\n');
 
     return `You are CodeLens, a senior software architect and code intelligence assistant.
 Analyze the following deterministic repository metrics and produce a clear, concise, high-level overview.
@@ -99,7 +103,15 @@ Generate a structured JSON response matching this exact schema:
 }`;
   }
 
-  static buildAutoFixPrompt(candidate, targetFile, originalCode, impactConstraints, specificEvidenceText, strategiesText, snippetContext = "") {
+  static buildAutoFixPrompt(
+    candidate,
+    targetFile,
+    originalCode,
+    impactConstraints,
+    specificEvidenceText,
+    strategiesText,
+    snippetContext = ''
+  ) {
     return `You are an expert AI software architect. Please refactor the following file to resolve the issue: "${candidate.title}".
 Category: ${candidate.type}
 Description: ${candidate.summary}

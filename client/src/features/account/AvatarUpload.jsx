@@ -15,11 +15,11 @@ function centerAspectCrop(mediaWidth, mediaHeight, aspect) {
       },
       aspect,
       mediaWidth,
-      mediaHeight,
+      mediaHeight
     ),
     mediaWidth,
-    mediaHeight,
-  )
+    mediaHeight
+  );
 }
 
 export default function AvatarUpload({ onUploadSuccess }) {
@@ -29,11 +29,11 @@ export default function AvatarUpload({ onUploadSuccess }) {
   const [completedCrop, setCompletedCrop] = useState();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
-  
+
   const imgRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  const onSelectFile = (e) => {
+  const onSelectFile = e => {
     if (e.target.files && e.target.files.length > 0) {
       setCrop(undefined); // Makes crop preview update between images.
       const reader = new FileReader();
@@ -42,7 +42,7 @@ export default function AvatarUpload({ onUploadSuccess }) {
     }
   };
 
-  const onImageLoad = (e) => {
+  const onImageLoad = e => {
     const { width, height } = e.currentTarget;
     setCrop(centerAspectCrop(width, height, 1));
   };
@@ -74,7 +74,7 @@ export default function AvatarUpload({ onUploadSuccess }) {
       );
 
       const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
-      
+
       if (!blob) throw new Error('Canvas is empty');
 
       // 2. Get ImageKit auth params from backend
@@ -105,12 +105,12 @@ export default function AvatarUpload({ onUploadSuccess }) {
       // 4. Update Supabase user metadata with new avatar URL
       // We explicitly save it as custom_avatar_url so that Google OAuth doesn't overwrite it on next login!
       const cacheBustedUrl = `${uploadData.url}?t=${Date.now()}`;
-      
+
       const { error: updateError } = await supabase.auth.updateUser({
-        data: { 
+        data: {
           avatar_url: cacheBustedUrl,
-          custom_avatar_url: cacheBustedUrl 
-        }
+          custom_avatar_url: cacheBustedUrl,
+        },
       });
 
       if (updateError) throw updateError;
@@ -128,17 +128,11 @@ export default function AvatarUpload({ onUploadSuccess }) {
   return (
     <div className="bg-panel border border-border rounded-xl p-6">
       <h3 className="text-sm font-semibold mb-4">Profile Avatar</h3>
-      
+
       {!imgSrc ? (
         <div className="flex flex-col items-start gap-4">
           <p className="text-xs text-muted">Upload a custom avatar to personalize your workspace.</p>
-          <input
-            type="file"
-            accept="image/*"
-            ref={fileInputRef}
-            onChange={onSelectFile}
-            className="hidden"
-          />
+          <input type="file" accept="image/*" ref={fileInputRef} onChange={onSelectFile} className="hidden" />
           <button
             onClick={() => fileInputRef.current?.click()}
             className="px-4 py-2 bg-surface hover:bg-surface-light border border-border rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
@@ -150,7 +144,7 @@ export default function AvatarUpload({ onUploadSuccess }) {
       ) : (
         <div className="flex flex-col gap-4">
           <div className="relative border border-border rounded-lg overflow-hidden bg-surface max-w-sm mx-auto">
-            <button 
+            <button
               onClick={() => setImgSrc('')}
               className="absolute top-2 right-2 z-10 p-1 bg-black/50 hover:bg-black/80 rounded-full text-text transition-colors"
             >
@@ -159,7 +153,7 @@ export default function AvatarUpload({ onUploadSuccess }) {
             <ReactCrop
               crop={crop}
               onChange={(_, percentCrop) => setCrop(percentCrop)}
-              onComplete={(c) => setCompletedCrop(c)}
+              onComplete={c => setCompletedCrop(c)}
               aspect={1}
               circularCrop
             >
@@ -174,9 +168,7 @@ export default function AvatarUpload({ onUploadSuccess }) {
           </div>
 
           {error && (
-            <div className="p-3 bg-danger/10 border border-danger/20 rounded-lg text-xs text-danger">
-              {error}
-            </div>
+            <div className="p-3 bg-danger/10 border border-danger/20 rounded-lg text-xs text-danger">{error}</div>
           )}
 
           <div className="flex justify-end gap-3 mt-2">

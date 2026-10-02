@@ -26,7 +26,7 @@ export class BaseParser {
     if (new.target === BaseParser) {
       throw new Error('BaseParser is abstract — extend it instead.');
     }
-    this.tsParser   = tsParser;
+    this.tsParser = tsParser;
     this.languageId = languageId;
   }
 
@@ -54,9 +54,7 @@ export class BaseParser {
     }
 
     // In web-tree-sitter 0.24+, hasError is often a function, not a boolean property
-    const hasErrors = typeof tree.rootNode.hasError === 'function' 
-                        ? tree.rootNode.hasError() 
-                        : tree.rootNode.hasError;
+    const hasErrors = typeof tree.rootNode.hasError === 'function' ? tree.rootNode.hasError() : tree.rootNode.hasError;
 
     let symbols;
     try {
@@ -89,39 +87,51 @@ export class BaseParser {
   }
 
   /**
-   * Executes a Tree-sitter S-expression query and extracts findings matching 
+   * Executes a Tree-sitter S-expression query and extracts findings matching
    * the CodeLens canonical AnalysisFinding schema for the Monaco Editor and Dashboard.
    */
-  extractFindings(rootNode, queryString, filePath, analyzerId, ruleId, category, severity, titleTemplate, messageTemplate) {
+  extractFindings(
+    rootNode,
+    queryString,
+    filePath,
+    analyzerId,
+    ruleId,
+    category,
+    severity,
+    titleTemplate,
+    messageTemplate
+  ) {
     let query = null;
     try {
       const language = this.tsParser.getLanguage();
       query = language.query(queryString);
       const matches = query.matches(rootNode);
-      
-      return matches.map((match, index) => {
-        const primaryCapture = match.captures[0];
-        if (!primaryCapture) return null;
-        const node = primaryCapture.node;
-        
-        return {
-          id: `${analyzerId}-${ruleId}-${filePath}-${node.startPosition.row}-${index}`,
-          analyzerId,
-          ruleId,
-          category,
-          severity,
-          title: titleTemplate.replace('{text}', node.text.substring(0, 40)),
-          message: messageTemplate.replace('{text}', node.text),
-          filePath,
-          range: {
-            startLine: node.startPosition.row + 1, // 1-based for Monaco
-            startColumn: node.startPosition.column + 1,
-            endLine: node.endPosition.row + 1,
-            endColumn: node.endPosition.column + 1
-          },
-          metrics: {}
-        };
-      }).filter(Boolean);
+
+      return matches
+        .map((match, index) => {
+          const primaryCapture = match.captures[0];
+          if (!primaryCapture) return null;
+          const node = primaryCapture.node;
+
+          return {
+            id: `${analyzerId}-${ruleId}-${filePath}-${node.startPosition.row}-${index}`,
+            analyzerId,
+            ruleId,
+            category,
+            severity,
+            title: titleTemplate.replace('{text}', node.text.substring(0, 40)),
+            message: messageTemplate.replace('{text}', node.text),
+            filePath,
+            range: {
+              startLine: node.startPosition.row + 1, // 1-based for Monaco
+              startColumn: node.startPosition.column + 1,
+              endLine: node.endPosition.row + 1,
+              endColumn: node.endPosition.column + 1,
+            },
+            metrics: {},
+          };
+        })
+        .filter(Boolean);
     } catch (error) {
       console.warn(`Query execution failed for ${ruleId} on ${filePath}:`, error);
       return [];

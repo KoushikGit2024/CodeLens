@@ -2,9 +2,9 @@
 
 **AI-Driven Code Intelligence and Automated Documentation System**
 
-CodeLens is a modern developer tool that transforms unfamiliar, undocumented software repositories into structured, navigable, and understandable intelligence. 
+CodeLens is a modern developer tool that transforms unfamiliar, undocumented software repositories into structured, navigable, and understandable intelligence.
 
-Instead of treating source code as plain text and dumping it blindly into an LLM (which leads to hallucinations and missed context), CodeLens uses a **"Deterministic First, AI Second"** architecture. It parses code into Abstract Syntax Trees, builds precise dependency graphs, detects architectural components, and evaluates engineering health *before* asking the AI for interpretations.
+Instead of treating source code as plain text and dumping it blindly into an LLM (which leads to hallucinations and missed context), CodeLens uses a **"Deterministic First, AI Second"** architecture. It parses code into Abstract Syntax Trees, builds precise dependency graphs, detects architectural components, and evaluates engineering health _before_ asking the AI for interpretations.
 
 ## Core Capabilities
 
@@ -15,7 +15,7 @@ Instead of treating source code as plain text and dumping it blindly into an LLM
 - 🛠️ **Refactoring Intelligence**: Translates structural risks into prioritized, actionable refactoring strategies.
 - ⚡ **Incremental Analysis**: Caches file ASTs using SHA-256 fingerprinting to ensure rapid re-analysis of large repositories.
 - 💥 **Change Impact**: Predicts the blast radius of modifying specific files (useful for CI/CD).
-- 🧠 **AI Repository Intelligence**: Integrates securely with **any compatible LLM provider** to answer questions, explain architectures, and generate automated documentation grounded *only* in deterministic facts.
+- 🧠 **AI Repository Intelligence**: Integrates securely with **any compatible LLM provider** to answer questions, explain architectures, and generate automated documentation grounded _only_ in deterministic facts.
 - 🖥️ **Interactive Code Viewer**: A Monaco-powered frontend that highlights code and embeds AI references directly onto the relevant lines.
 
 ## Architecture Overview
@@ -27,17 +27,17 @@ graph TD
     Discovery --> AST[Tree-sitter AST Analysis]
     AST --> Extraction[Canonical Symbol Extraction]
     Extraction --> Analysis[Repository Analysis]
-    
+
     Analysis --> Graph[Dependency Graph]
     Graph --> Architecture[Architecture Model]
     Graph --> Risk[Engineering Risk]
     Risk --> Refactoring[Refactoring Candidates]
-    
+
     Analysis & Graph & Architecture & Risk & Refactoring --> Dashboard[Unified Repository Intelligence]
-    
+
     Dashboard --> Context[AI Context Builder]
     Context --> LLM[AI Provider]
-    
+
     LLM & Dashboard --> UI[Developer Frontend]
 ```
 
@@ -78,6 +78,6 @@ See [docs/development.md](docs/development.md) for instructions on running the a
 
 ## Documentation Index
 
-The complete documentation for developers, contributors, and maintainers can be found in the [docs/README.md](docs/README.md) directory. 
+The complete documentation for developers, contributors, and maintainers can be found in the [docs/README.md](docs/README.md) directory.
 
 If you are an AI agent extending this codebase, you **MUST** read [AGENTS.md](AGENTS.md).

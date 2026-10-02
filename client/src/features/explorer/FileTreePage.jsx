@@ -1,17 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import ReactFlow, { 
-  Background, 
-  Controls, 
-  MiniMap, 
-  Handle, 
-  Position 
-} from 'reactflow';
+import ReactFlow, { Background, Controls, MiniMap, Handle, Position } from 'reactflow';
 import 'reactflow/dist/style.css';
 import clsx from 'clsx';
-import { 
-  Folder, 
-  FileCode, 
+import {
+  Folder,
+  FileCode,
   Image as ImageIcon,
   FileText,
   FileJson,
@@ -21,7 +15,7 @@ import {
   Loader2,
   FolderTree,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
 } from 'lucide-react';
 import { repositoryApi } from '../../shared/api';
 import PageHeader from '../../shared/components/PageHeader';
@@ -30,22 +24,31 @@ import { useRepository } from '../../shared/context/RepositoryContext';
 import { useTheme } from '../../shared/context/ThemeContext';
 
 // Maps file extensions to specific icons and colors
-const getFileIcon = (name) => {
+const getFileIcon = name => {
   const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
-  const iconProps = { className: "w-5 h-5 shrink-0" };
-  
-  switch(ext) {
-    case 'js': case 'jsx': case 'ts': case 'tsx': 
+  const iconProps = { className: 'w-5 h-5 shrink-0' };
+
+  switch (ext) {
+    case 'js':
+    case 'jsx':
+    case 'ts':
+    case 'tsx':
       return <FileCode {...iconProps} style={{ color: '#61dafb' }} />;
     case 'json':
       return <FileJson {...iconProps} style={{ color: '#f7c948' }} />;
-    case 'md': case 'txt':
+    case 'md':
+    case 'txt':
       return <FileText {...iconProps} style={{ color: '#aaa' }} />;
-    case 'sh': case 'bash':
+    case 'sh':
+    case 'bash':
       return <Terminal {...iconProps} style={{ color: '#89e051' }} />;
-    case 'sql': case 'db':
+    case 'sql':
+    case 'db':
       return <Database {...iconProps} style={{ color: '#e38c00' }} />;
-    case 'png': case 'jpg': case 'svg': case 'gif':
+    case 'png':
+    case 'jpg':
+    case 'svg':
+    case 'gif':
       return <ImageIcon {...iconProps} style={{ color: '#a855f7' }} />;
     default:
       return <FileCode {...iconProps} style={{ color: '#9ca3af' }} />;
@@ -57,34 +60,36 @@ const CustomTreeNode = ({ data }) => {
   const isActive = data.isActive; // Injected from layout map
 
   return (
-    <div className={clsx(
-      "w-[180px] h-[50px] px-3 py-2 rounded-lg border shadow-lg flex items-center gap-2 transition-all",
-      isActive ? "bg-accent/20 border-accent shadow-accent/20 scale-105 z-10" : "bg-panel",
-      isDir && !isActive ? "border-accent/40 shadow-accent/10" : "",
-      !isDir && !isActive ? "border-border/60 hover:border-accent/50 cursor-pointer" : ""
-    )}>
+    <div
+      className={clsx(
+        'w-[180px] h-[50px] px-3 py-2 rounded-lg border shadow-lg flex items-center gap-2 transition-all',
+        isActive ? 'bg-accent/20 border-accent shadow-accent/20 scale-105 z-10' : 'bg-panel',
+        isDir && !isActive ? 'border-accent/40 shadow-accent/10' : '',
+        !isDir && !isActive ? 'border-border/60 hover:border-accent/50 cursor-pointer' : ''
+      )}
+    >
       <Handle type="target" position={Position.Top} className="opacity-0" />
-      
+
       <div className="flex items-center justify-center shrink-0">
         {isDir ? <Folder className="w-5 h-5 text-yellow-400" /> : getFileIcon(data.label)}
       </div>
-      <span 
+      <span
         className={clsx(
-          "font-medium tracking-wide text-sm truncate min-w-0", 
-          isActive ? "text-accent" : (isDir ? "text-text" : "text-text/80")
+          'font-medium tracking-wide text-sm truncate min-w-0',
+          isActive ? 'text-accent' : isDir ? 'text-text' : 'text-text/80'
         )}
         title={data.label}
       >
         {data.label}
       </span>
-      
+
       <Handle type="source" position={Position.Bottom} className="opacity-0" />
     </div>
   );
 };
 
 const nodeTypes = {
-  treeNode: CustomTreeNode
+  treeNode: CustomTreeNode,
 };
 
 const NODE_WIDTH = 180;
@@ -98,7 +103,7 @@ const getLayoutedElements = (nodes, edges) => {
 
   const nodeMap = new Map();
   nodes.forEach(n => nodeMap.set(n.id, n));
-  
+
   const childrenMap = new Map();
   nodes.forEach(n => childrenMap.set(n.id, []));
   edges.forEach(e => {
@@ -115,7 +120,7 @@ const getLayoutedElements = (nodes, edges) => {
   const depths = new Map();
   const visited = new Set();
   const q = [[rootId, 0]];
-  
+
   while (q.length > 0) {
     const [id, d] = q.shift();
     if (visited.has(id)) continue;
@@ -129,7 +134,7 @@ const getLayoutedElements = (nodes, edges) => {
   // 2. DFS leaf-counter -> x slot
   let leaf = 0;
   const xSlot = new Map();
-  
+
   function place(id) {
     if (!visited.has(id)) return leaf;
     const children = childrenMap.get(id).filter(c => visited.has(c));
@@ -158,7 +163,7 @@ const getLayoutedElements = (nodes, edges) => {
       position: {
         x: slot * slotPitch,
         y: depth * V_GAP,
-      }
+      },
     };
   });
 
@@ -174,17 +179,17 @@ const flattenTree = (treeNodes, parentId = null, urlPath = null) => {
     flatNodes.push({
       id: nodeId,
       type: 'treeNode',
-      data: { 
-        label: node.name, 
-        type: node.type, 
+      data: {
+        label: node.name,
+        type: node.type,
         path: node.path,
-        isActive: urlPath && (urlPath === node.path),
+        isActive: urlPath && urlPath === node.path,
         exportBg: '#1E2335',
         exportBorder: node.type === 'directory' ? '#d29922' : '#343B54',
-        exportText: node.type === 'directory' ? '#e3b341' : '#CBD5E8'
+        exportText: node.type === 'directory' ? '#e3b341' : '#CBD5E8',
       },
     });
-    
+
     if (parentId) {
       edges.push({
         id: `${parentId}->${nodeId}`,
@@ -192,7 +197,11 @@ const flattenTree = (treeNodes, parentId = null, urlPath = null) => {
         target: nodeId,
         type: 'default',
         animated: true,
-        style: { stroke: `rgb(${getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim()})`, strokeWidth: 1.5, opacity: 0.6 }
+        style: {
+          stroke: `rgb(${getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim()})`,
+          strokeWidth: 1.5,
+          opacity: 0.6,
+        },
       });
     }
 
@@ -210,13 +219,13 @@ const filterTree = (treeNodes, searchTerm) => {
   if (!searchTerm) return treeNodes;
   const term = searchTerm.toLowerCase();
 
-  const filterNode = (node) => {
+  const filterNode = node => {
     // 1. Is this node a direct match?
     const isMatch = node.name.toLowerCase().includes(term);
-    
+
     // 2. If it's a folder match, we return it and ALL its children exactly as they are.
     if (isMatch && node.type === 'directory') {
-      return { ...node }; 
+      return { ...node };
     }
 
     // 3. Check children
@@ -229,7 +238,7 @@ const filterTree = (treeNodes, searchTerm) => {
     if (isMatch || childMatches.length > 0) {
       return {
         ...node,
-        children: childMatches.length > 0 ? childMatches : node.children
+        children: childMatches.length > 0 ? childMatches : node.children,
       };
     }
 
@@ -246,7 +255,7 @@ export default function FileTreePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const urlPath = searchParams.get('path');
-  
+
   const { repo, fileTree, loading: repoLoading, error: repoError } = useRepository();
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -265,12 +274,14 @@ export default function FileTreePage() {
     let treeData = fileTree;
     // Ensure a single root node for perfect centering and symmetry
     if (treeData.length > 1 || (treeData.length === 1 && treeData[0].type !== 'directory')) {
-      treeData = [{
-        path: 'root-repo',
-        name: repo?.name || 'Repository Root',
-        type: 'directory',
-        children: treeData
-      }];
+      treeData = [
+        {
+          path: 'root-repo',
+          name: repo?.name || 'Repository Root',
+          type: 'directory',
+          children: treeData,
+        },
+      ];
     }
     return treeData;
   }, [fileTree, repo?.name]);
@@ -282,11 +293,14 @@ export default function FileTreePage() {
     return getLayoutedElements(flattened.nodes, flattened.edges);
   }, [rawTree, debouncedSearch, urlPath]);
 
-  const onNodeDoubleClick = useCallback((event, node) => {
-    if (node.data.path === 'root-repo') return;
-    // Navigate to source browser for both files AND folders!
-    navigate(`/explore/${repoId}/source?path=${encodeURIComponent(node.data.path)}`);
-  }, [navigate, repoId]);
+  const onNodeDoubleClick = useCallback(
+    (event, node) => {
+      if (node.data.path === 'root-repo') return;
+      // Navigate to source browser for both files AND folders!
+      navigate(`/explore/${repoId}/source?path=${encodeURIComponent(node.data.path)}`);
+    },
+    [navigate, repoId]
+  );
 
   // Auto-center when search changes (debounced)
   useEffect(() => {
@@ -296,11 +310,10 @@ export default function FileTreePage() {
         // Small delay to ensure ReactFlow has processed the new layout dimensions
         setTimeout(() => {
           if (reactFlowInstance.current) {
-            reactFlowInstance.current.setCenter(
-              rootNode.position.x + 90,
-              rootNode.position.y + 25,
-              { zoom: 1, duration: 800 }
-            );
+            reactFlowInstance.current.setCenter(rootNode.position.x + 90, rootNode.position.y + 25, {
+              zoom: 1,
+              duration: 800,
+            });
           }
         }, 50);
       }
@@ -310,21 +323,22 @@ export default function FileTreePage() {
 
   return (
     <div className="flex-1 h-full flex flex-col bg-surface text-text overflow-hidden">
-      <div className={clsx(
-        "shrink-0 flex flex-col lg:flex-row lg:items-center justify-between relative z-20 transition-all duration-300",
-        isHeaderCollapsed ? "p-3 lg:px-6 lg:pt-6 gap-0 lg:gap-4" : "px-4 pt-4 sm:px-6 sm:pt-6 gap-4"
-      )}>
-        
+      <div
+        className={clsx(
+          'shrink-0 flex flex-col lg:flex-row lg:items-center justify-between relative z-20 transition-all duration-300',
+          isHeaderCollapsed ? 'p-3 lg:px-6 lg:pt-6 gap-0 lg:gap-4' : 'px-4 pt-4 sm:px-6 sm:pt-6 gap-4'
+        )}
+      >
         <div className={`flex justify-between w-full lg:w-auto ${isHeaderCollapsed ? 'items-center' : 'items-start'}`}>
-          <PageHeader 
-            title="Architectural File Tree" 
+          <PageHeader
+            title="Architectural File Tree"
             description="A visual, interactive topology of your entire codebase."
             icon={FolderTree}
             collapseOnMobile={isHeaderCollapsed}
           />
-          
-          <button 
-            onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)} 
+
+          <button
+            onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
             className={`lg:hidden p-1.5 text-muted hover:text-text bg-panel rounded-lg border border-border/60 shadow-sm shrink-0 transition-colors ${isHeaderCollapsed ? '' : 'mt-1'}`}
             title="Toggle Controls"
           >
@@ -332,10 +346,12 @@ export default function FileTreePage() {
           </button>
         </div>
 
-        <div className={clsx(
-          "flex-col lg:flex-row items-stretch lg:items-center gap-3 w-full lg:w-auto transition-all duration-300",
-          isHeaderCollapsed ? "hidden lg:flex" : "flex"
-        )}>
+        <div
+          className={clsx(
+            'flex-col lg:flex-row items-stretch lg:items-center gap-3 w-full lg:w-auto transition-all duration-300',
+            isHeaderCollapsed ? 'hidden lg:flex' : 'flex'
+          )}
+        >
           <div className="relative w-full lg:w-72 group">
             <div className="absolute inset-0 bg-accent/20 rounded-lg blur opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-500"></div>
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted group-focus-within:text-accent transition-colors z-10" />
@@ -343,14 +359,14 @@ export default function FileTreePage() {
               type="text"
               placeholder="Search nodes by name..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={e => setSearchTerm(e.target.value)}
               className="relative w-full bg-panel/80 backdrop-blur border border-border/60 hover:border-accent/40 rounded-lg pl-10 pr-4 py-2 text-sm text-text placeholder:text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all duration-300 z-10 shadow-sm shadow-black/20"
             />
           </div>
-          <ExportDiagramButton 
-            elementRef={diagramRef} 
-            filename={`file-tree-${repoId.replace(/[^a-zA-Z0-9-]/g, '_')}`} 
-            className="z-10 w-full lg:w-auto" 
+          <ExportDiagramButton
+            elementRef={diagramRef}
+            filename={`file-tree-${repoId.replace(/[^a-zA-Z0-9-]/g, '_')}`}
+            className="z-10 w-full lg:w-auto"
             availableToggles={['controls', 'minimap']}
             nodes={nodes}
             edges={edges}
@@ -374,12 +390,12 @@ export default function FileTreePage() {
             <p className="text-lg font-medium">No files found</p>
           </div>
         ) : (
-            <ReactFlow
+          <ReactFlow
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
             onNodeDoubleClick={onNodeDoubleClick}
-            onInit={(rf) => {
+            onInit={rf => {
               reactFlowInstance.current = rf;
               setTimeout(() => {
                 const rootNode = nodes.find(n => n.id === 'root-repo') || nodes[0];
@@ -400,12 +416,21 @@ export default function FileTreePage() {
             nodesConnectable={false}
             proOptions={{ hideAttribution: true }}
           >
-            <Background color={`rgb(${getComputedStyle(document.documentElement).getPropertyValue('--color-border').trim()})`} gap={24} size={2} variant="dots" />
+            <Background
+              color={`rgb(${getComputedStyle(document.documentElement).getPropertyValue('--color-border').trim()})`}
+              gap={24}
+              size={2}
+              variant="dots"
+            />
             <Controls className="bg-panel border-border" />
-            <MiniMap 
-              maskColor={isLight ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)"}
+            <MiniMap
+              maskColor={isLight ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)'}
               className="bg-panel border border-border"
-              nodeColor={n => n.data?.type === 'directory' ? '#facc15' : `rgb(${getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim()})`}
+              nodeColor={n =>
+                n.data?.type === 'directory'
+                  ? '#facc15'
+                  : `rgb(${getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim()})`
+              }
             />
           </ReactFlow>
         )}

@@ -6,7 +6,7 @@ const PORT = process.env.PORT || 3001;
 
 app.listen(PORT, async () => {
   console.log(`[CodeLens] Server running on http://localhost:${PORT}`);
-  
+
   if (isProviderConfigured()) {
     let providerName = 'Unknown';
     if (process.env.GEMINI_API_KEY) providerName = 'Google Gemini';
@@ -15,7 +15,7 @@ app.listen(PORT, async () => {
 
     // console.log(`[CodeLens] ⏳ Verifying connection to ${providerName}...`);
     // const isConnected = await verifyProviderConnection();
-    // 
+    //
     // if (isConnected) {
     //   console.log(`[CodeLens] ✅ AI Provider Online: ${providerName}`);
     // } else {

@@ -17,7 +17,7 @@ const getAllBookmarks = () => {
 /**
  * Saves all bookmarks to localStorage
  */
-const saveAllBookmarks = (data) => {
+const saveAllBookmarks = data => {
   try {
     localStorage.setItem(BOOKMARKS_STORAGE_KEY, JSON.stringify(data));
   } catch (error) {
@@ -28,7 +28,7 @@ const saveAllBookmarks = (data) => {
 /**
  * Get all bookmarks for a specific repository
  */
-export const getBookmarks = (repoId) => {
+export const getBookmarks = repoId => {
   if (!repoId) return {};
   const allBookmarks = getAllBookmarks();
   return allBookmarks[repoId] || {};
@@ -55,23 +55,25 @@ export const isBookmarked = (repoId, filePath) => {
  */
 export const addBookmark = (repoId, filePath, note = '') => {
   if (!repoId || !filePath) return;
-  
+
   const allBookmarks = getAllBookmarks();
   if (!allBookmarks[repoId]) {
     allBookmarks[repoId] = {};
   }
-  
+
   allBookmarks[repoId][filePath] = {
     note,
-    bookmarkedAt: new Date().toISOString()
+    bookmarkedAt: new Date().toISOString(),
   };
-  
+
   saveAllBookmarks(allBookmarks);
-  
+
   // Dispatch a custom event so UI components can re-render if needed
-  window.dispatchEvent(new CustomEvent('codelens-bookmarks-updated', {
-    detail: { repoId, filePath, action: 'add' }
-  }));
+  window.dispatchEvent(
+    new CustomEvent('codelens-bookmarks-updated', {
+      detail: { repoId, filePath, action: 'add' },
+    })
+  );
 };
 
 /**
@@ -79,19 +81,21 @@ export const addBookmark = (repoId, filePath, note = '') => {
  */
 export const removeBookmark = (repoId, filePath) => {
   if (!repoId || !filePath) return;
-  
+
   const allBookmarks = getAllBookmarks();
   if (!allBookmarks[repoId] || !allBookmarks[repoId][filePath]) {
     return; // Doesn't exist
   }
-  
+
   delete allBookmarks[repoId][filePath];
   saveAllBookmarks(allBookmarks);
-  
+
   // Dispatch event
-  window.dispatchEvent(new CustomEvent('codelens-bookmarks-updated', {
-    detail: { repoId, filePath, action: 'remove' }
-  }));
+  window.dispatchEvent(
+    new CustomEvent('codelens-bookmarks-updated', {
+      detail: { repoId, filePath, action: 'remove' },
+    })
+  );
 };
 
 /**
@@ -99,10 +103,10 @@ export const removeBookmark = (repoId, filePath) => {
  */
 export const removeBookmarks = (repoId, filePaths) => {
   if (!repoId || !filePaths || !filePaths.length) return;
-  
+
   const allBookmarks = getAllBookmarks();
   if (!allBookmarks[repoId]) return;
-  
+
   let changed = false;
   for (const filePath of filePaths) {
     if (allBookmarks[repoId][filePath]) {
@@ -110,12 +114,14 @@ export const removeBookmarks = (repoId, filePaths) => {
       changed = true;
     }
   }
-  
+
   if (changed) {
     saveAllBookmarks(allBookmarks);
-    window.dispatchEvent(new CustomEvent('codelens-bookmarks-updated', {
-      detail: { repoId, action: 'removeBatch' }
-    }));
+    window.dispatchEvent(
+      new CustomEvent('codelens-bookmarks-updated', {
+        detail: { repoId, action: 'removeBatch' },
+      })
+    );
   }
 };
 
@@ -124,35 +130,39 @@ export const removeBookmarks = (repoId, filePaths) => {
  */
 export const updateNote = (repoId, filePath, note) => {
   if (!repoId || !filePath) return;
-  
+
   const allBookmarks = getAllBookmarks();
   if (!allBookmarks[repoId] || !allBookmarks[repoId][filePath]) {
     return; // Cannot update a non-existent bookmark
   }
-  
+
   allBookmarks[repoId][filePath].note = note;
   saveAllBookmarks(allBookmarks);
-  
+
   // Dispatch event
-  window.dispatchEvent(new CustomEvent('codelens-bookmarks-updated', {
-    detail: { repoId, filePath, action: 'update' }
-  }));
+  window.dispatchEvent(
+    new CustomEvent('codelens-bookmarks-updated', {
+      detail: { repoId, filePath, action: 'update' },
+    })
+  );
 };
 
 /**
  * Clear all bookmarks for a repository
  */
-export const clearRepoBookmarks = (repoId) => {
+export const clearRepoBookmarks = repoId => {
   if (!repoId) return;
   const allBookmarks = getAllBookmarks();
   if (allBookmarks[repoId]) {
     delete allBookmarks[repoId];
     saveAllBookmarks(allBookmarks);
-    
+
     // Dispatch event
-    window.dispatchEvent(new CustomEvent('codelens-bookmarks-updated', {
-      detail: { repoId, action: 'clear' }
-    }));
+    window.dispatchEvent(
+      new CustomEvent('codelens-bookmarks-updated', {
+        detail: { repoId, action: 'clear' },
+      })
+    );
   }
 };
 
@@ -166,13 +176,13 @@ export const useBookmark = (repoId, filePath) => {
 
   useEffect(() => {
     setBookmark(getBookmark(repoId, filePath));
-    
-    const handler = (e) => {
+
+    const handler = e => {
       if (e.detail.repoId === repoId && e.detail.filePath === filePath) {
         setBookmark(getBookmark(repoId, filePath));
       }
     };
-    
+
     window.addEventListener('codelens-bookmarks-updated', handler);
     return () => window.removeEventListener('codelens-bookmarks-updated', handler);
   }, [repoId, filePath]);
@@ -183,18 +193,18 @@ export const useBookmark = (repoId, filePath) => {
 /**
  * React hook to get all bookmarks for a repository and listen for updates
  */
-export const useBookmarksList = (repoId) => {
+export const useBookmarksList = repoId => {
   const [bookmarks, setBookmarks] = useState(() => getBookmarks(repoId));
 
   useEffect(() => {
     setBookmarks(getBookmarks(repoId));
-    
-    const handler = (e) => {
+
+    const handler = e => {
       if (e.detail.repoId === repoId) {
         setBookmarks(getBookmarks(repoId));
       }
     };
-    
+
     window.addEventListener('codelens-bookmarks-updated', handler);
     return () => window.removeEventListener('codelens-bookmarks-updated', handler);
   }, [repoId]);

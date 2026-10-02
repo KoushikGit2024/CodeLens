@@ -5,24 +5,24 @@ import { clsx } from 'clsx';
 export default function RefactoringEngineTab() {
   return (
     <div className="w-full flex flex-col gap-6 animate-in fade-in zoom-in duration-500">
-      
       {/* Header section */}
       <div className="flex flex-col items-center text-center space-y-4 max-w-3xl mx-auto mb-8">
         <h1 className="flex items-center justify-center gap-4 text-4xl md:text-6xl font-light tracking-tight text-text">
           <Hammer className="w-10 h-10 md:w-14 md:h-14 text-accent" strokeWidth={1.5} />
-          <span>Refactoring <span className="font-semibold text-accent">Engine</span></span>
+          <span>
+            Refactoring <span className="font-semibold text-accent">Engine</span>
+          </span>
         </h1>
         <p className="text-xl text-muted mt-6 leading-relaxed">
-          Evaluate AI-suggested code improvements via a side-by-side diff viewer and review prioritized refactoring candidates across your codebase.
+          Evaluate AI-suggested code improvements via a side-by-side diff viewer and review prioritized refactoring
+          candidates across your codebase.
         </p>
       </div>
 
       {/* Bento Grid Showcase */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 w-full">
-        
         {/* Row 1: Prioritized Debt (Col Span 5) */}
         <div className="md:col-span-5 group relative overflow-hidden rounded-3xl border border-border bg-panel p-8 hover:border-accent/50 transition-colors flex flex-col justify-between">
-          
           <div className="relative z-10 mb-6 flex flex-col h-full">
             <div className="flex items-center gap-3 mb-4">
               <Layers className="w-6 h-6 text-accent" />
@@ -32,73 +32,77 @@ export default function RefactoringEngineTab() {
               CodeLens organizes architectural issues into an actionable list of refactoring candidates.
             </p>
             <p className="text-muted leading-relaxed mb-6">
-              Candidates are strictly prioritized by severity—Critical, High Priority, and General Suggestions—ensuring you tackle the most dangerous architectural flaws first.
+              Candidates are strictly prioritized by severity—Critical, High Priority, and General Suggestions—ensuring
+              you tackle the most dangerous architectural flaws first.
             </p>
-            
+
             <div className="mt-auto flex flex-col gap-2 p-3 border border-border bg-surface rounded-xl">
-               <div className="flex flex-col gap-1 p-2 bg-panel border border-border rounded">
-                 <div className="flex justify-between items-center text-[10px] text-muted"><span>Score 85</span> <span className="uppercase text-accent">Critical</span></div>
-                 <div className="text-sm font-mono text-text">auth_service.js</div>
-               </div>
-               <div className="flex flex-col gap-1 p-2 bg-panel border border-border rounded">
-                 <div className="flex justify-between items-center text-[10px] text-muted"><span>Score 62</span> <span className="uppercase text-accent">High Priority</span></div>
-                 <div className="text-sm font-mono text-text">database.config.js</div>
-               </div>
+              <div className="flex flex-col gap-1 p-2 bg-panel border border-border rounded">
+                <div className="flex justify-between items-center text-[10px] text-muted">
+                  <span>Score 85</span> <span className="uppercase text-accent">Critical</span>
+                </div>
+                <div className="text-sm font-mono text-text">auth_service.js</div>
+              </div>
+              <div className="flex flex-col gap-1 p-2 bg-panel border border-border rounded">
+                <div className="flex justify-between items-center text-[10px] text-muted">
+                  <span>Score 62</span> <span className="uppercase text-accent">High Priority</span>
+                </div>
+                <div className="text-sm font-mono text-text">database.config.js</div>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Row 1: Diff Viewer (Col Span 7) */}
         <div className="md:col-span-7 group relative overflow-hidden rounded-3xl border border-border bg-panel p-8 hover:border-accent/50 transition-colors flex flex-col justify-between">
-          
           <div className="relative z-10 mb-6">
             <div className="flex items-center gap-3 mb-4">
               <SplitSquareHorizontal className="w-6 h-6 text-accent" />
               <h3 className="text-2xl font-medium text-text">Side-by-Side Diff Viewer</h3>
             </div>
             <p className="text-muted leading-relaxed mb-6">
-              When reviewing a suggested refactoring, CodeLens provides a Side-by-Side Diff Viewer powered by Monaco Editor.
+              When reviewing a suggested refactoring, CodeLens provides a Side-by-Side Diff Viewer powered by Monaco
+              Editor.
             </p>
             <p className="text-muted leading-relaxed">
-              This allows you to visually compare the exact character changes between your original problematic code and the cleaner code generated by the analysis engine.
+              This allows you to visually compare the exact character changes between your original problematic code and
+              the cleaner code generated by the analysis engine.
             </p>
           </div>
-          
+
           {/* Mock UI Element: Diff Viewer */}
           <div className="relative z-10 mt-auto border border-border rounded-xl bg-surface flex flex-col font-mono text-[10px] sm:text-xs overflow-hidden">
-             <div className="flex">
-               {/* Original */}
-               <div className="flex-1 p-4 border-r border-border/50 bg-panel relative">
-                 <div className="absolute top-0 right-0 px-2 py-0.5 bg-surface border-b border-l border-border text-muted rounded-bl font-bold">Original</div>
-                 <div className="text-muted mt-2">
-                   <span className="text-accent">function</span> <span className="text-text">process</span>(data) {'{\n'}
-                 </div>
-                 <div className="text-muted">
-                   {'  '}return data.map(x =&gt; x * 2).filter(x =&gt; x &gt; 10);
-                 </div>
-                 <div className="text-muted">
-                   {'}'}
-                 </div>
-               </div>
-               
-               {/* Refactored */}
-               <div className="flex-1 p-4 bg-panel relative">
-                 <div className="absolute top-0 right-0 px-2 py-0.5 bg-surface border-b border-l border-border text-muted rounded-bl font-bold">Refactored</div>
-                 <div className="text-muted mt-2">
-                   <span className="text-accent">const</span> <span className="text-text">process</span> = (data) =&gt; {'{\n'}
-                 </div>
-                 <div className="text-muted">
-                   {'  '}const doubled = data.map(x =&gt; x * 2);{'\n'}
-                   {'  '}return doubled.filter(x =&gt; x &gt; 10);
-                 </div>
-                 <div className="text-muted">
-                   {'}'}
-                 </div>
-               </div>
-             </div>
+            <div className="flex">
+              {/* Original */}
+              <div className="flex-1 p-4 border-r border-border/50 bg-panel relative">
+                <div className="absolute top-0 right-0 px-2 py-0.5 bg-surface border-b border-l border-border text-muted rounded-bl font-bold">
+                  Original
+                </div>
+                <div className="text-muted mt-2">
+                  <span className="text-accent">function</span> <span className="text-text">process</span>(data) {'{\n'}
+                </div>
+                <div className="text-muted">{'  '}return data.map(x =&gt; x * 2).filter(x =&gt; x &gt; 10);</div>
+                <div className="text-muted">{'}'}</div>
+              </div>
+
+              {/* Refactored */}
+              <div className="flex-1 p-4 bg-panel relative">
+                <div className="absolute top-0 right-0 px-2 py-0.5 bg-surface border-b border-l border-border text-muted rounded-bl font-bold">
+                  Refactored
+                </div>
+                <div className="text-muted mt-2">
+                  <span className="text-accent">const</span> <span className="text-text">process</span> = (data) =&gt;{' '}
+                  {'{\n'}
+                </div>
+                <div className="text-muted">
+                  {'  '}const doubled = data.map(x =&gt; x * 2);{'\n'}
+                  {'  '}return doubled.filter(x =&gt; x &gt; 10);
+                </div>
+                <div className="text-muted">{'}'}</div>
+              </div>
+            </div>
           </div>
         </div>
-
       </div>
     </div>
   );

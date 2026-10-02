@@ -10,10 +10,14 @@ describe('Mermaid Transformer', () => {
   it('escapes special characters in node IDs', () => {
     const model = {
       components: [
-        { id: 'my-special@node!', data: { label: 'my-special@node!', layer: 'Domain' }, health: { severity: 'healthy' } }
+        {
+          id: 'my-special@node!',
+          data: { label: 'my-special@node!', layer: 'Domain' },
+          health: { severity: 'healthy' },
+        },
       ],
       relations: [],
-      violations: []
+      violations: [],
     };
     const result = toMermaid(model);
     expect(result).toContain('my_special_node_["my-special@node!"]');
@@ -23,10 +27,10 @@ describe('Mermaid Transformer', () => {
     const model = {
       components: [
         { id: 'CompA', layer: 'Domain', health: { severity: 'healthy' } },
-        { id: 'CompB', layer: 'API', health: { severity: 'healthy' } }
+        { id: 'CompB', layer: 'API', health: { severity: 'healthy' } },
       ],
       relations: [],
-      violations: []
+      violations: [],
     };
     const result = toMermaid(model);
     expect(result).toContain('subgraph Domain [Domain]');
@@ -39,14 +43,10 @@ describe('Mermaid Transformer', () => {
     const model = {
       components: [
         { id: 'CompA', layer: 'Domain', health: { severity: 'healthy' } },
-        { id: 'CompB', layer: 'API', health: { severity: 'healthy' } }
+        { id: 'CompB', layer: 'API', health: { severity: 'healthy' } },
       ],
-      relations: [
-        { source: 'CompB', target: 'CompA', type: 'calls' }
-      ],
-      violations: [
-        { sourceComponent: 'CompB', targetComponent: 'CompA' }
-      ]
+      relations: [{ source: 'CompB', target: 'CompA', type: 'calls' }],
+      violations: [{ sourceComponent: 'CompB', targetComponent: 'CompA' }],
     };
     const result = toMermaid(model);
     expect(result).toContain('CompB -->|"calls"| CompA');
@@ -55,13 +55,9 @@ describe('Mermaid Transformer', () => {
 
   it('extracts external dependencies', () => {
     const model = {
-      components: [
-        { id: 'CompA', layer: 'Domain', health: { severity: 'healthy' } }
-      ],
-      relations: [
-        { source: 'CompA', target: 'pkg:react', type: 'imports', targetType: 'external' }
-      ],
-      violations: []
+      components: [{ id: 'CompA', layer: 'Domain', health: { severity: 'healthy' } }],
+      relations: [{ source: 'CompA', target: 'pkg:react', type: 'imports', targetType: 'external' }],
+      violations: [],
     };
     const result = toMermaid(model);
     expect(result).toContain('subgraph Externals');

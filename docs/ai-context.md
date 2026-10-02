@@ -73,12 +73,12 @@ and removing stop words. Minimum token length: 2 characters.
 
 Each repository file gets a numeric relevance score:
 
-| Signal | Points | Example |
-|--------|--------|---------|
-| Filename/path contains term | +3 | `authController.js` ↔ `authentication` |
-| CamelCase stem part contains term | +3 | `AuthController` → `['auth','controller']` → `auth` in `authentication` |
-| Symbol name matches term | +2 | symbol `login` ↔ `login` |
-| Import source contains term | +1 | `require('express')` ↔ `express` |
+| Signal                            | Points | Example                                                                 |
+| --------------------------------- | ------ | ----------------------------------------------------------------------- |
+| Filename/path contains term       | +3     | `authController.js` ↔ `authentication`                                  |
+| CamelCase stem part contains term | +3     | `AuthController` → `['auth','controller']` → `auth` in `authentication` |
+| Symbol name matches term          | +2     | symbol `login` ↔ `login`                                                |
+| Import source contains term       | +1     | `require('express')` ↔ `express`                                        |
 
 Matching is bidirectional: `stem.includes(term) OR term.includes(stem)`.
 CamelCase filenames are split before matching: `authController` → `['auth', 'controller']`.
@@ -96,12 +96,12 @@ If no file scores > 0 (e.g. query is unrelated to the codebase), the first
 
 ### Context limits
 
-| Limit | Default | Override via `opts` |
-|-------|---------|---------------------|
-| Max files in context | 8 | `maxFiles` |
-| Max total source characters | 24 000 | `maxSourceChars` |
-| Max symbols per file | 20 | `maxSymbolsPerFile` |
-| Source lines around relevant symbol | 40 | `snippetLines` |
+| Limit                               | Default | Override via `opts` |
+| ----------------------------------- | ------- | ------------------- |
+| Max files in context                | 8       | `maxFiles`          |
+| Max total source characters         | 24 000  | `maxSourceChars`    |
+| Max symbols per file                | 20      | `maxSymbolsPerFile` |
+| Source lines around relevant symbol | 40      | `snippetLines`      |
 
 ---
 
@@ -204,11 +204,13 @@ error in the Q&A panel.
 Ask a natural-language question about an analyzed repository.
 
 **Request:**
+
 ```json
 { "question": "How does authentication work?" }
 ```
 
 **Response `200`:**
+
 ```json
 {
   "question": "How does authentication work?",
@@ -231,15 +233,15 @@ Ask a natural-language question about an analyzed repository.
 
 **Error responses:**
 
-| Status | Condition |
-|--------|-----------|
-| `400` | Missing or empty question; question > 2000 chars |
-| `202` | Repository still being analyzed |
-| `404` | Repository not found or analysis unavailable |
-| `409` | Repository not in `ready` state |
-| `500` | Context build failure |
-| `502` | AI provider call failed |
-| `503` | AI provider not configured (`configured: false` in body) |
+| Status | Condition                                                |
+| ------ | -------------------------------------------------------- |
+| `400`  | Missing or empty question; question > 2000 chars         |
+| `202`  | Repository still being analyzed                          |
+| `404`  | Repository not found or analysis unavailable             |
+| `409`  | Repository not in `ready` state                          |
+| `500`  | Context build failure                                    |
+| `502`  | AI provider call failed                                  |
+| `503`  | AI provider not configured (`configured: false` in body) |
 
 **File references in answer:**
 
@@ -269,19 +271,22 @@ The AI prompt explicitly instructs the model to:
 All scoring logic is in `scoreFiles()` in `server/src/ai/contextBuilder.js`.
 
 To change score weights, modify the constants in the loop:
+
 ```js
-score += 3;  // filename match — change to different weight
-score += 2;  // symbol match
-score += 1;  // import match
+score += 3; // filename match — change to different weight
+score += 2; // symbol match
+score += 1; // import match
 ```
 
 To add a new signal (e.g. +1 for files in the same directory as a matched file):
+
 1. Add your logic inside the `scoreFiles()` loop.
 2. Add tests in `server/tests/ai/contextBuilder.test.js`.
 
 ### Changing context limits
 
 Pass `opts` to `buildContext()`:
+
 ```js
 buildContext(analysis, question, extractPath, {
   maxFiles: 12,
@@ -309,6 +314,7 @@ console.log(buildPrompt(context));
 ### Testing the AI layer
 
 All tests are in `server/tests/ai/`. The AI provider is always mocked:
+
 ```bash
 cd server && npm test
 ```
@@ -329,11 +335,11 @@ No real external API calls are made in tests.
 
 ## Known Limitations
 
-| Limitation | Notes |
-|------------|-------|
-| IAM token is fetched per request | Acceptable for low traffic; add caching if request rate increases |
-| No conversation history | Each question is answered independently |
-| Simple keyword matching only | No semantic/embedding-based retrieval yet |
-| Only JS/TS files have symbol analysis | Other files matched by filename only |
-| Long questions may produce more stop-word filtered tokens | Questions > ~10 meaningful words work best |
-| Configured AI | Other providers require code addition; well-documented above |
+| Limitation                                                | Notes                                                             |
+| --------------------------------------------------------- | ----------------------------------------------------------------- |
+| IAM token is fetched per request                          | Acceptable for low traffic; add caching if request rate increases |
+| No conversation history                                   | Each question is answered independently                           |
+| Simple keyword matching only                              | No semantic/embedding-based retrieval yet                         |
+| Only JS/TS files have symbol analysis                     | Other files matched by filename only                              |
+| Long questions may produce more stop-word filtered tokens | Questions > ~10 meaningful words work best                        |
+| Configured AI                                             | Other providers require code addition; well-documented above      |

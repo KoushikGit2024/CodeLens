@@ -1,7 +1,7 @@
 /**
  * TypeScriptParser.js
  *
- * It extends the JavaScript parser, then extracts TypeScript-specific syntax nodes, 
+ * It extends the JavaScript parser, then extracts TypeScript-specific syntax nodes,
  * and then it applies the shared static analysis schemas to the results.
  *
  * TypeScript is a superset of JavaScript. The tree-sitter TypeScript grammar
@@ -19,12 +19,7 @@
  */
 
 import { JavaScriptParser } from './javascript.parser.js';
-import {
-  locationFromNode,
-  createClass,
-  createMethod,
-  createFunction
-} from '../symbols.js';
+import { locationFromNode, createClass, createMethod, createFunction } from '../symbols.js';
 
 // We need the nodeText helper — reproduce it here (it is not exported from JavaScriptParser)
 function nodeText(node, source) {
@@ -48,7 +43,7 @@ export class TypeScriptParser extends JavaScriptParser {
   // ── Override Findings to intercept TS-specific analysis ─────────────────────
 
   /**
-   * It calls the base JS findings, then extracts TypeScript specific typing issues, 
+   * It calls the base JS findings, then extracts TypeScript specific typing issues,
    * and then it applies them into a unified array of analysis findings.
    */
   extractAdvancedFindings(rootNode, filePath) {
@@ -58,21 +53,37 @@ export class TypeScriptParser extends JavaScriptParser {
 
     // It defines the explicit any type query, then extracts the occurrences, and then it applies the maintainability warning schema.
     const anyTypeQuery = `(predefined_type) @type (#eq? @type "any")`;
-    tsFindings.push(...this.extractFindings(
-      rootNode, anyTypeQuery, filePath, 'strictness', 'ANY_TYPE_USAGE', 'maintainability', 'warning',
-      'Explicit `any` type used',
-      'Using `any` defeats TypeScript\'s strict typing. Consider using `unknown` or a specific interface.'
-    ));
+    tsFindings.push(
+      ...this.extractFindings(
+        rootNode,
+        anyTypeQuery,
+        filePath,
+        'strictness',
+        'ANY_TYPE_USAGE',
+        'maintainability',
+        'warning',
+        'Explicit `any` type used',
+        "Using `any` defeats TypeScript's strict typing. Consider using `unknown` or a specific interface."
+      )
+    );
 
     // It isolates the exported declarations, then extracts the API boundary elements, and then it applies the architectural info schema.
     const exportQuery = `
       (export_statement declaration: (_) @exported_decl)
     `;
-    tsFindings.push(...this.extractFindings(
-      rootNode, exportQuery, filePath, 'architecture', 'PUBLIC_API_SURFACE', 'architecture', 'info',
-      'Public Export Detected',
-      'This declaration is part of the file\'s public API surface.'
-    ));
+    tsFindings.push(
+      ...this.extractFindings(
+        rootNode,
+        exportQuery,
+        filePath,
+        'architecture',
+        'PUBLIC_API_SURFACE',
+        'architecture',
+        'info',
+        'Public Export Detected',
+        "This declaration is part of the file's public API surface."
+      )
+    );
 
     return [...baseFindings, ...tsFindings];
   }
@@ -80,7 +91,7 @@ export class TypeScriptParser extends JavaScriptParser {
   // ── Override _walk to intercept TS-specific node types ────────────────────
 
   /**
-   * It evaluates the AST node type, then extracts interface/type declarations, 
+   * It evaluates the AST node type, then extracts interface/type declarations,
    * and then it applies the parent JavaScript parser walk for all other types.
    */
   _walk(node, source, symbols, className) {
@@ -122,7 +133,7 @@ export class TypeScriptParser extends JavaScriptParser {
     if (!nameNode) return;
 
     const name = nodeText(nameNode, source);
-    const sym  = createClass({ name, superClass: null, location: locationFromNode(node) });
+    const sym = createClass({ name, superClass: null, location: locationFromNode(node) });
     sym.tsKind = 'interface'; // TypeScript-specific extension field
     symbols.push(sym);
   }
@@ -135,7 +146,7 @@ export class TypeScriptParser extends JavaScriptParser {
     if (!nameNode) return;
 
     const name = nodeText(nameNode, source);
-    const sym  = createFunction({ name, async: false, generator: false, params: [], location: locationFromNode(node) });
+    const sym = createFunction({ name, async: false, generator: false, params: [], location: locationFromNode(node) });
     sym.tsKind = 'type'; // TypeScript-specific extension field
     symbols.push(sym);
   }
@@ -147,11 +158,11 @@ export class TypeScriptParser extends JavaScriptParser {
     const nameNode = node.childForFieldName('name');
     if (!nameNode) return;
 
-    const name     = nodeText(nameNode, source);
+    const name = nodeText(nameNode, source);
     const isStatic = nodeHasChild(node, 'static');
-    const isAsync  = nodeHasChild(node, 'async');
-    const isGen    = nodeHasChild(node, '*');
-    const params   = this._extractParams(node, source);
+    const isAsync = nodeHasChild(node, 'async');
+    const isGen = nodeHasChild(node, '*');
+    const params = this._extractParams(node, source);
 
     // TypeScript access modifier: first named child may be accessibility_modifier
     let visibility = 'public';
@@ -163,15 +174,17 @@ export class TypeScriptParser extends JavaScriptParser {
       }
     }
 
-    symbols.push(createMethod({
-      name,
-      className,
-      static: isStatic,
-      async: isAsync,
-      generator: isGen,
-      visibility,
-      params,
-      location: locationFromNode(node),
-    }));
+    symbols.push(
+      createMethod({
+        name,
+        className,
+        static: isStatic,
+        async: isAsync,
+        generator: isGen,
+        visibility,
+        params,
+        location: locationFromNode(node),
+      })
+    );
   }
 }

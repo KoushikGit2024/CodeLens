@@ -70,7 +70,7 @@ ${adr.evidence}
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `adr-${adr.id.substring(0,8)}_${dateStamp}.md`;
+    a.download = `adr-${adr.id.substring(0, 8)}_${dateStamp}.md`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -84,7 +84,10 @@ ${adr.evidence}
           <FileText className="w-4 h-4 text-accent" />
           <h2 className="text-sm font-semibold text-text">Draft Architecture Decision Record</h2>
         </div>
-        <button onClick={onClose} className="p-1.5 text-muted hover:text-text rounded hover:bg-surface transition-colors">
+        <button
+          onClick={onClose}
+          className="p-1.5 text-muted hover:text-text rounded hover:bg-surface transition-colors"
+        >
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -100,7 +103,10 @@ ${adr.evidence}
             <AlertCircle className="w-8 h-8 mb-2" />
             <span className="font-semibold mb-2">Generation Failed</span>
             <p className="text-sm text-center mb-4">{error}</p>
-            <button onClick={generate} className="px-4 py-2 bg-danger/20 hover:bg-danger/30 rounded transition-colors text-sm flex items-center gap-2">
+            <button
+              onClick={generate}
+              className="px-4 py-2 bg-danger/20 hover:bg-danger/30 rounded transition-colors text-sm flex items-center gap-2"
+            >
               <RefreshCw className="w-4 h-4" /> Retry
             </button>
           </div>
@@ -108,18 +114,18 @@ ${adr.evidence}
           <div className="flex flex-col gap-5">
             <div>
               <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1">Title</label>
-              <input 
-                value={adr.title || ''} 
-                onChange={(e) => handleChange('title', e.target.value)}
+              <input
+                value={adr.title || ''}
+                onChange={e => handleChange('title', e.target.value)}
                 className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm text-text focus:outline-none focus:border-accent"
               />
             </div>
-            
+
             <div>
               <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1">Status</label>
               <select
                 value={adr.status || 'Proposed'}
-                onChange={(e) => handleChange('status', e.target.value)}
+                onChange={e => handleChange('status', e.target.value)}
                 className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm text-text focus:outline-none focus:border-accent"
               >
                 <option value="Proposed">Proposed</option>
@@ -132,9 +138,9 @@ ${adr.evidence}
 
             <div>
               <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1">Context</label>
-              <textarea 
-                value={adr.context || ''} 
-                onChange={(e) => handleChange('context', e.target.value)}
+              <textarea
+                value={adr.context || ''}
+                onChange={e => handleChange('context', e.target.value)}
                 rows={4}
                 className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm text-text focus:outline-none focus:border-accent custom-scrollbar"
               />
@@ -142,9 +148,9 @@ ${adr.evidence}
 
             <div>
               <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1">Decision</label>
-              <textarea 
-                value={adr.decision || ''} 
-                onChange={(e) => handleChange('decision', e.target.value)}
+              <textarea
+                value={adr.decision || ''}
+                onChange={e => handleChange('decision', e.target.value)}
                 rows={3}
                 className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm text-text focus:outline-none focus:border-accent custom-scrollbar"
               />
@@ -152,19 +158,19 @@ ${adr.evidence}
 
             <div>
               <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1">Consequences</label>
-              <textarea 
-                value={adr.consequences || ''} 
-                onChange={(e) => handleChange('consequences', e.target.value)}
+              <textarea
+                value={adr.consequences || ''}
+                onChange={e => handleChange('consequences', e.target.value)}
                 rows={4}
                 className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm text-text focus:outline-none focus:border-accent custom-scrollbar"
               />
             </div>
-            
+
             <div>
               <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1">Alternatives</label>
-              <textarea 
-                value={adr.alternatives || ''} 
-                onChange={(e) => handleChange('alternatives', e.target.value)}
+              <textarea
+                value={adr.alternatives || ''}
+                onChange={e => handleChange('alternatives', e.target.value)}
                 rows={3}
                 className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm text-text focus:outline-none focus:border-accent custom-scrollbar"
               />
@@ -172,9 +178,9 @@ ${adr.evidence}
 
             <div>
               <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1">Evidence</label>
-              <textarea 
-                value={adr.evidence || ''} 
-                onChange={(e) => handleChange('evidence', e.target.value)}
+              <textarea
+                value={adr.evidence || ''}
+                onChange={e => handleChange('evidence', e.target.value)}
                 rows={2}
                 className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-accent custom-scrollbar text-muted"
               />
@@ -184,23 +190,23 @@ ${adr.evidence}
       </div>
 
       <div className="px-6 py-4 border-t border-border flex items-center justify-between shrink-0 bg-panel">
-        <button 
-          onClick={generate} 
+        <button
+          onClick={generate}
           disabled={loading || !adr}
           className="px-3 py-1.5 text-xs font-medium text-muted hover:text-text flex items-center gap-2 transition-colors disabled:opacity-50"
         >
           <RefreshCw className="w-3.5 h-3.5" /> Regenerate
         </button>
-        
+
         <div className="flex items-center gap-3">
-          <button 
+          <button
             onClick={handleCopy}
             disabled={loading || !adr}
             className="px-4 py-2 bg-surface border border-border hover:bg-surface/80 rounded-md text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
           >
             <Copy className="w-4 h-4" /> Copy Markdown
           </button>
-          <button 
+          <button
             onClick={handleDownload}
             disabled={loading || !adr}
             className="px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-md text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"

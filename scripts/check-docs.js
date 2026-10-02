@@ -33,7 +33,12 @@ function checkLinks(filePath) {
     let link = match[1].trim();
 
     // Ignore web URLs, anchors, mailto
-    if (link.startsWith('http://') || link.startsWith('https://') || link.startsWith('#') || link.startsWith('mailto:')) {
+    if (
+      link.startsWith('http://') ||
+      link.startsWith('https://') ||
+      link.startsWith('#') ||
+      link.startsWith('mailto:')
+    ) {
       continue;
     }
 

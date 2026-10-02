@@ -16,7 +16,7 @@ export default function GlobalCommandPalette() {
   const allFiles = useMemo(() => {
     if (!fileTree) return [];
     const flat = [];
-    const traverse = (nodes) => {
+    const traverse = nodes => {
       for (const node of nodes) {
         if (node.type === 'file') flat.push(node.path);
         if (node.children) traverse(node.children);
@@ -30,13 +30,11 @@ export default function GlobalCommandPalette() {
   const filteredFiles = useMemo(() => {
     if (!query) return allFiles.slice(0, 50); // Show max 50 by default
     const term = query.toLowerCase();
-    return allFiles
-      .filter(f => f.toLowerCase().includes(term))
-      .slice(0, 100);
+    return allFiles.filter(f => f.toLowerCase().includes(term)).slice(0, 100);
   }, [allFiles, query]);
 
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = e => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
         e.preventDefault();
         setIsOpen(true);
@@ -61,12 +59,12 @@ export default function GlobalCommandPalette() {
     setSelectedIndex(0);
   }, [query]);
 
-  const handleSelect = (filePath) => {
+  const handleSelect = filePath => {
     setIsOpen(false);
     navigate(`/explore/${repoId}/source?path=${encodeURIComponent(filePath)}`);
   };
 
-  const handleListKeyDown = (e) => {
+  const handleListKeyDown = e => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setSelectedIndex(prev => Math.min(prev + 1, filteredFiles.length - 1));
@@ -86,13 +84,10 @@ export default function GlobalCommandPalette() {
   return (
     <div className="fixed inset-0 z-50 flex justify-center items-start pt-[15vh]">
       {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-background/50 backdrop-blur-sm"
-        onClick={() => setIsOpen(false)}
-      />
-      
+      <div className="absolute inset-0 bg-background/50 backdrop-blur-sm" onClick={() => setIsOpen(false)} />
+
       {/* Modal */}
-      <div 
+      <div
         className="relative bg-surface border border-border shadow-2xl rounded-xl w-full max-w-2xl overflow-hidden flex flex-col"
         onKeyDown={handleListKeyDown}
       >
@@ -104,9 +99,9 @@ export default function GlobalCommandPalette() {
             className="flex-1 bg-transparent border-none text-text text-base placeholder-muted focus:outline-none"
             placeholder="Search files by name..."
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={e => setQuery(e.target.value)}
           />
-          <button 
+          <button
             className="p-1 rounded hover:bg-text/5 text-muted hover:text-text transition-colors"
             onClick={() => setIsOpen(false)}
           >
@@ -121,9 +116,7 @@ export default function GlobalCommandPalette() {
                 <button
                   onClick={() => handleSelect(file)}
                   className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 transition-colors ${
-                    idx === selectedIndex 
-                      ? 'bg-accent/15 text-accent' 
-                      : 'text-text hover:bg-text/5'
+                    idx === selectedIndex ? 'bg-accent/15 text-accent' : 'text-text hover:bg-text/5'
                   }`}
                   onMouseEnter={() => setSelectedIndex(idx)}
                 >

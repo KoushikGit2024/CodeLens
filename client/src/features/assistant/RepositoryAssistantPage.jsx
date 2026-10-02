@@ -1,7 +1,7 @@
 /**
  * RepositoryAssistantPage.jsx
  *
- * It loads the conversational interface, then extracts user queries, 
+ * It loads the conversational interface, then extracts user queries,
  * and then it applies the local AI context hook to proxy grounded requests to LLM.
  */
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
@@ -22,22 +22,30 @@ export default function RepositoryAssistantPage() {
   const bottomRef = useRef(null);
 
   /**
-   * It initializes the AI state manager, then extracts IndexedDB chat histories, 
+   * It initializes the AI state manager, then extracts IndexedDB chat histories,
    * and then it applies automatic message syncing for the assistant feature.
    */
-  const { 
-    messages, isLoading, loadingState, error: chatError, 
-    pendingContextPayload, confirmPendingContext, cancelPendingContext,
-    sendMessage, clearHistory, effectiveState, stopGeneration 
-  } = useAI({ 
-    repoId, 
-    feature: 'assistant', 
-    contextData: null 
+  const {
+    messages,
+    isLoading,
+    loadingState,
+    error: chatError,
+    pendingContextPayload,
+    confirmPendingContext,
+    cancelPendingContext,
+    sendMessage,
+    clearHistory,
+    effectiveState,
+    stopGeneration,
+  } = useAI({
+    repoId,
+    feature: 'assistant',
+    contextData: null,
   });
 
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [isGlobalDragging, setIsGlobalDragging] = useState(false);
-  
+
   const chatInputRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const isAtBottomRef = useRef(true);
@@ -49,9 +57,9 @@ export default function RepositoryAssistantPage() {
   // so that non-source files (configs, markdowns) can also be mentioned.
   const filePaths = useMemo(() => {
     if (!fileTree) return repo?.analysis?.files?.map(f => f.filePath) ?? [];
-    
+
     const flat = [];
-    const traverse = (nodes) => {
+    const traverse = nodes => {
       for (const node of nodes) {
         if (node.type === 'file') flat.push(node.path);
         if (node.children) traverse(node.children);
@@ -61,7 +69,7 @@ export default function RepositoryAssistantPage() {
     return flat;
   }, [fileTree, repo?.analysis?.files]);
 
-  const handleScroll = (e) => {
+  const handleScroll = e => {
     const { scrollTop, scrollHeight, clientHeight } = e.target;
     // Consider "at bottom" if within 100px of the bottom
     isAtBottomRef.current = scrollHeight - scrollTop - clientHeight < 100;
@@ -88,25 +96,27 @@ export default function RepositoryAssistantPage() {
   };
 
   // Suggestion card quick-send
-  const handleSuggestion = async (q) => {
+  const handleSuggestion = async q => {
     if (disableInput) return;
     isAtBottomRef.current = true;
-    try { await sendMessage(q, []); } catch {}
+    try {
+      await sendMessage(q, []);
+    } catch {}
   };
 
-  const handleDragOver = useCallback((e) => {
+  const handleDragOver = useCallback(e => {
     e.preventDefault();
     setIsGlobalDragging(true);
   }, []);
 
-  const handleDragLeave = useCallback((e) => {
+  const handleDragLeave = useCallback(e => {
     e.preventDefault();
     if (!e.currentTarget.contains(e.relatedTarget)) {
       setIsGlobalDragging(false);
     }
   }, []);
 
-  const handleDrop = useCallback((e) => {
+  const handleDrop = useCallback(e => {
     e.preventDefault();
     setIsGlobalDragging(false);
     if (e.dataTransfer?.files?.length && chatInputRef.current) {
@@ -127,7 +137,7 @@ export default function RepositoryAssistantPage() {
           <AlertCircle className="w-6 h-6 text-danger mx-auto mb-3" />
           <p className="text-danger mb-4 text-sm">{errorMsg}</p>
           {isNotReady ? (
-            <button 
+            <button
               onClick={async () => {
                 await repositoryApi.analyze(repoId);
                 await refetchRepo();
@@ -147,7 +157,7 @@ export default function RepositoryAssistantPage() {
   }
 
   return (
-    <div 
+    <div
       className="flex-1 h-full w-full flex flex-col overflow-hidden bg-surface text-text relative"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -164,26 +174,38 @@ export default function RepositoryAssistantPage() {
       )}
 
       {/* ── Main Chat Area ─────────────────────────────────────────────────── */}
-      <div 
-        ref={scrollContainerRef}
-        onScroll={handleScroll}
-        className="flex-1 overflow-y-auto p-4 flex flex-col gap-6"
-      >
+      <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 flex flex-col gap-6">
         <div className="max-w-4xl w-full mx-auto flex flex-col gap-6">
-          
           {messages.length === 0 && (
             <div className="mt-12 text-center animate-fade-in">
               <Brain className="w-12 h-12 text-accent/50 mx-auto mb-4" />
               <h1 className="text-2xl font-semibold mb-2">How can I help you understand this codebase?</h1>
               <p className="text-muted text-sm mb-8">
-                Ask anything. Type <kbd className="bg-panel border border-border rounded px-1 py-0.5 text-[11px] font-mono">@</kbd> to attach a file from the repository, or drag &amp; drop files directly.
+                Ask anything. Type{' '}
+                <kbd className="bg-panel border border-border rounded px-1 py-0.5 text-[11px] font-mono">@</kbd> to
+                attach a file from the repository, or drag &amp; drop files directly.
               </p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl mx-auto text-left" title={isExhausted ? "AI limit exceeded" : ""}>
+
+              <div
+                className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl mx-auto text-left"
+                title={isExhausted ? 'AI limit exceeded' : ''}
+              >
                 <SuggestionCard text="What are the entry points?" onClick={handleSuggestion} disabled={disableInput} />
-                <SuggestionCard text="How many files are in this project?" onClick={handleSuggestion} disabled={disableInput} />
-                <SuggestionCard text="What are the main architectural components?" onClick={handleSuggestion} disabled={disableInput} />
-                <SuggestionCard text="How does authentication work?" onClick={handleSuggestion} disabled={disableInput} />
+                <SuggestionCard
+                  text="How many files are in this project?"
+                  onClick={handleSuggestion}
+                  disabled={disableInput}
+                />
+                <SuggestionCard
+                  text="What are the main architectural components?"
+                  onClick={handleSuggestion}
+                  disabled={disableInput}
+                />
+                <SuggestionCard
+                  text="How does authentication work?"
+                  onClick={handleSuggestion}
+                  disabled={disableInput}
+                />
               </div>
             </div>
           )}
@@ -193,9 +215,9 @@ export default function RepositoryAssistantPage() {
           ))}
 
           {isLoading && <ThinkingIndicator onStop={stopGeneration} loadingState={loadingState} />}
-          
+
           {chatError && (
-             <div className="flex items-center gap-3 text-danger bg-danger/10 border border-danger/20 rounded-lg p-4 self-start">
+            <div className="flex items-center gap-3 text-danger bg-danger/10 border border-danger/20 rounded-lg p-4 self-start">
               <AlertTriangle className="w-5 h-5 shrink-0" />
               <span className="text-sm">{chatError}</span>
             </div>
@@ -208,10 +230,9 @@ export default function RepositoryAssistantPage() {
       {/* ── Input Area ─────────────────────────────────────────────────────── */}
       <div className="bg-panel/80 border-t border-border p-4 shrink-0" style={{ backdropFilter: 'blur(8px)' }}>
         <div className="max-w-4xl mx-auto flex flex-col gap-2">
-          
           {pendingContextPayload && (
-            <ContextInspector 
-              contextData={pendingContextPayload.builtContext} 
+            <ContextInspector
+              contextData={pendingContextPayload.builtContext}
               onConfirm={confirmPendingContext}
               onCancel={cancelPendingContext}
             />
@@ -226,14 +247,18 @@ export default function RepositoryAssistantPage() {
           />
           <div className="flex items-center justify-between">
             <span className="text-[10px] text-muted">
-              CodeLens uses deterministic analysis first, falling back to AI only when needed. Type <kbd className="bg-panel border border-border rounded px-1 font-mono">@</kbd> to attach a file.
+              CodeLens uses deterministic analysis first, falling back to AI only when needed. Type{' '}
+              <kbd className="bg-panel border border-border rounded px-1 font-mono">@</kbd> to attach a file.
             </span>
-            {messages.length > 0 && (
-              showClearConfirm ? (
+            {messages.length > 0 &&
+              (showClearConfirm ? (
                 <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4 duration-200">
                   <span className="text-[10px] text-danger font-medium uppercase tracking-wider">Clear history?</span>
                   <button
-                    onClick={() => { clearHistory(); setShowClearConfirm(false); }}
+                    onClick={() => {
+                      clearHistory();
+                      setShowClearConfirm(false);
+                    }}
                     className="text-[10px] bg-danger text-text px-2 py-0.5 rounded hover:bg-danger/80 transition-colors"
                   >
                     Yes
@@ -253,8 +278,7 @@ export default function RepositoryAssistantPage() {
                 >
                   <Trash2 className="w-3 h-3" /> Clear
                 </button>
-              )
-            )}
+              ))}
           </div>
         </div>
       </div>
@@ -263,14 +287,8 @@ export default function RepositoryAssistantPage() {
 }
 
 function ThinkingIndicator({ onStop, loadingState }) {
-  const PHASES = [
-    'Thinking…',
-    'Reading context…',
-    'Consulting AI…',
-    'Synthesising response…',
-    'Almost there…',
-  ];
-  
+  const PHASES = ['Thinking…', 'Reading context…', 'Consulting AI…', 'Synthesising response…', 'Almost there…'];
+
   let currentStatusStr = '';
   if (loadingState === 'gathering_dependencies') currentStatusStr = 'Building context payload…';
   else if (loadingState === 'waiting_for_ai') currentStatusStr = 'Waiting for AI response…';
@@ -279,13 +297,12 @@ function ThinkingIndicator({ onStop, loadingState }) {
   const [dots, setDots] = useState(0);
 
   useEffect(() => {
-    const phraseTimer = setInterval(() =>
-      setPhase(p => (p + 1) % PHASES.length), 2200
-    );
-    const dotTimer = setInterval(() =>
-      setDots(d => (d + 1) % 4), 500
-    );
-    return () => { clearInterval(phraseTimer); clearInterval(dotTimer); };
+    const phraseTimer = setInterval(() => setPhase(p => (p + 1) % PHASES.length), 2200);
+    const dotTimer = setInterval(() => setDots(d => (d + 1) % 4), 500);
+    return () => {
+      clearInterval(phraseTimer);
+      clearInterval(dotTimer);
+    };
   }, []);
 
   const dotStr = '.'.repeat(dots);
@@ -298,15 +315,15 @@ function ThinkingIndicator({ onStop, loadingState }) {
       <div className="flex items-center gap-3">
         {/* Pulsing brain icon */}
         <div className="relative shrink-0">
-          <Brain
-            className="w-4 h-4 text-accent"
-            style={{ animation: 'pulse 1.4s ease-in-out infinite' }}
-          />
+          <Brain className="w-4 h-4 text-accent" style={{ animation: 'pulse 1.4s ease-in-out infinite' }} />
         </div>
 
         {/* Phase text + dots */}
         <span className="text-sm text-text/70 tabular-nums" style={{ minWidth: 160 }}>
-          {currentStatusStr || PHASES[phase]}<span className="text-accent/60" style={{ letterSpacing: 2 }}>{dotStr}</span>
+          {currentStatusStr || PHASES[phase]}
+          <span className="text-accent/60" style={{ letterSpacing: 2 }}>
+            {dotStr}
+          </span>
         </span>
 
         {/* Three bouncing dots */}
@@ -324,8 +341,8 @@ function ThinkingIndicator({ onStop, loadingState }) {
       </div>
 
       {onStop && (
-        <button 
-          onClick={onStop} 
+        <button
+          onClick={onStop}
           className="ml-4 text-muted hover:text-danger p-1 rounded hover:bg-danger/10 transition-colors"
           title="Stop generating"
         >
@@ -356,7 +373,7 @@ function SuggestionCard({ text, onClick, disabled }) {
 }
 
 /**
- * It examines the message role, then extracts the content payload, 
+ * It examines the message role, then extracts the content payload,
  * and then it applies Markdown formatting for either the user or the AI Assistant.
  */
 function ChatMessage({ msg, repoId }) {
@@ -388,7 +405,7 @@ function ChatMessage({ msg, repoId }) {
           CodeLens AI
         </span>
       </div>
-      
+
       <div className="p-5">
         <AiResponse data={msg.content} title={null} />
       </div>

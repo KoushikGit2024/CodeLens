@@ -1,136 +1,136 @@
-@import "tailwindcss/base";
-@import "tailwindcss/components";
-@import "tailwindcss/utilities";
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
 
 /* ── Base ──────────────────────────────────────────────────────────────────── */
 :root {
   /* Default: Graphite Dark */
-  --color-surface: 12 14 20;     /* #0c0e14 */
-  --color-panel:   17 19 24;     /* #111318 */
-  --color-border:  29 33 48;     /* #1D2130 */
-  --color-accent:  77 126 255;   /* #4D7EFF */
-  --color-muted:   107 122 153;  /* #6B7A99 */
-  --color-text:    203 213 232;  /* #CBD5E8 */
-  --color-success: 52 168 90;    /* #34a85a */
-  --color-warning: 212 146 58;   /* #d4923a */
-  --color-danger:  224 82 82;    /* #e05252 */
+  --color-surface: 12 14 20; /* #0c0e14 */
+  --color-panel: 17 19 24; /* #111318 */
+  --color-border: 29 33 48; /* #1D2130 */
+  --color-accent: 77 126 255; /* #4D7EFF */
+  --color-muted: 107 122 153; /* #6B7A99 */
+  --color-text: 203 213 232; /* #CBD5E8 */
+  --color-success: 52 168 90; /* #34a85a */
+  --color-warning: 212 146 58; /* #d4923a */
+  --color-danger: 224 82 82; /* #e05252 */
 }
 
 /* ── Graphite Light ─────────────────────────────────────────────────────────── */
 html.theme-light {
   --color-surface: 245 247 252;
-  --color-panel:   255 255 255;
-  --color-border:  218 222 236;
-  --color-accent:  53 99 230;
-  --color-muted:   101 113 145;
-  --color-text:    24 29 45;
+  --color-panel: 255 255 255;
+  --color-border: 218 222 236;
+  --color-accent: 53 99 230;
+  --color-muted: 101 113 145;
+  --color-text: 24 29 45;
   --color-success: 29 135 64;
   --color-warning: 163 101 18;
-  --color-danger:  192 47 47;
+  --color-danger: 192 47 47;
 }
 
 /* ── High Contrast Dark ──────────────────────────────────────────────────────────── */
 html.theme-high-contrast-dark {
   --color-surface: 0 0 0;
-  --color-panel:   15 15 15;
-  --color-border:  255 255 255;
-  --color-accent:  100 180 255;
-  --color-muted:   200 200 200;
-  --color-text:    255 255 255;
+  --color-panel: 15 15 15;
+  --color-border: 255 255 255;
+  --color-accent: 100 180 255;
+  --color-muted: 200 200 200;
+  --color-text: 255 255 255;
   --color-success: 0 230 115;
   --color-warning: 255 210 0;
-  --color-danger:  255 100 100;
+  --color-danger: 255 100 100;
 }
 
 /* ── High Contrast Light ─────────────────────────────────────────────────────── */
 html.theme-high-contrast-light {
   --color-surface: 255 255 255;
-  --color-panel:   240 240 240;
-  --color-border:  0 0 0;
-  --color-accent:  0 0 200;
-  --color-muted:   60 60 60;
-  --color-text:    0 0 0;
+  --color-panel: 240 240 240;
+  --color-border: 0 0 0;
+  --color-accent: 0 0 200;
+  --color-muted: 60 60 60;
+  --color-text: 0 0 0;
   --color-success: 0 100 0;
   --color-warning: 180 80 0;
-  --color-danger:  200 0 0;
+  --color-danger: 200 0 0;
 }
 
 /* ── Ocean Dark ─────────────────────────────────────────────────────────────── */
 html.theme-ocean-dark {
   --color-surface: 4 14 28;
-  --color-panel:   6 20 38;
-  --color-border:  15 40 72;
-  --color-accent:  0 188 212;
-  --color-muted:   82 118 163;
-  --color-text:    189 215 242;
+  --color-panel: 6 20 38;
+  --color-border: 15 40 72;
+  --color-accent: 0 188 212;
+  --color-muted: 82 118 163;
+  --color-text: 189 215 242;
   --color-success: 38 166 154;
   --color-warning: 255 167 38;
-  --color-danger:  239 83 80;
+  --color-danger: 239 83 80;
 }
 
 /* ── Ocean Light ────────────────────────────────────────────────────────────── */
 html.theme-ocean-light {
   --color-surface: 224 242 254;
-  --color-panel:   255 255 255;
-  --color-border:  179 215 248;
-  --color-accent:  0 145 175;
-  --color-muted:   71 101 138;
-  --color-text:    13 35 61;
+  --color-panel: 255 255 255;
+  --color-border: 179 215 248;
+  --color-accent: 0 145 175;
+  --color-muted: 71 101 138;
+  --color-text: 13 35 61;
   --color-success: 0 121 107;
   --color-warning: 230 81 0;
-  --color-danger:  183 28 28;
+  --color-danger: 183 28 28;
 }
 
 /* ── Forest Dark ────────────────────────────────────────────────────────────── */
 html.theme-forest-dark {
   --color-surface: 10 18 12;
-  --color-panel:   14 26 17;
-  --color-border:  28 52 33;
-  --color-accent:  105 189 100;
-  --color-muted:   95 130 100;
-  --color-text:    196 226 196;
+  --color-panel: 14 26 17;
+  --color-border: 28 52 33;
+  --color-accent: 105 189 100;
+  --color-muted: 95 130 100;
+  --color-text: 196 226 196;
   --color-success: 102 187 106;
   --color-warning: 255 183 77;
-  --color-danger:  229 115 115;
+  --color-danger: 229 115 115;
 }
 
 /* ── Forest Light ───────────────────────────────────────────────────────────── */
 html.theme-forest-light {
   --color-surface: 232 245 233;
-  --color-panel:   255 255 255;
-  --color-border:  165 214 167;
-  --color-accent:  46 125 50;
-  --color-muted:   75 106 76;
-  --color-text:    15 37 16;
+  --color-panel: 255 255 255;
+  --color-border: 165 214 167;
+  --color-accent: 46 125 50;
+  --color-muted: 75 106 76;
+  --color-text: 15 37 16;
   --color-success: 27 94 32;
   --color-warning: 230 81 0;
-  --color-danger:  183 28 28;
+  --color-danger: 183 28 28;
 }
 
 /* ── Rose Dark ──────────────────────────────────────────────────────────────── */
 html.theme-rose-dark {
   --color-surface: 22 12 16;
-  --color-panel:   32 18 24;
-  --color-border:  70 32 45;
-  --color-accent:  244 143 177;
-  --color-muted:   160 100 120;
-  --color-text:    255 220 230;
+  --color-panel: 32 18 24;
+  --color-border: 70 32 45;
+  --color-accent: 244 143 177;
+  --color-muted: 160 100 120;
+  --color-text: 255 220 230;
   --color-success: 129 199 132;
   --color-warning: 255 183 77;
-  --color-danger:  239 83 80;
+  --color-danger: 239 83 80;
 }
 
 /* ── Rose Light ─────────────────────────────────────────────────────────────── */
 html.theme-rose-light {
   --color-surface: 252 228 236;
-  --color-panel:   255 245 248;
-  --color-border:  240 180 200;
-  --color-accent:  194 24 91;
-  --color-muted:   136 71 97;
-  --color-text:    50 18 30;
+  --color-panel: 255 245 248;
+  --color-border: 240 180 200;
+  --color-accent: 194 24 91;
+  --color-muted: 136 71 97;
+  --color-text: 50 18 30;
   --color-success: 27 94 32;
   --color-warning: 230 81 0;
-  --color-danger:  136 14 79;
+  --color-danger: 136 14 79;
 }
 
 /* ── High Contrast — strong focus outlines ──────────────────────────────────── */
@@ -140,7 +140,9 @@ html.theme-high-contrast *:focus-visible {
 }
 
 /* ── Base element styles ────────────────────────────────────────────────────── */
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   margin: 0;
   padding: 0;
@@ -152,11 +154,19 @@ html, body, #root {
 }
 
 /* ── Smooth theme transitions ───────────────────────────────────────────────── */
-*, *::before, *::after {
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.15s ease;
+*,
+*::before,
+*::after {
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.15s ease;
 }
 /* Exclude canvas/SVG internals and React Flow viewport from transitions */
-svg *, canvas, .react-flow__viewport *, img {
+svg *,
+canvas,
+.react-flow__viewport *,
+img {
   transition: none;
 }
 
@@ -171,10 +181,20 @@ svg *, canvas, .react-flow__viewport *, img {
 }
 
 /* ── Scrollbar ──────────────────────────────────────────────────────────────── */
-::-webkit-scrollbar        { width: 6px; height: 6px; }
-::-webkit-scrollbar-track  { background: transparent; }
-::-webkit-scrollbar-thumb  { background: rgb(var(--color-border)); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgb(var(--color-muted)); }
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--color-border));
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--color-muted));
+}
 
 /* ── React Flow Dark Theme Overrides ───────────────────────────────────────── */
 .react-flow__controls {

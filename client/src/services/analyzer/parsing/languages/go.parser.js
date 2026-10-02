@@ -1,7 +1,7 @@
 /**
  * GoParser.js
  *
- * It initializes the Go Tree-sitter parser, then extracts structural packages and functions, 
+ * It initializes the Go Tree-sitter parser, then extracts structural packages and functions,
  * and then it applies the canonical schemas to build intelligence models.
  *
  * How this file is structured:
@@ -19,7 +19,7 @@ import {
   createMethod,
   createInterface,
   createStruct,
-  createFunction
+  createFunction,
 } from '../symbols.js';
 import { calculateComplexity } from '../../advanced/complexity.analyzer.js';
 import { generateStructuralHash } from '../../advanced/clone.analyzer.js';
@@ -32,7 +32,7 @@ export class GoParser extends BaseParser {
   // ── Public entry points ─────────────────────────────────────────────────────
 
   /**
-   * It receives the top-level program node, then extracts the symbols via a depth-first walk, 
+   * It receives the top-level program node, then extracts the symbols via a depth-first walk,
    * and then it applies the collected array to the caller.
    */
   extractSymbols(rootNode, source) {
@@ -42,7 +42,7 @@ export class GoParser extends BaseParser {
   }
 
   /**
-   * It receives the parsed AST root, then extracts the advanced static findings using S-expression queries, 
+   * It receives the parsed AST root, then extracts the advanced static findings using S-expression queries,
    * and then it applies the canonical AnalysisFinding schema for the frontend intelligence dashboard.
    */
   extractAdvancedFindings(rootNode, filePath) {
@@ -53,21 +53,37 @@ export class GoParser extends BaseParser {
       (call_expression function: (selector_expression operand: (identifier) @pkg field: (field_identifier) @fn) 
       (#eq? @pkg "exec") (#eq? @fn "Command")) @sink
     `;
-    findings.push(...this.extractFindings(
-      rootNode, sinkQuery, filePath, 'security', 'OS_COMMAND_INJECTION', 'security', 'critical',
-      'OS Command Execution',
-      'Usage of `exec.Command` detected. Ensure all arguments are strictly sanitized to prevent command injection.'
-    ));
+    findings.push(
+      ...this.extractFindings(
+        rootNode,
+        sinkQuery,
+        filePath,
+        'security',
+        'OS_COMMAND_INJECTION',
+        'security',
+        'critical',
+        'OS Command Execution',
+        'Usage of `exec.Command` detected. Ensure all arguments are strictly sanitized to prevent command injection.'
+      )
+    );
 
     // It defines the Go test query, then extracts functions starting with Test, and then it applies the architectural info schema.
     const testQuery = `
       (function_declaration name: (identifier) @func (#match? @func "^Test"))
     `;
-    findings.push(...this.extractFindings(
-      rootNode, testQuery, filePath, 'architecture', 'TEST_BLOCK', 'reliability', 'info',
-      'Go Test Function',
-      'Test function identified: {text}'
-    ));
+    findings.push(
+      ...this.extractFindings(
+        rootNode,
+        testQuery,
+        filePath,
+        'architecture',
+        'TEST_BLOCK',
+        'reliability',
+        'info',
+        'Go Test Function',
+        'Test function identified: {text}'
+      )
+    );
 
     return findings;
   }
@@ -75,7 +91,7 @@ export class GoParser extends BaseParser {
   // ── AST walker ──────────────────────────────────────────────────────────────
 
   /**
-   * It evaluates the AST node type, then extracts Go-specific declarations, 
+   * It evaluates the AST node type, then extracts Go-specific declarations,
    * and then it applies the appropriate factory dispatchers.
    */
   _walk(node, source, symbols, className) {
@@ -109,7 +125,7 @@ export class GoParser extends BaseParser {
   }
 
   /**
-   * It iterates over the child nodes, then extracts each syntax child, 
+   * It iterates over the child nodes, then extracts each syntax child,
    * and then it applies the traversal switch.
    */
   _walkChildren(node, source, symbols, className) {
@@ -121,21 +137,23 @@ export class GoParser extends BaseParser {
   // ── Symbol extractors ────────────────────────────────────────────────────────
 
   /**
-   * It inspects the package clause, then extracts the package identifier, 
+   * It inspects the package clause, then extracts the package identifier,
    * and then it applies the package symbol factory.
    */
   _extractPackage(node, source, symbols) {
     const nameNode = node.childForFieldName('package_identifier');
     if (nameNode) {
-      symbols.push(createPackage({ 
-        name: nodeText(nameNode, source), 
-        location: locationFromNode(node) 
-      }));
+      symbols.push(
+        createPackage({
+          name: nodeText(nameNode, source),
+          location: locationFromNode(node),
+        })
+      );
     }
   }
 
   /**
-   * It evaluates the import declaration, then extracts the individual import specs, 
+   * It evaluates the import declaration, then extracts the individual import specs,
    * and then it applies them to construct unified import symbols.
    */
   _extractImport(node, source, symbols) {
@@ -157,7 +175,7 @@ export class GoParser extends BaseParser {
   }
 
   /**
-   * It inspects the import spec, then extracts the package path and optional alias, 
+   * It inspects the import spec, then extracts the package path and optional alias,
    * and then it applies the import symbol schema.
    */
   _createImportFromSpec(specNode, source, symbols) {
@@ -167,19 +185,21 @@ export class GoParser extends BaseParser {
     const moduleName = stripQuotes(nodeText(pathNode, source));
     const nameNode = specNode.childForFieldName('name');
     const alias = nameNode ? nodeText(nameNode, source) : null;
-    
+
     // In Go, the actual imported package name is the last segment of the path if no alias is provided
     const importedName = alias ? alias : moduleName.split('/').pop();
 
-    symbols.push(createImport({
-      source: moduleName,
-      specifiers: [{ name: importedName, alias: alias, type: 'default' }],
-      location: locationFromNode(specNode),
-    }));
+    symbols.push(
+      createImport({
+        source: moduleName,
+        specifiers: [{ name: importedName, alias: alias, type: 'default' }],
+        location: locationFromNode(specNode),
+      })
+    );
   }
 
   /**
-   * It parses the type declaration, then extracts the struct or interface specifications, 
+   * It parses the type declaration, then extracts the struct or interface specifications,
    * and then it applies the corresponding struct or interface factory.
    */
   _extractTypeDeclaration(node, source, symbols) {
@@ -188,7 +208,7 @@ export class GoParser extends BaseParser {
       if (spec.type === 'type_spec') {
         const nameNode = spec.childForFieldName('name');
         const typeNode = spec.childForFieldName('type');
-        
+
         if (!nameNode || !typeNode) continue;
         const name = nodeText(nameNode, source);
 
@@ -205,31 +225,33 @@ export class GoParser extends BaseParser {
   }
 
   /**
-   * It targets the function declaration, then extracts the parameters and complexity, 
+   * It targets the function declaration, then extracts the parameters and complexity,
    * and then it applies the function symbol schema.
    */
   _extractFunction(node, source, symbols) {
     const nameNode = node.childForFieldName('name');
     if (!nameNode) return;
 
-    const name       = nodeText(nameNode, source);
-    const params     = this._extractParams(node, source);
+    const name = nodeText(nameNode, source);
+    const params = this._extractParams(node, source);
     const complexity = calculateComplexity(node);
-    const hash       = generateStructuralHash(node);
+    const hash = generateStructuralHash(node);
 
-    symbols.push(createFunction({
-      name,
-      async: false,
-      generator: false,
-      params,
-      complexity,
-      hash,
-      location: locationFromNode(node),
-    }));
+    symbols.push(
+      createFunction({
+        name,
+        async: false,
+        generator: false,
+        params,
+        complexity,
+        hash,
+        location: locationFromNode(node),
+      })
+    );
   }
 
   /**
-   * It checks the method declaration, then extracts the receiver type to link the parent struct, 
+   * It checks the method declaration, then extracts the receiver type to link the parent struct,
    * and then it applies the method symbol factory.
    */
   _extractMethod(node, source, symbols) {
@@ -249,7 +271,7 @@ export class GoParser extends BaseParser {
         if (typeNode) {
           // It checks for pointer types, then extracts the underlying identifier, and then it applies it to the className.
           if (typeNode.type === 'pointer_type') {
-            className = nodeText(typeNode.child(1), source); 
+            className = nodeText(typeNode.child(1), source);
           } else {
             className = nodeText(typeNode, source);
           }
@@ -257,31 +279,33 @@ export class GoParser extends BaseParser {
       }
     }
 
-    const params     = this._extractParams(node, source);
+    const params = this._extractParams(node, source);
     const complexity = calculateComplexity(node);
-    const hash       = generateStructuralHash(node);
+    const hash = generateStructuralHash(node);
 
     // Go methods are exported if they start with a capital letter
     const visibility = name[0] === name[0].toUpperCase() ? 'public' : 'private';
 
-    symbols.push(createMethod({
-      name,
-      className,
-      static: false,
-      visibility,
-      async: false,
-      generator: false,
-      params,
-      complexity,
-      hash,
-      location: locationFromNode(node),
-    }));
+    symbols.push(
+      createMethod({
+        name,
+        className,
+        static: false,
+        visibility,
+        async: false,
+        generator: false,
+        params,
+        complexity,
+        hash,
+        location: locationFromNode(node),
+      })
+    );
   }
 
   // ── Utilities ────────────────────────────────────────────────────────────────
 
   /**
-   * It navigates the parameter list, then extracts the parameter names, 
+   * It navigates the parameter list, then extracts the parameter names,
    * and then it applies them to the output array.
    */
   _extractParams(fnNode, source) {
@@ -316,7 +340,7 @@ export class GoParser extends BaseParser {
 // ── Module-level helpers ──────────────────────────────────────────────────────
 
 /**
- * It isolates the byte indexes, then extracts the string slice, 
+ * It isolates the byte indexes, then extracts the string slice,
  * and then it applies it as a textual representation.
  */
 function nodeText(node, source) {
@@ -324,7 +348,7 @@ function nodeText(node, source) {
 }
 
 /**
- * It evaluates the raw string literal, then extracts the boundary quotes, 
+ * It evaluates the raw string literal, then extracts the boundary quotes,
  * and then it applies a regex replacement.
  */
 function stripQuotes(str) {

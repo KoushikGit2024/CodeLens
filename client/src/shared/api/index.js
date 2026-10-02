@@ -1,7 +1,7 @@
 /**
  * index.js (API Bridge)
  *
- * It intercepts frontend data requests, then extracts local IndexedDB payloads, 
+ * It intercepts frontend data requests, then extracts local IndexedDB payloads,
  * and then it applies them to the UI or proxies prompts to the configured AI provider.
  */
 import axios from 'axios';
@@ -14,12 +14,21 @@ import { supabase } from '../lib/supabase.js';
 
 import { buildArchitectureModel } from '../../services/analyzer/advanced/architecture.analyzer.js';
 import { buildRepositoryIntelligence } from '../../services/analyzer/advanced/intelligence.analyzer.js';
-import { buildEngineeringRiskModel, recalculateScoreWithIgnored, SEVERITY_PENALTY } from '../../services/analyzer/advanced/risk.analyzer.js';
+import {
+  buildEngineeringRiskModel,
+  recalculateScoreWithIgnored,
+  SEVERITY_PENALTY,
+} from '../../services/analyzer/advanced/risk.analyzer.js';
 import { buildRefactoringIntelligence } from '../../services/analyzer/advanced/refactoring.analyzer.js';
 import { analyzeChangeImpact } from '../../services/analyzer/advanced/change.impact.js';
 import { buildQuestionContext } from '../../services/analyzer/advanced/question.context.js';
 import { buildPrompt } from '../../services/analyzer/advanced/base.context.js';
-import { buildOverviewContext, buildModuleContext, buildOverviewPrompt, buildModulePrompt } from '../../services/analyzer/advanced/documentation.context.js';
+import {
+  buildOverviewContext,
+  buildModuleContext,
+  buildOverviewPrompt,
+  buildModulePrompt,
+} from '../../services/analyzer/advanced/documentation.context.js';
 import { aiArtifactStore, buildCacheKey } from '../../services/storage/aiArtifact.store.js';
 import { clearRepoBookmarks } from '../../services/storage/bookmark.store.js';
 import { ContextOrchestrator } from '../../services/analyzer/advanced/context.orchestrator.js';
@@ -29,56 +38,64 @@ const api = axios.create({
   baseURL: import.meta.env.PROD ? import.meta.env.VITE_API_URL : '/api',
   timeout: 60_000,
 });
-console.log(import.meta.env.PROD ? import.meta.env.VITE_API_URL : '/api')
-api.interceptors.request.use(async (config) => {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session?.access_token) {
-    config.headers.Authorization = `Bearer ${session.access_token}`;
+console.log(import.meta.env.PROD ? import.meta.env.VITE_API_URL : '/api');
+api.interceptors.request.use(
+  async config => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      config.headers.Authorization = `Bearer ${session.access_token}`;
+    }
+    return config;
+  },
+  error => {
+    return Promise.reject(error);
   }
-  return config;
-}, (error) => {
-  return Promise.reject(error);
-});
+);
 
-api.interceptors.response.use(async (response) => {
-  if (response.status === 202 && response.data?.jobId) {
-    const jobId = response.data.jobId;
-    while (true) {
-      await new Promise(r => setTimeout(r, 2000));
-      const pollRes = await axios.get(`${api.defaults.baseURL}/ai/job/${jobId}`, {
-        headers: { Authorization: response.config.headers.Authorization }
-      });
-      if (pollRes.data.status === 'completed') {
-        return { ...response, status: 200, data: { response: pollRes.data.result } };
-      }
-      if (pollRes.data.status === 'failed') {
-        return Promise.reject(new Error(pollRes.data.error || 'AI Job failed.'));
+api.interceptors.response.use(
+  async response => {
+    if (response.status === 202 && response.data?.jobId) {
+      const jobId = response.data.jobId;
+      while (true) {
+        await new Promise(r => setTimeout(r, 2000));
+        const pollRes = await axios.get(`${api.defaults.baseURL}/ai/job/${jobId}`, {
+          headers: { Authorization: response.config.headers.Authorization },
+        });
+        if (pollRes.data.status === 'completed') {
+          return { ...response, status: 200, data: { response: pollRes.data.result } };
+        }
+        if (pollRes.data.status === 'failed') {
+          return Promise.reject(new Error(pollRes.data.error || 'AI Job failed.'));
+        }
       }
     }
+    return response;
+  },
+  error => {
+    return Promise.reject(error);
   }
-  return response;
-}, (error) => {
-  return Promise.reject(error);
-});
+);
 
 /**
- * It iterates over flat file paths, then extracts their directory segments, 
+ * It iterates over flat file paths, then extracts their directory segments,
  * and then it applies nested object creation to build a hierarchical UI tree.
  */
 function buildFileTreeFromPaths(paths) {
   const root = { type: 'directory', name: 'root', path: '', children: [] };
-  
+
   for (const filePath of paths) {
     const parts = filePath.split('/');
     let currentDir = root;
-    
+
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
       const isFile = i === parts.length - 1;
       const currentPath = parts.slice(0, i + 1).join('/');
-      
+
       let existingNode = currentDir.children.find(c => c.name === part);
-      
+
       if (!existingNode) {
         existingNode = {
           type: isFile ? 'file' : 'directory',
@@ -90,20 +107,20 @@ function buildFileTreeFromPaths(paths) {
         }
         currentDir.children.push(existingNode);
       }
-      
+
       if (!isFile) {
         currentDir = existingNode;
       }
     }
   }
-  
+
   return root.children;
 }
 
 // ── Offline-First API Client ──────────────────────────────────────────────────
 export const repositoryApi = {
   /**
-   * It queries the IndexedDB store, then extracts all saved repository records, 
+   * It queries the IndexedDB store, then extracts all saved repository records,
    * and then it applies a descending chronological sort for the dashboard.
    */
   async listAll() {
@@ -113,31 +130,34 @@ export const repositoryApi = {
   },
 
   /**
-   * It receives the ZIP file, then extracts its uncompressed text contents, 
+   * It receives the ZIP file, then extracts its uncompressed text contents,
    * and then it applies them to the local virtual file system before triggering the Web Worker.
    */
   async upload(file, options = {}, onProgress = () => {}) {
     const repoId = uuidv4();
     const repoName = file.name.replace(/\.zip$/i, '');
-    
+
     onProgress({ loaded: 10, total: 100 });
-    
+
     const record = {
       id: repoId,
       name: repoName,
       uploadedAt: new Date().toISOString(),
       status: 'analyzing',
       phase: 'extracting',
-      analysisVersion: 2
+      analysisVersion: 2,
     };
     await repositoryStore.set(repoId, record);
-    
+
     try {
       const zip = await JSZip.loadAsync(file);
       const files = Object.keys(zip.files).filter(name => !zip.files[name].dir);
-      
-      const ignorePatterns = options.ignorePatterns 
-        ? options.ignorePatterns.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
+
+      const ignorePatterns = options.ignorePatterns
+        ? options.ignorePatterns
+            .split(/[\n,]+/)
+            .map(s => s.trim())
+            .filter(Boolean)
         : [];
 
       let commonRoot = '';
@@ -150,15 +170,16 @@ export const repositoryApi = {
           }
         }
       }
-      
+
       let processedCount = 0;
       for (const originalPath of files) {
         const filePath = commonRoot ? originalPath.substring(commonRoot.length) : originalPath;
         const defaultIgnores = ['node_modules', 'dist', 'build', 'coverage', '.next', 'out'];
         const pathSegments = filePath.split('/');
-        const shouldIgnore = ignorePatterns.some(p => filePath.includes(p)) || 
-                             defaultIgnores.some(ignoreDir => pathSegments.includes(ignoreDir));
-        
+        const shouldIgnore =
+          ignorePatterns.some(p => filePath.includes(p)) ||
+          defaultIgnores.some(ignoreDir => pathSegments.includes(ignoreDir));
+
         if (!shouldIgnore) {
           const extMatch = filePath.match(/\.(png|jpe?g|gif|webp|ico|bmp)$/i);
           let content;
@@ -179,13 +200,12 @@ export const repositoryApi = {
           onProgress({ loaded: 10 + (processedCount / files.length) * 20, total: 100 });
         }
       }
-      
+
       startAnalysis(repoId, options).catch(err => {
         console.error('Background analysis failed:', err);
       });
-      
+
       return { data: { id: repoId, name: repoName, status: 'analyzing' } };
-      
     } catch (err) {
       console.error('Upload/Extraction failed:', err);
       await repositoryStore.update(repoId, { status: 'error', error: err.message });
@@ -198,24 +218,27 @@ export const repositoryApi = {
    */
   async uploadDirectory(fileList, rootName, options = {}, onProgress = () => {}) {
     const repoId = uuidv4();
-    
+
     onProgress({ loaded: 10, total: 100 });
-    
+
     const record = {
       id: repoId,
       name: rootName,
       uploadedAt: new Date().toISOString(),
       status: 'analyzing',
       phase: 'extracting',
-      analysisVersion: 2
+      analysisVersion: 2,
     };
     await repositoryStore.set(repoId, record);
-    
+
     try {
       const files = Array.from(fileList);
-      
-      const ignorePatterns = options.ignorePatterns 
-        ? options.ignorePatterns.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
+
+      const ignorePatterns = options.ignorePatterns
+        ? options.ignorePatterns
+            .split(/[\n,]+/)
+            .map(s => s.trim())
+            .filter(Boolean)
         : [];
 
       let commonRoot = '';
@@ -228,16 +251,17 @@ export const repositoryApi = {
           }
         }
       }
-      
+
       let processedCount = 0;
       for (const file of files) {
         const originalPath = file.webkitRelativePath || file.name;
         const filePath = commonRoot ? originalPath.substring(commonRoot.length) : originalPath;
         const defaultIgnores = ['node_modules', 'dist', 'build', 'coverage', '.next', 'out'];
         const pathSegments = filePath.split('/');
-        const shouldIgnore = ignorePatterns.some(p => filePath.includes(p)) || 
-                             defaultIgnores.some(ignoreDir => pathSegments.includes(ignoreDir));
-        
+        const shouldIgnore =
+          ignorePatterns.some(p => filePath.includes(p)) ||
+          defaultIgnores.some(ignoreDir => pathSegments.includes(ignoreDir));
+
         if (!shouldIgnore) {
           const extMatch = filePath.match(/\.(png|jpe?g|gif|webp|ico|bmp)$/i);
           let content;
@@ -261,13 +285,12 @@ export const repositoryApi = {
           onProgress({ loaded: 10 + (processedCount / files.length) * 20, total: 100 });
         }
       }
-      
+
       startAnalysis(repoId, options).catch(err => {
         console.error('Background analysis failed:', err);
       });
-      
+
       return { data: { id: repoId, name: rootName, status: 'analyzing' } };
-      
     } catch (err) {
       console.error('Folder Upload failed:', err);
       await repositoryStore.update(repoId, { status: 'error', error: err.message });
@@ -284,16 +307,16 @@ export const repositoryApi = {
   async reanalyze(id, options = {}) {
     const record = await repositoryStore.get(id);
     if (!record) throw new Error('Repository not found');
-    
+
     await repositoryStore.clearAnalysis(id);
     await repositoryStore.update(id, { status: 'analyzing', phase: 'uploading' });
     // Bust stale AI artifact cache so docs/ADRs are re-generated against the new analysis
     aiArtifactStore.invalidateRepo(id).catch(() => {});
-    
+
     startAnalysis(id, options).catch(err => {
       console.error('Background analysis failed:', err);
     });
-    
+
     return { data: { id, status: 'analyzing' } };
   },
 
@@ -314,21 +337,21 @@ export const repositoryApi = {
   },
 
   /**
-   * It requests the file manifest, then extracts the absolute path keys, 
+   * It requests the file manifest, then extracts the absolute path keys,
    * and then it applies the tree builder to return a navigatable UI object.
    */
   async listFiles(id) {
     const record = await repositoryStore.get(id);
     if (!record) throw new Error('Repository not found');
-    
+
     const paths = await persistenceStore.listFilePaths(id);
     const tree = buildFileTreeFromPaths(paths);
-    
+
     return { data: { id: record.id, name: record.name, tree } };
   },
 
   /**
-   * It queries the IndexedDB files store, then extracts the string buffer, 
+   * It queries the IndexedDB files store, then extracts the string buffer,
    * and then it applies a language mapping heuristic for the Monaco editor.
    */
   async getFile(id, filePath) {
@@ -337,14 +360,34 @@ export const repositoryApi = {
 
     const ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase();
     const EXT_TO_LANG = {
-      '.js': 'javascript', '.mjs': 'javascript', '.cjs': 'javascript', '.jsx': 'javascript',
-      '.ts': 'typescript', '.tsx': 'typescript', '.mts': 'typescript', '.cts': 'typescript',
-      '.py': 'python', '.java': 'java',
-      '.cpp': 'cpp', '.cc': 'cpp', '.cxx': 'cpp', '.h': 'cpp', '.hpp': 'cpp',
-      '.go': 'go', '.rs': 'rust', '.c': 'c',
-      '.json': 'json', '.md': 'markdown', '.css': 'css',
-      '.html': 'html', '.htm': 'html', '.xml': 'xml',
-      '.yaml': 'yaml', '.yml': 'yaml', '.sh': 'shell', '.env': 'ini',
+      '.js': 'javascript',
+      '.mjs': 'javascript',
+      '.cjs': 'javascript',
+      '.jsx': 'javascript',
+      '.ts': 'typescript',
+      '.tsx': 'typescript',
+      '.mts': 'typescript',
+      '.cts': 'typescript',
+      '.py': 'python',
+      '.java': 'java',
+      '.cpp': 'cpp',
+      '.cc': 'cpp',
+      '.cxx': 'cpp',
+      '.h': 'cpp',
+      '.hpp': 'cpp',
+      '.go': 'go',
+      '.rs': 'rust',
+      '.c': 'c',
+      '.json': 'json',
+      '.md': 'markdown',
+      '.css': 'css',
+      '.html': 'html',
+      '.htm': 'html',
+      '.xml': 'xml',
+      '.yaml': 'yaml',
+      '.yml': 'yaml',
+      '.sh': 'shell',
+      '.env': 'ini',
     };
     const language = EXT_TO_LANG[ext] || 'plaintext';
 
@@ -358,16 +401,16 @@ export const repositoryApi = {
   },
 
   /**
-   * It resolves a single file node, then extracts its incoming and outgoing edges, 
+   * It resolves a single file node, then extracts its incoming and outgoing edges,
    * and then it applies structural mapping to return isolated dependency info.
    */
   async getFileDependencyInfo(id, filePath) {
     const record = await repositoryStore.get(id);
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
-    
+
     const graph = record.analysis.graph;
     const nodeId = `file:${filePath}`;
-    
+
     const dependencies = graph.edges
       .filter(e => e.source === nodeId)
       .map(e => {
@@ -376,10 +419,10 @@ export const repositoryApi = {
           id: e.target,
           type: e.type,
           filePath: !isPkg ? e.target.replace('file:', '') : undefined,
-          package: isPkg ? e.target.replace('pkg:', '') : undefined
+          package: isPkg ? e.target.replace('pkg:', '') : undefined,
         };
       });
-      
+
     const dependents = graph.edges
       .filter(e => e.target === nodeId)
       .map(e => {
@@ -388,37 +431,37 @@ export const repositoryApi = {
           id: e.source,
           type: e.type,
           filePath: !isPkg ? e.source.replace('file:', '') : undefined,
-          package: isPkg ? e.source.replace('pkg:', '') : undefined
+          package: isPkg ? e.source.replace('pkg:', '') : undefined,
         };
       });
-      
+
     const externalPackages = [...new Set(dependencies.filter(d => d.package).map(d => d.package))];
 
     const architecture = buildArchitectureModel(record.analysis, graph);
     const engineeringHealth = buildEngineeringRiskModel(record.analysis, graph, architecture);
-    
+
     const fileRisks = engineeringHealth.risks.filter(r => r.file === filePath);
     const hotspot = engineeringHealth.hotspots.find(h => h.file === filePath);
-    
+
     let severity = 'healthy';
     if (fileRisks.some(r => r.severity === 'critical')) severity = 'critical';
     else if (fileRisks.some(r => r.severity === 'high')) severity = 'high';
     else if (fileRisks.some(r => r.severity === 'warning')) severity = 'warning';
-      
-    return { 
-      data: { 
-        filePath, 
-        dependencies: dependencies.filter(d => !d.package), 
-        dependents, 
+
+    return {
+      data: {
+        filePath,
+        dependencies: dependencies.filter(d => !d.package),
+        dependents,
         externalPackages,
         dependencyCount: dependencies.filter(d => !d.package).length,
         dependentCount: dependents.length,
         health: {
           severity,
           risks: fileRisks,
-          hotspot: hotspot || null
-        }
-      } 
+          hotspot: hotspot || null,
+        },
+      },
     };
   },
 
@@ -429,8 +472,12 @@ export const repositoryApi = {
     const health = buildEngineeringRiskModel(record.analysis, record.analysis.graph, architecture);
 
     architecture.layers.forEach(comp => {
-      const compRisks = health.risks.filter(r => comp.data.files?.includes(r.file) || (r.category === 'ARCHITECTURE' && r.evidence?.component === comp.data.label));
-      
+      const compRisks = health.risks.filter(
+        r =>
+          comp.data.files?.includes(r.file) ||
+          (r.category === 'ARCHITECTURE' && r.evidence?.component === comp.data.label)
+      );
+
       let severity = 'healthy';
       if (compRisks.some(r => r.severity === 'critical')) severity = 'critical';
       else if (compRisks.some(r => r.severity === 'high')) severity = 'high';
@@ -438,10 +485,10 @@ export const repositoryApi = {
 
       comp.health = {
         severity,
-        risks: compRisks
+        risks: compRisks,
       };
     });
-    
+
     // Normalize shape: ArchitecturePage expects { components, relations, violations }
     // but buildArchitectureModel returns { layers, boundaryViolations, ... }
     const model = {
@@ -458,7 +505,11 @@ export const repositoryApi = {
       const aiResponse = await api.post('/ai/chat', { prompt, jsonMode: true });
       let insights = null;
       try {
-        const raw = (aiResponse.data.response || '').trim().replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+        const raw = (aiResponse.data.response || '')
+          .trim()
+          .replace(/^```json\s*/i, '')
+          .replace(/^```\s*/, '')
+          .replace(/\s*```$/, '');
         insights = JSON.parse(raw);
       } catch (e) {
         insights = { summary: aiResponse.data.response };
@@ -472,7 +523,7 @@ export const repositoryApi = {
   async getIntelligence(repoId, options = {}) {
     const record = await repositoryStore.get(repoId);
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
-    
+
     const architecture = record.analysis.architecture || buildArchitectureModel(record.analysis, record.analysis.graph);
     const intelligence = buildRepositoryIntelligence(record.analysis, record.analysis.graph, architecture);
 
@@ -491,7 +542,7 @@ export const repositoryApi = {
           `Engineering health score: ${intelligence.engineeringHealth.score}/100 (${intelligence.engineeringHealth.critical} critical, ${intelligence.engineeringHealth.high} high issues)`,
           `${intelligence.refactoring.candidateCount} refactoring candidate(s) identified`,
         ],
-        references: (intelligence.hotspots || []).slice(0, 5).map(h => h.filePath)
+        references: (intelligence.hotspots || []).slice(0, 5).map(h => h.filePath),
       };
       return { data: { intelligence, insights } };
     }
@@ -512,7 +563,11 @@ export const repositoryApi = {
       const aiResponse = await api.post('/ai/chat', { prompt, jsonMode: true });
       let insights = null;
       try {
-        const raw = (aiResponse.data.response || '').trim().replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+        const raw = (aiResponse.data.response || '')
+          .trim()
+          .replace(/^```json\s*/i, '')
+          .replace(/^```\s*/, '')
+          .replace(/\s*```$/, '');
         insights = JSON.parse(raw);
       } catch (e) {
         insights = { summary: aiResponse.data.response };
@@ -529,7 +584,7 @@ export const repositoryApi = {
     const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
     const risks = buildEngineeringRiskModel(record.analysis, record.analysis.graph, architecture);
     const refactoring = buildRefactoringIntelligence(risks, record.analysis, record.analysis.graph);
-    
+
     const candidate = refactoring.candidates.find(c => c.id === candidateId);
     if (!candidate) throw new Error('Candidate not found');
 
@@ -538,7 +593,11 @@ export const repositoryApi = {
     const res = await api.post('/ai/chat', { prompt, jsonMode: true });
     let insights;
     try {
-      const raw = (res.data.response || '').trim().replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+      const raw = (res.data.response || '')
+        .trim()
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/, '')
+        .replace(/\s*```$/, '');
       insights = JSON.parse(raw);
     } catch (e) {
       throw new Error('Failed to parse AI response as JSON.');
@@ -565,14 +624,14 @@ export const repositoryApi = {
   async getRefactoringImpact(repoId, candidateId) {
     const record = await repositoryStore.get(repoId);
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
-    
+
     const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
     const risks = buildEngineeringRiskModel(record.analysis, record.analysis.graph, architecture);
     const refactoring = buildRefactoringIntelligence(risks, record.analysis, record.analysis.graph);
-    
+
     const candidate = refactoring.candidates.find(c => c.id === candidateId);
     if (!candidate) throw new Error('Candidate not found');
-    
+
     const files = candidate.files || [];
     const impact = analyzeChangeImpact(record.analysis, record.analysis.graph, files);
     return { data: impact };
@@ -581,22 +640,22 @@ export const repositoryApi = {
   async autoFixRefactoringCandidate(repoId, candidateId) {
     const record = await repositoryStore.get(repoId);
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
-    
+
     const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
     const risks = buildEngineeringRiskModel(record.analysis, record.analysis.graph, architecture);
     const refactoring = buildRefactoringIntelligence(risks, record.analysis, record.analysis.graph);
-    
+
     const candidate = refactoring.candidates.find(c => c.id === candidateId);
     if (!candidate) throw new Error('Candidate not found');
     if (!candidate.files || candidate.files.length === 0) throw new Error('No files associated with this candidate');
-    
+
     const targetFile = candidate.files[0];
     const originalCode = await persistenceStore.loadFile(repoId, targetFile);
     if (!originalCode) throw new Error(`Could not load source file ${targetFile}`);
-    
+
     // Phase 2: AST Snippet Slicing
     let slicedCode = originalCode;
-    let snippetContext = "";
+    let snippetContext = '';
     if (candidate.fileRanges && candidate.fileRanges[targetFile]) {
       const range = candidate.fileRanges[targetFile];
       if (range.startLine && range.endLine) {
@@ -611,7 +670,7 @@ export const repositoryApi = {
 
     // Phase 2b: Cross-File Clone Sibling Injection
     // If this is a clone, provide the other file's snippet so the AI can generalize the abstraction.
-    let siblingContextText = "";
+    let siblingContextText = '';
     if (candidate.title && candidate.title.includes('Clone') && candidate.files && candidate.files.length > 1) {
       const siblingFile = candidate.files.find(f => f !== targetFile);
       if (siblingFile) {
@@ -632,7 +691,7 @@ export const repositoryApi = {
         }
       }
     }
-    
+
     // Phase 3: Graph Context (Signatures)
     let impactConstraints = '';
     try {
@@ -650,15 +709,24 @@ export const repositoryApi = {
         impactConstraints = `\nCRITICAL INTEGRATION CONSTRAINTS:\nThe following ${impact.directlyAffectedFiles.length} downstream file(s) depend on this module. You MUST preserve all existing exported function/class signatures, argument orders, and public APIs:\n${depSignatures.join('\n')}`;
       }
     } catch (e) {
-      console.warn("Could not calculate downstream impact for constraints", e);
+      console.warn('Could not calculate downstream impact for constraints', e);
     }
-    
-    const strategiesText = candidate.suggestedStrategies?.map(s => `- ${s.action}: ${s.description}`).join('\n') || 'Improve code quality and structure.';
-    
+
+    const strategiesText =
+      candidate.suggestedStrategies?.map(s => `- ${s.action}: ${s.description}`).join('\n') ||
+      'Improve code quality and structure.';
+
     let specificEvidenceText = '';
     if (candidate.evidence) {
       if (candidate.type === 'QUALITY' && candidate.evidence.instances) {
-        specificEvidenceText = '\nSpecific Offending Code Blocks (AST Focus):\n' + candidate.evidence.instances.map(inst => `- Function/Method '${inst.name}' has a high cyclomatic complexity of ${inst.complexity}. Target this specifically.`).join('\n');
+        specificEvidenceText =
+          '\nSpecific Offending Code Blocks (AST Focus):\n' +
+          candidate.evidence.instances
+            .map(
+              inst =>
+                `- Function/Method '${inst.name}' has a high cyclomatic complexity of ${inst.complexity}. Target this specifically.`
+            )
+            .join('\n');
       } else if (candidate.type === 'SIZE') {
         specificEvidenceText = `\nSpecific File Metrics:\n- Lines of Code: ${candidate.evidence.lineCount}\n- Public Exports: ${candidate.evidence.exportCount}\n- Total File Complexity: ${candidate.evidence.complexity}`;
       } else if (candidate.type === 'COUPLING') {
@@ -667,17 +735,25 @@ export const repositoryApi = {
         specificEvidenceText = `\nCircular Dependency Path:\n${candidate.evidence.cyclePath.join(' -> ')}\nPlease refactor to break this exact circular reference.`;
       }
     }
-    
+
     // Append sibling clone context to the evidence if it exists
     if (siblingContextText) {
       specificEvidenceText += siblingContextText;
     }
-    
-    const prompt = ContextOrchestrator.buildAutoFixPrompt(candidate, targetFile, slicedCode, impactConstraints, specificEvidenceText, strategiesText, snippetContext);
+
+    const prompt = ContextOrchestrator.buildAutoFixPrompt(
+      candidate,
+      targetFile,
+      slicedCode,
+      impactConstraints,
+      specificEvidenceText,
+      strategiesText,
+      snippetContext
+    );
 
     const res = await api.post(`/ai/chat`, { prompt });
     const responseText = res.data?.response || res.data || '';
-    
+
     let refactoredChunk = responseText;
     const codeBlockMatch = responseText.match(/```[a-z]*\n([\s\S]*?)\n```/);
     if (codeBlockMatch) {
@@ -700,24 +776,24 @@ export const repositoryApi = {
   async generateTestsRefactoringCandidate(repoId, candidateId) {
     const record = await repositoryStore.get(repoId);
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
-    
+
     const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
     const risks = buildEngineeringRiskModel(record.analysis, record.analysis.graph, architecture);
     const refactoring = buildRefactoringIntelligence(risks, record.analysis, record.analysis.graph);
-    
+
     const candidate = refactoring.candidates.find(c => c.id === candidateId);
     if (!candidate) throw new Error('Candidate not found');
     if (!candidate.files || candidate.files.length === 0) throw new Error('No files associated with this candidate');
-    
+
     const targetFile = candidate.files[0];
     const originalCode = await persistenceStore.loadFile(repoId, targetFile);
     if (!originalCode) throw new Error(`Could not load source file ${targetFile}`);
-    
+
     const prompt = ContextOrchestrator.buildGenerateTestsPrompt(candidate, targetFile, originalCode);
 
     const res = await api.post(`/ai/chat`, { prompt });
     const responseText = res.data?.response || res.data || '';
-    
+
     let testCode = responseText;
     const codeBlockMatch = responseText.match(/```[a-z]*\n([\s\S]*?)\n```/);
     if (codeBlockMatch) {
@@ -738,9 +814,9 @@ export const repositoryApi = {
     const record = await repositoryStore.get(id);
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Analysis not available');
 
-    const fileLoaderCallback = (path) => persistenceStore.loadFile(id, path);
+    const fileLoaderCallback = path => persistenceStore.loadFile(id, path);
     const { contextData } = await buildQuestionContext(record.analysis, question, fileLoaderCallback, activeContext);
-    
+
     return contextData;
   },
 
@@ -749,16 +825,17 @@ export const repositoryApi = {
    */
   async askQuestionWithContext(contextData, question, history = [], options = {}) {
     const promptContext = {
-       question,
-       repository: contextData.meta,
-       files: contextData.files,
-       truncated: false
+      question,
+      repository: contextData.meta,
+      files: contextData.files,
+      truncated: false,
     };
     const rawPrompt = buildPrompt(promptContext);
-    
-    const fullPrompt = contextData.facts && contextData.facts.length > 0 
-      ? `Facts:\n${contextData.facts.join('\n')}\n\n${rawPrompt}` 
-      : rawPrompt;
+
+    const fullPrompt =
+      contextData.facts && contextData.facts.length > 0
+        ? `Facts:\n${contextData.facts.join('\n')}\n\n${rawPrompt}`
+        : rawPrompt;
 
     const reqOptions = options.signal ? { signal: options.signal } : {};
     return api.post(`/ai/chat`, { prompt: fullPrompt, history }, reqOptions);
@@ -779,7 +856,6 @@ export const repositoryApi = {
     return this.askQuestionWithContext(contextData, question, history, options);
   },
 
-
   async getOverviewDocumentation(id, options = {}) {
     const record = await repositoryStore.get(id);
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Analysis not available');
@@ -794,15 +870,18 @@ export const repositoryApi = {
       try {
         // The server's ai.service.js already strips fences and parses JSON when jsonMode=true,
         // but the response is re-serialised as a string to keep the client contract uniform.
-        const raw = (aiResponse.data.response || '').trim()
-          .replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+        const raw = (aiResponse.data.response || '')
+          .trim()
+          .replace(/^```json\s*/i, '')
+          .replace(/^```\s*/, '')
+          .replace(/\s*```$/, '');
         aiInterpretation = JSON.parse(raw);
       } catch (e) {
         console.warn('[getOverviewDocumentation] Failed to parse AI JSON:', e.message);
       }
       return { data: { facts: context, aiInterpretation } };
     }
-    
+
     return { data: { facts: context, aiInterpretation: null } };
   },
 
@@ -819,21 +898,25 @@ export const repositoryApi = {
     const aiResponse = await api.post('/ai/chat', { prompt, jsonMode: true });
     let adr = null;
     try {
-      const raw = (aiResponse.data.response || '').trim().replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+      const raw = (aiResponse.data.response || '')
+        .trim()
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/, '')
+        .replace(/\s*```$/, '');
       adr = JSON.parse(raw);
     } catch (e) {
       throw new Error('Failed to generate ADR: Invalid AI response format');
     }
-    
+
     adr.id = uuidv4();
     adr.date = new Date().toISOString().split('T')[0];
 
     // ── Store result in cache ────────────────────────────────────────────
     await aiArtifactStore.set(cacheKey, adr, { analysisVersion });
-    
+
     return { data: adr };
   },
-  
+
   async getModuleDocumentation(id, path, options = {}) {
     const record = await repositoryStore.get(id);
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Analysis not available');
@@ -853,8 +936,11 @@ export const repositoryApi = {
       const aiResponse = await api.post(`/ai/chat`, { prompt, jsonMode: true });
       let aiInterpretation = null;
       try {
-        const raw = (aiResponse.data.response || '').trim()
-          .replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+        const raw = (aiResponse.data.response || '')
+          .trim()
+          .replace(/^```json\s*/i, '')
+          .replace(/^```\s*/, '')
+          .replace(/\s*```$/, '');
         aiInterpretation = JSON.parse(raw);
       } catch (e) {
         console.warn('[getModuleDocumentation] Failed to parse AI JSON:', e.message);
@@ -867,17 +953,17 @@ export const repositoryApi = {
 
       return { data: { facts: context, aiInterpretation } };
     }
-    
+
     return { data: { facts: context, aiInterpretation: null } };
   },
 
   // ── CI / Trigger Endpoints ───────────────────────────────────────────────────
-  analyze: async (id) => {
+  analyze: async id => {
     await repositoryStore.update(id, { status: 'analyzing', phase: 'extracting', error: null });
     startAnalysis(id, {}).catch(err => console.error('Background analysis failed:', err));
     return { data: { success: true } };
   },
-  analyzeIncremental: async (id) => {
+  analyzeIncremental: async id => {
     await repositoryStore.update(id, { status: 'analyzing', phase: 'extracting', error: null });
     startAnalysis(id, {}).catch(err => console.error('Background analysis failed:', err));
     return { data: { success: true } };
@@ -900,11 +986,14 @@ export const repositoryApi = {
 
 export const getAiHealth = () => api.get('/ai/health').then(res => res.data);
 export const getAiStatus = () => api.get('/ai/status').then(res => res.data);
-export const getEngineeringRisks = (id) => repositoryApi.getRisks(id).then(res => res.data);
-export const getRefactoringIntelligence = (id) => repositoryApi.getRefactoringIntelligence(id).then(res => res.data);
-export const getRefactoringCandidate = (id, candidateId) => repositoryApi.getRefactoringIntelligence(id).then(res => res.data.candidates.find(c => c.id === candidateId));
+export const getEngineeringRisks = id => repositoryApi.getRisks(id).then(res => res.data);
+export const getRefactoringIntelligence = id => repositoryApi.getRefactoringIntelligence(id).then(res => res.data);
+export const getRefactoringCandidate = (id, candidateId) =>
+  repositoryApi.getRefactoringIntelligence(id).then(res => res.data.candidates.find(c => c.id === candidateId));
 export const getRefactoringImpact = (id, candidateId) => repositoryApi.getChangeImpact(id).then(res => res.data);
-export const autoFixRefactoringCandidate = (id, candidateId) => repositoryApi.autoFixRefactoringCandidate(id, candidateId).then(res => res.data);
-export const generateTestsRefactoringCandidate = (id, candidateId) => repositoryApi.generateTestsRefactoringCandidate(id, candidateId).then(res => res.data);
+export const autoFixRefactoringCandidate = (id, candidateId) =>
+  repositoryApi.autoFixRefactoringCandidate(id, candidateId).then(res => res.data);
+export const generateTestsRefactoringCandidate = (id, candidateId) =>
+  repositoryApi.generateTestsRefactoringCandidate(id, candidateId).then(res => res.data);
 
 export default api;

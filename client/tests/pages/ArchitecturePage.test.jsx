@@ -8,16 +8,14 @@ import { AIProvider } from '../../src/shared/context/AIContext';
 vi.mock('../../src/shared/api', () => ({
   repositoryApi: {
     getArchitecture: vi.fn().mockResolvedValue({ data: { nodes: [], edges: [] } }),
-  }
+  },
 }));
 
-const renderWithProviders = (component) => {
+const renderWithProviders = component => {
   return render(
     <BrowserRouter>
       <RepositoryProvider>
-        <AIProvider>
-        {component}
-      </AIProvider>
+        <AIProvider>{component}</AIProvider>
       </RepositoryProvider>
     </BrowserRouter>
   );

@@ -1,12 +1,12 @@
 /**
  * repository.intelligence.context.js
- * 
- * It receives the aggregated repository intelligence JSON, then extracts the key metrics, 
+ *
+ * It receives the aggregated repository intelligence JSON, then extracts the key metrics,
  * and then it applies structured formatting to build a deterministic text context for LLM.
  */
 
 /**
- * It evaluates the intelligence object, then extracts string variables, 
+ * It evaluates the intelligence object, then extracts string variables,
  * and then it applies template literals to construct a bounded prompt.
  */
 export function buildIntelligenceContext(intel) {

@@ -12,7 +12,7 @@ export default function ContextInspector({ contextData, onConfirm, onCancel }) {
 
   if (!contextData) return null;
 
-  const handleToggleFile = (filePath) => {
+  const handleToggleFile = filePath => {
     setExcludedFiles(prev => {
       const next = new Set(prev);
       if (next.has(filePath)) {
@@ -28,7 +28,7 @@ export default function ContextInspector({ contextData, onConfirm, onCancel }) {
     // Filter out excluded files
     const modifiedContext = {
       ...contextData,
-      files: (contextData.files || []).filter(f => !excludedFiles.has(f.filePath))
+      files: (contextData.files || []).filter(f => !excludedFiles.has(f.filePath)),
     };
     onConfirm(modifiedContext);
   };
@@ -37,7 +37,11 @@ export default function ContextInspector({ contextData, onConfirm, onCancel }) {
     <div className="bg-gray-800/80 backdrop-blur-md border border-indigo-500/30 rounded-xl p-4 mb-4 shadow-xl text-sm animate-in fade-in slide-in-from-bottom-2">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => setExpanded(!expanded)}>
-          {expanded ? <ChevronDown size={16} className="text-gray-400" /> : <ChevronRight size={16} className="text-gray-400" />}
+          {expanded ? (
+            <ChevronDown size={16} className="text-gray-400" />
+          ) : (
+            <ChevronRight size={16} className="text-gray-400" />
+          )}
           <Layers size={18} className="text-indigo-400" />
           <h3 className="font-semibold text-gray-200">AI Context Payload Inspector</h3>
           <span className="bg-indigo-500/20 text-indigo-300 text-xs px-2 py-0.5 rounded-full ml-2">
@@ -66,7 +70,9 @@ export default function ContextInspector({ contextData, onConfirm, onCancel }) {
               </div>
               <ul className="list-disc list-inside text-gray-400 space-y-1 ml-1 text-xs">
                 {contextData.facts.map((fact, i) => (
-                  <li key={i} className="truncate" title={fact}>{fact}</li>
+                  <li key={i} className="truncate" title={fact}>
+                    {fact}
+                  </li>
                 ))}
               </ul>
             </div>
@@ -80,23 +86,25 @@ export default function ContextInspector({ contextData, onConfirm, onCancel }) {
                 <span className="font-medium">Source Files ({contextData.files.length})</span>
                 <span className="text-xs text-gray-500 ml-auto">Uncheck to exclude from prompt</span>
               </div>
-              
+
               <div className="max-h-48 overflow-y-auto space-y-1 pr-2 custom-scrollbar">
                 {contextData.files.map((f, i) => {
                   const isExcluded = excludedFiles.has(f.filePath);
                   return (
-                    <div 
-                      key={i} 
+                    <div
+                      key={i}
                       className={`flex items-center justify-between p-2 rounded border ${isExcluded ? 'bg-gray-800/40 border-gray-700/30' : 'bg-gray-800 border-gray-700'} hover:border-gray-600 transition-colors`}
                     >
                       <div className="flex items-center gap-3 overflow-hidden">
-                        <input 
-                          type="checkbox" 
+                        <input
+                          type="checkbox"
                           checked={!isExcluded}
                           onChange={() => handleToggleFile(f.filePath)}
                           className="w-4 h-4 rounded border-gray-600 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-gray-900 bg-gray-700"
                         />
-                        <span className={`truncate text-xs ${isExcluded ? 'text-gray-500 line-through' : 'text-gray-300'}`}>
+                        <span
+                          className={`truncate text-xs ${isExcluded ? 'text-gray-500 line-through' : 'text-gray-300'}`}
+                        >
                           {f.filePath}
                         </span>
                       </div>

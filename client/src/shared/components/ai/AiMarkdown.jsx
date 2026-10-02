@@ -14,13 +14,13 @@ export default function AiMarkdown({ content, className = '' }) {
   if (!content) return null;
 
   let safeContent = content;
-  
+
   // Attempt to parse stringified JSON leaks from the LLM
   if (typeof safeContent === 'string' && safeContent.trim().startsWith('{')) {
     try {
       const parsed = JSON.parse(safeContent);
       if (parsed && typeof parsed === 'object') safeContent = parsed;
-    } catch(e) {}
+    } catch (e) {}
   }
 
   // If it's an object, gracefully extract human-readable text instead of dumping raw JSON
@@ -31,7 +31,7 @@ export default function AiMarkdown({ content, className = '' }) {
     if (safeContent.responsibility) parts.push(safeContent.responsibility);
     if (safeContent.architectureRole) parts.push(safeContent.architectureRole);
     if (safeContent.text) parts.push(safeContent.text);
-    
+
     if (parts.length > 0) {
       safeContent = parts.join('\n\n');
     } else {
@@ -40,7 +40,9 @@ export default function AiMarkdown({ content, className = '' }) {
   }
 
   return (
-    <div className={`ai-markdown prose prose-sm max-w-none prose-pre:p-0 prose-pre:bg-transparent ${!isLight ? 'prose-invert' : ''} ${className}`}>
+    <div
+      className={`ai-markdown prose prose-sm max-w-none prose-pre:p-0 prose-pre:bg-transparent ${!isLight ? 'prose-invert' : ''} ${className}`}
+    >
       <Markdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeSanitize]}
@@ -48,7 +50,11 @@ export default function AiMarkdown({ content, className = '' }) {
           code({ node, inline, className, children, ...props }) {
             const match = /language-(\w+)/.exec(className || '');
             if (!inline && match) {
-              return <CodeBlock match={match} props={props} isLight={isLight}>{children}</CodeBlock>;
+              return (
+                <CodeBlock match={match} props={props} isLight={isLight}>
+                  {children}
+                </CodeBlock>
+              );
             }
             return (
               <code className="bg-panel/50 text-accent font-mono text-[0.85em] px-1.5 py-0.5 rounded" {...props}>
@@ -58,7 +64,12 @@ export default function AiMarkdown({ content, className = '' }) {
           },
           a({ node, children, ...props }) {
             return (
-              <a target="_blank" rel="noopener noreferrer" className="text-accent hover:underline decoration-accent/30" {...props}>
+              <a
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent hover:underline decoration-accent/30"
+                {...props}
+              >
                 {children}
               </a>
             );
@@ -73,26 +84,54 @@ export default function AiMarkdown({ content, className = '' }) {
             );
           },
           th({ node, children, ...props }) {
-            return <th className="bg-panel p-3 font-semibold border-b border-border" {...props}>{children}</th>;
+            return (
+              <th className="bg-panel p-3 font-semibold border-b border-border" {...props}>
+                {children}
+              </th>
+            );
           },
           td({ node, children, ...props }) {
-            return <td className="p-3 border-b border-border/50 bg-surface/50" {...props}>{children}</td>;
+            return (
+              <td className="p-3 border-b border-border/50 bg-surface/50" {...props}>
+                {children}
+              </td>
+            );
           },
           p({ node, children, ...props }) {
-            return <p className="leading-relaxed text-text/90" {...props}>{children}</p>;
+            return (
+              <p className="leading-relaxed text-text/90" {...props}>
+                {children}
+              </p>
+            );
           },
           li({ node, children, ...props }) {
-            return <li className="text-text/80" {...props}>{children}</li>;
+            return (
+              <li className="text-text/80" {...props}>
+                {children}
+              </li>
+            );
           },
           h1({ node, children, ...props }) {
-            return <h1 className="text-text/90 font-semibold" {...props}>{children}</h1>;
+            return (
+              <h1 className="text-text/90 font-semibold" {...props}>
+                {children}
+              </h1>
+            );
           },
           h2({ node, children, ...props }) {
-            return <h2 className="text-text/90 font-semibold mt-6 mb-3" {...props}>{children}</h2>;
+            return (
+              <h2 className="text-text/90 font-semibold mt-6 mb-3" {...props}>
+                {children}
+              </h2>
+            );
           },
           h3({ node, children, ...props }) {
-            return <h3 className="text-text/90 font-semibold mt-4 mb-2" {...props}>{children}</h3>;
-          }
+            return (
+              <h3 className="text-text/90 font-semibold mt-4 mb-2" {...props}>
+                {children}
+              </h3>
+            );
+          },
         }}
       >
         {safeContent}
@@ -104,7 +143,7 @@ export default function AiMarkdown({ content, className = '' }) {
 function CodeBlock({ match, children, props, isLight }) {
   const [copied, setCopied] = useState(false);
   const codeString = String(children).replace(/\n$/, '');
-  
+
   const handleCopy = () => {
     navigator.clipboard.writeText(codeString);
     setCopied(true);
@@ -115,7 +154,7 @@ function CodeBlock({ match, children, props, isLight }) {
     <div className="relative group my-4 rounded-md overflow-hidden border border-border">
       <div className="flex justify-between items-center bg-panel px-4 py-1.5 text-xs text-muted border-b border-border">
         <span className="uppercase tracking-wider">{match[1]}</span>
-        <button 
+        <button
           onClick={handleCopy}
           className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-text flex items-center gap-1 cursor-pointer"
           title="Copy code"

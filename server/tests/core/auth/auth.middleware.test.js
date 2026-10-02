@@ -4,12 +4,12 @@ const jwt = require('jsonwebtoken');
 jest.mock('../../../src/core/db/supabase.client', () => ({
   getSupabaseClient: jest.fn(() => ({
     auth: {
-      getUser: jest.fn(async (token) => {
+      getUser: jest.fn(async token => {
         if (token === 'invalid-token') return { data: { user: null }, error: new Error('Invalid token') };
         return { data: { user: { id: 'user-123', email: 'test@example.com' } }, error: null };
-      })
-    }
-  }))
+      }),
+    },
+  })),
 }));
 
 describe('Auth Middleware', () => {

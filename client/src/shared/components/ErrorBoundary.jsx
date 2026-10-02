@@ -5,11 +5,11 @@ import { Link } from 'react-router-dom';
 export class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { 
-      hasError: false, 
-      error: null, 
+    this.state = {
+      hasError: false,
+      error: null,
       errorInfo: null,
-      copied: false 
+      copied: false,
     };
   }
 
@@ -20,23 +20,26 @@ export class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     // You can also log the error to an error reporting service
-    console.error("ErrorBoundary caught an error", error, errorInfo);
+    console.error('ErrorBoundary caught an error', error, errorInfo);
     this.setState({ errorInfo });
   }
 
   handleCopy = () => {
     const { error, errorInfo } = this.state;
     const errorText = `${error ? error.toString() : ''}\n\n${errorInfo?.componentStack || ''}`;
-    
-    navigator.clipboard.writeText(errorText).then(() => {
-      this.setState({ copied: true });
-      setTimeout(() => {
-        this.setState({ copied: false });
-      }, 2000);
-    }).catch(err => {
-      console.error("Failed to copy error details:", err);
-    });
-  }
+
+    navigator.clipboard
+      .writeText(errorText)
+      .then(() => {
+        this.setState({ copied: true });
+        setTimeout(() => {
+          this.setState({ copied: false });
+        }, 2000);
+      })
+      .catch(err => {
+        console.error('Failed to copy error details:', err);
+      });
+  };
 
   render() {
     if (this.state.hasError) {
@@ -48,7 +51,7 @@ export class ErrorBoundary extends React.Component {
               <AlertTriangle className="w-8 h-8" />
               <h2 className="text-xl font-semibold">Something went wrong</h2>
             </div>
-            
+
             {/* Error Container with group-hover configuration */}
             <div className="relative group mb-6">
               <button
@@ -82,7 +85,7 @@ export class ErrorBoundary extends React.Component {
                 <RefreshCw className="w-4 h-4" />
                 Reload Page
               </button>
-              
+
               <Link
                 to={(() => {
                   const pathParts = window.location.pathname.split('/');

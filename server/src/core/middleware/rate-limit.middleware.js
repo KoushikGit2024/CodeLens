@@ -5,7 +5,7 @@ const globalRateLimiter = rateLimit({
   max: 100, // limit each IP to 100 requests per windowMs
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many requests, please try again later.' }
+  message: { error: 'Too many requests, please try again later.' },
 });
 
 const aiRateLimiter = rateLimit({
@@ -13,10 +13,10 @@ const aiRateLimiter = rateLimit({
   max: 20, // limit each IP to 20 AI requests per minute
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'AI rate limit exceeded, please slow down.' }
+  message: { error: 'AI rate limit exceeded, please slow down.' },
 });
 
 module.exports = {
   globalRateLimiter,
-  aiRateLimiter
+  aiRateLimiter,
 };

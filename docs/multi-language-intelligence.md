@@ -4,13 +4,13 @@ CodeLens is built to natively analyze not just JavaScript and TypeScript, but mu
 
 ## Supported Languages
 
-| Language | Extensions | Tree-sitter Grammar | Capabilities |
-| --- | --- | --- | --- |
-| **JavaScript** | `.js`, `.jsx`, `.cjs`, `.mjs` | `tree-sitter-javascript` | Functions, Async, Generators, Arrow, Classes, Methods, Imports (ESM/CJS), Exports. |
-| **TypeScript** | `.ts`, `.tsx`, `.cts`, `.mts` | `tree-sitter-typescript` | Same as JS + Interfaces, Types. |
-| **Python** | `.py` | `tree-sitter-python` | Functions, Async, Classes, Methods, Decorators, Imports (absolute, relative, alias, wildcard). |
-| **Java** | `.java` | `tree-sitter-java` | Classes, Interfaces, Methods, Constructors, Visibility Modifiers, Packages, Imports (wildcard). |
-| **C++** | `.cpp`, `.cc`, `.cxx`, `.h`, `.hpp` | `tree-sitter-cpp` | Classes, Structs, Namespaces, Functions, Methods, Preprocessor Includes (internal and system). |
+| Language       | Extensions                          | Tree-sitter Grammar      | Capabilities                                                                                    |
+| -------------- | ----------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------- |
+| **JavaScript** | `.js`, `.jsx`, `.cjs`, `.mjs`       | `tree-sitter-javascript` | Functions, Async, Generators, Arrow, Classes, Methods, Imports (ESM/CJS), Exports.              |
+| **TypeScript** | `.ts`, `.tsx`, `.cts`, `.mts`       | `tree-sitter-typescript` | Same as JS + Interfaces, Types.                                                                 |
+| **Python**     | `.py`                               | `tree-sitter-python`     | Functions, Async, Classes, Methods, Decorators, Imports (absolute, relative, alias, wildcard).  |
+| **Java**       | `.java`                             | `tree-sitter-java`       | Classes, Interfaces, Methods, Constructors, Visibility Modifiers, Packages, Imports (wildcard). |
+| **C++**        | `.cpp`, `.cc`, `.cxx`, `.h`, `.hpp` | `tree-sitter-cpp`        | Classes, Structs, Namespaces, Functions, Methods, Preprocessor Includes (internal and system).  |
 
 ## Architecture
 

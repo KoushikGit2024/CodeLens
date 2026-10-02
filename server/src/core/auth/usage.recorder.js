@@ -25,16 +25,19 @@ function estimateTokens(chars) {
   return Math.ceil(chars / 4);
 }
 
-async function recordUsage(req, {
-  provider,
-  feature = null,
-  status,
-  usage = null,
-  promptChars = null,
-  responseChars = null,
-  latencyMs = null,
-  errorMessage = null,
-}) {
+async function recordUsage(
+  req,
+  {
+    provider,
+    feature = null,
+    status,
+    usage = null,
+    promptChars = null,
+    responseChars = null,
+    latencyMs = null,
+    errorMessage = null,
+  }
+) {
   try {
     const userId = req.user && req.user.id;
     if (!userId) return;

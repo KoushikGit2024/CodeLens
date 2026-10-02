@@ -40,9 +40,9 @@ describe('ThemeContext', () => {
   it('persists mode and color selection in localStorage', () => {
     const { result } = renderHook(() => useTheme(), { wrapper: ThemeProvider });
 
-    act(() => { 
+    act(() => {
       result.current.setMode('light');
-      result.current.setColorTheme('ocean'); 
+      result.current.setColorTheme('ocean');
     });
 
     expect(localStorage.getItem('codelens:themeMode')).toBe('light');

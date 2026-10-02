@@ -32,17 +32,17 @@ flowchart TD
 
 ### Node types
 
-| Type | Description |
-|------|-------------|
-| `file` | A source file that exists inside the repository |
-| `package` | An external npm/node package (bare specifier) |
+| Type      | Description                                     |
+| --------- | ----------------------------------------------- |
+| `file`    | A source file that exists inside the repository |
+| `package` | An external npm/node package (bare specifier)   |
 
 #### File node schema
 
 ```json
 {
-  "id":       "file:src/controllers/authController.js",
-  "type":     "file",
+  "id": "file:src/controllers/authController.js",
+  "type": "file",
   "filePath": "src/controllers/authController.js"
 }
 ```
@@ -51,7 +51,7 @@ flowchart TD
 
 ```json
 {
-  "id":   "pkg:express",
+  "id": "pkg:express",
   "type": "package",
   "name": "express"
 }
@@ -61,11 +61,11 @@ flowchart TD
 
 ### Edge types
 
-| Type | Description |
-|------|-------------|
-| `imports` | ES module import statement (`import … from '…'`) |
-| `requires` | CommonJS require() call (`require('…')`) |
-| `depends_on` | Aggregated — reserved for future use |
+| Type         | Description                                      |
+| ------------ | ------------------------------------------------ |
+| `imports`    | ES module import statement (`import … from '…'`) |
+| `requires`   | CommonJS require() call (`require('…')`)         |
+| `depends_on` | Aggregated — reserved for future use             |
 
 #### Edge schema
 
@@ -73,15 +73,15 @@ flowchart TD
 {
   "source": "file:src/controllers/authController.js",
   "target": "file:src/services/authService.js",
-  "type":   "imports",
+  "type": "imports",
   "evidence": {
-    "specifier":      "../services/authService",
-    "importedNames":  ["login", "logout"],
+    "specifier": "../services/authService",
+    "importedNames": ["login", "logout"],
     "location": {
-      "startLine":   1,
+      "startLine": 1,
       "startColumn": 0,
-      "endLine":     1,
-      "endColumn":   50
+      "endLine": 1,
+      "endColumn": 50
     }
   }
 }
@@ -89,11 +89,11 @@ flowchart TD
 
 **Edge evidence fields:**
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `specifier` | string | The raw import/require string as written in source |
-| `importedNames` | string[] | Bound names (named imports, aliases, or identifier) |
-| `location` | Location\|null | Source position of the import statement |
+| Field           | Type           | Description                                         |
+| --------------- | -------------- | --------------------------------------------------- |
+| `specifier`     | string         | The raw import/require string as written in source  |
+| `importedNames` | string[]       | Bound names (named imports, aliases, or identifier) |
+| `location`      | Location\|null | Source position of the import statement             |
 
 ---
 
@@ -101,17 +101,17 @@ flowchart TD
 
 ```json
 {
-  "nodes": [ /* Node[] */ ],
-  "edges": [ /* Edge[] */ ],
+  "nodes": [/* Node[] */],
+  "edges": [/* Edge[] */],
   "meta": {
-    "totalFiles":        9,
-    "totalPackages":     4,
-    "totalEdges":        14,
+    "totalFiles": 9,
+    "totalPackages": 4,
+    "totalEdges": 14,
     "unresolvedImports": 2,
-    "builtAt":           "2025-01-01T00:00:00.000Z"
+    "builtAt": "2025-01-01T00:00:00.000Z"
   },
-  "cycles":        [ ["src/a.js", "src/b.js", "src/a.js"] ],
-  "isolatedFiles": [ "src/constants.js" ]
+  "cycles": [["src/a.js", "src/b.js", "src/a.js"]],
+  "isolatedFiles": ["src/constants.js"]
 }
 ```
 
@@ -123,7 +123,7 @@ flowchart TD
 {
   "source": "file:src/controllers/authController.js",
   "target": "file:src/services/authService.js",
-  "type":   "imports",
+  "type": "imports",
   "evidence": {
     "specifier": "../services/authService",
     "importedNames": ["login"],
@@ -138,7 +138,7 @@ flowchart TD
 {
   "source": "file:src/services/authService.js",
   "target": "pkg:jsonwebtoken",
-  "type":   "imports",
+  "type": "imports",
   "evidence": {
     "specifier": "jsonwebtoken",
     "importedNames": ["sign", "verify"],
@@ -158,16 +158,17 @@ Unresolved imports are **not** added to the graph as edges. They are counted in 
 ### Algorithm
 
 Given:
+
 - `importingFile` — relative path of the file containing the import
 - `specifier` — the raw import string (e.g. `./utils/helper`, `express`)
 - `knownFiles` — Set of all repository file paths
 
 **Step 1 — Classify the specifier**
 
-| Specifier | Classification |
-|-----------|---------------|
-| Starts with `./` or `../` | `relative` → attempt file resolution |
-| Anything else (bare name, `@org/pkg`) | `external` → package node, stop |
+| Specifier                             | Classification                       |
+| ------------------------------------- | ------------------------------------ |
+| Starts with `./` or `../`             | `relative` → attempt file resolution |
+| Anything else (bare name, `@org/pkg`) | `external` → package node, stop      |
 
 **Step 2 — Exact match**
 
@@ -249,8 +250,8 @@ Returns the full dependency graph for a repository.
 
 **Parameters:**
 
-| Name | In | Type | Description |
-|------|----|------|-------------|
+| Name | In   | Type   | Description     |
+| ---- | ---- | ------ | --------------- |
 | `id` | path | string | Repository UUID |
 
 **Response `200`:**
@@ -258,14 +259,14 @@ Returns the full dependency graph for a repository.
 ```json
 {
   "nodes": [
-    { "id": "file:src/app.js",   "type": "file",    "filePath": "src/app.js" },
-    { "id": "pkg:express",        "type": "package", "name": "express" }
+    { "id": "file:src/app.js", "type": "file", "filePath": "src/app.js" },
+    { "id": "pkg:express", "type": "package", "name": "express" }
   ],
   "edges": [
     {
-      "source":   "file:src/app.js",
-      "target":   "pkg:express",
-      "type":     "imports",
+      "source": "file:src/app.js",
+      "target": "pkg:express",
+      "type": "imports",
       "evidence": { "specifier": "express", "importedNames": ["Router"], "location": null }
     }
   ],
@@ -283,12 +284,12 @@ Returns the full dependency graph for a repository.
 
 **Error responses:**
 
-| Status | Condition |
-|--------|-----------|
-| `404` | Repository not found |
-| `202` | Repository still being analyzed |
-| `409` | Repository not in `ready` state |
-| `500` | Graph build failed |
+| Status | Condition                       |
+| ------ | ------------------------------- |
+| `404`  | Repository not found            |
+| `202`  | Repository still being analyzed |
+| `409`  | Repository not in `ready` state |
+| `500`  | Graph build failed              |
 
 ---
 
@@ -298,9 +299,9 @@ Returns dependencies and dependents for a single file.
 
 **Parameters:**
 
-| Name | In | Type | Description |
-|------|----|------|-------------|
-| `id` | path | string | Repository UUID |
+| Name   | In    | Type   | Description                            |
+| ------ | ----- | ------ | -------------------------------------- |
+| `id`   | path  | string | Repository UUID                        |
 | `path` | query | string | Relative file path (e.g. `src/app.js`) |
 
 **Response `200`:**
@@ -315,7 +316,7 @@ Returns dependencies and dependents for a single file.
       "evidence": { "specifier": "../services/authService", "importedNames": ["login"], "location": null }
     },
     {
-      "package":  "jsonwebtoken",
+      "package": "jsonwebtoken",
       "edgeType": "imports",
       "evidence": { "specifier": "jsonwebtoken", "importedNames": ["sign"], "location": null }
     }
@@ -335,12 +336,12 @@ Returns dependencies and dependents for a single file.
 
 **Error responses:**
 
-| Status | Condition |
-|--------|-----------|
-| `400` | Missing `path` query parameter |
-| `404` | Repository or file not found |
-| `409` | Repository not ready |
-| `500` | Graph query failed |
+| Status | Condition                      |
+| ------ | ------------------------------ |
+| `400`  | Missing `path` query parameter |
+| `404`  | Repository or file not found   |
+| `409`  | Repository not ready           |
+| `500`  | Graph query failed             |
 
 ---
 
@@ -350,10 +351,10 @@ Returns dependencies and dependents for a single file.
 
 ```javascript
 const { buildDependencyGraph } = require('./src/analyzers/dependencyGraph');
-const { analyzeRepository }    = require('./src/analyzers/repositoryAnalyzer');
+const { analyzeRepository } = require('./src/analyzers/repositoryAnalyzer');
 
 const analysis = await analyzeRepository('/path/to/repo');
-const graph    = buildDependencyGraph(analysis);
+const graph = buildDependencyGraph(analysis);
 
 // All nodes
 console.log(graph.nodes);
@@ -375,7 +376,7 @@ To inspect them, call `resolveAllImports` directly:
 const { resolveAllImports, buildKnownFilesSet } = require('./src/analyzers/moduleResolver');
 
 const knownFiles = buildKnownFilesSet(analysis);
-const resolved   = resolveAllImports(analysis, knownFiles);
+const resolved = resolveAllImports(analysis, knownFiles);
 
 for (const [filePath, imports] of resolved) {
   const unresolved = imports.filter(i => i.kind === 'unresolved');
@@ -415,16 +416,16 @@ To support `tsconfig.json` path aliases:
 
 ### Test files
 
-| File | What it tests |
-|------|---------------|
-| `server/tests/analyzers/dependencyGraph.test.js` | Graph builder, nodes, edges, meta, cycles, isolation, derived queries |
-| `server/tests/analyzers/commonJsRequire.test.js` | CJS require() extraction in JavaScriptParser |
-| `server/tests/analyzers/moduleResolver.test.js` | Module resolution algorithm (all steps) |
-| `server/tests/analyzers/JavaScriptParser.test.js` | Full JS symbol extraction (Step 2 regression) |
-| `server/tests/analyzers/TypeScriptParser.test.js` | Full TS symbol extraction (Step 2 regression) |
-| `server/tests/analyzers/repositoryAnalyzer.test.js` | Repository scan + analysis (Step 2 regression) |
-| `server/tests/analyzers/parserRegistry.test.js` | Parser caching (Step 2 regression) |
-| `server/tests/analyzers/languageDetector.test.js` | Language detection (Step 2 regression) |
+| File                                                | What it tests                                                         |
+| --------------------------------------------------- | --------------------------------------------------------------------- |
+| `server/tests/analyzers/dependencyGraph.test.js`    | Graph builder, nodes, edges, meta, cycles, isolation, derived queries |
+| `server/tests/analyzers/commonJsRequire.test.js`    | CJS require() extraction in JavaScriptParser                          |
+| `server/tests/analyzers/moduleResolver.test.js`     | Module resolution algorithm (all steps)                               |
+| `server/tests/analyzers/JavaScriptParser.test.js`   | Full JS symbol extraction (Step 2 regression)                         |
+| `server/tests/analyzers/TypeScriptParser.test.js`   | Full TS symbol extraction (Step 2 regression)                         |
+| `server/tests/analyzers/repositoryAnalyzer.test.js` | Repository scan + analysis (Step 2 regression)                        |
+| `server/tests/analyzers/parserRegistry.test.js`     | Parser caching (Step 2 regression)                                    |
+| `server/tests/analyzers/languageDetector.test.js`   | Language detection (Step 2 regression)                                |
 
 ### Running tests
 
@@ -454,18 +455,22 @@ Tests:       209 passed, 209 total
 When interacting with the Dependency Graph in the React UI, users can navigate from an internal file node directly to the Monaco Code Viewer (Explorer).
 
 **Navigation Flow:**
+
 1. User selects a blue (internal) file node in the dependency graph.
 2. The right-hand File Detail Panel populates with dependency data.
 3. User clicks the **"View in Explorer"** button (or the "View" link next to a specific dependency).
 4. The user is navigated to the Explorer route via a deep-link.
 
 **Route format:**
+
 ```
 /explore/:repoId?path=<encoded-file-path>
 ```
+
 Example: `/explore/1234-abcd?path=src%2Fcontrollers%2FauthController.js`
 
 **Path Handling:**
+
 - The `path` parameter is strictly URI-encoded to safely handle spaces and special characters.
 - The `ExplorerPage` reads the `path` and `line` (optional) query parameters on mount.
 - External packages (e.g. `express`) do not expose a "View in Explorer" action because they are not part of the analyzed repository source.

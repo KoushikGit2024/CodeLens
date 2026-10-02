@@ -1,4 +1,14 @@
-import { RefreshCw, RefreshCcw, Loader2, ChevronLeft, ChevronRight, Search, Menu, MoreVertical, Database } from 'lucide-react';
+import {
+  RefreshCw,
+  RefreshCcw,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  Menu,
+  MoreVertical,
+  Database,
+} from 'lucide-react';
 import { useState } from 'react';
 import Breadcrumbs from '../ui/Breadcrumbs';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
@@ -29,7 +39,7 @@ export default function RepositoryHeader() {
       addToast({
         title: 'Re-analysis Failed',
         description: err.message || 'An unexpected error occurred.',
-        type: 'error'
+        type: 'error',
       });
     } finally {
       setReanalyzing(false);
@@ -40,12 +50,15 @@ export default function RepositoryHeader() {
     <header className="h-12 flex items-center px-2 sm:px-4 border-b border-border bg-panel shrink-0 gap-2 sm:gap-4 justify-between relative z-30">
       <div className="flex items-center gap-2 sm:gap-4 min-w-0 z-10 flex-1">
         <div className="flex items-center gap-1 shrink-0">
-          <button 
+          <button
             onClick={() => {
-              setSearchParams(prev => {
-                prev.set('mobileNav', 'open');
-                return prev;
-              }, { replace: true });
+              setSearchParams(
+                prev => {
+                  prev.set('mobileNav', 'open');
+                  return prev;
+                },
+                { replace: true }
+              );
             }}
             aria-label="Open Navigation"
             className="p-1.5 text-muted hover:text-text hover:bg-surface rounded transition-colors sm:hidden mr-1"
@@ -53,7 +66,7 @@ export default function RepositoryHeader() {
           >
             <Menu className="w-5 h-5" />
           </button>
-          <button 
+          <button
             onClick={() => navigate(-1)}
             aria-label="Go back"
             className="p-1.5 text-muted hover:text-text hover:bg-surface rounded transition-colors hidden sm:block"
@@ -61,7 +74,7 @@ export default function RepositoryHeader() {
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <button 
+          <button
             onClick={() => navigate(1)}
             aria-label="Go forward"
             className="p-1.5 text-muted hover:text-text hover:bg-surface rounded transition-colors hidden sm:block"
@@ -112,7 +125,6 @@ export default function RepositoryHeader() {
       </div>
 
       <div className="flex items-center gap-1.5 sm:gap-3 z-10 shrink-0">
-        
         {/* Desktop / Tablet Actions */}
         <div className="hidden md:flex items-center gap-3">
           <button
@@ -122,7 +134,9 @@ export default function RepositoryHeader() {
           >
             <Search className="w-3.5 h-3.5" />
             <span>Search...</span>
-            <kbd className="font-sans text-[10px] px-1.5 py-0 rounded-sm bg-surface/50 border border-border/50 text-muted ml-1">Ctrl+P</kbd>
+            <kbd className="font-sans text-[10px] px-1.5 py-0 rounded-sm bg-surface/50 border border-border/50 text-muted ml-1">
+              Ctrl+P
+            </kbd>
           </button>
 
           <button
@@ -146,8 +160,8 @@ export default function RepositoryHeader() {
         {/* Mobile Actions */}
         <div className="md:hidden flex items-center gap-1">
           <UserAvatarWidget />
-          <button 
-            onClick={() => setIsRightMenuOpen(!isRightMenuOpen)} 
+          <button
+            onClick={() => setIsRightMenuOpen(!isRightMenuOpen)}
             className="p-1.5 text-muted hover:text-text hover:bg-surface rounded transition-colors"
             title="More Options"
           >
@@ -162,15 +176,25 @@ export default function RepositoryHeader() {
           <div className="fixed inset-0 z-40 md:hidden" onClick={() => setIsRightMenuOpen(false)} />
           <div className="absolute top-full right-2 mt-2 bg-panel border border-border shadow-xl rounded-lg p-2 flex flex-col gap-2 z-50 min-w-[200px] md:hidden animate-in slide-in-from-top-2 fade-in duration-200">
             <button
-              onClick={() => { setIsRightMenuOpen(false); window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', ctrlKey: true })); }}
+              onClick={() => {
+                setIsRightMenuOpen(false);
+                window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', ctrlKey: true }));
+              }}
               className="flex items-center justify-between w-full text-left text-sm text-muted hover:text-text hover:bg-surface rounded px-2 py-2"
             >
-              <span className="flex items-center gap-2"><Search className="w-4 h-4" /> Search</span>
-              <kbd className="font-sans text-[10px] px-1.5 py-0 rounded-sm bg-surface/50 border border-border/50 text-muted">Ctrl+P</kbd>
+              <span className="flex items-center gap-2">
+                <Search className="w-4 h-4" /> Search
+              </span>
+              <kbd className="font-sans text-[10px] px-1.5 py-0 rounded-sm bg-surface/50 border border-border/50 text-muted">
+                Ctrl+P
+              </kbd>
             </button>
             <div className="flex items-stretch gap-2 w-full">
               <button
-                onClick={() => { setIsRightMenuOpen(false); window.location.reload(); }}
+                onClick={() => {
+                  setIsRightMenuOpen(false);
+                  window.location.reload();
+                }}
                 className="flex-1 flex items-center justify-center gap-1 text-sm text-muted hover:text-text hover:bg-surface border border-border/40 rounded px-px py-2 transition-colors"
                 title="Refresh Page"
               >
@@ -178,7 +202,10 @@ export default function RepositoryHeader() {
                 Refresh
               </button>
               <button
-                onClick={() => { setIsRightMenuOpen(false); handleReanalyze(); }}
+                onClick={() => {
+                  setIsRightMenuOpen(false);
+                  handleReanalyze();
+                }}
                 disabled={reanalyzing}
                 className="flex-1 flex items-center justify-center gap-1 text-sm text-accent hover:text-text hover:bg-surface border border-accent/20 rounded px-px py-2 disabled:opacity-50 transition-colors"
               >
@@ -197,7 +224,9 @@ export default function RepositoryHeader() {
             </div>
             <div className="h-px w-full bg-border" />
             <div className="flex items-center justify-between px-2 py-1.5">
-              <span className="text-sm text-muted font-medium flex items-center gap-1"><Database className="w-4 h-4"/> Keep Repo Saved</span>
+              <span className="text-sm text-muted font-medium flex items-center gap-1">
+                <Database className="w-4 h-4" /> Keep Repo Saved
+              </span>
               <button
                 onClick={() => {
                   const current = localStorage.getItem(`mobile_save_${repoId}`) === 'true';
@@ -212,7 +241,9 @@ export default function RepositoryHeader() {
                 }}
                 className={`w-8 h-4 rounded-full transition-colors ${localStorage.getItem(`mobile_save_${repoId}`) === 'true' ? 'bg-accent' : 'bg-surface border border-border'}`}
               >
-                <div className={`w-4 h-4 bg-text rounded-full shadow-sm transition-transform ${localStorage.getItem(`mobile_save_${repoId}`) === 'true' ? 'translate-x-4' : 'translate-x-0'} border`} />
+                <div
+                  className={`w-4 h-4 bg-text rounded-full shadow-sm transition-transform ${localStorage.getItem(`mobile_save_${repoId}`) === 'true' ? 'translate-x-4' : 'translate-x-0'} border`}
+                />
               </button>
             </div>
           </div>

@@ -48,7 +48,7 @@ function getHtmlClass(colorTheme, resolvedMode) {
   if (colorTheme === 'graphite') {
     return resolvedMode === 'light' ? 'theme-light' : '';
   }
-  
+
   return `theme-${colorTheme}-${resolvedMode}`;
 }
 
@@ -57,7 +57,7 @@ function applyThemeClass(htmlClass) {
   // Remove all theme classes
   const classesToRemove = Array.from(root.classList).filter(c => c.startsWith('theme-'));
   classesToRemove.forEach(c => root.classList.remove(c));
-  
+
   if (htmlClass) root.classList.add(htmlClass);
 }
 
@@ -74,12 +74,12 @@ export function ThemeProvider({ children }) {
     return mode === 'system' ? resolveSystemMode() : mode;
   });
 
-  const setColorTheme = (newColorTheme) => {
+  const setColorTheme = newColorTheme => {
     setColorThemeState(newColorTheme);
     localStorage.setItem(STORAGE_KEY_COLOR, newColorTheme);
   };
 
-  const setMode = (newMode) => {
+  const setMode = newMode => {
     setModeState(newMode);
     localStorage.setItem(STORAGE_KEY_MODE, newMode);
   };
@@ -87,7 +87,7 @@ export function ThemeProvider({ children }) {
   useEffect(() => {
     const currentResolvedMode = mode === 'system' ? resolveSystemMode() : mode;
     setResolvedMode(currentResolvedMode);
-    
+
     const htmlClass = getHtmlClass(colorTheme, currentResolvedMode);
     applyThemeClass(htmlClass);
   }, [colorTheme, mode]);
@@ -109,11 +109,13 @@ export function ThemeProvider({ children }) {
   const backwardsCompatTheme = {
     id: `${colorTheme}-${resolvedMode}`,
     label: COLOR_THEMES.find(t => t.id === colorTheme)?.label || 'Theme',
-    iconKey: COLOR_THEMES.find(t => t.id === colorTheme)?.iconKey || 'monitor'
+    iconKey: COLOR_THEMES.find(t => t.id === colorTheme)?.iconKey || 'monitor',
   };
 
   return (
-    <ThemeContext.Provider value={{ colorTheme, setColorTheme, mode, setMode, resolvedMode, theme: backwardsCompatTheme }}>
+    <ThemeContext.Provider
+      value={{ colorTheme, setColorTheme, mode, setMode, resolvedMode, theme: backwardsCompatTheme }}
+    >
       {children}
     </ThemeContext.Provider>
   );

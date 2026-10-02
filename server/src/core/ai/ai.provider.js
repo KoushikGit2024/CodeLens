@@ -77,9 +77,9 @@ function estimateTokens(text) {
 }
 
 // ── Generic LLM provider ──────────────────────────────────────────────────────
-const LLM_DEFAULT_URL      = 'https://api.your-provider.com';
-const LLM_DEFAULT_MODEL    = 'generic-llm-instruct-v2';
-const IAM_TOKEN_URL        = 'https://auth.your-provider.com/token';
+const LLM_DEFAULT_URL = 'https://api.your-provider.com';
+const LLM_DEFAULT_MODEL = 'generic-llm-instruct-v2';
+const IAM_TOKEN_URL = 'https://auth.your-provider.com/token';
 
 /**
  * Obtain a Generic access token using the API key.
@@ -108,34 +108,32 @@ async function getLlmAccessToken(apiKey) {
  * @returns {Promise<string>}
  */
 async function genericLlmProvider(prompt) {
-  const apiKey    = process.env.LLM_API_KEY;
+  const apiKey = process.env.LLM_API_KEY;
   const projectId = process.env.LLM_PROJECT_ID;
-  const apiUrl    = (process.env.LLM_API_URL || LLM_DEFAULT_URL).replace(/\/$/, '');
-  const modelId   = process.env.LLM_MODEL_ID || LLM_DEFAULT_MODEL;
+  const apiUrl = (process.env.LLM_API_URL || LLM_DEFAULT_URL).replace(/\/$/, '');
+  const modelId = process.env.LLM_MODEL_ID || LLM_DEFAULT_MODEL;
 
   if (!apiKey || !projectId) {
-    throw new ProviderUnavailableError(
-      'Generic LLM provider is not configured. Set LLM_API_KEY and LLM_PROJECT_ID.'
-    );
+    throw new ProviderUnavailableError('Generic LLM provider is not configured. Set LLM_API_KEY and LLM_PROJECT_ID.');
   }
 
   const accessToken = await getLlmAccessToken(apiKey);
 
   const endpoint = `${apiUrl}/ml/v1/text/generation?version=2023-05-29`;
   const payload = JSON.stringify({
-    model_id:   modelId,
+    model_id: modelId,
     project_id: projectId,
-    input:      prompt,
+    input: prompt,
     parameters: {
-      decoding_method:  'greedy',
-      max_new_tokens:   1024,
+      decoding_method: 'greedy',
+      max_new_tokens: 1024,
       repetition_penalty: 1.1,
     },
   });
 
   const data = await httpPost(endpoint, payload, {
-    'Content-Type':  'application/json',
-    'Authorization': `Bearer ${accessToken}`,
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${accessToken}`,
   });
 
   const parsed = JSON.parse(data);
@@ -144,10 +142,10 @@ async function genericLlmProvider(prompt) {
   if (typeof text !== 'string') {
     throw new Error(`Unexpected LLM response shape: ${data.slice(0, 200)}`);
   }
-  
+
   const estimatedInput = estimateTokens(prompt);
   const estimatedOutput = estimateTokens(text);
-  
+
   return {
     text: text.trim(),
     usage: {
@@ -171,26 +169,26 @@ async function geminiProvider(prompt) {
     generationConfig: {
       temperature: 0.1,
       maxOutputTokens: 8192,
-    }
+    },
   };
 
   const headers = { 'Content-Type': 'application/json' };
   const resStr = await httpPost(url, JSON.stringify(payload), headers);
   const data = JSON.parse(resStr);
-  
+
   if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
     const usageMeta = data.usageMetadata || {};
     const text = data.candidates[0].content.parts[0].text.trim();
-    
+
     const estimatedInput = estimateTokens(prompt);
     const estimatedOutput = estimateTokens(text);
-    
+
     return {
       text: text,
       usage: {
         input_tokens: usageMeta.promptTokenCount ?? estimatedInput,
         output_tokens: usageMeta.candidatesTokenCount ?? estimatedOutput,
-        total_tokens: usageMeta.totalTokenCount ?? (estimatedInput + estimatedOutput),
+        total_tokens: usageMeta.totalTokenCount ?? estimatedInput + estimatedOutput,
         source: usageMeta.totalTokenCount != null ? 'provider_reported' : 'estimated',
       },
     };
@@ -207,34 +205,32 @@ async function openAiCompatibleProvider(prompt) {
 
   const payload = {
     model: model,
-    messages: [
-      { role: 'user', content: prompt }
-    ],
+    messages: [{ role: 'user', content: prompt }],
     temperature: 0.1,
-    max_tokens: 4096
+    max_tokens: 4096,
   };
 
-  const headers = { 
+  const headers = {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${apiKey}`
+    Authorization: `Bearer ${apiKey}`,
   };
-  
+
   const resStr = await httpPost(url, JSON.stringify(payload), headers);
   const data = JSON.parse(resStr);
-  
+
   if (data.choices && data.choices[0]?.message?.content) {
     const usage = data.usage || {};
     const text = data.choices[0].message.content.trim();
-    
+
     const estimatedInput = estimateTokens(prompt);
     const estimatedOutput = estimateTokens(text);
-    
+
     return {
       text: text,
       usage: {
         input_tokens: usage.prompt_tokens ?? estimatedInput,
         output_tokens: usage.completion_tokens ?? estimatedOutput,
-        total_tokens: usage.total_tokens ?? (estimatedInput + estimatedOutput),
+        total_tokens: usage.total_tokens ?? estimatedInput + estimatedOutput,
         source: usage.total_tokens != null ? 'provider_reported' : 'estimated',
       },
     };
@@ -251,34 +247,32 @@ async function groqProvider(prompt) {
 
   const payload = {
     model: model,
-    messages: [
-      { role: 'user', content: prompt }
-    ],
+    messages: [{ role: 'user', content: prompt }],
     temperature: 0.1,
-    max_tokens: 4096
+    max_tokens: 4096,
   };
 
-  const headers = { 
+  const headers = {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${apiKey}`
+    Authorization: `Bearer ${apiKey}`,
   };
-  
+
   const resStr = await httpPost(url, JSON.stringify(payload), headers);
   const data = JSON.parse(resStr);
-  
+
   if (data.choices && data.choices[0]?.message?.content) {
     const usage = data.usage || {};
     const text = data.choices[0].message.content.trim();
-    
+
     const estimatedInput = estimateTokens(prompt);
     const estimatedOutput = estimateTokens(text);
-    
+
     return {
       text: text,
       usage: {
         input_tokens: usage.prompt_tokens ?? estimatedInput,
         output_tokens: usage.completion_tokens ?? estimatedOutput,
-        total_tokens: usage.total_tokens ?? (estimatedInput + estimatedOutput),
+        total_tokens: usage.total_tokens ?? estimatedInput + estimatedOutput,
         source: usage.total_tokens != null ? 'provider_reported' : 'estimated',
       },
     };
@@ -365,9 +359,7 @@ async function generateAnswer(prompt) {
     }
   }
 
-  throw new ProviderUnavailableError(
-    `All configured AI providers failed.\n${errors.join('\n')}`
-  );
+  throw new ProviderUnavailableError(`All configured AI providers failed.\n${errors.join('\n')}`);
 }
 
 /**
@@ -406,12 +398,12 @@ function httpPost(url, body, headers) {
     const u = new URL(url);
     const opts = {
       hostname: u.hostname,
-      port:     u.port || 443,
-      path:     u.pathname + u.search,
-      method:   'POST',
-      headers:  { ...headers, 'Content-Length': Buffer.byteLength(body) },
+      port: u.port || 443,
+      path: u.pathname + u.search,
+      method: 'POST',
+      headers: { ...headers, 'Content-Length': Buffer.byteLength(body) },
     };
-    const req = https.request(opts, (res) => {
+    const req = https.request(opts, res => {
       const chunks = [];
       res.on('data', c => chunks.push(c));
       res.on('end', () => {
@@ -429,4 +421,10 @@ function httpPost(url, body, headers) {
   });
 }
 
-module.exports = { generateAnswer, isProviderConfigured, getProviderName, verifyProviderConnection, ProviderUnavailableError };
+module.exports = {
+  generateAnswer,
+  isProviderConfigured,
+  getProviderName,
+  verifyProviderConnection,
+  ProviderUnavailableError,
+};

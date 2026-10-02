@@ -1,7 +1,7 @@
 /**
  * repository.analyzer.js
  *
- * It coordinates the language parser instances, then extracts individual file ASTs, 
+ * It coordinates the language parser instances, then extracts individual file ASTs,
  * and then it applies a caching algorithm to perform rapid incremental scans.
  */
 
@@ -21,25 +21,25 @@ import { hashContent } from './fingerprint.js';
 import { loadAllFiles } from './persistence.store.js';
 
 const PARSER_FACTORIES = {
-  javascript: (tsParser) => new JavaScriptParser(tsParser),
-  typescript: (tsParser) => new TypeScriptParser(tsParser),
-  tsx:        (tsParser) => new TypeScriptParser(tsParser),
-  python:     (tsParser) => new PythonParser(tsParser),
-  java:       (tsParser) => new JavaParser(tsParser),
-  cpp:        (tsParser) => new CppParser(tsParser),
-  kotlin:     (tsParser) => new KotlinParser(tsParser),
-  go:         (tsParser) => new GoParser(tsParser),
-  rust:       (tsParser) => new RustParser(tsParser),
-  c:          (tsParser) => new CParser(tsParser),
+  javascript: tsParser => new JavaScriptParser(tsParser),
+  typescript: tsParser => new TypeScriptParser(tsParser),
+  tsx: tsParser => new TypeScriptParser(tsParser),
+  python: tsParser => new PythonParser(tsParser),
+  java: tsParser => new JavaParser(tsParser),
+  cpp: tsParser => new CppParser(tsParser),
+  kotlin: tsParser => new KotlinParser(tsParser),
+  go: tsParser => new GoParser(tsParser),
+  rust: tsParser => new RustParser(tsParser),
+  c: tsParser => new CParser(tsParser),
 };
 
 /**
- * It loads the source files from IndexedDB, then extracts ASTs sequentially, 
+ * It loads the source files from IndexedDB, then extracts ASTs sequentially,
  * and then it applies deterministic hashing to skip unmodified files.
  */
 export async function analyzeRepository(repoId, previousAnalysis = null, onProgress = null, options = {}) {
   if (onProgress) onProgress('scanning_files');
-  
+
   let sourceFiles;
   try {
     sourceFiles = await loadAllFiles(repoId);
@@ -48,15 +48,15 @@ export async function analyzeRepository(repoId, previousAnalysis = null, onProgr
   }
 
   const result = {
-    status:        'ready',
-    error:         null,
+    status: 'ready',
+    error: null,
     repoId,
-    analyzedAt:    new Date().toISOString(),
-    totalFiles:    sourceFiles.length,
+    analyzedAt: new Date().toISOString(),
+    totalFiles: sourceFiles.length,
     analyzedFiles: 0,
-    skippedFiles:  0,
-    errorFiles:    0,
-    files:         [],
+    skippedFiles: 0,
+    errorFiles: 0,
+    files: [],
     languageSummary: {},
     meta: {
       analysisVersion: previousAnalysis ? previousAnalysis.meta.analysisVersion + 1 : 1,
@@ -65,8 +65,8 @@ export async function analyzeRepository(repoId, previousAnalysis = null, onProgr
       addedFiles: 0,
       modifiedFiles: 0,
       deletedFiles: 0,
-      unchangedFiles: 0
-    }
+      unchangedFiles: 0,
+    },
   };
 
   if (onProgress) onProgress('analyzing_ast', { total: sourceFiles.length, current: 0 });
@@ -74,16 +74,16 @@ export async function analyzeRepository(repoId, previousAnalysis = null, onProgr
   let currentIndex = 0;
   for (const fileRecord of sourceFiles) {
     currentIndex++;
-    
+
     // Yield the event loop to allow UI/Worker to update
     await new Promise(resolve => setTimeout(resolve, 0));
-    
+
     if (onProgress) {
       onProgress('analyzing_ast', { total: sourceFiles.length, current: currentIndex });
     }
-    
-    const relPath  = fileRecord.filePath;
-    const content  = fileRecord.content;
+
+    const relPath = fileRecord.filePath;
+    const content = fileRecord.content;
 
     // Skip .git/ internals and binary/non-source files — they must never enter the AST pipeline
     if (relPath.match(/(^|\/)\.git\//) || content instanceof Uint8Array) {
@@ -107,10 +107,10 @@ export async function analyzeRepository(repoId, previousAnalysis = null, onProgr
 
     if (cachedAnalysis && cachedAnalysis.hash === hash && cachedAnalysis.language === language) {
       result.files.push(cachedAnalysis);
-      
+
       result.meta.cacheHits++;
       result.meta.unchangedFiles++;
-      
+
       if (cachedAnalysis.error && !cachedAnalysis.symbols?.length) {
         result.errorFiles++;
       } else {
@@ -128,8 +128,8 @@ export async function analyzeRepository(repoId, previousAnalysis = null, onProgr
     }
 
     const fileAnalysis = await analyzeFileContent(content, relPath, language);
-    fileAnalysis.hash = hash; 
-    
+    fileAnalysis.hash = hash;
+
     result.files.push(fileAnalysis);
 
     if (fileAnalysis.error && !fileAnalysis.symbols?.length) {
@@ -155,7 +155,7 @@ export async function analyzeRepository(repoId, previousAnalysis = null, onProgr
 }
 
 /**
- * It resolves the WebAssembly instance, then extracts deterministic node symbols and findings, 
+ * It resolves the WebAssembly instance, then extracts deterministic node symbols and findings,
  * and then it applies the unified file envelope.
  */
 export async function analyzeFileContent(source, relPath, language) {
@@ -175,11 +175,11 @@ export async function analyzeFileContent(source, relPath, language) {
 
   try {
     const factory = PARSER_FACTORIES[language];
-    const parser  = factory(tsParser);
+    const parser = factory(tsParser);
 
     const fileAnalysis = await parser.parseFile(source, relPath);
     fileAnalysis.lineCount = lineCount;
-    
+
     // It triggers the deterministic findings logic, then extracts SAST results, and then it applies them to the payload.
     if (typeof parser.extractAdvancedFindings === 'function') {
       let advancedTree = null;

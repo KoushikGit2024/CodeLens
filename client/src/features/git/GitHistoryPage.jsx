@@ -1,22 +1,36 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRepository } from '../../shared/context/RepositoryContext';
-import { Clock, User, GitBranch, TerminalSquare, AlertCircle, RefreshCw, GitCommit, GitMerge, Cpu, Check } from 'lucide-react';
+import {
+  Clock,
+  User,
+  GitBranch,
+  TerminalSquare,
+  AlertCircle,
+  RefreshCw,
+  GitCommit,
+  GitMerge,
+  Cpu,
+  Check,
+} from 'lucide-react';
 import * as persistenceStore from '../../services/analyzer/repository/persistence.store.js';
 import { startAnalysis, onProgress, initWorker } from '../../services/analyzer/analyzer.client.js';
 
 // ─── Git-Themed Animated Loader ──────────────────────────────────────────────
 function GitLoader({ phase }) {
   const phases = [
-    { key: 'hydrating',  label: 'Hydrating Git filesystem…',  icon: Cpu },
-    { key: 'reading',    label: 'Reading commit history…',     icon: GitCommit },
-    { key: 'diffing',    label: 'Diffing commit trees…',       icon: GitMerge },
-    { key: 'finalizing', label: 'Computing churn scores…',     icon: GitBranch },
+    { key: 'hydrating', label: 'Hydrating Git filesystem…', icon: Cpu },
+    { key: 'reading', label: 'Reading commit history…', icon: GitCommit },
+    { key: 'diffing', label: 'Diffing commit trees…', icon: GitMerge },
+    { key: 'finalizing', label: 'Computing churn scores…', icon: GitBranch },
   ];
 
-  const activeIndex = phase?.includes('Hydrating') ? 0
-    : phase?.includes('Reading')   ? 1
-    : phase?.includes('Diffing')   ? 2
-    : 3;
+  const activeIndex = phase?.includes('Hydrating')
+    ? 0
+    : phase?.includes('Reading')
+      ? 1
+      : phase?.includes('Diffing')
+        ? 2
+        : 3;
 
   return (
     <div className="h-full flex flex-col items-center justify-center bg-surface p-8 gap-10">
@@ -24,7 +38,10 @@ function GitLoader({ phase }) {
       <div className="relative flex flex-col items-center gap-0">
         {/* Pulsing main branch line */}
         <div className="w-0.5 h-16 bg-gradient-to-b from-accent/0 via-accent to-accent/0 animate-pulse" />
-        <div className="absolute w-3 h-3 rounded-full bg-accent ring-4 ring-accent/20 animate-ping" style={{top: '50%', transform: 'translateY(-50%)'}}/>
+        <div
+          className="absolute w-3 h-3 rounded-full bg-accent ring-4 ring-accent/20 animate-ping"
+          style={{ top: '50%', transform: 'translateY(-50%)' }}
+        />
         <div className="w-3 h-3 rounded-full bg-accent ring-4 ring-accent/20 z-10" />
         <div className="w-0.5 h-16 bg-gradient-to-b from-accent via-accent/40 to-accent/0" />
       </div>
@@ -42,21 +59,30 @@ function GitLoader({ phase }) {
                 isActive
                   ? 'bg-accent/10 border-accent/40 shadow-[0_0_12px_rgba(var(--color-accent),.15)]'
                   : isDone
-                  ? 'bg-panel border-border opacity-60'
-                  : 'border-border/40 opacity-30'
+                    ? 'bg-panel border-border opacity-60'
+                    : 'border-border/40 opacity-30'
               }`}
             >
               <div className={`p-1.5 rounded-lg ${isActive ? 'bg-accent/20' : 'bg-surface'}`}>
-                <Icon className={`w-4 h-4 ${isActive ? 'text-accent animate-pulse' : isDone ? 'text-success' : 'text-muted'}`} />
+                <Icon
+                  className={`w-4 h-4 ${isActive ? 'text-accent animate-pulse' : isDone ? 'text-success' : 'text-muted'}`}
+                />
               </div>
-              <span className={`text-sm font-medium ${isActive ? 'text-text' : 'text-muted'}`}>
-                {p.label}
-              </span>
+              <span className={`text-sm font-medium ${isActive ? 'text-text' : 'text-muted'}`}>{p.label}</span>
               {isActive && (
                 <div className="ml-auto flex gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '300ms' }} />
+                  <span
+                    className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce"
+                    style={{ animationDelay: '0ms' }}
+                  />
+                  <span
+                    className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce"
+                    style={{ animationDelay: '150ms' }}
+                  />
+                  <span
+                    className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce"
+                    style={{ animationDelay: '300ms' }}
+                  />
                 </div>
               )}
               {isDone && (
@@ -70,11 +96,7 @@ function GitLoader({ phase }) {
       </div>
 
       {/* Live detail */}
-      {phase && (
-        <p className="text-xs text-muted font-mono animate-pulse text-center max-w-xs truncate">
-          {phase}
-        </p>
-      )}
+      {phase && <p className="text-xs text-muted font-mono animate-pulse text-center max-w-xs truncate">{phase}</p>}
     </div>
   );
 }
@@ -95,7 +117,9 @@ export default function GitHistoryPage() {
     try {
       const meta = await persistenceStore.load(repoId);
       if (!meta?.analysis?.gitChurn?.commits?.length) {
-        throw new Error('No Git history found. Click "Re-analyze Git History" to compute it from your uploaded repository.');
+        throw new Error(
+          'No Git history found. Click "Re-analyze Git History" to compute it from your uploaded repository.'
+        );
       }
       setCommits(meta.analysis.gitChurn.commits);
     } catch (err) {
@@ -106,12 +130,14 @@ export default function GitHistoryPage() {
   }, [repoId]);
 
   // Load on mount
-  useEffect(() => { loadHistory(); }, [loadHistory]);
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
 
   // Listen for worker progress/complete events
   useEffect(() => {
     initWorker();
-    const unsub = onProgress((msg) => {
+    const unsub = onProgress(msg => {
       if (msg.repoId !== repoId) return;
 
       if (msg.phase === 'analyzing_git_churn' && msg.details) {
@@ -138,7 +164,7 @@ export default function GitHistoryPage() {
     setReanalyzing(true);
     setError(null);
     setGitPhase('Hydrating Git filesystem…');
-    startAnalysis(repoId, {}).catch((err) => {
+    startAnalysis(repoId, {}).catch(err => {
       setReanalyzing(false);
       setGitPhase(null);
       setError('Re-analysis failed: ' + err.message);
@@ -216,7 +242,7 @@ export default function GitHistoryPage() {
             </div>
           ) : (
             <div className="relative border-l-2 border-border ml-4 space-y-6 pb-12">
-              {commits.map((commit) => (
+              {commits.map(commit => (
                 <div key={commit.oid} className="relative pl-8">
                   {/* Timeline Dot */}
                   <div className="absolute w-4 h-4 bg-panel border-2 border-accent rounded-full -left-[9px] top-1.5 shadow-[0_0_8px_rgba(var(--color-accent),.3)]" />

@@ -1,7 +1,7 @@
 /**
  * RepositoryContext.jsx
  *
- * It initiates the repository state hooks, then extracts progress events via the worker, 
+ * It initiates the repository state hooks, then extracts progress events via the worker,
  * and then it applies instantaneous UI re-renders without blind polling.
  */
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
@@ -22,7 +22,7 @@ export function RepositoryProvider({ children }) {
   const { addToast } = useToast();
 
   /**
-   * It calls the local API, then extracts the IndexedDB repository record, 
+   * It calls the local API, then extracts the IndexedDB repository record,
    * and then it applies the payload to the component state.
    */
   const fetchRepo = useCallback(async () => {
@@ -32,13 +32,13 @@ export function RepositoryProvider({ children }) {
     try {
       const repoRes = await repositoryApi.get(repoId);
       setRepo(repoRes.data);
-      
+
       if (repoRes.data.status === 'ready') {
         try {
           const treeRes = await repositoryApi.listFiles(repoId);
           setFileTree(treeRes.data.tree);
         } catch (treeErr) {
-          console.warn("Failed to fetch file tree", treeErr);
+          console.warn('Failed to fetch file tree', treeErr);
           setFileTree(null);
         }
       } else {
@@ -57,7 +57,7 @@ export function RepositoryProvider({ children }) {
 
   // It intercepts the active worker status, then extracts specific progress callbacks, and then it applies them to refresh the repository data in real-time.
   useEffect(() => {
-    const unsubscribe = onProgress((msg) => {
+    const unsubscribe = onProgress(msg => {
       if (msg.repoId !== repoId) return;
 
       // Update live phase label instantly without a DB round-trip
@@ -71,7 +71,7 @@ export function RepositoryProvider({ children }) {
           addToast({
             title: 'Analysis Failed',
             description: msg.error || 'An unexpected error occurred during repository analysis.',
-            type: 'error'
+            type: 'error',
           });
         }
         fetchRepo().then(() => setLivePhase(null));
@@ -90,11 +90,7 @@ export function RepositoryProvider({ children }) {
     refetchRepo: fetchRepo,
   };
 
-  return (
-    <RepositoryContext.Provider value={value}>
-      {children}
-    </RepositoryContext.Provider>
-  );
+  return <RepositoryContext.Provider value={value}>{children}</RepositoryContext.Provider>;
 }
 
 export function useRepository() {

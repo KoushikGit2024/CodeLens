@@ -11,6 +11,7 @@ Welcome to CodeLens! This guide will help you set up the project locally.
 ## Installation
 
 1. Clone the repository (or extract the source):
+
    ```bash
    git clone <repository-url>
    cd CodeLens
@@ -26,6 +27,7 @@ Welcome to CodeLens! This guide will help you set up the project locally.
 CodeLens requires environment variables for AI services.
 
 1. In the `server` directory, create a `.env` file:
+
    ```bash
    cd server
    touch .env

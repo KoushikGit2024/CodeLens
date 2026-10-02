@@ -13,8 +13,8 @@ import { FileCode, Image as ImageIcon, AlignLeft, X, Eye } from 'lucide-react';
 import AttachmentPreview from './AttachmentPreview';
 
 const TYPE_CONFIG = {
-  file:    { icon: FileCode,  color: '#61dafb', bg: 'rgba(97,218,251,0.10)' },
-  image:   { icon: ImageIcon, color: '#a855f7', bg: 'rgba(168,85,247,0.10)' },
+  file: { icon: FileCode, color: '#61dafb', bg: 'rgba(97,218,251,0.10)' },
+  image: { icon: ImageIcon, color: '#a855f7', bg: 'rgba(168,85,247,0.10)' },
   snippet: { icon: AlignLeft, color: '#e3b341', bg: 'rgba(227,179,65,0.10)' },
 };
 
@@ -26,10 +26,7 @@ export default function AttachmentChip({ attachment, onRemove, isFlashing = fals
   const isImage = attachment.type === 'image';
 
   // Determine if a preview is possible
-  const canPreview = !!(
-    (isImage && attachment.dataUrl) ||
-    (!isImage && attachment.content)
-  );
+  const canPreview = !!((isImage && attachment.dataUrl) || (!isImage && attachment.content));
 
   return (
     <>
@@ -47,12 +44,7 @@ export default function AttachmentChip({ attachment, onRemove, isFlashing = fals
       )}
 
       {/* Full preview modal — rendered via portal */}
-      {previewOpen && (
-        <AttachmentPreview
-          attachment={attachment}
-          onClose={() => setPreviewOpen(false)}
-        />
-      )}
+      {previewOpen && <AttachmentPreview attachment={attachment} onClose={() => setPreviewOpen(false)} />}
 
       <div
         className="relative group flex flex-col rounded-lg border overflow-hidden shrink-0"
@@ -85,9 +77,7 @@ export default function AttachmentChip({ attachment, onRemove, isFlashing = fals
 
         {/* Header row */}
         <div className="flex items-center gap-1.5 px-2.5 py-1.5 min-w-0">
-          {!isImage && (
-            <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: cfg.color }} />
-          )}
+          {!isImage && <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: cfg.color }} />}
 
           <span
             className="text-[11px] font-medium truncate flex-1"
@@ -101,7 +91,10 @@ export default function AttachmentChip({ attachment, onRemove, isFlashing = fals
           {canPreview && (
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); setPreviewOpen(true); }}
+              onClick={e => {
+                e.stopPropagation();
+                setPreviewOpen(true);
+              }}
               className="text-text/30 hover:text-text/80 transition-colors shrink-0"
               title="Preview attachment"
             >
@@ -112,7 +105,10 @@ export default function AttachmentChip({ attachment, onRemove, isFlashing = fals
           {/* Remove button */}
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onRemove(); }}
+            onClick={e => {
+              e.stopPropagation();
+              onRemove();
+            }}
             className="text-text/30 hover:text-danger transition-colors shrink-0"
             title="Remove attachment"
           >

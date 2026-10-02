@@ -24,11 +24,11 @@ export function EnvironmentGuard({ children }) {
           </div>
           <h2 className="text-2xl font-bold text-text mb-3">Preview Mode Restricted</h2>
           <p className="text-muted leading-relaxed mb-8">
-            CodeLens relies on advanced browser storage (IndexedDB) for local repository analysis. 
-            Because you are viewing this inside an iframe or preview window, your browser has blocked 
-            storage access for security reasons.
+            CodeLens relies on advanced browser storage (IndexedDB) for local repository analysis. Because you are
+            viewing this inside an iframe or preview window, your browser has blocked storage access for security
+            reasons.
           </p>
-          <button 
+          <button
             onClick={() => window.open(window.location.href, '_blank')}
             className="flex items-center gap-2 px-6 py-3 bg-accent hover:bg-accent-hover text-text rounded-lg font-medium transition-colors w-full justify-center"
           >

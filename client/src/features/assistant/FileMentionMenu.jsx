@@ -25,42 +25,42 @@ const FileMentionMenu = forwardRef(function FileMentionMenu({ query, filePaths, 
     if (p.startsWith(dirPath)) {
       const remaining = p.slice(dirPath.length);
       if (!remaining) continue;
-      
+
       const parts = remaining.split('/');
       const isDir = parts.length > 1;
       const name = parts[0];
-      
+
       if (name.toLowerCase().startsWith(searchPrefix)) {
         if (!entries.has(name)) {
           entries.set(name, {
             name,
             path: dirPath + name + (isDir ? '/' : ''),
-            isDir
+            isDir,
           });
         }
       }
     }
   }
 
-  let filtered = Array.from(entries.values()).sort((a, b) => {
-    if (a.isDir && !b.isDir) return -1;
-    if (!a.isDir && b.isDir) return 1;
-    return a.name.localeCompare(b.name);
-  }).slice(0, MAX_RESULTS);
+  let filtered = Array.from(entries.values())
+    .sort((a, b) => {
+      if (a.isDir && !b.isDir) return -1;
+      if (!a.isDir && b.isDir) return 1;
+      return a.name.localeCompare(b.name);
+    })
+    .slice(0, MAX_RESULTS);
 
   // Fallback: If no direct matches are found in this directory, do a global fuzzy search for files!
   if (filtered.length === 0 && searchPrefix.length > 0) {
-    const globalMatches = filePaths
-      .filter(p => p.toLowerCase().includes(searchPrefix))
-      .slice(0, 20); // Keep global search results smaller
-      
+    const globalMatches = filePaths.filter(p => p.toLowerCase().includes(searchPrefix)).slice(0, 20); // Keep global search results smaller
+
     filtered = globalMatches.map(p => {
       const parts = p.split('/');
       return {
         name: parts.pop(), // Filename
         path: p,
         isDir: false,
-        dirPathFallback: parts.join('/') // To show the folder it was found in
+        dirPathFallback: parts.join('/'), // To show the folder it was found in
       };
     });
   }
@@ -71,35 +71,43 @@ const FileMentionMenu = forwardRef(function FileMentionMenu({ query, filePaths, 
   }, [query]);
 
   // Expose keyboard handler to parent
-  useImperativeHandle(ref, () => ({
-    handleKeyDown: (e) => {
-      if (filtered.length === 0) return false;
-      
-      if (e.key === 'Tab' || e.key === 'Enter') {
-        e.preventDefault();
-        const item = filtered[selectedIndex];
-        if (item) onSelect(item.path, item.isDir);
-        return true;
-      }
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setSelectedIndex(i => Math.min(i + 1, filtered.length - 1));
-        return true;
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setSelectedIndex(i => Math.max(i - 1, 0));
-        return true;
-      }
-      return false;
-    }
-  }), [filtered, selectedIndex, onSelect]);
+  useImperativeHandle(
+    ref,
+    () => ({
+      handleKeyDown: e => {
+        if (filtered.length === 0) return false;
+
+        if (e.key === 'Tab' || e.key === 'Enter') {
+          e.preventDefault();
+          const item = filtered[selectedIndex];
+          if (item) onSelect(item.path, item.isDir);
+          return true;
+        }
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setSelectedIndex(i => Math.min(i + 1, filtered.length - 1));
+          return true;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setSelectedIndex(i => Math.max(i - 1, 0));
+          return true;
+        }
+        return false;
+      },
+    }),
+    [filtered, selectedIndex, onSelect]
+  );
 
   // Close on outside click
   useEffect(() => {
-    const handle = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target) &&
-          anchorRef.current && !anchorRef.current.contains(e.target)) {
+    const handle = e => {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(e.target) &&
+        anchorRef.current &&
+        !anchorRef.current.contains(e.target)
+      ) {
         onClose();
       }
     };
@@ -109,8 +117,12 @@ const FileMentionMenu = forwardRef(function FileMentionMenu({ query, filePaths, 
 
   if (filtered.length === 0) {
     return (
-      <div ref={menuRef} className="absolute bottom-full left-0 mb-2 bg-panel border border-border rounded-lg shadow-2xl p-3 text-xs text-muted z-50 w-72">
-        No matching files in <span className="text-accent font-mono">{dirPath || '/'}</span> for <span className="font-mono">"{searchPrefix}"</span>
+      <div
+        ref={menuRef}
+        className="absolute bottom-full left-0 mb-2 bg-panel border border-border rounded-lg shadow-2xl p-3 text-xs text-muted z-50 w-72"
+      >
+        No matching files in <span className="text-accent font-mono">{dirPath || '/'}</span> for{' '}
+        <span className="font-mono">"{searchPrefix}"</span>
       </div>
     );
   }
@@ -124,7 +136,9 @@ const FileMentionMenu = forwardRef(function FileMentionMenu({ query, filePaths, 
         <span className="text-[10px] text-muted uppercase tracking-widest">
           {dirPath ? `Attach from /${dirPath}` : 'Attach file from repository'}
         </span>
-        <span className="text-[10px] text-muted">{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>
+        <span className="text-[10px] text-muted">
+          {filtered.length} result{filtered.length !== 1 ? 's' : ''}
+        </span>
       </div>
       <ul className="max-h-52 overflow-y-auto custom-scrollbar py-1">
         {filtered.map((item, idx) => {
@@ -134,7 +148,10 @@ const FileMentionMenu = forwardRef(function FileMentionMenu({ query, filePaths, 
               <button
                 type="button"
                 onMouseEnter={() => setSelectedIndex(idx)}
-                onMouseDown={(e) => { e.preventDefault(); onSelect(item.path, item.isDir); }}
+                onMouseDown={e => {
+                  e.preventDefault();
+                  onSelect(item.path, item.isDir);
+                }}
                 className={`w-full flex items-center gap-2 px-3 py-2 transition-colors text-left group ${isActive ? 'bg-accent/15' : 'hover:bg-accent/10'}`}
               >
                 {item.isDir ? (
@@ -143,8 +160,11 @@ const FileMentionMenu = forwardRef(function FileMentionMenu({ query, filePaths, 
                   <FileCode className="w-3.5 h-3.5 text-accent shrink-0" />
                 )}
                 <div className="flex flex-col min-w-0 flex-1">
-                  <span className={`text-xs truncate ${item.isDir ? 'text-text font-medium' : 'text-text font-medium'}`}>
-                    {item.name}{item.isDir ? '/' : ''}
+                  <span
+                    className={`text-xs truncate ${item.isDir ? 'text-text font-medium' : 'text-text font-medium'}`}
+                  >
+                    {item.name}
+                    {item.isDir ? '/' : ''}
                   </span>
                   {item.dirPathFallback && (
                     <span className="text-[10px] text-muted font-mono truncate">{item.dirPathFallback}</span>

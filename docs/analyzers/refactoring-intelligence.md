@@ -11,4 +11,4 @@ The Refactoring Analyzer (`server/src/analyzers/refactoringAnalyzer.js`) transla
 
 ## AI Synergy
 
-The AI Context Builder takes a specific refactoring candidate and feeds it to the AI provider. The LLM uses the deterministic strategy assignment and the source file context to generate step-by-step instructions on *how* to apply the refactoring to the specific code in question.
+The AI Context Builder takes a specific refactoring candidate and feeds it to the AI provider. The LLM uses the deterministic strategy assignment and the source file context to generate step-by-step instructions on _how_ to apply the refactoring to the specific code in question.

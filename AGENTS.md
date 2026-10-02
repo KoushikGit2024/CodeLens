@@ -18,13 +18,17 @@ CodeLens operates on a strict **client-dominant** architecture. The guiding rule
 > **If it is static analysis, it runs on the client. If it requires AI, it goes to the server.**
 
 #### Server (`server/src/`) — AI Proxy Only
+
 The server is intentionally minimal and strictly stateless. It stores absolutely zero information — no files, no analysis, no user data. Its ONLY mechanical role is:
+
 1. **AI Proxy**: Receive a fully pre-built context prompt (assembled entirely by the client) and forward it verbatim to the configured AI API. Return the AI response to the client. The server does not build this prompt — it only relays it.
 
 The server does NOT parse code, does NOT build dependency graphs, does NOT compute complexity scores, does NOT detect clones, and does NOT produce architecture or risk models. It has no concept of code structure at all.
 
 #### Client (`client/src/`) — Full Analysis Engine
+
 The client browser is the sole analysis engine and data store. It is responsible for:
+
 1. **File Handling**: Processing ZIP uploads and reading source file content entirely in the browser.
 2. **Parsing** source files using `web-tree-sitter` (WASM) running inside a dedicated Web Worker (`analyzer.worker.js`) to avoid blocking the UI thread.
 3. **Extracting** symbols (functions, classes, imports, exports).
@@ -59,6 +63,7 @@ The client browser is the sole analysis engine and data store. It is responsible
 ## 5. State Management & Storage Philosophy
 
 **Rule:** The backend must remain strictly stateless. It stores zero information — not even temporary files.
+
 - All files from the ZIP upload are processed entirely in the browser.
 - All analysis results (symbols, graphs, complexity scores, clone groups) are computed on the client and persisted in **browser IndexedDB**. They are never sent back to the server.
 - User-specific data (AI chat histories, UI preferences) MUST also be stored locally on the client (e.g., `localStorage`).
@@ -74,11 +79,13 @@ From the root directory:
 - **Test Server**: `npm test`
 
 From the `client` directory:
+
 - **Build Frontend**: `npm run build`
 
 ## 7. Extension Guidelines
 
 When adding a new intelligence capability:
+
 1. **Client analysis**: Build the deterministic analysis logic in `client/src/services/analyzer/` as a service that runs inside the Web Worker.
 2. **UI visualization**: Build the rendering components in `client/src/features/`.
 3. **AI context**: If the user wants an AI explanation, extend the client-side context builder to include the newly computed facts in the prompt payload.
@@ -86,4 +93,5 @@ When adding a new intelligence capability:
 5. **Update `docs/`**.
 
 ## 8. Current Project State
+
 We have completed up to **Step 20** (Deterministic Analysis Expansion — Dead Code, Cyclomatic Complexity, Cross-File Clone Detection, AI Context Integration, and UI visualization on the Engineering Health page). The canonical architecture is **client-dominant**: the browser handles file extraction, runs Tree-sitter WASM, builds all analysis models, persists to IndexedDB, and uses the server ONLY as a medium for AI interaction.

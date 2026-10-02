@@ -4,8 +4,9 @@ CodeLens is designed to securely analyze arbitrary, untrusted repositories uploa
 
 ## 1. ZIP Extraction Sandbox
 
-Repositories are uploaded as ZIP archives to `POST /api/repository/upload`. 
+Repositories are uploaded as ZIP archives to `POST /api/repository/upload`.
 The extraction process (`server/src/repositories/repositoryStore.js`) protects against **Path Traversal Attacks**:
+
 - If any file path in the ZIP attempts to escape the root directory using `../` or absolute paths (`/etc/passwd`), the extraction is aborted immediately.
 - Files are extracted into a secure, isolated sandbox located in `server/.data/<uuid>`.
 
@@ -22,6 +23,7 @@ If the AI hallucinates a file path that does not exist in the deterministic repo
 
 ## 4. Environment Secrets
 
-API keys for the AI provider are strictly managed via the `server/.env` file. 
+API keys for the AI provider are strictly managed via the `server/.env` file.
+
 - The `.gitignore` at the project root explicitly ignores `.env`, preventing accidental commits of secrets.
 - The backend never sends API keys to the frontend client. All LLM calls are proxied securely through the Express backend.

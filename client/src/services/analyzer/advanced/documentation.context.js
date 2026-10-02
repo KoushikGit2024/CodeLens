@@ -1,7 +1,7 @@
 /**
  * documentation.context.js
  *
- * It aggregates AST analysis outputs, then extracts precise architectural boundaries, 
+ * It aggregates AST analysis outputs, then extracts precise architectural boundaries,
  * and then it applies JSON formatting instructions to generate targeted LLM prompts.
  */
 
@@ -11,7 +11,7 @@ import { buildRefactoringIntelligence } from './refactoring.analyzer.js';
 import { buildRepositoryIntelligence } from './intelligence.analyzer.js';
 
 /**
- * It compiles the repository facts, then extracts unified architectural statistics, 
+ * It compiles the repository facts, then extracts unified architectural statistics,
  * and then it applies them into a structured object for the overview prompt.
  */
 export function buildOverviewContext(analysis, graph, architectureModel) {
@@ -34,7 +34,7 @@ export function buildOverviewContext(analysis, graph, architectureModel) {
       totalEdges: graph.edges?.length || 0,
       unresolvedImports: graph.meta?.unresolvedImports || 0,
       languages: Object.keys(unifiedIntel.repository.languages || {}),
-      healthScore: unifiedIntel.engineeringHealth.score
+      healthScore: unifiedIntel.engineeringHealth.score,
     },
     engineeringRisks: {
       cycles: detectCycles(graph).length,
@@ -46,8 +46,8 @@ export function buildOverviewContext(analysis, graph, architectureModel) {
       topCandidates: refactoringIntel.candidates.slice(0, 3).map(c => ({
         title: c.title,
         priority: c.priority,
-        files: c.files
-      }))
+        files: c.files,
+      })),
     },
     entryPoints: architectureModel.entryPoints || [],
     apiBoundaries: (architectureModel.apiBoundaries || []).map(b => ({
@@ -61,14 +61,14 @@ export function buildOverviewContext(analysis, graph, architectureModel) {
     })),
     hotspots: unifiedIntel.hotspots.slice(0, 5).map(h => ({
       filePath: h.filePath,
-      reasons: h.reasons
+      reasons: h.reasons,
     })),
     keyExternalPackages: getTopExternalPackages(graph, 10),
   };
 }
 
 /**
- * It isolates a single file node, then extracts its incoming and outgoing edges, 
+ * It isolates a single file node, then extracts its incoming and outgoing edges,
  * and then it applies layer logic to define its module-level boundary context.
  */
 export function buildModuleContext(analysis, graph, architectureModel, filePath) {
@@ -77,7 +77,7 @@ export function buildModuleContext(analysis, graph, architectureModel, filePath)
 
   let componentName = 'Unknown';
   let layer = 'Unknown';
-  
+
   const fileNode = graph.nodes.find(n => n.id === `file:${filePath}`);
   if (fileNode && fileNode.data.layer) {
     layer = fileNode.data.layer;
@@ -89,14 +89,14 @@ export function buildModuleContext(analysis, graph, architectureModel, filePath)
     .filter(e => e.source === `file:${filePath}`)
     .map(e => {
       const targetNode = graph.nodes.find(n => n.id === e.target);
-      return targetNode ? (targetNode.data?.filePath || targetNode.data?.label) : e.target;
+      return targetNode ? targetNode.data?.filePath || targetNode.data?.label : e.target;
     });
 
   const dependents = graph.edges
     .filter(e => e.target === `file:${filePath}`)
     .map(e => {
       const srcNode = graph.nodes.find(n => n.id === e.source);
-      return srcNode ? (srcNode.data?.filePath || srcNode.data?.label) : e.source;
+      return srcNode ? srcNode.data?.filePath || srcNode.data?.label : e.source;
     });
 
   const exports = file.symbols
@@ -122,12 +122,12 @@ export function buildModuleContext(analysis, graph, architectureModel, filePath)
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
- * It filters the graph for module nodes, then extracts their incoming degree counts, 
+ * It filters the graph for module nodes, then extracts their incoming degree counts,
  * and then it applies sorting to surface the most relied-upon external dependencies.
  */
 function getTopExternalPackages(graph, limit = 10) {
   const packageNodes = graph.nodes.filter(n => n.type === 'moduleNode');
-  
+
   const incoming = {};
   for (const edge of graph.edges) {
     if (incoming[edge.target] === undefined) {

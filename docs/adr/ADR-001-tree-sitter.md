@@ -1,9 +1,11 @@
 # ADR-001: Use Tree-sitter (via web-tree-sitter) for AST Parsing
 
 ## Status
+
 Accepted
 
 ## Date
+
 2025
 
 ## Context
@@ -15,6 +17,7 @@ statements, method definitions, and source locations.
 ### The Problem
 
 Naive approaches to code understanding fail in practice:
+
 - **Regex / string matching**: fragile, breaks on edge cases, cannot handle
   nested structures or multiline declarations reliably.
 - **Simple line scanning**: no awareness of language semantics.
@@ -27,6 +30,7 @@ Tree reflecting the full syntactic structure of the source code.
 ## Considered Approaches
 
 ### Option 1: Babel Parser (`@babel/parser`)
+
 - Pure JavaScript, no native dependencies
 - Battle-tested, widely used in the JS ecosystem
 - Produces a Babel-flavoured AST (ESTree variant)
@@ -35,6 +39,7 @@ Tree reflecting the full syntactic structure of the source code.
   (Python, Java, C) would require entirely different parsers with different APIs.
 
 ### Option 2: Native `tree-sitter` bindings
+
 - The canonical Node.js tree-sitter binding
 - Fastest possible performance (native C bindings)
 - **Limitation**: Requires compilation via `node-gyp`, which breaks on paths
@@ -43,6 +48,7 @@ Tree reflecting the full syntactic structure of the source code.
   moving the project.
 
 ### Option 3: `web-tree-sitter` (WASM)
+
 - The same Tree-sitter parser compiled to WebAssembly
 - No native compilation required — runs as pure WASM in Node.js
 - Identical grammar support and API to native tree-sitter
@@ -80,22 +86,22 @@ Use **`web-tree-sitter@0.24.7`** with **`tree-sitter-wasms@0.1.13`**.
 
 ## Trade-offs
 
-| Factor | Trade-off |
-|--------|-----------|
-| Performance | WASM is ~2–5× slower than native C bindings, but still < 5ms per typical file |
-| Init cost | WASM binary must be loaded once per process (~100–300ms startup) |
-| Bundle size | `web-tree-sitter.wasm` (~2 MB) + per-language WASM (~0.5–1 MB each) |
-| API stability | `web-tree-sitter` API changed between 0.22 and 0.24; pinning to `^0.24.7` |
+| Factor             | Trade-off                                                                      |
+| ------------------ | ------------------------------------------------------------------------------ |
+| Performance        | WASM is ~2–5× slower than native C bindings, but still < 5ms per typical file  |
+| Init cost          | WASM binary must be loaded once per process (~100–300ms startup)               |
+| Bundle size        | `web-tree-sitter.wasm` (~2 MB) + per-language WASM (~0.5–1 MB each)            |
+| API stability      | `web-tree-sitter` API changed between 0.22 and 0.24; pinning to `^0.24.7`      |
 | WASM compatibility | Grammar WASMs built for a specific tree-sitter ABI version; must match runtime |
 
 ## Version Compatibility
 
 The WASM ABI must match between the runtime and the grammar files:
 
-| Package | Version | Notes |
-|---------|---------|-------|
-| `web-tree-sitter` | 0.24.7 | Requires grammars built with dylink format |
-| `tree-sitter-wasms` | 0.1.13 | Provides pre-built grammars in the matching format |
+| Package             | Version | Notes                                              |
+| ------------------- | ------- | -------------------------------------------------- |
+| `web-tree-sitter`   | 0.24.7  | Requires grammars built with dylink format         |
+| `tree-sitter-wasms` | 0.1.13  | Provides pre-built grammars in the matching format |
 
 The `parserRegistry` resolves WASM paths relative to both `server/node_modules`
 and the workspace root `node_modules` to handle npm workspace hoisting.
