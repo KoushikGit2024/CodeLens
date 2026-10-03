@@ -54,8 +54,8 @@ export default function RepositoryShell() {
         };
       };
 
-      window.addEventListener('unload', handleUnload);
-      return () => window.removeEventListener('unload', handleUnload);
+      window.addEventListener('pagehide', handleUnload);
+      return () => window.removeEventListener('pagehide', handleUnload);
     }
   }, [isSavedPermanently, repoId]);
 

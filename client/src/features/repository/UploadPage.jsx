@@ -26,10 +26,12 @@ import {
   Brain,
   Activity,
   Info,
+  Github,
 } from 'lucide-react';
 import { repositoryApi } from '../../shared/api';
 import { Logo } from '../../shared/components/Logo';
 import UserAvatarWidget from '../account/UserAvatarWidget';
+import ThemeSwitcher from '../../shared/components/ThemeSwitcher';
 import JSZip from 'jszip';
 import { useToast } from '../../shared/context/ToastContext';
 
@@ -108,7 +110,9 @@ export default function UploadPage() {
   const [batchActionRunning, setBatchActionRunning] = useState(false);
   const [showManager, setShowManager] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [inputMode, setInputMode] = useState('zip'); // 'zip' | 'folder'
+  const [inputMode, setInputMode] = useState('zip'); // 'zip' | 'folder' | 'github'
+  const [githubUrl, setGithubUrl] = useState('');
+  const [cloningPhase, setCloningPhase] = useState('');
   const [packingFolder, setPackingFolder] = useState(false); // zipping in-browser
   const [largeWarning, setLargeWarning] = useState(null); // { count, mb, proceed }
   const dropdownRef = useRef(null);
@@ -266,14 +270,29 @@ export default function UploadPage() {
 
   // ── Upload ──────────────────────────────────────────────────────────────────
   const onUpload = async () => {
-    if (!file) return;
+    if (inputMode === 'github') {
+      if (!githubUrl || !githubUrl.includes('github.com')) {
+        setError('Please enter a valid GitHub repository URL.');
+        return;
+      }
+    } else {
+      if (!file) return;
+    }
+
     setUploading(true);
     setError(null);
     setProgress(0);
     setIsSuccess(false);
+    setCloningPhase('');
     try {
       let data;
-      if (file instanceof FileList) {
+      if (inputMode === 'github') {
+        const res = await repositoryApi.importFromGitHub(githubUrl, { ignorePatterns }, evt => {
+          if (evt.total) setProgress(Math.round((evt.loaded / evt.total) * 100));
+          if (evt.phase) setCloningPhase(evt.phase);
+        });
+        data = res.data;
+      } else if (file instanceof FileList) {
         const rootName = (file[0]?.webkitRelativePath || '').split('/')[0] || 'Selected Folder';
         const res = await repositoryApi.uploadDirectory(file, rootName, { ignorePatterns }, evt => {
           if (evt.total) setProgress(Math.round((evt.loaded / evt.total) * 100));
@@ -382,6 +401,9 @@ export default function UploadPage() {
           >
             <Info className="w-4 h-4" /> About
           </Link>
+          <div className="h-4 w-px bg-border" />
+          <ThemeSwitcher />
+          <div className="h-4 w-px bg-border" />
           <UserAvatarWidget />
         </div>
       </div>
@@ -409,7 +431,7 @@ export default function UploadPage() {
                     setError(null);
                   }}
                   className={`flex-1 py-2 font-medium flex items-center justify-center gap-2 transition-colors
-                    ${inputMode === 'zip' ? 'bg-accent/15 text-accent border-r border-accent/30' : 'text-muted hover:text-text hover:bg-surface/50 border-r border-border'}`}
+                    ${inputMode === 'zip' ? 'bg-accent/15 text-accent border-r border-accent/30' : 'text-muted hover:text-text hover:bg-surface/50'}`}
                 >
                   <Upload className="w-3.5 h-3.5" />
                   ZIP Archive
@@ -422,15 +444,47 @@ export default function UploadPage() {
                     setError(null);
                   }}
                   className={`flex-1 py-2 font-medium flex items-center justify-center gap-2 transition-colors
-                    ${inputMode === 'folder' ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text hover:bg-surface/50'}`}
+                    ${inputMode === 'folder' ? 'bg-accent/15 text-accent border-x border-accent/30' : 'text-muted hover:text-text hover:bg-surface/50'}`}
                 >
                   <FolderInput className="w-3.5 h-3.5" />
                   Select Folder
                 </button>
+                <button
+                  onClick={() => {
+                    setInputMode('github');
+                    setFile(null);
+                    setFolderName(null);
+                    setError(null);
+                  }}
+                  className={`flex-1 py-2 font-medium flex items-center justify-center gap-2 transition-colors
+                    ${inputMode === 'github' ? 'bg-accent/15 text-accent border-l border-accent/30' : 'text-muted hover:text-text hover:bg-surface/50'}`}
+                >
+                  <Github className="w-3.5 h-3.5" />
+                  GitHub URL
+                </button>
               </div>
 
               {/* ── Drop Zone ───────────────────────────────────────────────── */}
-              {inputMode === 'zip' ? (
+              {inputMode === 'github' ? (
+                <div className="relative rounded-xl p-6 flex flex-col items-center justify-center gap-4 border border-border/60 bg-surface/30 shrink-0">
+                  <div className="p-4 rounded-full mb-1 bg-surface text-muted">
+                    <Github className="w-8 h-8" />
+                  </div>
+                  <div className="text-center w-full">
+                    <p className="text-base font-medium">Import from GitHub</p>
+                    <p className="text-muted text-sm mt-1 mb-4">
+                      Enter a public GitHub repository URL to import it directly.
+                    </p>
+                    <input
+                      type="url"
+                      placeholder="https://github.com/facebook/react"
+                      value={githubUrl}
+                      onChange={e => setGithubUrl(e.target.value)}
+                      className="w-full max-w-md px-4 py-2.5 rounded-lg bg-surface border border-border focus:outline-none focus:border-accent text-sm"
+                    />
+                  </div>
+                </div>
+              ) : inputMode === 'zip' ? (
                 <div
                   onDragOver={e => {
                     e.preventDefault();
@@ -594,10 +648,15 @@ export default function UploadPage() {
               <div className="mt-auto pt-6 flex flex-col gap-3 shrink-0">
                 <button
                   onClick={onUpload}
-                  disabled={!file || uploading || packingFolder}
+                  disabled={
+                    uploading ||
+                    packingFolder ||
+                    (inputMode !== 'github' && !file) ||
+                    (inputMode === 'github' && !githubUrl)
+                  }
                   className={[
                     'w-full py-3 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2',
-                    file && !uploading && !packingFolder
+                    !uploading && !packingFolder && (file || (inputMode === 'github' && githubUrl))
                       ? 'bg-accent hover:bg-accent-hover text-text'
                       : 'bg-surface border border-border text-muted cursor-not-allowed',
                   ].join(' ')}

@@ -22,6 +22,7 @@ import {
 import { buildRefactoringIntelligence } from '../../services/analyzer/advanced/refactoring.analyzer.js';
 import { analyzeChangeImpact } from '../../services/analyzer/advanced/change.impact.js';
 import { buildQuestionContext } from '../../services/analyzer/advanced/question.context.js';
+import { cloneAndExtractGithub } from '../../services/analyzer/repository/github.importer.js';
 import { buildPrompt } from '../../services/analyzer/advanced/base.context.js';
 import {
   buildOverviewContext,
@@ -293,6 +294,71 @@ export const repositoryApi = {
       return { data: { id: repoId, name: rootName, status: 'analyzing' } };
     } catch (err) {
       console.error('Folder Upload failed:', err);
+      await repositoryStore.update(repoId, { status: 'error', error: err.message });
+      throw err;
+    }
+  },
+
+  async importFromGitHub(url, options = {}, onProgress = () => {}) {
+    const repoId = uuidv4();
+
+    // Attempt to extract a decent rootName from the URL
+    // e.g. https://github.com/facebook/react -> facebook/react
+    let rootName = 'github-repo';
+    try {
+      const parts = new URL(url).pathname.split('/').filter(Boolean);
+      if (parts.length >= 2) {
+        rootName = `${parts[0]}/${parts[1]}`;
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    const record = {
+      id: repoId,
+      name: rootName,
+      uploadedAt: new Date().toISOString(),
+      status: 'analyzing',
+      phase: 'cloning',
+      analysisVersion: 2,
+    };
+    await repositoryStore.set(repoId, record);
+
+    try {
+      const files = await cloneAndExtractGithub(url, onProgress);
+
+      const ignorePatterns = options.ignorePatterns
+        ? options.ignorePatterns
+            .split(/[\n,]+/)
+            .map(s => s.trim())
+            .filter(Boolean)
+        : [];
+      const defaultIgnores = ['node_modules', 'dist', 'build', 'coverage', '.next', 'out'];
+
+      let processedCount = 0;
+      for (const file of files) {
+        const filePath = file.path;
+        const pathSegments = filePath.split('/');
+        const shouldIgnore =
+          ignorePatterns.some(p => filePath.includes(p)) ||
+          defaultIgnores.some(ignoreDir => pathSegments.includes(ignoreDir));
+
+        if (!shouldIgnore) {
+          await persistenceStore.saveFile(repoId, filePath, file.content);
+        }
+        processedCount++;
+        if (processedCount % 10 === 0) {
+          onProgress({ loaded: 50 + (processedCount / files.length) * 50, total: 100, phase: 'Saving files...' });
+        }
+      }
+
+      startAnalysis(repoId, options).catch(err => {
+        console.error('Background analysis failed:', err);
+      });
+
+      return { data: { id: repoId, name: rootName, status: 'analyzing' } };
+    } catch (err) {
+      console.error('GitHub Import failed:', err);
       await repositoryStore.update(repoId, { status: 'error', error: err.message });
       throw err;
     }

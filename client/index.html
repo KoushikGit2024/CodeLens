@@ -9,9 +9,117 @@
     <link rel="apple-touch-icon" href="/codelens.png" />
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#0C0E14" />
+    <style>
+      body {
+        margin: 0;
+        background-color: #0c0e14; /* Default dark theme background */
+      }
+      body {
+        margin: 0;
+        background-color: #0c0e14; /* Charcoal */
+        overflow: hidden;
+      }
+      
+      #initial-loader {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        width: 100vw;
+        background-color: #0c0e14;
+        font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+      }
+      
+      .brackets-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 56px;
+        font-weight: 700;
+        margin-bottom: 30px;
+        letter-spacing: -5px; /* Pull them closer */
+      }
+
+      .bracket {
+        display: inline-block;
+        color: rgb(var(--color-accent, 77 126 255)); /* Graphite Blue */
+      }
+
+      .b-outer { opacity: 0.1; animation: pulse-b-outer 1.5s ease-in-out infinite alternate; }
+      .b-mid { opacity: 0.4; animation: pulse-b-mid 1.5s ease-in-out infinite alternate; }
+      .b-inner { opacity: 1; text-shadow: 0 0 20px rgba(77, 126, 255, 0.6); animation: pulse-b-inner 1.5s ease-in-out infinite alternate; }
+
+      @keyframes pulse-b-outer {
+        0% { transform: translateX(15px); opacity: 0; }
+        100% { transform: translateX(0); opacity: 0.2; }
+      }
+      @keyframes pulse-b-mid {
+        0% { transform: translateX(8px); opacity: 0.1; }
+        100% { transform: translateX(0); opacity: 0.5; }
+      }
+      @keyframes pulse-b-inner {
+        0% { transform: scale(0.9); opacity: 0.5; }
+        100% { transform: scale(1.1); opacity: 1; text-shadow: 0 0 24px rgba(77, 126, 255, 0.8); }
+      }
+      
+      /* Reverse transforms for right side */
+      .right .b-outer { animation-name: pulse-b-outer-r; }
+      .right .b-mid { animation-name: pulse-b-mid-r; }
+      
+      @keyframes pulse-b-outer-r {
+        0% { transform: translateX(-15px); opacity: 0; }
+        100% { transform: translateX(0); opacity: 0.2; }
+      }
+      @keyframes pulse-b-mid-r {
+        0% { transform: translateX(-8px); opacity: 0.1; }
+        100% { transform: translateX(0); opacity: 0.5; }
+      }
+
+      .slash {
+        color: rgb(var(--color-text, 203 213 232));
+        margin: 0 16px;
+        font-size: 64px;
+        font-weight: 300;
+        transform: rotate(15deg);
+        animation: slash-glow 1.5s ease-in-out infinite alternate;
+      }
+      
+      @keyframes slash-glow {
+        0% { opacity: 0.3; }
+        100% { opacity: 1; text-shadow: 0 0 15px rgba(203, 213, 232, 0.5); }
+      }
+
+      .brand-text {
+        font-family: system-ui, -apple-system, sans-serif;
+        font-size: 16px;
+        font-weight: 700;
+        letter-spacing: 8px;
+        color: #cbd5e8; /* 203 213 232 as hex approx */
+        text-transform: uppercase;
+        animation: fade-in-up 1s ease-out;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="initial-loader">
+        <div class="brackets-container">
+          <div class="left">
+            <span class="bracket b-outer">&lt;</span>
+            <span class="bracket b-mid">&lt;</span>
+            <span class="bracket b-inner">&lt;</span>
+          </div>
+          <span class="slash">/</span>
+          <div class="right">
+            <span class="bracket b-inner">&gt;</span>
+            <span class="bracket b-mid">&gt;</span>
+            <span class="bracket b-outer">&gt;</span>
+          </div>
+        </div>
+        <div class="brand-text">CODELENS</div>
+      </div>
+    </div>
     <script type="module" src="/src/app/main.jsx"></script>
   </body>
 </html>
