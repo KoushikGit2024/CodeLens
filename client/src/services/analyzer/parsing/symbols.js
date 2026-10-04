@@ -131,6 +131,7 @@ export function createFileAnalysis({
   language,
   lineCount = 0,
   symbols = [],
+  usages = [],
   hasErrors = false,
   error = null,
 }) {
@@ -139,6 +140,7 @@ export function createFileAnalysis({
     language,
     lineCount,
     symbols,
+    usages,
     hasErrors,
     error,
     analyzedAt: new Date().toISOString(),

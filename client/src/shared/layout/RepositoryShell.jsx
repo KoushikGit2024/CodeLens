@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Outlet, useParams, useSearchParams } from 'react-router-dom';
 import RepositorySidebar from './RepositorySidebar';
 import RepositoryHeader from './RepositoryHeader';
@@ -6,6 +6,65 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { RepositoryProvider } from '../context/RepositoryContext';
 import GlobalCommandPalette from '../components/GlobalCommandPalette';
 import { Database, AlertTriangle, Save, X } from 'lucide-react';
+import { useRepository } from '../context/RepositoryContext';
+import AnalysisProgress from '../../features/repository/AnalysisProgress';
+
+function RepositoryContentWrapper() {
+  const { repo, livePhase } = useRepository();
+  const [showProgress, setShowProgress] = useState(false);
+  const wasAnalyzingRef = useRef(repo?.status === 'analyzing');
+
+  useEffect(() => {
+    if (repo?.status === 'analyzing') {
+      wasAnalyzingRef.current = true;
+      setShowProgress(true);
+    } else if (repo?.status === 'ready' && wasAnalyzingRef.current) {
+      // Keep it visible for a short delay after finishing so the Outlet can mount cleanly behind it
+      const timer = setTimeout(() => {
+        setShowProgress(false);
+        wasAnalyzingRef.current = false;
+      }, 1500);
+      return () => clearTimeout(timer);
+    } else {
+      setShowProgress(false);
+    }
+  }, [repo?.status]);
+
+  if (showProgress) {
+    if (repo?.status === 'analyzing') {
+      // Completely hide the Outlet to prevent crashes during active analysis
+      return (
+        <div className="flex-1 flex items-center justify-center bg-surface w-full h-full">
+          <AnalysisProgress
+            currentPhase={livePhase?.phase ?? repo?.phase}
+            phaseDetails={livePhase?.details ?? repo?.phaseDetails}
+          />
+        </div>
+      );
+    }
+
+    // During the 1.5s completion hold, mount the Outlet underneath so it can load data
+    return (
+      <>
+        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-surface">
+          <AnalysisProgress
+            currentPhase={livePhase?.phase ?? repo?.phase}
+            phaseDetails={livePhase?.details ?? repo?.phaseDetails}
+          />
+        </div>
+        <ErrorBoundary>
+          <Outlet />
+        </ErrorBoundary>
+      </>
+    );
+  }
+
+  return (
+    <ErrorBoundary>
+      <Outlet />
+    </ErrorBoundary>
+  );
+}
 
 export default function RepositoryShell() {
   const { repoId } = useParams();
@@ -137,9 +196,7 @@ export default function RepositoryShell() {
 
           <RepositoryHeader />
           <main className="flex-1 overflow-hidden relative flex flex-col min-h-0">
-            <ErrorBoundary>
-              <Outlet />
-            </ErrorBoundary>
+            <RepositoryContentWrapper />
           </main>
         </div>
       </div>

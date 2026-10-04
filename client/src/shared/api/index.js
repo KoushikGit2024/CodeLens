@@ -178,6 +178,7 @@ export const repositoryApi = {
         const defaultIgnores = ['node_modules', 'dist', 'build', 'coverage', '.next', 'out'];
         const pathSegments = filePath.split('/');
         const shouldIgnore =
+          (!import.meta.env.DEV && pathSegments.includes('.git')) ||
           ignorePatterns.some(p => filePath.includes(p)) ||
           defaultIgnores.some(ignoreDir => pathSegments.includes(ignoreDir));
 
@@ -198,7 +199,7 @@ export const repositoryApi = {
         }
         processedCount++;
         if (processedCount % 10 === 0) {
-          onProgress({ loaded: 10 + (processedCount / files.length) * 20, total: 100 });
+          onProgress({ loaded: 10 + (processedCount / files.length) * 20, total: 100, currentFile: filePath });
         }
       }
 
@@ -260,6 +261,7 @@ export const repositoryApi = {
         const defaultIgnores = ['node_modules', 'dist', 'build', 'coverage', '.next', 'out'];
         const pathSegments = filePath.split('/');
         const shouldIgnore =
+          (!import.meta.env.DEV && pathSegments.includes('.git')) ||
           ignorePatterns.some(p => filePath.includes(p)) ||
           defaultIgnores.some(ignoreDir => pathSegments.includes(ignoreDir));
 
@@ -283,7 +285,7 @@ export const repositoryApi = {
         }
         processedCount++;
         if (processedCount % 10 === 0) {
-          onProgress({ loaded: 10 + (processedCount / files.length) * 20, total: 100 });
+          onProgress({ loaded: 10 + (processedCount / files.length) * 20, total: 100, currentFile: filePath });
         }
       }
 
@@ -325,7 +327,7 @@ export const repositoryApi = {
     await repositoryStore.set(repoId, record);
 
     try {
-      const files = await cloneAndExtractGithub(url, onProgress);
+      const files = await cloneAndExtractGithub(url, onProgress, options.fetchAllBranches);
 
       const ignorePatterns = options.ignorePatterns
         ? options.ignorePatterns
@@ -348,7 +350,12 @@ export const repositoryApi = {
         }
         processedCount++;
         if (processedCount % 10 === 0) {
-          onProgress({ loaded: 50 + (processedCount / files.length) * 50, total: 100, phase: 'Saving files...' });
+          onProgress({
+            loaded: 50 + (processedCount / files.length) * 50,
+            total: 100,
+            phase: 'Saving files...',
+            currentFile: filePath,
+          });
         }
       }
 

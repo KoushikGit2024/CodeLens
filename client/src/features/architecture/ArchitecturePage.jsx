@@ -21,6 +21,7 @@ import AiResponse from '../../shared/components/ai/AiResponse';
 import ContextBreadcrumbs from '../../shared/components/ContextBreadcrumbs';
 import { useToast } from '../../shared/context/ToastContext';
 import { useAIState } from '../../shared/context/AIContext';
+import { useRepository } from '../../shared/context/RepositoryContext';
 import ReactFlow, { Background, Controls, MiniMap, MarkerType, Handle, Position } from 'reactflow';
 import 'reactflow/dist/style.css';
 import * as d3Force from 'd3-force';
@@ -408,6 +409,8 @@ export default function ArchitecturePage() {
   const [selectedComponent, setSelectedComponent] = useState(null);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [isReanalyzing, setIsReanalyzing] = useState(false);
+  const { repo, livePhase } = useRepository();
+  const isGloballyAnalyzing = !!livePhase || repo?.status === 'analyzing';
   const [aiError, setAiError] = useState(null);
   const [expandedComponents, setExpandedComponents] = useState(new Set());
 
@@ -532,10 +535,10 @@ export default function ArchitecturePage() {
             </button>
             <button
               onClick={handleReanalyze}
-              disabled={isReanalyzing}
+              disabled={isReanalyzing || isGloballyAnalyzing}
               className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isReanalyzing ? (
+              {(isReanalyzing || isGloballyAnalyzing) ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" /> Starting...
                 </>
@@ -545,6 +548,7 @@ export default function ArchitecturePage() {
                 </>
               )}
             </button>
+
           </div>
         </div>
       </div>

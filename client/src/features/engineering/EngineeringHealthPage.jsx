@@ -23,6 +23,7 @@ import {
   Search,
   X,
 } from 'lucide-react';
+import { useRepository } from '../../shared/context/RepositoryContext';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { repositoryApi } from '../../shared/api';
 import AiResponse from '../../shared/components/ai/AiResponse';
@@ -248,6 +249,8 @@ const EngineeringHealthPage = () => {
   const [isReanalyzing, setIsReanalyzing] = useState(false);
   const [explainLoading, setExplainLoading] = useState(false);
   const [explainResult, setExplainResult] = useState(null);
+  const { repo, livePhase } = useRepository();
+  const isGloballyAnalyzing = !!livePhase || repo?.status === 'analyzing';
 
   // Local ignored IDs — mirrors what's in IndexedDB, updated optimistically
   const [ignoredIds, setIgnoredIds] = useState(new Set());
@@ -585,12 +588,12 @@ const EngineeringHealthPage = () => {
             {!isNotReady && (
               <button
                 onClick={handleReanalyze}
-                disabled={isReanalyzing}
+                disabled={isReanalyzing || isGloballyAnalyzing}
                 className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isReanalyzing ? (
+                {(isReanalyzing || isGloballyAnalyzing) ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> Starting...
+                    <Loader2 className="w-4 h-4 animate-spin" /> Analyzing...
                   </>
                 ) : (
                   <>
@@ -599,6 +602,7 @@ const EngineeringHealthPage = () => {
                 )}
               </button>
             )}
+
             {isNotReady && (
               <button
                 onClick={async () => {

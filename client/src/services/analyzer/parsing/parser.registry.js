@@ -19,6 +19,7 @@ const LANGUAGE_WASM_MAP = {
   kotlin: 'tree-sitter-kotlin.wasm',
   go: 'tree-sitter-go.wasm',
   rust: 'tree-sitter-rust.wasm',
+  swift: 'tree-sitter-swift.wasm',
 };
 
 // ── State ─────────────────────────────────────────────────────────────────────

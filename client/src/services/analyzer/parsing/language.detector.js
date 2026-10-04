@@ -48,6 +48,9 @@ export const EXTENSION_MAP = new Map([
 
   // Rust
   ['.rs', 'rust'],
+
+  // Swift
+  ['.swift', 'swift'],
 ]);
 
 /**

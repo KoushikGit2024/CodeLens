@@ -8,7 +8,7 @@
 import { analyzeRepository } from './repository/repository.analyzer.js';
 import { buildDependencyGraph } from './dependencies/dependency.analyzer.js';
 import { buildArchitectureModel } from './advanced/architecture.analyzer.js';
-// import { analyzeGitChurn } from './advanced/git.analyzer.js';
+import { analyzeGitChurn } from './advanced/git.analyzer.js';
 import * as repositoryStore from './repository/repository.store.js';
 
 // It triggers a manual timeout, then extracts the thread lock, and then it applies a brief pause so UI polling can catch up.
@@ -18,7 +18,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
  * It initiates the repository state, then extracts sequential AST and graph models,
  * and then it applies the final unified analysis to the browser's IndexedDB.
  */
-export async function executeAnalysisPipeline(repoId, options = {}, postMessage = () => {}) {
+export async function executeAnalysisPipeline(repoId, options = {}, postMessage = () => { }) {
   let record = await repositoryStore.get(repoId);
   if (!record) {
     record = { id: repoId, name: `Repo-${repoId}`, uploadedAt: new Date().toISOString() };
@@ -49,26 +49,28 @@ export async function executeAnalysisPipeline(repoId, options = {}, postMessage 
   const architecture = buildArchitectureModel(analysis, graph);
   analysis.architecture = architecture;
 
-  // await onProgress('analyzing_git_churn');
-  // const gitChurnResult = await analyzeGitChurn(repoId, postMessage);
-  // if (gitChurnResult) {
-  //   analysis.gitChurn = gitChurnResult;
-  //   graph.gitChurn = gitChurnResult;
-  //   for (const [filePath, fileNode] of Object.entries(analysis.files)) {
-  //     const churnScore = gitChurnResult.churnScores[filePath] || 0;
-  //     const complexity = fileNode.metrics?.complexity || 0;
-  //
-  //     // Normalize complexity to 0-100 (assume 30 is extremely high)
-  //     const complexityScore = Math.min(100, Math.round((complexity / 30) * 100));
-  //
-  //     // Calculate Composite Risk Rating: (0.6 * complexityScore) + (0.4 * churnScore)
-  //     const compositeScore = Math.round((0.6 * complexityScore) + (0.4 * churnScore));
-  //
-  //     if (!fileNode.metrics) fileNode.metrics = {};
-  //     fileNode.metrics.churnScore = churnScore;
-  //     fileNode.metrics.compositeRisk = compositeScore;
-  //   }
-  // }
+  if (import.meta.env.DEV) {
+    await onProgress('analyzing_git_churn');
+    const gitChurnResult = await analyzeGitChurn(repoId, postMessage);
+    if (gitChurnResult) {
+      analysis.gitChurn = gitChurnResult;
+      graph.gitChurn = gitChurnResult;
+      for (const [filePath, fileNode] of Object.entries(analysis.files)) {
+        const churnScore = gitChurnResult.churnScores[filePath] || 0;
+        const complexity = fileNode.metrics?.complexity || 0;
+
+        // Normalize complexity to 0-100 (assume 30 is extremely high)
+        const complexityScore = Math.min(100, Math.round((complexity / 30) * 100));
+
+        // Calculate Composite Risk Rating: (0.6 * complexityScore) + (0.4 * churnScore)
+        const compositeScore = Math.round(0.6 * complexityScore + 0.4 * churnScore);
+
+        if (!fileNode.metrics) fileNode.metrics = {};
+        fileNode.metrics.churnScore = churnScore;
+        fileNode.metrics.compositeRisk = compositeScore;
+      }
+    }
+  }
 
   // It finalizes the database transaction, then extracts the complete analysis object, and then it applies it to IndexedDB BEFORE notifying the UI.
   await repositoryStore.update(repoId, {

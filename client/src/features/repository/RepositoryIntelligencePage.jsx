@@ -26,7 +26,7 @@ import {
 import { useAIState, useAI } from '../../shared/context/AIContext';
 import { useRepository } from '../../shared/context/RepositoryContext';
 import { useToast } from '../../shared/context/ToastContext';
-import AnalysisProgress from './AnalysisProgress';
+
 import OpenSourceButton from '../../shared/components/OpenSourceButton';
 import { tryMakeSourceRef } from '../../shared/navigation/sourceRef';
 
@@ -119,21 +119,6 @@ export default function RepositoryIntelligencePage() {
       });
     }
   };
-
-  // Determine if we should show the analysis progress UI.
-  // This includes when it's actively analyzing OR when it just finished ('ready') but we are still in the 1.5s visual hold.
-  const isAnalyzing = repo?.status === 'analyzing' || (wasAnalyzingRef.current && repo?.status === 'ready' && loading);
-
-  if (isAnalyzing) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-surface text-text">
-        <AnalysisProgress
-          currentPhase={livePhase?.phase ?? repo?.phase}
-          phaseDetails={livePhase?.details ?? repo?.phaseDetails}
-        />
-      </div>
-    );
-  }
 
   const isInitialLoad = loading && !data;
 

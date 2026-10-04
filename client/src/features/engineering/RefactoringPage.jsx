@@ -28,6 +28,7 @@ import { DiffEditor } from '@monaco-editor/react';
 import { ResizableLayout } from '../../shared/components/ResizableLayout';
 import { useToast } from '../../shared/context/ToastContext';
 import { useAIState } from '../../shared/context/AIContext';
+import { useRepository } from '../../shared/context/RepositoryContext';
 import { repositoryApi } from '../../shared/api';
 import AiResponse from '../../shared/components/ai/AiResponse';
 import PageHeader from '../../shared/components/PageHeader';
@@ -260,6 +261,8 @@ export default function RefactoringPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isReanalyzing, setIsReanalyzing] = useState(false);
+  const { repo, livePhase } = useRepository();
+  const isGloballyAnalyzing = !!livePhase || repo?.status === 'analyzing';
   const [searchParams, setSearchParams] = useSearchParams();
 
   // ── URL-synced UI State ──
@@ -382,10 +385,10 @@ export default function RefactoringPage() {
             {!isNotReady && (
               <button
                 onClick={handleReanalyze}
-                disabled={isReanalyzing}
+                disabled={isReanalyzing || isGloballyAnalyzing}
                 className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isReanalyzing ? (
+                {(isReanalyzing || isGloballyAnalyzing) ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" /> Starting...
                   </>

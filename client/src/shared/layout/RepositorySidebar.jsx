@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { Logo } from '../components/Logo';
 import { useAuth } from '../context/AuthContext';
+import { useRepository } from '../context/RepositoryContext';
 import clsx from 'clsx';
 
 const NAV_GROUPS = [
@@ -51,7 +52,7 @@ const NAV_GROUPS = [
     items: [
       { id: 'architecture', label: 'Architecture', icon: Box, to: 'architecture' },
       { id: 'dependencies', label: 'Dependencies', icon: GitMerge, to: 'dependencies' },
-      // { id: 'git', label: 'Git History', icon: GitCommit, to: 'git' },
+      ...(import.meta.env.DEV ? [{ id: 'git', label: 'Git History', icon: GitCommit, to: 'git' }] : []),
     ],
   },
   {
@@ -79,6 +80,9 @@ export default function RepositorySidebar() {
   const { repoId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
+  const { repo } = useRepository();
+
+  const isAnalyzing = repo?.status === 'analyzing';
 
   const collapsed = searchParams.get('sidebar') === 'closed';
   const isMobileOpen = searchParams.get('mobileNav') === 'open';
@@ -216,17 +220,26 @@ export default function RepositorySidebar() {
                   return (
                     <NavLink
                       key={item.id}
-                      to={`/explore/${repoId}/${item.to}${effectiveCollapsed ? '?sidebar=closed' : ''}`}
+                      to={isAnalyzing ? '#' : `/explore/${repoId}/${item.to}${effectiveCollapsed ? '?sidebar=closed' : ''}`}
                       end={item.to === ''}
-                      onClick={closeMobileNav}
+                      onClick={(e) => {
+                        if (isAnalyzing) {
+                          e.preventDefault();
+                          return;
+                        }
+                        closeMobileNav();
+                      }}
                       title={effectiveCollapsed ? item.label : undefined}
                       className={({ isActive }) =>
                         clsx(
                           'flex items-center rounded-r text-[13px] transition-all duration-200 group relative overflow-hidden border-l-2',
                           effectiveCollapsed ? 'justify-center w-10 h-10 mb-1' : 'gap-3 px-2.5 py-1.5 w-full',
-                          isActive
+                          isAnalyzing && 'opacity-50 cursor-not-allowed',
+                          isActive && !isAnalyzing
                             ? 'border-accent text-text font-medium bg-accent/[0.07]'
-                            : 'border-transparent text-muted hover:bg-text/[0.04] hover:text-text'
+                            : !isAnalyzing
+                              ? 'border-transparent text-muted hover:bg-text/[0.04] hover:text-text'
+                              : 'border-transparent text-muted'
                         )
                       }
                     >

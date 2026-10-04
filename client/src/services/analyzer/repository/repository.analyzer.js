@@ -16,6 +16,7 @@ import { KotlinParser } from '../parsing/languages/kotlin.parser.js';
 import { GoParser } from '../parsing/languages/go.parser.js';
 import { RustParser } from '../parsing/languages/rust.parser.js';
 import { CParser } from '../parsing/languages/c.parser.js';
+import { SwiftParser } from '../parsing/languages/swift.parser.js';
 import { createFileAnalysis } from '../parsing/symbols.js';
 import { hashContent } from './fingerprint.js';
 import { loadAllFiles } from './persistence.store.js';
@@ -31,6 +32,7 @@ const PARSER_FACTORIES = {
   go: tsParser => new GoParser(tsParser),
   rust: tsParser => new RustParser(tsParser),
   c: tsParser => new CParser(tsParser),
+  swift: tsParser => new SwiftParser(tsParser),
 };
 
 /**
@@ -105,7 +107,12 @@ export async function analyzeRepository(repoId, previousAnalysis = null, onProgr
       cachedAnalysis = previousAnalysis.files.find(f => f.filePath === relPath);
     }
 
-    if (cachedAnalysis && cachedAnalysis.hash === hash && cachedAnalysis.language === language) {
+    if (
+      cachedAnalysis &&
+      cachedAnalysis.hash === hash &&
+      cachedAnalysis.language === language &&
+      cachedAnalysis.usages !== undefined // Invalidate old cache entries that lack the usages schema
+    ) {
       result.files.push(cachedAnalysis);
 
       result.meta.cacheHits++;

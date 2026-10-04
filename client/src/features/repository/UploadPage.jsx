@@ -112,7 +112,9 @@ export default function UploadPage() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [inputMode, setInputMode] = useState('zip'); // 'zip' | 'folder' | 'github'
   const [githubUrl, setGithubUrl] = useState('');
+  const [fetchAllBranches, setFetchAllBranches] = useState(false);
   const [cloningPhase, setCloningPhase] = useState('');
+  const [currentFile, setCurrentFile] = useState('');
   const [packingFolder, setPackingFolder] = useState(false); // zipping in-browser
   const [largeWarning, setLargeWarning] = useState(null); // { count, mb, proceed }
   const dropdownRef = useRef(null);
@@ -284,23 +286,27 @@ export default function UploadPage() {
     setProgress(0);
     setIsSuccess(false);
     setCloningPhase('');
+    setCurrentFile('');
     try {
       let data;
       if (inputMode === 'github') {
-        const res = await repositoryApi.importFromGitHub(githubUrl, { ignorePatterns }, evt => {
+        const res = await repositoryApi.importFromGitHub(githubUrl, { ignorePatterns, fetchAllBranches }, evt => {
           if (evt.total) setProgress(Math.round((evt.loaded / evt.total) * 100));
           if (evt.phase) setCloningPhase(evt.phase);
+          if (evt.currentFile) setCurrentFile(evt.currentFile);
         });
         data = res.data;
       } else if (file instanceof FileList) {
         const rootName = (file[0]?.webkitRelativePath || '').split('/')[0] || 'Selected Folder';
         const res = await repositoryApi.uploadDirectory(file, rootName, { ignorePatterns }, evt => {
           if (evt.total) setProgress(Math.round((evt.loaded / evt.total) * 100));
+          if (evt.currentFile) setCurrentFile(evt.currentFile);
         });
         data = res.data;
       } else {
         const res = await repositoryApi.upload(file, { ignorePatterns }, evt => {
           if (evt.total) setProgress(Math.round((evt.loaded / evt.total) * 100));
+          if (evt.currentFile) setCurrentFile(evt.currentFile);
         });
         data = res.data;
       }
@@ -321,7 +327,7 @@ export default function UploadPage() {
 
   return (
     <div
-      className={`min-h-screen lg:h-screen bg-surface flex flex-col pt-8 pb-4 px-4 md:px-8 font-sans text-text lg:overflow-hidden transition-opacity ${uploading || packingFolder ? 'pointer-events-none' : ''}`}
+      className={`h-[100dvh] bg-surface flex flex-col pt-6 md:pt-8 pb-4 md:pb-6 px-4 md:px-8 font-sans text-text overflow-y-auto overflow-x-hidden transition-opacity ${uploading || packingFolder ? 'pointer-events-none' : ''}`}
     >
       {/* ── Large-Folder Warning Modal ─────────────────────────────────────── */}
       {largeWarning && (
@@ -387,35 +393,39 @@ export default function UploadPage() {
       )}
 
       {/* ── Header ────────────────────────────────────────────────────────────── */}
-      <div className="w-full max-w-7xl mx-auto mb-6 flex flex-col md:flex-row items-center justify-between gap-4 border-b border-border/50 pb-4 shrink-0">
-        <div className="flex flex-col items-center md:items-start text-center md:text-left">
-          <Logo className="w-12 h-12 mb-2" textClass="text-2xl font-bold tracking-tight text-text" showText={true} />
-          <p className="text-muted text-sm mt-1 max-w-md leading-relaxed hidden md:block">
-            Upload your codebase to extract architecture, map dependencies, and generate intelligent documentation.
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <Link
-            to="/about"
-            className="text-sm font-medium text-muted hover:text-text transition-colors flex items-center gap-2 px-3 py-1.5 rounded-lg border border-transparent hover:border-border hover:bg-surface"
-          >
-            <Info className="w-4 h-4" /> About
-          </Link>
-          <div className="h-4 w-px bg-border" />
-          <ThemeSwitcher />
-          <div className="h-4 w-px bg-border" />
-          <UserAvatarWidget />
+      <div className="w-full max-w-7xl mx-auto mb-6 md:mb-8 border-b border-border/50 pb-5 md:pb-6 shrink-0">
+        <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+          <div className="flex flex-col items-start text-left">
+            <Logo className="w-10 h-10 md:w-12 md:h-12 mb-1.5 md:mb-2" textClass="text-xl md:text-2xl font-bold tracking-tight text-text" showText={true} />
+            <p className="text-muted text-[13px] md:text-sm mt-1 max-w-[280px] sm:max-w-sm md:max-w-md leading-relaxed">
+              Upload your codebase to extract architecture, map dependencies, and generate intelligent documentation.
+            </p>
+          </div>
+          <div className="flex items-center gap-3 sm:gap-4 shrink-0 mt-2 sm:mt-0 w-full sm:w-auto justify-between sm:justify-end">
+            <div className="flex items-center gap-2 sm:gap-4 bg-surface/50 sm:bg-transparent p-1.5 sm:p-0 rounded-xl border border-border/50 sm:border-transparent flex-1 sm:flex-none justify-evenly sm:justify-start">
+              <Link
+                to="/about"
+                className="text-sm font-medium text-muted hover:text-text transition-colors flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-surface"
+              >
+                <Info className="w-4 h-4" /> About
+              </Link>
+              <div className="h-4 w-px bg-border" />
+              <ThemeSwitcher />
+            </div>
+            <div className="h-4 w-px bg-border hidden sm:block" />
+            <div className="shrink-0">
+              <UserAvatarWidget />
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="w-full max-w-7xl mx-auto flex-1 flex flex-col lg:flex-row gap-8 min-h-0">
+      <div className="w-full max-w-7xl mx-auto flex-1 flex flex-col lg:flex-row gap-6 md:gap-8 lg:min-h-0 mb-4 md:mb-6">
         {/* ── Left Column: Upload ──────────────────────────────────────────────── */}
         <div className="w-full lg:w-[55%] flex flex-col lg:min-h-0">
           <div className="bg-panel border border-border rounded-2xl shadow-sm flex-1 flex flex-col lg:overflow-hidden relative">
-            <div
-              className="flex-1 flex flex-col p-5 md:p-6 lg:overflow-y-auto [&::-webkit-scrollbar]:hidden"
-              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-            >
+            {/* ── Fixed Header & Tabs ── */}
+            <div className="p-5 md:p-6 pb-0 shrink-0">
               <h2 className="text-base font-semibold mb-4 flex items-center gap-2 shrink-0">
                 <FolderOpen className="w-4 h-4 text-accent" />
                 Upload New Repository
@@ -463,7 +473,13 @@ export default function UploadPage() {
                   GitHub URL
                 </button>
               </div>
+            </div>
 
+            {/* ── Scrollable Form Area ── */}
+            <div
+              className="flex-1 flex flex-col px-5 md:px-6 pb-5 md:pb-6 lg:overflow-y-auto [&::-webkit-scrollbar]:hidden"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
               {/* ── Drop Zone ───────────────────────────────────────────────── */}
               {inputMode === 'github' ? (
                 <div className="relative rounded-xl p-6 flex flex-col items-center justify-center gap-4 border border-border/60 bg-surface/30 shrink-0">
@@ -480,8 +496,33 @@ export default function UploadPage() {
                       placeholder="https://github.com/facebook/react"
                       value={githubUrl}
                       onChange={e => setGithubUrl(e.target.value)}
-                      className="w-full max-w-md px-4 py-2.5 rounded-lg bg-surface border border-border focus:outline-none focus:border-accent text-sm"
+                      className="w-full max-w-md px-4 py-2.5 rounded-lg bg-surface border border-border focus:outline-none focus:border-accent text-sm mb-5"
                     />
+                    
+                    <div className="flex items-start justify-center w-full max-w-md mx-auto">
+                      <label className="flex items-start gap-3 cursor-pointer group text-left">
+                        <div className="relative mt-0.5 shrink-0">
+                          <input
+                            type="checkbox"
+                            className="sr-only"
+                            checked={fetchAllBranches}
+                            onChange={(e) => setFetchAllBranches(e.target.checked)}
+                          />
+                          <div className={`w-9 h-5 rounded-full transition-colors ${fetchAllBranches ? 'bg-warning/90' : 'bg-surface border border-border group-hover:border-accent/50'}`} />
+                          <div className={`absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${fetchAllBranches ? 'translate-x-4' : 'translate-x-0'}`} />
+                        </div>
+                        <div>
+                          <span className={`font-semibold text-sm transition-colors block ${fetchAllBranches ? 'text-warning' : 'text-text group-hover:text-accent'}`}>
+                            Fetch All Branches
+                          </span>
+                          <span className="text-[11px] text-muted leading-snug block mt-1">
+                            {fetchAllBranches 
+                              ? "Warning: Downloads the entire history of all remote branches. This can take a very long time and consume massive bandwidth for large repositories." 
+                              : "Downloads only the default branch to save bandwidth and memory."}
+                          </span>
+                        </div>
+                      </label>
+                    </div>
                   </div>
                 </div>
               ) : inputMode === 'zip' ? (
@@ -602,6 +643,11 @@ export default function UploadPage() {
                     </span>
                     {!isSuccess && <span className="text-sm font-mono text-muted">{progress}%</span>}
                   </div>
+                  {!isSuccess && currentFile && (
+                    <div className="text-[11px] font-mono text-muted/70 truncate max-w-full -mt-2 mb-1">
+                      {currentFile}
+                    </div>
+                  )}
                   <div className="w-full bg-panel h-2 rounded-full overflow-hidden">
                     <div
                       className={`h-full transition-all duration-300 ease-out ${isSuccess ? 'bg-success' : 'bg-accent'}`}
@@ -921,7 +967,7 @@ export default function UploadPage() {
       )}
 
       {/* ── Footer ───────────────────────────────────────────────────────────── */}
-      <footer className="mt-4 text-center shrink-0 w-full border-t border-border/50 pt-4 max-w-7xl mx-auto">
+      <footer className="mt-8 md:mt-12 text-center shrink-0 w-full border-t border-border/50 pt-4 pb-2 max-w-7xl mx-auto">
         <p className="text-xs text-muted">
           CodeLens runs static analysis locally. Your code is processed securely in your browser.
         </p>

@@ -193,13 +193,15 @@ const impactNodeTypes = { impactNode: ImpactNode };
 export default function ImpactPage() {
   const { repoId } = useParams();
   const navigate = useNavigate();
-  const { repo, loading: repoLoading, error: repoError } = useRepository();
+  const { repo, livePhase, loading: repoLoading, error: repoError } = useRepository();
   const { addToast } = useToast();
 
   const [impact, setImpact] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isReanalyzing, setIsReanalyzing] = useState(false);
+  
+  const isGloballyAnalyzing = !!livePhase || repo?.status === 'analyzing';
 
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -411,10 +413,10 @@ export default function ImpactPage() {
             {!isNotReady && (
               <button
                 onClick={handleReanalyze}
-                disabled={isReanalyzing}
+                disabled={isReanalyzing || isGloballyAnalyzing}
                 className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isReanalyzing ? (
+                {(isReanalyzing || isGloballyAnalyzing) ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" /> Starting...
                   </>

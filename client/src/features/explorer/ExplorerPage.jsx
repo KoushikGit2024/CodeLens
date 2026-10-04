@@ -56,7 +56,6 @@ import { FileTree } from './FileTree';
 import AiResponse from '../../shared/components/ai/AiResponse';
 import AiMarkdown from '../../shared/components/ai/AiMarkdown';
 import ModuleDocumentation from './ModuleDocumentation';
-import AnalysisProgress from '../repository/AnalysisProgress';
 import { useAIState } from '../../shared/context/AIContext';
 import { useBookmark, addBookmark, removeBookmark, updateNote } from '../../services/storage/bookmark.store';
 import { useToast } from '../../shared/context/ToastContext';
@@ -488,17 +487,7 @@ export default function ExplorerPage() {
     );
   }
 
-  // If repo is reanalyzing after being ready, we can also show progress over the UI
-  if (repo?.status === 'analyzing') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-surface text-text">
-        <AnalysisProgress
-          currentPhase={livePhase?.phase ?? repo.phase}
-          phaseDetails={livePhase?.details ?? repo.phaseDetails}
-        />
-      </div>
-    );
-  }
+
   if (repoError || repo?.status === 'error') {
     const displayError = repoError || repo?.error || 'Unknown analysis error';
     return (

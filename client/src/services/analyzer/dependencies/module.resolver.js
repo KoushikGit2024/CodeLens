@@ -195,7 +195,7 @@ export function resolveImport({ importingFile, specifier, knownFiles, type }) {
     }
   }
 
-  if (isPython || isJava || isGo || isRust) {
+  if (isPython || isJava || isGo || isRust || isCpp) {
     return { specifier, kind: 'external', resolvedTo: null, reason: null };
   }
 

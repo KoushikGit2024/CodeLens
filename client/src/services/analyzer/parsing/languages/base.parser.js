@@ -66,11 +66,18 @@ export class BaseParser {
         hasErrors,
         error: `Symbol extraction error: ${err.message}`,
       });
+    }
+
+    let usages = [];
+    try {
+      usages = this.extractUsages ? this.extractUsages(tree.rootNode, source) : [];
+    } catch (err) {
+      console.warn(`[BaseParser] Usage extraction error for ${filePath}:`, err);
     } finally {
       if (tree) tree.delete();
     }
 
-    return createFileAnalysis({ filePath, language: this.languageId, symbols, hasErrors });
+    return createFileAnalysis({ filePath, language: this.languageId, symbols, usages, hasErrors });
   }
 
   /**

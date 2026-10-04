@@ -8,6 +8,11 @@
 import git from 'isomorphic-git';
 import FS from '@isomorphic-git/lightning-fs';
 import * as persistenceStore from '../repository/persistence.store.js';
+import { Buffer } from 'buffer';
+
+if (typeof self !== 'undefined') {
+  self.Buffer = self.Buffer || Buffer;
+}
 
 const fs = new FS('CodeLens-Git-FS');
 const pfs = fs.promises;
@@ -55,32 +60,51 @@ export async function analyzeGitChurn(repoId, postMessage = () => {}) {
   postMessage({ type: 'PROGRESS', repoId, phase: 'analyzing_git_churn', details: 'Reading commit history…' });
 
   let commits = [];
+  let branchMap = {};
   try {
     // Manually walk history to handle shallow clone boundaries gracefully
     let currentOid = await git.resolveRef({ fs, dir: repoDir, ref: 'HEAD' });
+    try {
+      const localBranches = await git.listBranches({ fs, dir: repoDir });
+      const remoteBranches = await git.listBranches({ fs, dir: repoDir, remote: 'origin' });
+      for (const b of localBranches) {
+        const oid = await git.resolveRef({ fs, dir: repoDir, ref: b });
+        if (!branchMap[oid]) branchMap[oid] = [];
+        if (!branchMap[oid].includes(b)) branchMap[oid].push(b);
+      }
+      for (const b of remoteBranches) {
+        const oid = await git.resolveRef({ fs, dir: repoDir, ref: `refs/remotes/origin/${b}` });
+        if (!branchMap[oid]) branchMap[oid] = [];
+        if (!branchMap[oid].includes(b)) branchMap[oid].push(b);
+      }
+    } catch (e) {
+      console.warn('Could not list branches:', e);
+    }
     const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
 
-    for (let i = 0; i < 500; i++) {
+    // Extract unique branch tips to start log from
+    const oidsToWalk = new Set(Object.keys(branchMap));
+    if (currentOid) oidsToWalk.add(currentOid);
+
+    const commitsMap = new Map();
+
+    for (const startOid of oidsToWalk) {
       try {
-        const commit = await git.readCommit({ fs, dir: repoDir, oid: currentOid });
-        commits.push(commit);
-
-        const commitTime = commit.commit.author.timestamp * 1000;
-        if (commitTime < ninetyDaysAgo) break;
-
-        if (commit.commit.parent && commit.commit.parent.length > 0) {
-          currentOid = commit.commit.parent[0];
-        } else {
-          break; // End of history
+        const log = await git.log({ fs, dir: repoDir, ref: startOid, depth: 500 });
+        for (const c of log) {
+          if (commitsMap.has(c.oid)) continue;
+          const commitTime = c.commit.author.timestamp * 1000;
+          if (commitTime < ninetyDaysAgo) continue;
+          commitsMap.set(c.oid, c);
         }
       } catch (e) {
-        if (e.code === 'NotFoundError') {
-          // Reached shallow boundary - silently break
-          break;
-        }
-        throw e;
+        console.warn(`Could not log branch tip ${startOid}:`, e);
       }
     }
+
+    commits = Array.from(commitsMap.values());
+    // Sort reverse chronological
+    commits.sort((a, b) => b.commit.author.timestamp - a.commit.author.timestamp);
   } catch (err) {
     console.error('[Git Analyzer] Failed to read git log:', err);
     return null;
@@ -93,16 +117,19 @@ export async function analyzeGitChurn(repoId, postMessage = () => {}) {
   const fileChurn = {};
   let totalCommitsAnalyzed = 0;
 
-  for (let i = 0; i < commits.length - 1; i++) {
+  for (let i = 0; i < commits.length; i++) {
     const commit = commits[i];
-    const parent = commits[i + 1];
+    if (!commit.commit.parent || commit.commit.parent.length === 0) continue;
+    
+    // Diff against the primary parent to measure churn
+    const parentOid = commit.commit.parent[0];
     totalCommitsAnalyzed++;
 
     try {
       const changes = await git.walk({
         fs,
         dir: repoDir,
-        trees: [git.TREE({ ref: commit.oid }), git.TREE({ ref: parent.oid })],
+        trees: [git.TREE({ ref: commit.oid }), git.TREE({ ref: parentOid })],
         map: async function (filepath, [A, B]) {
           if (filepath === '.') return;
           const typeA = A ? await A.type() : null;
@@ -121,12 +148,14 @@ export async function analyzeGitChurn(repoId, postMessage = () => {}) {
         fileChurn[filepath]++;
       }
 
-      postMessage({
-        type: 'PROGRESS',
-        repoId,
-        phase: 'analyzing_git_churn',
-        details: `Diffing commit ${i + 1} of ${commits.length - 1}…`,
-      });
+      if (i % 10 === 0 || i === commits.length - 2) {
+        postMessage({
+          type: 'PROGRESS',
+          repoId,
+          phase: 'analyzing_git_churn',
+          details: `Diffing commit ${i + 1} of ${commits.length - 1}…`,
+        });
+      }
     } catch (err) {
       console.warn(`[Git Analyzer] Failed to diff commit ${commit.oid}`, err);
     }
@@ -142,6 +171,7 @@ export async function analyzeGitChurn(repoId, postMessage = () => {}) {
   // Strip non-serializable fields if any exist
   const serializedCommits = commits.map(c => ({
     oid: c.oid,
+    refs: branchMap[c.oid] || [],
     commit: {
       message: c.commit.message,
       author: c.commit.author,

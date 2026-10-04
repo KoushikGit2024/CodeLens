@@ -22,6 +22,7 @@ import {
   RefreshCw,
   X,
 } from 'lucide-react';
+import { useRepository } from '../../shared/context/RepositoryContext';
 import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide, forceX, forceY } from 'd3-force';
 
 import { repositoryApi } from '../../shared/api';
@@ -53,6 +54,8 @@ export default function DependencyGraphPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isReanalyzing, setIsReanalyzing] = useState(false);
+  const { repo, livePhase } = useRepository();
+  const isGloballyAnalyzing = !!livePhase || repo?.status === 'analyzing';
   const [selected, setSelected] = useState(null);
   const { addToast } = useToast();
   const [fileInfo, setFileInfo] = useState(null);
@@ -142,20 +145,48 @@ export default function DependencyGraphPage() {
     setDirColorMap(dcm || new Map());
 
     if (layoutType === 'force') {
+      // If a simulation is already running, check if we actually need to restart it
       if (simRef.current) {
-        setNodes(currentNodes => {
-          const updatedMap = new Map(rfNodes.map(n => [n.id, n]));
-          return currentNodes.map(cn => {
-            const updated = updatedMap.get(cn.id);
-            return updated ? { ...updated, position: cn.position, fx: cn.fx, fy: cn.fy } : cn;
-          });
-        });
-        setEdges(rfEdges);
-        return;
-      }
+        const currentSimNodes = simRef.current.nodes();
+        const topologyChanged = currentSimNodes.length !== rfNodes.length;
 
-      setNodes(rfNodes);
-      setEdges(rfEdges);
+        if (!topologyChanged) {
+          // Topology is the same (e.g., just clicking to select a node).
+          // Update visual state (fading/highlighting) without disturbing the physics engine!
+          setNodes(currentNodes => {
+            const updatedMap = new Map(rfNodes.map(n => [n.id, n]));
+            return currentNodes.map(cn => {
+              const updated = updatedMap.get(cn.id);
+              return updated ? { ...updated, position: cn.position, fx: cn.fx, fy: cn.fy } : cn;
+            });
+          });
+          setEdges(currentEdges => {
+            const updatedMap = new Map(rfEdges.map(e => [e.id, e]));
+            return currentEdges.map(ce => {
+              const updated = updatedMap.get(ce.id);
+              return updated ? { ...ce, ...updated } : ce;
+            });
+          });
+          return; // Skip simulation restart
+        }
+
+        // Topology CHANGED (e.g., toggled external packages).
+        // Preserve positions of existing nodes before restarting the simulation.
+        const oldSimNodes = new Map(currentSimNodes.map(n => [n.id, n]));
+        const initialNodes = rfNodes.map(n => {
+          const old = oldSimNodes.get(n.id);
+          return old ? { ...n, position: { x: old.x, y: old.y } } : n;
+        });
+
+        simRef.current.stop();
+        simRef.current = null;
+        setNodes(initialNodes);
+        setEdges(rfEdges);
+        rfNodes = initialNodes; // Ensure the rest of the block uses preserved positions
+      } else {
+        setNodes(rfNodes);
+        setEdges(rfEdges);
+      }
 
       const simNodes = rfNodes.map(n => ({ id: n.id, x: n.position.x, y: n.position.y }));
       const nodeIndex = new Map(simNodes.map((n, i) => [n.id, i]));
@@ -361,10 +392,10 @@ export default function DependencyGraphPage() {
             {!isNotReady && (
               <button
                 onClick={handleReanalyze}
-                disabled={isReanalyzing}
+                disabled={isReanalyzing || isGloballyAnalyzing}
                 className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isReanalyzing ? (
+                {(isReanalyzing || isGloballyAnalyzing) ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" /> Starting...
                   </>
@@ -375,6 +406,7 @@ export default function DependencyGraphPage() {
                 )}
               </button>
             )}
+
             {isNotReady && (
               <button
                 onClick={async () => {

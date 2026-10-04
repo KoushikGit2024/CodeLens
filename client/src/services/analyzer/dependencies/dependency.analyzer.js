@@ -105,6 +105,49 @@ export function buildDependencyGraph(analysis) {
     }
   }
 
+  // ── Swift / Global Symbol Resolution ──
+  // Swift doesn't use explicit imports for internal files, so we build a global symbol map
+  // and resolve usages (capitalized identifiers) to the file that defines them.
+  const globalSymbolMap = new Map(); // symbol name -> fileNodeId
+  for (const f of analysis.files) {
+    if (!f.filePath.endsWith('.swift')) continue;
+    const sourceId = fileNodeId(f.filePath);
+    for (const sym of f.symbols) {
+      if (['class', 'struct', 'interface'].includes(sym.kind)) {
+        globalSymbolMap.set(sym.name, sourceId);
+      }
+    }
+  }
+
+  for (const f of analysis.files) {
+    if (!f.filePath.endsWith('.swift') || !f.usages) continue;
+    const sourceId = fileNodeId(f.filePath);
+    for (const usage of f.usages) {
+      const targetId = globalSymbolMap.get(usage);
+      if (targetId && targetId !== sourceId) {
+        const edgeKey = `${sourceId}|${targetId}`;
+        if (!edgesMap.has(edgeKey)) {
+          edgesMap.set(
+            edgeKey,
+            createAnalysisEdge({
+              id: edgeKey,
+              source: sourceId,
+              target: targetId,
+              type: 'default',
+              importCount: 1,
+              specifiers: [usage],
+            })
+          );
+        } else {
+          const existingEdge = edgesMap.get(edgeKey);
+          if (!existingEdge.data.specifiers.includes(usage)) {
+            existingEdge.data.specifiers.push(usage);
+          }
+        }
+      }
+    }
+  }
+
   // Deterministic Sorting
   const nodes = Array.from(nodesMap.values()).sort((a, b) => a.id.localeCompare(b.id));
   const edges = Array.from(edgesMap.values()).sort((a, b) => {

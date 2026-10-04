@@ -183,7 +183,7 @@ export function FileDetailPanel({ info, repoId, graph }) {
       {info.externalPackages?.length > 0 && (
         <section className="bg-panel p-3 rounded-lg border border-border">
           <p className="text-muted uppercase tracking-wider mb-2 text-[10px] font-bold">External packages</p>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col max-h-48 overflow-y-auto custom-scrollbar pr-1">
             {info.externalPackages.map(pkg => (
               <div key={pkg} className="flex items-center gap-2 py-1 border-b border-text/5 last:border-0">
                 <Package className="w-3.5 h-3.5 text-amber-400 shrink-0" />
