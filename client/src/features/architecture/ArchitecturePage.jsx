@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import {
   RefreshCw,
   AlertCircle,
@@ -31,6 +31,7 @@ import OpenSourceButton from '../../shared/components/OpenSourceButton';
 import { tryMakeSourceRef } from '../../shared/navigation/sourceRef';
 import { ExportDiagramButton } from '../../shared/components/ExportDiagramButton';
 import { useTheme } from '../../shared/context/ThemeContext';
+import GraphSearchUI from '../../shared/components/GraphSearchUI';
 
 // ── Layer color map ───────────────────────────────────────────────────────
 
@@ -59,14 +60,20 @@ const ArchNode = ({ data }) => {
       style={{
         width: data.isExternal ? 120 : 160,
         borderRadius: data.isExternal ? 16 : 8,
-        border: isViolating
-          ? '2px solid #ff7b72'
-          : isFocused
-            ? `2px solid ${colors.border}`
-            : `1px solid ${colors.border}66`,
+        border: data.isSearchMatch
+          ? `2px solid ${colors.border}`
+          : isViolating
+            ? '2px solid #ff7b72'
+            : isFocused
+              ? `2px solid ${colors.border}`
+              : `1px solid ${colors.border}66`,
         background: isViolating ? '#3d1a1acc' : isFocused ? `${colors.bg}dd` : `${colors.bg}55`,
-        boxShadow: isFocused ? `0 0 16px ${colors.border}66` : 'none',
-        opacity: data.isFaded ? 0.15 : 1,
+        boxShadow: data.isSearchMatch
+          ? `0 0 8px ${colors.border}88`
+          : isFocused
+            ? `0 0 8px ${colors.border}44`
+            : 'none',
+        opacity: data.isFaded ? 0.15 : data.isSearchActive && !data.isSearchMatch ? 0.15 : 1,
         overflow: 'hidden',
         cursor: 'pointer',
         transition: 'all 0.2s ease',
@@ -406,11 +413,27 @@ export default function ArchitecturePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
-  const [selectedComponent, setSelectedComponent] = useState(null);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedComponent = searchParams.get('node');
+  const setSelectedComponent = useCallback(
+    val => {
+      setSearchParams(prev => {
+        const current = prev.get('node');
+        const next = typeof val === 'function' ? val(current) : val;
+        if (next) {
+          prev.set('node', next);
+        } else {
+          prev.delete('node');
+        }
+        return prev;
+      });
+    },
+    [setSearchParams]
+  );
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [isReanalyzing, setIsReanalyzing] = useState(false);
   const { repo, livePhase } = useRepository();
-  const isGloballyAnalyzing = !!livePhase || repo?.status === 'analyzing';
   const [aiError, setAiError] = useState(null);
   const [expandedComponents, setExpandedComponents] = useState(new Set());
 
@@ -424,6 +447,11 @@ export default function ArchitecturePage() {
   const [mobileInsightsOpen, setMobileInsightsOpen] = useState(false);
   const [viewMode, setViewMode] = useState('interactive');
   const diagramRef = useRef(null);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [matchedNodes, setMatchedNodes] = useState([]);
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
+  const [rfInstance, setRfInstance] = useState(null);
 
   const loadArchitecture = async () => {
     setLoading(true);
@@ -479,10 +507,94 @@ export default function ArchitecturePage() {
       data.model.violations || []
     );
 
-    const mStr = toMermaid(data.model);
+    let nodes = flow.rfNodes;
+    if (matchedNodes.length > 0) {
+      const matchSet = new Set(matchedNodes);
+      nodes = nodes.map(n => {
+        const isMatch = matchSet.has(n.id);
+        return {
+          ...n,
+          data: {
+            ...n.data,
+            isSearchMatch: isMatch,
+            isSearchActive: true,
+          },
+        };
+      });
+    }
 
-    return { ...flow, mermaidStr: mStr };
-  }, [data, selectedComponent]);
+    const mStr = toMermaid(data.model);
+    return { rfNodes: nodes, rfEdges: flow.rfEdges, mermaidStr: mStr };
+  }, [data, selectedComponent, matchedNodes]);
+
+  const handleSearch = useCallback(
+    query => {
+      setSearchQuery(query);
+      if (!query || !data?.model?.components) {
+        setMatchedNodes([]);
+        setCurrentMatchIndex(0);
+        return;
+      }
+
+      const lowerQuery = query.toLowerCase();
+      const allComponents = [
+        ...(data.model.components || []).map(c => c.data?.label ?? c.id),
+        ...(data.model.relations || []).filter(r => r.targetType === 'external').map(r => r.target),
+      ];
+
+      const uniqueComps = [...new Set(allComponents)];
+      const matches = uniqueComps.filter(label => label.toLowerCase().includes(lowerQuery));
+
+      setMatchedNodes(matches);
+      if (matches.length > 0) {
+        setCurrentMatchIndex(1);
+        if (rfInstance) {
+          const matchNode = rfInstance.getNodes().find(n => n.id === matches[0]);
+          if (matchNode) {
+            const w = matchNode.data?.isExternal ? 120 : 160;
+            rfInstance.setCenter(matchNode.position.x + w / 2, matchNode.position.y + 23, { zoom: 1.2, duration: 800 });
+          }
+        }
+      } else {
+        setCurrentMatchIndex(0);
+      }
+    },
+    [data, rfInstance]
+  );
+
+  const handleNextMatch = useCallback(() => {
+    if (matchedNodes.length === 0) return;
+    const nextIdx = currentMatchIndex >= matchedNodes.length ? 1 : currentMatchIndex + 1;
+    setCurrentMatchIndex(nextIdx);
+
+    if (rfInstance) {
+      const matchNode = rfInstance.getNodes().find(n => n.id === matchedNodes[nextIdx - 1]);
+      if (matchNode) {
+        const w = matchNode.data?.isExternal ? 120 : 160;
+        rfInstance.setCenter(matchNode.position.x + w / 2, matchNode.position.y + 23, { zoom: 1.2, duration: 800 });
+      }
+    }
+  }, [matchedNodes, currentMatchIndex, rfInstance]);
+
+  const handlePrevMatch = useCallback(() => {
+    if (matchedNodes.length === 0) return;
+    const prevIdx = currentMatchIndex <= 1 ? matchedNodes.length : currentMatchIndex - 1;
+    setCurrentMatchIndex(prevIdx);
+
+    if (rfInstance) {
+      const matchNode = rfInstance.getNodes().find(n => n.id === matchedNodes[prevIdx - 1]);
+      if (matchNode) {
+        const w = matchNode.data?.isExternal ? 120 : 160;
+        rfInstance.setCenter(matchNode.position.x + w / 2, matchNode.position.y + 23, { zoom: 1.2, duration: 800 });
+      }
+    }
+  }, [matchedNodes, currentMatchIndex, rfInstance]);
+
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('');
+    setMatchedNodes([]);
+    setCurrentMatchIndex(0);
+  }, []);
 
   const onNodeClick = useCallback(
     (_, node) => {
@@ -538,7 +650,7 @@ export default function ArchitecturePage() {
               disabled={isReanalyzing || isGloballyAnalyzing}
               className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {(isReanalyzing || isGloballyAnalyzing) ? (
+              {isReanalyzing || isGloballyAnalyzing ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" /> Starting...
                 </>
@@ -548,7 +660,6 @@ export default function ArchitecturePage() {
                 </>
               )}
             </button>
-
           </div>
         </div>
       </div>
@@ -820,7 +931,7 @@ export default function ArchitecturePage() {
           className="flex-1 bg-surface shadow-inner relative flex flex-col justify-center h-full w-full"
         >
           <div className="absolute top-4 left-4 right-4 z-20 pointer-events-none flex flex-col lg:flex-row flex-wrap justify-between items-start lg:items-center gap-3">
-            <div className="export-element-breadcrumbs pointer-events-auto max-w-full">
+            <div className="export-element-breadcrumbs pointer-events-auto max-w-[80vw]">
               <ContextBreadcrumbs
                 domain="Architecture"
                 activeNode={selectedComponent}
@@ -828,6 +939,14 @@ export default function ArchitecturePage() {
               />
             </div>
             <div className="export-element-breadcrumbs flex flex-wrap items-center gap-2 pointer-events-auto">
+              <GraphSearchUI
+                onSearch={handleSearch}
+                onNext={handleNextMatch}
+                onPrev={handlePrevMatch}
+                onClear={handleClearSearch}
+                matchCount={searchQuery ? matchedNodes.length : null}
+                currentMatchIndex={currentMatchIndex}
+              />
               <ExportDiagramButton
                 elementRef={diagramRef}
                 filename={`architecture-diagram-${repoId.replace(/[^a-zA-Z0-9-]/g, '_')}`}
@@ -857,6 +976,7 @@ export default function ArchitecturePage() {
             </div>
           ) : rfNodes.length > 0 ? (
             <ReactFlow
+              onInit={setRfInstance}
               nodes={rfNodes}
               edges={rfEdges}
               nodeTypes={archNodeTypes}
