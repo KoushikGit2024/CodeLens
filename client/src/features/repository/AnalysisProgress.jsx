@@ -14,7 +14,7 @@ const PHASES = [
   { id: 'analyzing_ast', label: 'Parsing source files' },
   { id: 'building_graph', label: 'Building dependency graph' },
   { id: 'building_architecture', label: 'Building architecture model' },
-  ...(import.meta.env.DEV ? [{ id: 'analyzing_git_churn', label: 'Analyzing git history' }] : []),
+  { id: 'analyzing_git_churn', label: 'Analyzing git history' },
   { id: 'ready', label: 'Finalizing repository intelligence' },
 ];
 

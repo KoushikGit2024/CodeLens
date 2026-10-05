@@ -8,12 +8,18 @@ if (typeof window !== 'undefined') {
   window.Buffer = window.Buffer || Buffer;
 }
 
-export async function cloneAndExtractGithub(url, onProgress, fetchAllBranches = false) {
-  // Use a temporary unique name for the filesystem
-  const fsName = `github-clone-${Date.now()}`;
-  const fs = new FS(fsName);
+export async function cloneAndExtractGithub(repoId, url, onProgress, fetchAllBranches = false) {
+  // Use a unified persistent filesystem for all git clones so Git Analyzer can access it later
+  const fs = new FS('CodeLensGitFS');
   const pfs = fs.promises;
-  const dir = '/repo';
+  const dir = `/${repoId}`;
+
+  // Ensure directory exists or is clean
+  try {
+    await pfs.mkdir(dir);
+  } catch (e) {
+    // If it exists, we could potentially wipe it, but isomorphic-git clone handles non-empty if it's a valid repo
+  }
 
   onProgress({ loaded: 10, total: 100, phase: 'Cloning repository...' });
 
@@ -21,7 +27,7 @@ export async function cloneAndExtractGithub(url, onProgress, fetchAllBranches = 
     // 1. Clone the repository (with retries and progress tracking)
     let cloneSuccess = false;
     let lastError = null;
-    
+
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         if (attempt > 1) {
@@ -34,14 +40,14 @@ export async function cloneAndExtractGithub(url, onProgress, fetchAllBranches = 
           url,
           corsProxy: 'https://cors.isomorphic-git.org',
           singleBranch: !fetchAllBranches,
-          depth: import.meta.env.DEV ? undefined : 1, // shallow clone in prod to save bandwidth
-          onProgress: (evt) => {
+          depth: undefined,
+          onProgress: evt => {
             if (evt.total) {
               const percent = Math.floor((evt.loaded / evt.total) * 100);
-              onProgress({ 
-                loaded: 10 + (percent * 0.4), // Scale 0-100 to 10-50% overall
-                total: 100, 
-                phase: `Git: ${evt.phase} (${percent}%)` 
+              onProgress({
+                loaded: 10 + percent * 0.4, // Scale 0-100 to 10-50% overall
+                total: 100,
+                phase: `Git: ${evt.phase} (${percent}%)`,
               });
             } else {
               onProgress({ loaded: 30, total: 100, phase: `Git: ${evt.phase} (${evt.loaded})` });
@@ -70,9 +76,6 @@ export async function cloneAndExtractGithub(url, onProgress, fetchAllBranches = 
     async function walk(currentPath, relativePath = '') {
       const entries = await pfs.readdir(currentPath);
       for (const entry of entries) {
-        // Skip git history in production to prevent massive IDB payloads
-        if (!import.meta.env.DEV && entry === '.git') continue;
-
         const fullPath = `${currentPath}/${entry}`;
         const relPath = relativePath ? `${relativePath}/${entry}` : entry;
         const stat = await pfs.stat(fullPath);
@@ -113,14 +116,7 @@ export async function cloneAndExtractGithub(url, onProgress, fetchAllBranches = 
     await walk(dir);
 
     return filesToSave;
-  } finally {
-    // Cleanup: try to wipe the temporary lightning-fs if possible to free space
-    try {
-      // LightningFS doesn't have a built-in destroy, but we can try to clear IndexedDB directly
-      // However, it's safer to just let it be or overwrite it next time.
-      // For now, we leave it since it's an ephemeral named DB.
-    } catch (e) {
-      console.warn('Failed to cleanup temp github fs', e);
-    }
+  } catch (err) {
+    throw err;
   }
 }

@@ -396,7 +396,11 @@ export default function UploadPage() {
       <div className="w-full max-w-7xl mx-auto mb-6 md:mb-8 border-b border-border/50 pb-5 md:pb-6 shrink-0">
         <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
           <div className="flex flex-col items-start text-left">
-            <Logo className="w-10 h-10 md:w-12 md:h-12 mb-1.5 md:mb-2" textClass="text-xl md:text-2xl font-bold tracking-tight text-text" showText={true} />
+            <Logo
+              className="w-10 h-10 md:w-12 md:h-12 mb-1.5 md:mb-2"
+              textClass="text-xl md:text-2xl font-bold tracking-tight text-text"
+              showText={true}
+            />
             <p className="text-muted text-[13px] md:text-sm mt-1 max-w-[280px] sm:max-w-sm md:max-w-md leading-relaxed">
               Upload your codebase to extract architecture, map dependencies, and generate intelligent documentation.
             </p>
@@ -498,7 +502,7 @@ export default function UploadPage() {
                       onChange={e => setGithubUrl(e.target.value)}
                       className="w-full max-w-md px-4 py-2.5 rounded-lg bg-surface border border-border focus:outline-none focus:border-accent text-sm mb-5"
                     />
-                    
+
                     <div className="flex items-start justify-center w-full max-w-md mx-auto">
                       <label className="flex items-start gap-3 cursor-pointer group text-left">
                         <div className="relative mt-0.5 shrink-0">
@@ -506,19 +510,25 @@ export default function UploadPage() {
                             type="checkbox"
                             className="sr-only"
                             checked={fetchAllBranches}
-                            onChange={(e) => setFetchAllBranches(e.target.checked)}
+                            onChange={e => setFetchAllBranches(e.target.checked)}
                           />
-                          <div className={`w-9 h-5 rounded-full transition-colors ${fetchAllBranches ? 'bg-warning/90' : 'bg-surface border border-border group-hover:border-accent/50'}`} />
-                          <div className={`absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${fetchAllBranches ? 'translate-x-4' : 'translate-x-0'}`} />
+                          <div
+                            className={`w-9 h-5 rounded-full transition-colors ${fetchAllBranches ? 'bg-warning/90' : 'bg-surface border border-border group-hover:border-accent/50'}`}
+                          />
+                          <div
+                            className={`absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${fetchAllBranches ? 'translate-x-4' : 'translate-x-0'}`}
+                          />
                         </div>
                         <div>
-                          <span className={`font-semibold text-sm transition-colors block ${fetchAllBranches ? 'text-warning' : 'text-text group-hover:text-accent'}`}>
+                          <span
+                            className={`font-semibold text-sm transition-colors block ${fetchAllBranches ? 'text-warning' : 'text-text group-hover:text-accent'}`}
+                          >
                             Fetch All Branches
                           </span>
                           <span className="text-[11px] text-muted leading-snug block mt-1">
-                            {fetchAllBranches 
-                              ? "Warning: Downloads the entire history of all remote branches. This can take a very long time and consume massive bandwidth for large repositories." 
-                              : "Downloads only the default branch to save bandwidth and memory."}
+                            {fetchAllBranches
+                              ? 'Warning: Downloads the entire history of all remote branches. This can take a very long time and consume massive bandwidth for large repositories.'
+                              : 'Downloads only the default branch to save bandwidth and memory.'}
                           </span>
                         </div>
                       </label>
