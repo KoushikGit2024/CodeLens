@@ -1157,7 +1157,7 @@ export default function GitHistoryPage() {
       const meta = await persistenceStore.load(repoId);
       if (!meta?.analysis?.gitChurn?.commits?.length) {
         throw new Error(
-          'No Git history found. Click "Re-analyze Git History" to compute it from your uploaded repository.'
+          'No Git history found. This repository was likely uploaded without a .git folder or is not a git repository.'
         );
       }
       setCommits(meta.analysis.gitChurn.commits);
@@ -1273,21 +1273,34 @@ export default function GitHistoryPage() {
   }
 
   if (error) {
+    const isMissingGit = error.includes('without a .git folder');
     return (
       <div className="h-full flex items-center justify-center bg-surface p-8">
-        <div className="max-w-md w-full bg-panel border border-danger/30 rounded-2xl p-8 text-center">
-          <div className="w-16 h-16 bg-danger/10 rounded-full flex items-center justify-center mx-auto mb-6">
-            <AlertCircle className="w-8 h-8 text-danger" />
-          </div>
-          <h3 className="text-xl font-semibold text-text mb-3">Analysis Failed</h3>
-          <p className="text-muted text-sm leading-relaxed mb-8 px-4">{error}</p>
-          <button
-            onClick={handleReanalyze}
-            className="inline-flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-danger/10 text-danger text-sm font-semibold hover:bg-danger/20 transition-all active:scale-[0.98]"
+        <div
+          className={`max-w-md w-full bg-panel border ${isMissingGit ? 'border-border' : 'border-danger/30'} rounded-2xl p-8 text-center`}
+        >
+          <div
+            className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 ${isMissingGit ? 'bg-surface border border-border' : 'bg-danger/10'}`}
           >
-            <RefreshCw className="w-4 h-4" />
-            Try Again
-          </button>
+            {isMissingGit ? (
+              <GitCommit className="w-8 h-8 text-muted" />
+            ) : (
+              <AlertCircle className="w-8 h-8 text-danger" />
+            )}
+          </div>
+          <h3 className="text-xl font-semibold text-text mb-3">
+            {isMissingGit ? 'No Git History' : 'Analysis Failed'}
+          </h3>
+          <p className="text-muted text-sm leading-relaxed mb-8 px-4">{error}</p>
+          {!isMissingGit && (
+            <button
+              onClick={handleReanalyze}
+              className="inline-flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-danger/10 text-danger text-sm font-semibold hover:bg-danger/20 transition-all active:scale-[0.98]"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Try Again
+            </button>
+          )}
         </div>
       </div>
     );
@@ -1353,7 +1366,7 @@ export default function GitHistoryPage() {
             )}
             <button
               onClick={handleReanalyze}
-              title="Re-analyze Git History"
+              title="Re-analyze Repository"
               className="p-2 rounded-lg border border-border hover:border-accent/40 hover:text-accent transition-colors"
             >
               <RefreshCw className="w-4 h-4" />
