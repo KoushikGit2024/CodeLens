@@ -6,7 +6,7 @@
  */
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import ReactFlow, { Background, Controls, MiniMap, useNodesState, useEdgesState } from 'reactflow';
+import ReactFlow, { Background, Controls, MiniMap, Panel, useNodesState, useEdgesState } from 'reactflow';
 import 'reactflow/dist/style.css';
 import {
   Loader2,
@@ -36,6 +36,7 @@ import { nodeTypes, edgeTypes } from './GraphNodes';
 import { StatRow, FileDetailPanel, PackageDetailPanel } from './GraphSideBar';
 import { ExportDiagramButton } from '../../shared/components/ExportDiagramButton';
 import { useTheme } from '../../shared/context/ThemeContext';
+import GraphSearchUI from '../../shared/components/GraphSearchUI';
 
 const LAYOUT_OPTIONS = [
   { key: 'clustered', label: 'Clustered', icon: LayoutGrid, tip: 'Group files by directory into visual clusters' },
@@ -56,7 +57,22 @@ export default function DependencyGraphPage() {
   const [isReanalyzing, setIsReanalyzing] = useState(false);
   const { repo, livePhase } = useRepository();
   const isGloballyAnalyzing = !!livePhase || repo?.status === 'analyzing';
-  const [selected, setSelected] = useState(null);
+  const selected = searchParams.get('node');
+  const setSelected = useCallback(
+    val => {
+      setSearchParams(prev => {
+        const current = prev.get('node');
+        const next = typeof val === 'function' ? val(current) : val;
+        if (next) {
+          prev.set('node', next);
+        } else {
+          prev.delete('node');
+        }
+        return prev;
+      });
+    },
+    [setSearchParams]
+  );
   const { addToast } = useToast();
   const [fileInfo, setFileInfo] = useState(null);
   const [infoLoading, setInfoLoading] = useState(false);
@@ -66,8 +82,12 @@ export default function DependencyGraphPage() {
   const [showExternalWarningModal, setShowExternalWarningModal] = useState(false);
   const [edgeStyle, setEdgeStyle] = useState('spring');
   const [showChurn, setShowChurn] = useState(false);
-
   const [spread, setSpread] = useState(50);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [matchedNodes, setMatchedNodes] = useState([]);
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
+  const [rfInstance, setRfInstance] = useState(null);
 
   const layoutType = searchParams.get('layout') || 'clustered';
   const setLayoutType = type => {
@@ -115,6 +135,133 @@ export default function DependencyGraphPage() {
     loadGraph();
   }, [loadGraph]);
 
+  useEffect(() => {
+    if (!graph || graph.status === 'analyzing' || !selected) {
+      setFileInfo(null);
+      return;
+    }
+
+    const node = graph.nodes?.find(n => n.id === selected);
+
+    if (!node) {
+      setSearchParams(
+        prev => {
+          prev.delete('node');
+          return prev;
+        },
+        { replace: true }
+      );
+      setFileInfo(null);
+      return;
+    }
+
+    if (node.type !== 'fileNode' && node.type !== 'file') {
+      setFileInfo(null);
+      return;
+    }
+
+    const filePath = node.data?.fullLabel || node.data?.filePath || selected;
+    let isMounted = true;
+
+    setInfoLoading(true);
+    setFileInfo(null);
+
+    repositoryApi
+      .getFileDependencyInfo(repoId, filePath)
+      .then(res => {
+        if (isMounted) setFileInfo(res.data);
+      })
+      .catch(() => {
+        if (isMounted) setFileInfo(null);
+      })
+      .finally(() => {
+        if (isMounted) setInfoLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [graph, selected, repoId, setSearchParams]);
+
+  const handleSearch = useCallback(
+    query => {
+      setSearchQuery(query);
+      if (!query) {
+        setMatchedNodes([]);
+        setCurrentMatchIndex(0);
+        return;
+      }
+
+      const lowerQuery = query.toLowerCase();
+      const matches = nodes
+        .filter(n => {
+          if (n.type === 'group') return false;
+          return (
+            n.data?.label?.toLowerCase().includes(lowerQuery) || n.data?.fullLabel?.toLowerCase().includes(lowerQuery)
+          );
+        })
+        .map(n => n.id);
+
+      setMatchedNodes(matches);
+      if (matches.length > 0) {
+        setCurrentMatchIndex(1);
+        if (rfInstance) {
+          const matchNode = nodes.find(n => n.id === matches[0]);
+          if (matchNode) {
+            rfInstance.setCenter(
+              matchNode.position.x + parseInt(matchNode.style?.width || 150) / 2,
+              matchNode.position.y + parseInt(matchNode.style?.height || 34) / 2,
+              { zoom: 1.2, duration: 800 }
+            );
+          }
+        }
+      } else {
+        setCurrentMatchIndex(0);
+      }
+    },
+    [nodes, rfInstance]
+  );
+
+  const handleNextMatch = useCallback(() => {
+    if (matchedNodes.length === 0) return;
+    const nextIdx = currentMatchIndex >= matchedNodes.length ? 1 : currentMatchIndex + 1;
+    setCurrentMatchIndex(nextIdx);
+
+    if (rfInstance) {
+      const matchNode = nodes.find(n => n.id === matchedNodes[nextIdx - 1]);
+      if (matchNode) {
+        rfInstance.setCenter(
+          matchNode.position.x + parseInt(matchNode.style?.width || 150) / 2,
+          matchNode.position.y + parseInt(matchNode.style?.height || 34) / 2,
+          { zoom: 1.2, duration: 800 }
+        );
+      }
+    }
+  }, [matchedNodes, currentMatchIndex, nodes, rfInstance]);
+
+  const handlePrevMatch = useCallback(() => {
+    if (matchedNodes.length === 0) return;
+    const prevIdx = currentMatchIndex <= 1 ? matchedNodes.length : currentMatchIndex - 1;
+    setCurrentMatchIndex(prevIdx);
+
+    if (rfInstance) {
+      const matchNode = nodes.find(n => n.id === matchedNodes[prevIdx - 1]);
+      if (matchNode) {
+        rfInstance.setCenter(
+          matchNode.position.x + parseInt(matchNode.style?.width || 150) / 2,
+          matchNode.position.y + parseInt(matchNode.style?.height || 34) / 2,
+          { zoom: 1.2, duration: 800 }
+        );
+      }
+    }
+  }, [matchedNodes, currentMatchIndex, nodes, rfInstance]);
+
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('');
+    setMatchedNodes([]);
+    setCurrentMatchIndex(0);
+  }, []);
+
   /**
    * It tracks the repository status flag, then extracts the ongoing analysis state,
    * and then it applies an automatic polling sequence until the graph finishes.
@@ -134,7 +281,7 @@ export default function DependencyGraphPage() {
   useEffect(() => {
     if (!graph?.nodes) return;
 
-    const {
+    let {
       rfNodes,
       rfEdges,
       dirColorMap: dcm,
@@ -142,6 +289,23 @@ export default function DependencyGraphPage() {
       showChurn,
       churnData: graph.gitChurn,
     });
+
+    if (matchedNodes.length > 0) {
+      const matchSet = new Set(matchedNodes);
+      rfNodes = rfNodes.map(n => {
+        if (n.type === 'group') return n;
+        const isMatch = matchSet.has(n.id);
+        return {
+          ...n,
+          data: {
+            ...n.data,
+            isSearchMatch: isMatch,
+            isSearchActive: true,
+          },
+        };
+      });
+    }
+
     setDirColorMap(dcm || new Map());
 
     if (layoutType === 'force') {
@@ -231,7 +395,7 @@ export default function DependencyGraphPage() {
       setNodes(rfNodes);
       setEdges(rfEdges);
     }
-  }, [graph, selected, showExternalPackages, layoutType, edgeStyle, showChurn]);
+  }, [graph, selected, showExternalPackages, layoutType, edgeStyle, showChurn, matchedNodes]);
 
   /**
    * It monitors the slider value, then extracts gravity and repulsion multipliers,
@@ -305,30 +469,13 @@ export default function DependencyGraphPage() {
    * and then it applies a secondary API fetch to load detailed sidebar statistics.
    */
   const onNodeClick = useCallback(
-    async (_ev, rfNode) => {
+    (_ev, rfNode) => {
       if (rfNode.type === 'group') return;
       const nodeId = rfNode.id;
       setSelected(prev => (prev === nodeId ? null : nodeId));
       if (isMobile) setMobileDetailOpen(true);
-
-      if (rfNode.data.nodeType !== 'fileNode' && rfNode.data.nodeType !== 'file') {
-        setFileInfo(null);
-        return;
-      }
-
-      const filePath = rfNode.data.fullLabel;
-      setInfoLoading(true);
-      setFileInfo(null);
-      try {
-        const res = await repositoryApi.getFileDependencyInfo(repoId, filePath);
-        setFileInfo(res.data);
-      } catch {
-        setFileInfo(null);
-      } finally {
-        setInfoLoading(false);
-      }
     },
-    [repoId, isMobile]
+    [setSelected, isMobile]
   );
 
   const onPaneClick = useCallback(() => {
@@ -395,7 +542,7 @@ export default function DependencyGraphPage() {
                 disabled={isReanalyzing || isGloballyAnalyzing}
                 className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {(isReanalyzing || isGloballyAnalyzing) ? (
+                {isReanalyzing || isGloballyAnalyzing ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" /> Starting...
                   </>
@@ -508,6 +655,23 @@ export default function DependencyGraphPage() {
             </div>
             <p className="text-muted" style={{ fontSize: 10 }}>
               Toggle between springy and straight lines
+            </p>
+          </section>
+
+          <section className="border-t border-border pt-3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-text font-medium">Git Churn overlay</span>
+              <button
+                onClick={() => setShowChurn(prev => !prev)}
+                className={`w-8 h-4 rounded-full transition-colors ${showChurn ? 'bg-accent' : 'bg-surface border border-border'}`}
+              >
+                <div
+                  className={`w-4 h-4 bg-text rounded-full shadow-sm transition-transform ${showChurn ? 'translate-x-4' : 'translate-x-0'} border`}
+                />
+              </button>
+            </div>
+            <p className="text-muted" style={{ fontSize: 10 }}>
+              Highlight files with high change frequency
             </p>
           </section>
 
@@ -627,12 +791,21 @@ export default function DependencyGraphPage() {
       minWidth: 300,
       collapsible: false,
       content: (
-        <div ref={graphRef} className="relative bg-surface shadow-inner flex flex-col h-full w-full">
-          <div className="absolute top-3 left-3 right-3 z-30 pointer-events-none flex flex-col sm:flex-row flex-wrap justify-between items-start sm:items-center gap-2">
-            <div className="export-element-breadcrumbs pointer-events-auto max-w-full">
+        <div ref={graphRef} className="relative bg-surface shadow-inner h-full w-full">
+          <div className="absolute top-3 left-3 right-3 z-30 pointer-events-none flex flex-col md:flex-row flex-wrap justify-between items-start md:items-center gap-3">
+            <div className="export-element-breadcrumbs pointer-events-auto max-w-[80vw]">
               <ContextBreadcrumbs domain="Dependency Graph" activeNode={selected} onClear={() => setSelected(null)} />
             </div>
-            <div className="export-element-breadcrumbs pointer-events-auto shrink-0">
+
+            <div className="export-element-breadcrumbs pointer-events-auto shrink-0 flex items-center gap-2">
+              <GraphSearchUI
+                onSearch={handleSearch}
+                onNext={handleNextMatch}
+                onPrev={handlePrevMatch}
+                onClear={handleClearSearch}
+                matchCount={searchQuery ? matchedNodes.length : null}
+                currentMatchIndex={currentMatchIndex}
+              />
               <ExportDiagramButton
                 elementRef={graphRef}
                 filename={`dependency-graph-${repoId.replace(/[^a-zA-Z0-9-]/g, '_')}`}
@@ -652,6 +825,7 @@ export default function DependencyGraphPage() {
             </div>
           ) : (
             <ReactFlow
+              onInit={setRfInstance}
               nodes={nodes}
               edges={edges}
               nodeTypes={nodeTypes}
@@ -686,7 +860,7 @@ export default function DependencyGraphPage() {
                   return n.data?.heatColor || '#4D7EFF';
                 }}
                 maskColor={isLight ? 'rgba(255,255,255,0.7)' : 'rgba(12,14,20,0.85)'}
-                className="bg-panel border border-border mt-20 sm:mt-12 hidden sm:block"
+                className="bg-panel border border-border mt-24 sm:mt-16 hidden sm:block"
               />
             </ReactFlow>
           )}

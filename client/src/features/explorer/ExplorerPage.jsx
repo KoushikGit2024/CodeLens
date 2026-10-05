@@ -487,7 +487,6 @@ export default function ExplorerPage() {
     );
   }
 
-
   if (repoError || repo?.status === 'error') {
     const displayError = repoError || repo?.error || 'Unknown analysis error';
     return (

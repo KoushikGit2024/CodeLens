@@ -388,7 +388,7 @@ export default function RefactoringPage() {
                 disabled={isReanalyzing || isGloballyAnalyzing}
                 className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {(isReanalyzing || isGloballyAnalyzing) ? (
+                {isReanalyzing || isGloballyAnalyzing ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" /> Starting...
                   </>
