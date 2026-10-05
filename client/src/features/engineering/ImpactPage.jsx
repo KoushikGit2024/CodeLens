@@ -4,7 +4,7 @@
  * It initiates the change impact dashboard, then extracts selected file dependencies,
  * and then it applies the dagre layout to visualize the deterministic blast radius.
  */
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   Activity,
@@ -30,6 +30,7 @@ import dagre from 'dagre';
 import { FileTree } from '../explorer/FileTree';
 import OpenSourceButton from '../../shared/components/OpenSourceButton';
 import { tryMakeSourceRef } from '../../shared/navigation/sourceRef';
+import GraphSearchUI from '../../shared/components/GraphSearchUI';
 
 // ── Dagre Layout & Smart Packing Helper ───────────────────────────
 const dagreGraph = new dagre.graphlib.Graph();
@@ -150,24 +151,27 @@ const ImpactNode = ({ data }) => {
 
   const bg = isChanged ? '#da3633cc' : isDirect ? '#d29922cc' : '#8957e5cc';
   const border = isChanged ? '#ff7b72' : isDirect ? '#e3b341' : '#a371f7';
-  const shadow = isChanged
-    ? '0 0 15px rgba(255,123,114,0.4)'
-    : isDirect
-      ? '0 0 10px rgba(227,179,65,0.3)'
-      : '0 4px 6px rgba(0,0,0,0.3)';
+  const shadow = data.isSearchMatch
+    ? `0 0 8px ${border}88`
+    : isChanged
+      ? '0 0 15px rgba(255,123,114,0.4)'
+      : isDirect
+        ? '0 0 10px rgba(227,179,65,0.3)'
+        : '0 4px 6px rgba(0,0,0,0.3)';
 
   return (
     <div
       style={{
         width: 160,
         borderRadius: 8,
-        border: `2px solid ${border}`,
+        border: data.isSearchMatch ? `2px solid ${border}` : `2px solid ${border}`,
         background: bg,
         padding: '10px',
         color: `rgb(${getComputedStyle(document.documentElement).getPropertyValue('--color-text').trim()})`,
         fontFamily: 'monospace',
         fontSize: '11px',
         boxShadow: shadow,
+        opacity: data.isSearchActive && !data.isSearchMatch ? 0.2 : 1,
         transition: 'all 0.2s ease',
       }}
     >
@@ -200,7 +204,7 @@ export default function ImpactPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isReanalyzing, setIsReanalyzing] = useState(false);
-  
+
   const isGloballyAnalyzing = !!livePhase || repo?.status === 'analyzing';
 
   const [selectedFiles, setSelectedFiles] = useState([]);
@@ -214,6 +218,11 @@ export default function ImpactPage() {
   const diagramRef = useRef(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Graph Search State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [matchedNodes, setMatchedNodes] = useState([]);
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -370,6 +379,87 @@ export default function ImpactPage() {
     setSelectedFiles(prev => (prev.includes(filePath) ? prev.filter(f => f !== filePath) : [...prev, filePath]));
   };
 
+  const handleSearch = useCallback(
+    query => {
+      setSearchQuery(query);
+      if (!query) {
+        setMatchedNodes([]);
+        setCurrentMatchIndex(0);
+        setNodes(nds =>
+          nds.map(n => ({
+            ...n,
+            data: { ...n.data, isSearchMatch: false, isSearchActive: false },
+          }))
+        );
+        return;
+      }
+
+      const lowerQuery = query.toLowerCase();
+      const matches = nodes.filter(n => (n.data.label || '').toLowerCase().includes(lowerQuery)).map(n => n.id);
+
+      setMatchedNodes(matches);
+      const matchSet = new Set(matches);
+
+      setNodes(nds =>
+        nds.map(n => ({
+          ...n,
+          data: { ...n.data, isSearchMatch: matchSet.has(n.id), isSearchActive: true },
+        }))
+      );
+
+      if (matches.length > 0) {
+        setCurrentMatchIndex(1);
+        if (rfInstance) {
+          const matchNode = nodes.find(n => n.id === matches[0]);
+          if (matchNode) {
+            rfInstance.setCenter(matchNode.position.x + 80, matchNode.position.y + 32, { zoom: 1.2, duration: 800 });
+          }
+        }
+      } else {
+        setCurrentMatchIndex(0);
+      }
+    },
+    [nodes, rfInstance]
+  );
+
+  const handleNextMatch = useCallback(() => {
+    if (matchedNodes.length === 0) return;
+    const nextIdx = currentMatchIndex >= matchedNodes.length ? 1 : currentMatchIndex + 1;
+    setCurrentMatchIndex(nextIdx);
+
+    if (rfInstance) {
+      const matchNode = nodes.find(n => n.id === matchedNodes[nextIdx - 1]);
+      if (matchNode) {
+        rfInstance.setCenter(matchNode.position.x + 80, matchNode.position.y + 32, { zoom: 1.2, duration: 800 });
+      }
+    }
+  }, [matchedNodes, currentMatchIndex, nodes, rfInstance]);
+
+  const handlePrevMatch = useCallback(() => {
+    if (matchedNodes.length === 0) return;
+    const prevIdx = currentMatchIndex <= 1 ? matchedNodes.length : currentMatchIndex - 1;
+    setCurrentMatchIndex(prevIdx);
+
+    if (rfInstance) {
+      const matchNode = nodes.find(n => n.id === matchedNodes[prevIdx - 1]);
+      if (matchNode) {
+        rfInstance.setCenter(matchNode.position.x + 80, matchNode.position.y + 32, { zoom: 1.2, duration: 800 });
+      }
+    }
+  }, [matchedNodes, currentMatchIndex, nodes, rfInstance]);
+
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('');
+    setMatchedNodes([]);
+    setCurrentMatchIndex(0);
+    setNodes(nds =>
+      nds.map(n => ({
+        ...n,
+        data: { ...n.data, isSearchMatch: false, isSearchActive: false },
+      }))
+    );
+  }, []);
+
   if (repoLoading)
     return (
       <div className="p-8 flex justify-center text-muted">
@@ -416,7 +506,7 @@ export default function ImpactPage() {
                 disabled={isReanalyzing || isGloballyAnalyzing}
                 className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {(isReanalyzing || isGloballyAnalyzing) ? (
+                {isReanalyzing || isGloballyAnalyzing ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" /> Starting...
                   </>
@@ -545,15 +635,25 @@ export default function ImpactPage() {
             >
               <Controls showInteractive={false} className="bg-panel border-border" />
             </ReactFlow>
-            <div className="export-element-legend absolute top-4 right-4 z-20 flex flex-col gap-2 pointer-events-none [&>*]:pointer-events-auto">
-              <ExportDiagramButton
-                elementRef={diagramRef}
-                filename={`impact-graph-${repoId.replace(/[^a-zA-Z0-9-]/g, '_')}`}
-                availableToggles={['legend', 'controls']}
-                nodes={nodes}
-                edges={edges}
-              />
-              <div className="bg-panel/90 border border-border rounded p-3 text-xs flex flex-col gap-2 backdrop-blur-sm shadow-xl">
+            <div className="absolute top-4 right-4 z-20 flex flex-col gap-2 pointer-events-none [&>*]:pointer-events-auto items-end">
+              <div className="flex items-center gap-2">
+                <GraphSearchUI
+                  onSearch={handleSearch}
+                  onNext={handleNextMatch}
+                  onPrev={handlePrevMatch}
+                  onClear={handleClearSearch}
+                  matchCount={searchQuery ? matchedNodes.length : null}
+                  currentMatchIndex={currentMatchIndex}
+                />
+                <ExportDiagramButton
+                  elementRef={diagramRef}
+                  filename={`impact-graph-${repoId.replace(/[^a-zA-Z0-9-]/g, '_')}`}
+                  availableToggles={['legend', 'controls']}
+                  nodes={nodes}
+                  edges={edges}
+                />
+              </div>
+              <div className="bg-panel/90 border border-border rounded p-3 text-xs flex flex-col gap-2 backdrop-blur-sm shadow-xl w-48">
                 <div className="font-semibold text-text/90 border-b border-border/50 pb-2 mb-1">Impact Legend</div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-[#da3633] shadow-[0_0_8px_rgba(218,54,51,0.6)]"></div> Changed

@@ -20,6 +20,7 @@ import {
 import { repositoryApi } from '../../shared/api';
 import PageHeader from '../../shared/components/PageHeader';
 import { ExportDiagramButton } from '../../shared/components/ExportDiagramButton';
+import GraphSearchUI from '../../shared/components/GraphSearchUI';
 import { useRepository } from '../../shared/context/RepositoryContext';
 import { useTheme } from '../../shared/context/ThemeContext';
 
@@ -67,6 +68,11 @@ const CustomTreeNode = ({ data }) => {
         isDir && !isActive ? 'border-accent/40 shadow-accent/10' : '',
         !isDir && !isActive ? 'border-border/60 hover:border-accent/50 cursor-pointer' : ''
       )}
+      style={{
+        opacity: data.isSearchActive && !data.isSearchMatch ? 0.2 : 1,
+        boxShadow: data.isSearchMatch ? '0 0 8px rgba(77,126,255,0.3)' : undefined,
+        borderColor: data.isSearchMatch ? 'rgba(77,126,255,0.8)' : undefined,
+      }}
     >
       <Handle type="target" position={Position.Top} className="opacity-0" />
 
@@ -220,21 +226,17 @@ const filterTree = (treeNodes, searchTerm) => {
   const term = searchTerm.toLowerCase();
 
   const filterNode = node => {
-    // 1. Is this node a direct match?
     const isMatch = node.name.toLowerCase().includes(term);
 
-    // 2. If it's a folder match, we return it and ALL its children exactly as they are.
     if (isMatch && node.type === 'directory') {
       return { ...node };
     }
 
-    // 3. Check children
     let childMatches = [];
     if (node.children) {
       childMatches = node.children.map(filterNode).filter(Boolean);
     }
 
-    // 4. If this node is a file match, or any child matches, return it.
     if (isMatch || childMatches.length > 0) {
       return {
         ...node,
@@ -257,17 +259,13 @@ export default function FileTreePage() {
   const urlPath = searchParams.get('path');
 
   const { repo, fileTree, loading: repoLoading, error: repoError } = useRepository();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [matchedNodes, setMatchedNodes] = useState([]);
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
+
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(true);
   const reactFlowInstance = useRef(null);
   const diagramRef = useRef(null);
-
-  // Debounce search input
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
 
   const rawTree = useMemo(() => {
     if (!fileTree) return [];
@@ -288,10 +286,98 @@ export default function FileTreePage() {
 
   // Compute Layout
   const { nodes, edges } = useMemo(() => {
-    const filteredTree = filterTree(rawTree, debouncedSearch);
+    const filteredTree = filterTree(rawTree, searchQuery);
     const flattened = flattenTree(filteredTree, null, urlPath);
-    return getLayoutedElements(flattened.nodes, flattened.edges);
-  }, [rawTree, debouncedSearch, urlPath]);
+    let { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(flattened.nodes, flattened.edges);
+
+    if (matchedNodes.length > 0) {
+      const matchSet = new Set(matchedNodes);
+      layoutedNodes = layoutedNodes.map(n => ({
+        ...n,
+        data: {
+          ...n.data,
+          isSearchMatch: matchSet.has(n.id),
+          isSearchActive: true,
+        },
+      }));
+    }
+
+    return { nodes: layoutedNodes, edges: layoutedEdges };
+  }, [rawTree, urlPath, matchedNodes]);
+
+  const handleSearch = useCallback(
+    query => {
+      setSearchQuery(query);
+      if (!query) {
+        setMatchedNodes([]);
+        setCurrentMatchIndex(0);
+        return;
+      }
+      const lowerQuery = query.toLowerCase();
+
+      // Find all nodes that match the query
+      const flattened = flattenTree(rawTree, null, null).nodes;
+      const matches = flattened.filter(n => (n.data.label || '').toLowerCase().includes(lowerQuery)).map(n => n.id);
+
+      setMatchedNodes(matches);
+      if (matches.length > 0) {
+        setCurrentMatchIndex(1);
+        if (reactFlowInstance.current) {
+          const matchNode = nodes.find(n => n.id === matches[0]);
+          if (matchNode) {
+            reactFlowInstance.current.setCenter(
+              matchNode.position.x + NODE_WIDTH / 2,
+              matchNode.position.y + NODE_HEIGHT / 2,
+              { zoom: 1.2, duration: 800 }
+            );
+          }
+        }
+      } else {
+        setCurrentMatchIndex(0);
+      }
+    },
+    [rawTree, nodes]
+  );
+
+  const handleNextMatch = useCallback(() => {
+    if (matchedNodes.length === 0) return;
+    const nextIdx = currentMatchIndex >= matchedNodes.length ? 1 : currentMatchIndex + 1;
+    setCurrentMatchIndex(nextIdx);
+
+    if (reactFlowInstance.current) {
+      const matchNode = nodes.find(n => n.id === matchedNodes[nextIdx - 1]);
+      if (matchNode) {
+        reactFlowInstance.current.setCenter(
+          matchNode.position.x + NODE_WIDTH / 2,
+          matchNode.position.y + NODE_HEIGHT / 2,
+          { zoom: 1.2, duration: 800 }
+        );
+      }
+    }
+  }, [matchedNodes, currentMatchIndex, nodes]);
+
+  const handlePrevMatch = useCallback(() => {
+    if (matchedNodes.length === 0) return;
+    const prevIdx = currentMatchIndex <= 1 ? matchedNodes.length : currentMatchIndex - 1;
+    setCurrentMatchIndex(prevIdx);
+
+    if (reactFlowInstance.current) {
+      const matchNode = nodes.find(n => n.id === matchedNodes[prevIdx - 1]);
+      if (matchNode) {
+        reactFlowInstance.current.setCenter(
+          matchNode.position.x + NODE_WIDTH / 2,
+          matchNode.position.y + NODE_HEIGHT / 2,
+          { zoom: 1.2, duration: 800 }
+        );
+      }
+    }
+  }, [matchedNodes, currentMatchIndex, nodes]);
+
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('');
+    setMatchedNodes([]);
+    setCurrentMatchIndex(0);
+  }, []);
 
   const onNodeDoubleClick = useCallback(
     (event, node) => {
@@ -302,12 +388,11 @@ export default function FileTreePage() {
     [navigate, repoId]
   );
 
-  // Auto-center when search changes (debounced)
+  // Note: Auto-centering on initial load only (if search is not active)
   useEffect(() => {
-    if (reactFlowInstance.current && nodes.length > 0) {
+    if (reactFlowInstance.current && nodes.length > 0 && matchedNodes.length === 0) {
       const rootNode = nodes.find(n => n.id === 'root-repo') || nodes[0];
       if (rootNode) {
-        // Small delay to ensure ReactFlow has processed the new layout dimensions
         setTimeout(() => {
           if (reactFlowInstance.current) {
             reactFlowInstance.current.setCenter(rootNode.position.x + 90, rootNode.position.y + 25, {
@@ -319,7 +404,7 @@ export default function FileTreePage() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, rawTree.length]);
+  }, [rawTree.length]);
 
   return (
     <div className="flex-1 h-full flex flex-col bg-surface text-text overflow-hidden">
@@ -352,17 +437,14 @@ export default function FileTreePage() {
             isHeaderCollapsed ? 'hidden lg:flex' : 'flex'
           )}
         >
-          <div className="relative w-full lg:w-72 group">
-            <div className="absolute inset-0 bg-accent/20 rounded-lg blur opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-500"></div>
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted group-focus-within:text-accent transition-colors z-10" />
-            <input
-              type="text"
-              placeholder="Search nodes by name..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="relative w-full bg-panel/80 backdrop-blur border border-border/60 hover:border-accent/40 rounded-lg pl-10 pr-4 py-2 text-sm text-text placeholder:text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all duration-300 z-10 shadow-sm shadow-black/20"
-            />
-          </div>
+          <GraphSearchUI
+            onSearch={handleSearch}
+            onNext={handleNextMatch}
+            onPrev={handlePrevMatch}
+            onClear={handleClearSearch}
+            matchCount={searchQuery ? matchedNodes.length : null}
+            currentMatchIndex={currentMatchIndex}
+          />
           <ExportDiagramButton
             elementRef={diagramRef}
             filename={`file-tree-${repoId.replace(/[^a-zA-Z0-9-]/g, '_')}`}

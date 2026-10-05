@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import { Handle, Position } from 'reactflow';
-import { File, Package, AlertCircle } from 'lucide-react';
+import { File, Package, AlertCircle, Flame } from 'lucide-react';
 import { NODE_W, PKG_W } from './graphUtils';
 
 /** Read a CSS variable from the document root as an rgb() string */
@@ -19,7 +19,11 @@ export const CustomNode = ({ data }) => {
   const w = isFile ? NODE_W : PKG_W;
 
   const hasCritical = data.findingsCount?.critical > 0;
-  const shadowGlow = hasCritical && !data.isFaded ? '0 0 12px rgba(224, 82, 82, 0.35)' : 'none';
+  const shadowGlow = data.isSearchMatch
+    ? `0 0 8px ${cssVar('--color-accent')}88`
+    : hasCritical && !data.isFaded
+      ? '0 0 12px rgba(224, 82, 82, 0.35)'
+      : 'none';
 
   // Churn overlay support
   const churnScore = data.churnScore || 0;
@@ -41,15 +45,17 @@ export const CustomNode = ({ data }) => {
   const mutedColor = cssVar('--color-muted');
   const dangerColor = cssVar('--color-danger');
 
-  const defaultBorder = data.isFocused
-    ? `2px solid ${data.heatColor || accentColor}`
-    : `1px solid ${data.heatColor || borderColor}${data.isFaded ? '18' : '55'}`;
+  const defaultBorder = data.isSearchMatch
+    ? `2px solid ${accentColor}`
+    : data.isFocused
+      ? `2px solid ${data.heatColor || accentColor}`
+      : `1px solid ${data.heatColor || borderColor}${data.isFaded ? '18' : '55'}`;
 
   return (
     <div
       className="shadow-md rounded transition-all duration-150 relative"
       style={{
-        opacity: data.isFaded ? 0.1 : 1,
+        opacity: data.isFaded ? 0.1 : data.isSearchActive && !data.isSearchMatch ? 0.15 : 1,
         width: w,
         borderTop: defaultBorder,
         borderLeft: defaultBorder,
@@ -159,17 +165,10 @@ export const CustomNode = ({ data }) => {
       {/* Churn flame badge for high composite risk */}
       {showChurn && compositeRisk >= 70 && (
         <div
-          style={{
-            position: 'absolute',
-            top: -5,
-            left: -5,
-            fontSize: 10,
-            lineHeight: 1,
-            title: `Churn: ${churnScore}/100 | Composite Risk: ${compositeRisk}/100`,
-          }}
+          className="absolute -top-1.5 -left-1.5 rounded-full p-0.5 shadow-md border border-surface bg-panel"
           title={`Churn: ${churnScore}/100 | Composite Risk: ${compositeRisk}/100`}
         >
-          {compositeRisk >= 85 ? '🔴' : '🟠'}
+          <Flame className={`w-2.5 h-2.5 ${compositeRisk >= 85 ? 'text-danger' : 'text-orange-500'}`} />
         </div>
       )}
     </div>
