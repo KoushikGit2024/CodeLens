@@ -14,7 +14,7 @@ if (typeof self !== 'undefined') {
   self.Buffer = self.Buffer || Buffer;
 }
 
-const fs = new FS('CodeLens-Git-FS');
+const fs = new FS('CodeLensGitFS');
 const pfs = fs.promises;
 
 async function ensureDir(dirPath) {
@@ -120,7 +120,7 @@ export async function analyzeGitChurn(repoId, postMessage = () => {}) {
   for (let i = 0; i < commits.length; i++) {
     const commit = commits[i];
     if (!commit.commit.parent || commit.commit.parent.length === 0) continue;
-    
+
     // Diff against the primary parent to measure churn
     const parentOid = commit.commit.parent[0];
     totalCommitsAnalyzed++;

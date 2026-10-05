@@ -36,16 +36,11 @@ describe('git.analyzer', () => {
     persistenceStore.loadFile.mockResolvedValue(new Uint8Array(0));
 
     git.resolveRef.mockResolvedValue('commit3');
-    git.readCommit
-      .mockResolvedValueOnce({
-        oid: 'commit3',
-        commit: { author: { timestamp: Date.now() / 1000 }, parent: ['commit2'] },
-      })
-      .mockResolvedValueOnce({
-        oid: 'commit2',
-        commit: { author: { timestamp: Date.now() / 1000 }, parent: ['commit1'] },
-      })
-      .mockResolvedValueOnce({ oid: 'commit1', commit: { author: { timestamp: Date.now() / 1000 }, parent: [] } });
+    git.log.mockResolvedValue([
+      { oid: 'commit3', commit: { author: { timestamp: Date.now() / 1000 }, parent: ['commit2'] } },
+      { oid: 'commit2', commit: { author: { timestamp: Date.now() / 1000 }, parent: ['commit1'] } },
+      { oid: 'commit1', commit: { author: { timestamp: Date.now() / 1000 }, parent: [] } },
+    ]);
 
     // First diff: commit3 -> commit2 (fileB changed)
     git.walk

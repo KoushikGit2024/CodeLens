@@ -134,7 +134,7 @@ export class SwiftParser extends BaseParser {
         createImport({
           source: parts[parts.length - 1],
           specifiers: [],
-          location: locationFromNode(node)
+          location: locationFromNode(node),
         })
       );
     }
@@ -173,9 +173,9 @@ export class SwiftParser extends BaseParser {
         for (let j = 0; j < child.childCount; j++) {
           const p = child.child(j);
           if (p.type === 'parameter') {
-             // In swift, parameter has a name or external name
-             let pName = nodeText(p, source).split(':')[0].trim();
-             params.push(pName);
+            // In swift, parameter has a name or external name
+            let pName = nodeText(p, source).split(':')[0].trim();
+            params.push(pName);
           }
         }
       }
@@ -187,38 +187,42 @@ export class SwiftParser extends BaseParser {
     for (let i = 0; i < node.childCount; i++) {
       const child = node.child(i);
       if (child.type === 'modifiers') {
-         const mods = nodeText(child, source).toLowerCase();
-         if (mods.includes('static') || mods.includes('class')) isStatic = true;
-         if (mods.includes('private')) visibility = 'private';
-         if (mods.includes('internal')) visibility = 'internal';
+        const mods = nodeText(child, source).toLowerCase();
+        if (mods.includes('static') || mods.includes('class')) isStatic = true;
+        if (mods.includes('private')) visibility = 'private';
+        if (mods.includes('internal')) visibility = 'internal';
       }
     }
 
     const isAsync = nodeText(node, source).includes('async');
 
     if (className) {
-      symbols.push(createMethod({
-        name,
-        className,
-        static: isStatic,
-        visibility,
-        async: isAsync,
-        generator: false,
-        params,
-        complexity,
-        hash,
-        location: locationFromNode(node)
-      }));
+      symbols.push(
+        createMethod({
+          name,
+          className,
+          static: isStatic,
+          visibility,
+          async: isAsync,
+          generator: false,
+          params,
+          complexity,
+          hash,
+          location: locationFromNode(node),
+        })
+      );
     } else {
-      symbols.push(createFunction({
-        name,
-        async: isAsync,
-        generator: false,
-        params,
-        complexity,
-        hash,
-        location: locationFromNode(node)
-      }));
+      symbols.push(
+        createFunction({
+          name,
+          async: isAsync,
+          generator: false,
+          params,
+          complexity,
+          hash,
+          location: locationFromNode(node),
+        })
+      );
     }
   }
 }

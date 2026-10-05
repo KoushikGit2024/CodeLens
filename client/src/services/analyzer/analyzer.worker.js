@@ -18,7 +18,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
  * It initiates the repository state, then extracts sequential AST and graph models,
  * and then it applies the final unified analysis to the browser's IndexedDB.
  */
-export async function executeAnalysisPipeline(repoId, options = {}, postMessage = () => { }) {
+export async function executeAnalysisPipeline(repoId, options = {}, postMessage = () => {}) {
   let record = await repositoryStore.get(repoId);
   if (!record) {
     record = { id: repoId, name: `Repo-${repoId}`, uploadedAt: new Date().toISOString() };
@@ -49,7 +49,7 @@ export async function executeAnalysisPipeline(repoId, options = {}, postMessage 
   const architecture = buildArchitectureModel(analysis, graph);
   analysis.architecture = architecture;
 
-  if (import.meta.env.DEV) {
+  if (true) {
     await onProgress('analyzing_git_churn');
     const gitChurnResult = await analyzeGitChurn(repoId, postMessage);
     if (gitChurnResult) {
