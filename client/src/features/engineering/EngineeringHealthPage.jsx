@@ -496,23 +496,37 @@ const EngineeringHealthPage = () => {
   // aren't yet reflected in the backend-returned score
   function effectiveScore() {
     if (!model) return 0;
-    // ignoredIds may contain IDs added locally this session that aren't yet in
-    // model.ignoredRisks — we subtract their extra penalties
+
+    // We cannot do a simple linear delta anymore because the score decays exponentially.
+    // Instead, we compute the optimistic list of active risks and re-run the algorithm locally.
+    const optimisticRisks = [];
     const alreadyIgnored = new Set((model.ignoredRisks || []).map(r => r.id));
-    let delta = 0;
-    for (const id of ignoredIds) {
-      if (!alreadyIgnored.has(id)) {
-        const risk = model.risks?.find(r => r.id === id);
-        if (risk) delta += SEV_SCORE[risk.severity] || 0;
+
+    // 1. Keep risks that were active and haven't been newly ignored locally
+    for (const r of model.risks || []) {
+      if (!ignoredIds.has(r.id)) {
+        optimisticRisks.push(r);
       }
     }
-    // Also add back any risks restored this session that were in model.ignoredRisks
+
+    // 2. Add back risks that were ignored in backend but have been restored locally
     for (const r of model.ignoredRisks || []) {
       if (!ignoredIds.has(r.id)) {
-        delta -= SEV_SCORE[r.severity] || 0;
+        optimisticRisks.push(r);
       }
     }
-    return Math.max(0, Math.min(100, model.score - delta));
+
+    let penalty = 0;
+    for (const r of optimisticRisks) {
+      penalty += SEV_SCORE[r.severity] || 0;
+    }
+
+    const totalFiles = model.metrics?.totalFiles || 1;
+    const sizeFactor = Math.max(1, totalFiles / 25);
+    const normalizedPenalty = penalty / sizeFactor;
+
+    let score = Math.round(100 * Math.exp(-normalizedPenalty / 100));
+    return Math.max(0, Math.min(100, score));
   }
 
   // ── Sync ignoredIds with what the backend already has ──────────────────────
@@ -591,7 +605,7 @@ const EngineeringHealthPage = () => {
                 disabled={isReanalyzing || isGloballyAnalyzing}
                 className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {(isReanalyzing || isGloballyAnalyzing) ? (
+                {isReanalyzing || isGloballyAnalyzing ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" /> Analyzing...
                   </>

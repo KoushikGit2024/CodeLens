@@ -422,13 +422,20 @@ function analyzeCodeQualityRisks(analysis, graph) {
  * It reduces the risk payload, then extracts the severity penalties,
  * and then it applies a final calculation for an overall health score.
  */
-function calculateScoreAndLevel(risks) {
-  let score = 100;
+function calculateScoreAndLevel(risks, totalFiles = 1) {
+  let penalty = 0;
   for (const risk of risks) {
-    score -= SEVERITY_PENALTY[risk.severity] || 0;
+    penalty += SEVERITY_PENALTY[risk.severity] || 0;
   }
 
-  score = Math.max(0, score);
+  // Normalize penalty by repository size (baseline: 25 files)
+  const sizeFactor = Math.max(1, totalFiles / 25);
+  const normalizedPenalty = penalty / sizeFactor;
+
+  // Exponential decay curve: makes the score forgiving for large codebases
+  // and prevents it from immediately hitting 0.
+  let score = Math.round(100 * Math.exp(-normalizedPenalty / 100));
+  score = Math.max(0, Math.min(100, score));
 
   let riskLevel = 'LOW';
   if (score < 50) riskLevel = 'CRITICAL';
@@ -534,11 +541,13 @@ export function buildEngineeringRiskModel(analysis, graph, architecture, ignored
   const risks = allRisks.filter(r => !ignoredSet.has(r.id));
   const ignoredRisks = allRisks.filter(r => ignoredSet.has(r.id));
 
-  const { score, riskLevel } = calculateScoreAndLevel(risks);
+  const totalFiles = Object.keys(analysis?.files || {}).length || 1;
+  const { score, riskLevel } = calculateScoreAndLevel(risks, totalFiles);
   const hotspots = determineHotspots(risks);
 
   const metrics = {
     totalRisks: risks.length,
+    totalFiles,
     critical: risks.filter(r => r.severity === SEVERITY.CRITICAL).length,
     high: risks.filter(r => r.severity === SEVERITY.HIGH).length,
     warning: risks.filter(r => r.severity === SEVERITY.WARNING).length,
@@ -579,10 +588,10 @@ export function buildEngineeringRiskModel(analysis, graph, architecture, ignored
  * and then it returns the new score without rebuilding the full model.
  * Useful for instant UI updates when a user ignores/restores a single risk.
  */
-export function recalculateScoreWithIgnored(allRisks, ignoredRiskIds) {
+export function recalculateScoreWithIgnored(allRisks, ignoredRiskIds, totalFiles = 1) {
   const ignoredSet = new Set(ignoredRiskIds);
   const activeRisks = allRisks.filter(r => !ignoredSet.has(r.id));
-  const { score } = calculateScoreAndLevel(activeRisks);
+  const { score } = calculateScoreAndLevel(activeRisks, totalFiles);
   return score;
 }
 
