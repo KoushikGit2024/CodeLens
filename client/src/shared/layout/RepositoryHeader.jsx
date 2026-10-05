@@ -27,7 +27,7 @@ export default function RepositoryHeader() {
   const [reanalyzing, setReanalyzing] = useState(false);
   const [isRightMenuOpen, setIsRightMenuOpen] = useState(false);
   const { addToast } = useToast();
-  
+
   const isGloballyAnalyzing = !!livePhase || repo?.status === 'analyzing';
 
   const handleReanalyze = async () => {
@@ -148,11 +148,13 @@ export default function RepositoryHeader() {
             className="flex items-center gap-1.5 text-xs text-accent hover:text-text transition-colors border border-accent/30 hover:border-muted/50 rounded px-2 py-1 disabled:opacity-50"
             title="Re-analyze Repository"
           >
-            {(reanalyzing || isGloballyAnalyzing) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-            <span>{(reanalyzing || isGloballyAnalyzing) ? 'Analyzing...' : 'Re-analyze'}</span>
+            {reanalyzing || isGloballyAnalyzing ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="w-3.5 h-3.5" />
+            )}
+            <span>{reanalyzing || isGloballyAnalyzing ? 'Analyzing...' : 'Re-analyze'}</span>
           </button>
-
-
 
           <div className="h-4 w-px bg-border" />
           <ThemeSwitcher />

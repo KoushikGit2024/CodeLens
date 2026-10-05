@@ -52,7 +52,7 @@ const NAV_GROUPS = [
     items: [
       { id: 'architecture', label: 'Architecture', icon: Box, to: 'architecture' },
       { id: 'dependencies', label: 'Dependencies', icon: GitMerge, to: 'dependencies' },
-      ...(import.meta.env.DEV ? [{ id: 'git', label: 'Git History', icon: GitCommit, to: 'git' }] : []),
+      { id: 'git', label: 'Git History', icon: GitCommit, to: 'git' },
     ],
   },
   {
@@ -80,9 +80,8 @@ export default function RepositorySidebar() {
   const { repoId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
-  const { repo } = useRepository();
-
-  const isAnalyzing = repo?.status === 'analyzing';
+  const { repo, livePhase } = useRepository();
+  const isAnalyzing = repo?.status === 'analyzing' || !!livePhase;
 
   const collapsed = searchParams.get('sidebar') === 'closed';
   const isMobileOpen = searchParams.get('mobileNav') === 'open';
@@ -220,9 +219,13 @@ export default function RepositorySidebar() {
                   return (
                     <NavLink
                       key={item.id}
-                      to={isAnalyzing ? '#' : `/explore/${repoId}/${item.to}${effectiveCollapsed ? '?sidebar=closed' : ''}`}
+                      to={
+                        isAnalyzing
+                          ? '#'
+                          : `/explore/${repoId}/${item.to}${effectiveCollapsed ? '?sidebar=closed' : ''}`
+                      }
                       end={item.to === ''}
-                      onClick={(e) => {
+                      onClick={e => {
                         if (isAnalyzing) {
                           e.preventDefault();
                           return;

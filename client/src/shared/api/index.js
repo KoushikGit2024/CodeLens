@@ -178,7 +178,6 @@ export const repositoryApi = {
         const defaultIgnores = ['node_modules', 'dist', 'build', 'coverage', '.next', 'out'];
         const pathSegments = filePath.split('/');
         const shouldIgnore =
-          (!import.meta.env.DEV && pathSegments.includes('.git')) ||
           ignorePatterns.some(p => filePath.includes(p)) ||
           defaultIgnores.some(ignoreDir => pathSegments.includes(ignoreDir));
 
@@ -261,7 +260,6 @@ export const repositoryApi = {
         const defaultIgnores = ['node_modules', 'dist', 'build', 'coverage', '.next', 'out'];
         const pathSegments = filePath.split('/');
         const shouldIgnore =
-          (!import.meta.env.DEV && pathSegments.includes('.git')) ||
           ignorePatterns.some(p => filePath.includes(p)) ||
           defaultIgnores.some(ignoreDir => pathSegments.includes(ignoreDir));
 
@@ -327,7 +325,7 @@ export const repositoryApi = {
     await repositoryStore.set(repoId, record);
 
     try {
-      const files = await cloneAndExtractGithub(url, onProgress, options.fetchAllBranches);
+      const files = await cloneAndExtractGithub(repoId, url, onProgress, options.fetchAllBranches);
 
       const ignorePatterns = options.ignorePatterns
         ? options.ignorePatterns

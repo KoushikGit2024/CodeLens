@@ -12,10 +12,11 @@ import AnalysisProgress from '../../features/repository/AnalysisProgress';
 function RepositoryContentWrapper() {
   const { repo, livePhase } = useRepository();
   const [showProgress, setShowProgress] = useState(false);
-  const wasAnalyzingRef = useRef(repo?.status === 'analyzing');
+  const isAnalyzing = repo?.status === 'analyzing' || !!livePhase;
+  const wasAnalyzingRef = useRef(isAnalyzing);
 
   useEffect(() => {
-    if (repo?.status === 'analyzing') {
+    if (isAnalyzing) {
       wasAnalyzingRef.current = true;
       setShowProgress(true);
     } else if (repo?.status === 'ready' && wasAnalyzingRef.current) {
@@ -28,22 +29,9 @@ function RepositoryContentWrapper() {
     } else {
       setShowProgress(false);
     }
-  }, [repo?.status]);
+  }, [isAnalyzing, repo?.status]);
 
   if (showProgress) {
-    if (repo?.status === 'analyzing') {
-      // Completely hide the Outlet to prevent crashes during active analysis
-      return (
-        <div className="flex-1 flex items-center justify-center bg-surface w-full h-full">
-          <AnalysisProgress
-            currentPhase={livePhase?.phase ?? repo?.phase}
-            phaseDetails={livePhase?.details ?? repo?.phaseDetails}
-          />
-        </div>
-      );
-    }
-
-    // During the 1.5s completion hold, mount the Outlet underneath so it can load data
     return (
       <>
         <div className="absolute inset-0 z-[100] flex items-center justify-center bg-surface">

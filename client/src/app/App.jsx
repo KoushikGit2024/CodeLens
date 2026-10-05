@@ -75,7 +75,7 @@ export default function App() {
                     <Route path="source" element={<ExplorerPage />} />
                     <Route path="dependencies" element={<DependencyGraphPage />} />
                     <Route path="architecture" element={<ArchitecturePage />} />
-                    {import.meta.env.DEV && <Route path="git" element={<GitHistoryPage />} />}
+                    <Route path="git" element={<GitHistoryPage />} />
 
                     <Route path="assistant" element={<RepositoryAssistantPage />} />
                     <Route path="impact" element={<ImpactPage />} />
