@@ -8,7 +8,7 @@
 import { analyzeRepository } from './repository/repository.analyzer.js';
 import { buildDependencyGraph } from './dependencies/dependency.analyzer.js';
 import { buildArchitectureModel } from './advanced/architecture.analyzer.js';
-import { analyzeGitChurn } from './advanced/git.analyzer.js';
+import { analyzeGitChurn, classifyHotspot } from './advanced/git.analyzer.js';
 import * as repositoryStore from './repository/repository.store.js';
 
 // It triggers a manual timeout, then extracts the thread lock, and then it applies a brief pause so UI polling can catch up.
@@ -65,9 +65,13 @@ export async function executeAnalysisPipeline(repoId, options = {}, postMessage 
         // Calculate Composite Risk Rating: (0.6 * complexityScore) + (0.4 * churnScore)
         const compositeScore = Math.round(0.6 * complexityScore + 0.4 * churnScore);
 
+        const hotspot = classifyHotspot(churnScore, complexityScore);
+
         if (!fileNode.metrics) fileNode.metrics = {};
         fileNode.metrics.churnScore = churnScore;
         fileNode.metrics.compositeRisk = compositeScore;
+        fileNode.metrics.hotspotScore = hotspot.hotspotScore;
+        fileNode.metrics.hotspotQuadrant = hotspot.quadrant;
       }
     }
   }

@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { AlertCircle, GitBranch, ExternalLink, Package, File, Info, Activity } from 'lucide-react';
+import { AlertCircle, GitBranch, ExternalLink, Package, File, Info, Activity, Flame } from 'lucide-react';
 import OpenSourceButton from '../../shared/components/OpenSourceButton';
 import { makeSourceRef } from '../../shared/navigation/sourceRef';
 
@@ -118,12 +118,25 @@ export function FileDetailPanel({ info, repoId, graph, onSelectNode }) {
 
       {info.health?.hotspot && (
         <div className="bg-danger/10 border border-danger/30 p-3 rounded-lg flex items-start gap-2.5 shadow-sm">
-          <AlertCircle className="w-4 h-4 text-danger shrink-0 mt-0.5" />
-          <div className="flex flex-col">
-            <span className="text-xs font-bold text-danger uppercase tracking-wider">Hotspot File</span>
+          <Flame className="w-4 h-4 text-danger shrink-0 mt-0.5" />
+          <div className="flex flex-col min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs font-bold text-danger uppercase tracking-wider">Hotspot File</span>
+              {info.health.hotspot.quadrant && (
+                <span className="text-[9px] px-1.5 py-0.5 bg-danger/20 text-danger rounded font-semibold uppercase">
+                  {info.health.hotspot.quadrant.replace('_', ' ')}
+                </span>
+              )}
+            </div>
             <span className="text-[11px] text-danger/80 leading-relaxed mt-1">
-              This file requires immediate attention (Score: {info.health.hotspot.score})
+              High churn & complexity risk (Score: {info.health.hotspot.score})
             </span>
+            {(info.health.hotspot.churnScore != null || info.health.hotspot.complexityScore != null) && (
+              <div className="flex items-center gap-2 mt-1.5 text-[10px] font-mono text-muted">
+                {info.health.hotspot.churnScore != null && <span>Churn: {info.health.hotspot.churnScore}/100</span>}
+                {info.health.hotspot.complexityScore != null && <span>CC: {info.health.hotspot.complexityScore}/100</span>}
+              </div>
+            )}
           </div>
         </div>
       )}

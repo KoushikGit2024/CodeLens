@@ -512,12 +512,27 @@ export const repositoryApi = {
     const engineeringHealth = buildEngineeringRiskModel(record.analysis, graph, architecture);
 
     const fileRisks = engineeringHealth.risks.filter(r => r.file === filePath);
-    const hotspot = engineeringHealth.hotspots.find(h => h.file === filePath);
+    const hotspot = engineeringHealth.hotspots.find(h => (typeof h === 'string' ? h === filePath : h.file === filePath));
+    const hotspotRisk = fileRisks.find(r => r.title.startsWith('Behavioral Hotspot'));
 
     let severity = 'healthy';
     if (fileRisks.some(r => r.severity === 'critical')) severity = 'critical';
     else if (fileRisks.some(r => r.severity === 'high')) severity = 'high';
     else if (fileRisks.some(r => r.severity === 'warning')) severity = 'warning';
+
+    const hotspotData = hotspotRisk
+      ? {
+          file: filePath,
+          score: hotspotRisk.evidence?.hotspotScore || (typeof hotspot === 'object' ? hotspot?.score : 50),
+          quadrant: hotspotRisk.evidence?.quadrant,
+          churnScore: hotspotRisk.evidence?.churnScore,
+          complexityScore: hotspotRisk.evidence?.complexityScore,
+        }
+      : typeof hotspot === 'object'
+        ? hotspot
+        : hotspot
+          ? { file: filePath, score: 50 }
+          : null;
 
     return {
       data: {
@@ -530,7 +545,7 @@ export const repositoryApi = {
         health: {
           severity,
           risks: fileRisks,
-          hotspot: hotspot || null,
+          hotspot: hotspotData,
         },
       },
     };

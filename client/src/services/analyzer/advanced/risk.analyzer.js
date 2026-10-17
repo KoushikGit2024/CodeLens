@@ -8,6 +8,7 @@
 import { getFileDependencies, detectCycles, getIsolatedFiles } from '../dependencies/dependency.analyzer.js';
 import { detectClones } from './clone.analyzer.js';
 import { analyzeReachability } from './reachability.analyzer.js';
+import { classifyHotspot, HOTSPOT_QUADRANTS } from './git.analyzer.js';
 
 export const RISK_CATEGORIES = {
   SIZE: 'SIZE',
@@ -647,26 +648,44 @@ function determineHotspots(risks) {
  * exceeding churn thresholds, and then it applies composite risk scoring
  * to surface the highest-priority files for review.
  */
-function analyzeChurnRisks(analysis) {
+function analyzeChurnRisks(analysis, graph) {
   const risks = [];
   const gitChurn = analysis?.gitChurn;
   if (!gitChurn || !gitChurn.churnScores) return risks;
 
+  const filesList = Array.isArray(analysis?.files)
+    ? analysis.files
+    : Object.values(analysis?.files || {});
+
+  // 1. Tornhill Behavioral Hotspot Matrix & Churn Evaluation
   for (const [filePath, churnScore] of Object.entries(gitChurn.churnScores)) {
     if (filePath.startsWith('.git/')) continue;
 
-    const fileNode = analysis.files?.find(f => f.filePath === filePath);
-    const compositeRisk = fileNode?.metrics?.compositeRisk || churnScore;
+    const fileNode = filesList.find(f => f.filePath === filePath);
+    const complexity =
+      fileNode?.metrics?.complexity ||
+      (fileNode?.symbols ? fileNode.symbols.reduce((acc, s) => acc + (s.complexity || 0), 0) : 0);
+    const complexityScore = Math.min(100, Math.round((complexity / 30) * 100));
 
-    if (compositeRisk >= THRESHOLDS.COMPOSITE_RISK_CRITICAL) {
+    const hotspot = classifyHotspot(churnScore, complexityScore);
+    const compositeRisk = fileNode?.metrics?.compositeRisk || Math.round(0.6 * complexityScore + 0.4 * churnScore);
+
+    if (hotspot.quadrant === HOTSPOT_QUADRANTS.CRITICAL_HOTSPOT) {
       risks.push(
         createRisk(
           RISK_CATEGORIES.CHURN,
           SEVERITY.CRITICAL,
-          'Critical Composite Risk (High Churn + High Complexity)',
-          `This file has a composite risk score of ${compositeRisk}/100, driven by frequent changes (churn: ${churnScore}/100) combined with high cyclomatic complexity. It is the most likely source of regressions.`,
+          'Behavioral Hotspot (Critical Active Risk)',
+          `File is in the top quadrant of the Tornhill Hotspot Matrix: high churn (${churnScore}/100) combined with high complexity (${complexityScore}/100, score: ${hotspot.hotspotScore}). Frequently modified complex code is the primary source of regressions and defect leakage.`,
           filePath,
-          { churnScore, compositeRisk, commitsModified: gitChurn.fileChurn?.[filePath] || 0 }
+          {
+            churnScore,
+            complexityScore,
+            hotspotScore: hotspot.hotspotScore,
+            quadrant: hotspot.quadrant,
+            commitsModified: gitChurn.fileChurn?.[filePath] || 0,
+          },
+          `${filePath}>hotspot`
         )
       );
     } else if (compositeRisk >= THRESHOLDS.COMPOSITE_RISK_HIGH) {
@@ -677,7 +696,8 @@ function analyzeChurnRisks(analysis) {
           'High Composite Risk (Churn + Complexity)',
           `This file has a composite risk score of ${compositeRisk}/100 (churn: ${churnScore}/100). Frequently modified complex files are hotspots for bugs.`,
           filePath,
-          { churnScore, compositeRisk, commitsModified: gitChurn.fileChurn?.[filePath] || 0 }
+          { churnScore, compositeRisk, commitsModified: gitChurn.fileChurn?.[filePath] || 0 },
+          `${filePath}>composite`
         )
       );
     } else if (churnScore >= THRESHOLDS.CHURN_HIGH) {
@@ -688,9 +708,48 @@ function analyzeChurnRisks(analysis) {
           'High Churn File',
           `This file is modified very frequently (churn score: ${churnScore}/100). Frequent changes may indicate unstable design or ongoing development.`,
           filePath,
-          { churnScore, commitsModified: gitChurn.fileChurn?.[filePath] || 0 }
+          { churnScore, commitsModified: gitChurn.fileChurn?.[filePath] || 0 },
+          `${filePath}>churn`
         )
       );
+    }
+  }
+
+  // 2. Temporal Co-Change Coupling (Hidden Logical Coupling)
+  if (gitChurn.coChanges && Array.isArray(gitChurn.coChanges)) {
+    // Cap to top 10 strongest couplings to avoid card explosion
+    const topCouplings = gitChurn.coChanges.slice(0, 10);
+    for (const co of topCouplings) {
+      const { fileA, fileB, sharedCommits, jaccard } = co;
+      if (!fileA || !fileB) continue;
+
+      const hasDirectEdge = graph?.edges?.some(e => {
+        const s = (e.source || '').replace(/^file:/, '');
+        const t = (e.target || '').replace(/^file:/, '');
+        return (s === fileA && t === fileB) || (s === fileB && t === fileA);
+      });
+
+      if (!hasDirectEdge) {
+        risks.push(
+          createRisk(
+            RISK_CATEGORIES.ARCHITECTURE,
+            SEVERITY.HIGH,
+            'Hidden Logical Coupling (Temporal Co-Change)',
+            `Files '${fileA}' and '${fileB}' change together in ${sharedCommits} commits (${Math.round(jaccard * 100)}% co-change rate) without a direct import relationship. This suggests hidden coupling or missing architectural abstraction.`,
+            fileA,
+            {
+              fileA,
+              fileB,
+              coupledFiles: [fileB],
+              sharedCommits,
+              jaccard,
+              coChangeCount: sharedCommits,
+              coChangeSimilarity: jaccard,
+            },
+            `${fileA}+${fileB}>cochange`
+          )
+        );
+      }
     }
   }
 
@@ -712,7 +771,7 @@ export function buildEngineeringRiskModel(analysis, graph, architecture, ignored
     ...analyzeDependencyRisks(graph),
     ...analyzeArchitectureRisks(architecture),
     ...analyzeCodeQualityRisks(analysis, graph),
-    ...analyzeChurnRisks(analysis),
+    ...analyzeChurnRisks(analysis, graph),
   ];
 
   const ignoredSet = new Set(ignoredRiskIds);

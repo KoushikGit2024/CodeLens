@@ -22,6 +22,8 @@ import {
   ChevronRight,
   Search,
   X,
+  Flame,
+  GitCompare,
 } from 'lucide-react';
 import { useRepository } from '../../shared/context/RepositoryContext';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
@@ -153,6 +155,57 @@ const RiskCard = ({
             Risk Id: {risk.id?.slice(5, 13)}
           </span>
         </div>
+
+        {/* ── Tornhill Behavioral Hotspot breakdown ── */}
+        {risk.evidence?.hotspotScore != null && (
+          <div className="mb-3 flex flex-wrap gap-1.5 text-[10px] font-mono">
+            <span className="px-2 py-0.5 rounded bg-danger/15 text-danger font-bold border border-danger/30 flex items-center gap-1">
+              <Flame className="w-3 h-3" /> Hotspot: {risk.evidence.hotspotScore}/100
+            </span>
+            <span className="px-2 py-0.5 rounded bg-surface border border-border text-muted">
+              Churn: {risk.evidence.churnScore}/100
+            </span>
+            <span className="px-2 py-0.5 rounded bg-surface border border-border text-muted">
+              Complexity: {risk.evidence.complexityScore}/100
+            </span>
+            {risk.evidence.quadrant && (
+              <span className="px-2 py-0.5 rounded bg-accent/15 text-accent font-semibold border border-accent/20">
+                {risk.evidence.quadrant.replace('_', ' ')}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* ── Temporal Co-change breakdown ── */}
+        {(risk.evidence?.coChangeSimilarity != null || risk.evidence?.jaccard != null) && (
+          <div className="mb-3 p-2 rounded bg-surface border border-border/60">
+            <div className="flex items-center gap-2 text-[10px] font-mono mb-2">
+              <span className="px-2 py-0.5 rounded bg-warning/15 text-warning font-bold border border-warning/30 flex items-center gap-1">
+                <GitCompare className="w-3 h-3" /> Co-Change: {Math.round((risk.evidence.coChangeSimilarity ?? risk.evidence.jaccard) * 100)}%
+              </span>
+              <span className="text-muted text-[10px]">
+                {risk.evidence.coChangeCount ?? risk.evidence.sharedCommits} shared commits
+              </span>
+            </div>
+            {((risk.evidence.coupledFiles && risk.evidence.coupledFiles.length > 0) || risk.evidence.fileB) && (
+              <div className="text-[11px] text-muted space-y-1">
+                <span className="text-[10px] uppercase font-semibold text-text/60 block">Coupled Files (No Import Edge):</span>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {(risk.evidence.coupledFiles || [risk.evidence.fileB]).map(cf => {
+                    const cRef = tryMakeSourceRef({ filePath: cf });
+                    return cRef ? (
+                      <OpenSourceButton key={cf} ref={cRef} variant="button" className="text-[10px] py-0.5" />
+                    ) : (
+                      <span key={cf} className="px-1.5 py-0.5 rounded bg-panel text-muted font-mono text-[10px] border border-border">
+                        {cf}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Grouped instances (same issue, discontinuous blocks) ── */}
         {isGrouped ? (
@@ -819,6 +872,23 @@ const EngineeringHealthPage = () => {
       count: r.evidence?.count || 0,
       instances: r.evidence?.instances || [],
     }));
+  const hotspotList = activeRisks
+    .filter(r => r.title.startsWith('Behavioral Hotspot'))
+    .map(r => ({
+      file: r.file,
+      score: r.evidence?.hotspotScore || r.evidence?.compositeRisk || 0,
+      churnScore: r.evidence?.churnScore || 0,
+      complexityScore: r.evidence?.complexityScore || 0,
+      quadrant: r.evidence?.quadrant || 'CRITICAL_HOTSPOT',
+    }));
+  const coChangeList = activeRisks
+    .filter(r => r.title === 'Hidden Logical Coupling (Temporal Co-Change)')
+    .map(r => ({
+      file: r.file,
+      coupledFiles: r.evidence?.coupledFiles || (r.evidence?.fileB ? [r.evidence.fileB] : []),
+      similarity: r.evidence?.coChangeSimilarity ?? r.evidence?.jaccard ?? 0,
+      count: r.evidence?.coChangeCount ?? r.evidence?.sharedCommits ?? 0,
+    }));
 
   return (
     <div className="flex h-full flex-col overflow-auto bg-surface text-text">
@@ -888,9 +958,104 @@ const EngineeringHealthPage = () => {
           ))}
         </div>
 
-        {/* ── Dead code / Clone summary panels ── */}
-        {(deadCodeFiles.length > 0 || clonesList.length > 0) && (
+        {/* ── Summary Panels (Hotspots, Co-Change, Dead Code, Clones) ── */}
+        {(hotspotList.length > 0 || coChangeList.length > 0 || deadCodeFiles.length > 0 || clonesList.length > 0) && (
           <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {hotspotList.length > 0 && (
+              <div className="rounded border border-border bg-panel p-5">
+                <div className="flex items-center gap-2 text-danger mb-2">
+                  <Flame className="w-5 h-5" />
+                  <h3 className="font-semibold text-text">Behavioral Hotspots ({hotspotList.length})</h3>
+                </div>
+                <p className="text-sm text-muted mb-3">High churn & high complexity files prone to defect regressions (Tornhill Matrix).</p>
+                <div className="max-h-40 overflow-y-auto space-y-2 custom-scrollbar">
+                  {hotspotList.map((h, i) => {
+                    const ref = tryMakeSourceRef({ filePath: h.file });
+                    return (
+                      <div key={i} className="flex items-center justify-between text-xs bg-surface px-2.5 py-1.5 rounded gap-2">
+                        <div className="flex-1 min-w-0">
+                          {ref ? (
+                            <OpenSourceButton ref={ref} variant="button" className="truncate text-[11px] py-0" />
+                          ) : (
+                            <span className="font-mono text-muted truncate block">{h.file}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-[10px] font-bold text-danger bg-danger/10 px-1.5 py-0.5 rounded">
+                            Score {h.score}
+                          </span>
+                          <span className="text-[9px] text-muted font-mono hidden sm:inline">
+                            Churn {h.churnScore} • CC {h.complexityScore}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {coChangeList.length > 0 && (
+              <div className="rounded border border-border bg-panel p-5">
+                <div className="flex items-center gap-2 text-warning mb-2">
+                  <GitCompare className="w-5 h-5" />
+                  <h3 className="font-semibold text-text">Hidden Logical Couplings ({coChangeList.length})</h3>
+                </div>
+                <p className="text-sm text-muted mb-3">Files frequently co-modified across commits without static imports.</p>
+                <div className="max-h-40 overflow-y-auto space-y-2 custom-scrollbar">
+                  {coChangeList.map((c, i) => {
+                    const refA = tryMakeSourceRef({ filePath: c.file });
+                    return (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between text-xs bg-surface px-2.5 py-1.5 rounded gap-2 border border-border/30 hover:border-border transition-colors"
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <div className="min-w-0 flex-1">
+                            {refA ? (
+                              <OpenSourceButton
+                                ref={refA}
+                                variant="button"
+                                className="truncate text-[11px] py-0 w-full justify-start"
+                              />
+                            ) : (
+                              <span className="font-mono text-muted truncate block text-[11px]">{c.file}</span>
+                            )}
+                          </div>
+                          <span className="text-muted/50 shrink-0 font-mono text-xs">↔</span>
+                          <div className="min-w-0 flex-1 flex flex-col gap-1">
+                            {c.coupledFiles.map(cf => {
+                              const refB = tryMakeSourceRef({ filePath: cf });
+                              return refB ? (
+                                <OpenSourceButton
+                                  key={cf}
+                                  ref={refB}
+                                  variant="button"
+                                  className="truncate text-[11px] py-0 w-full justify-start"
+                                />
+                              ) : (
+                                <span key={cf} className="font-mono text-muted truncate block text-[11px]">
+                                  {cf}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0 pl-1">
+                          <span className="text-[10px] font-bold text-warning bg-warning/10 border border-warning/20 px-1.5 py-0.5 rounded">
+                            {Math.round(c.similarity * 100)}% match
+                          </span>
+                          {c.count > 0 && (
+                            <span className="text-[9px] text-muted font-mono hidden sm:inline">
+                              {c.count} commits
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             {deadCodeFiles.length > 0 && (
               <div className="rounded border border-border bg-panel p-5">
                 <div className="flex items-center gap-2 text-warning mb-2">
