@@ -85,7 +85,17 @@ function InstanceRow({ inst, isClone }) {
 }
 
 // ── RiskCard ──────────────────────────────────────────────────────────────────
-const RiskCard = ({ risk, repoId, navigate, onDraftAdr, onExplainAi, onIgnore, ignored = false }) => {
+const RiskCard = ({
+  risk,
+  repoId,
+  navigate,
+  onDraftAdr,
+  onExplainAi,
+  onIgnore,
+  ignored = false,
+  selected = false,
+  onSelect,
+}) => {
   const [expanded, setExpanded] = useState(false);
 
   const instances = risk.evidence?.instances || [];
@@ -107,18 +117,29 @@ const RiskCard = ({ risk, repoId, navigate, onDraftAdr, onExplainAi, onIgnore, i
 
   return (
     <div
-      className={`rounded-xl border flex flex-col overflow-hidden shadow-lg transition-all ${
+      className={`rounded-xl border flex flex-col overflow-hidden shadow-lg transition-all relative ${
         ignored ? 'border-border/40 bg-panel/50 opacity-60' : 'border-border bg-panel hover:border-accent/40'
-      }`}
+      } ${selected ? 'ring-2 ring-accent border-transparent' : ''}`}
     >
+      {onSelect && (
+        <div
+          className="absolute top-4 right-4 z-10 cursor-pointer"
+          onClick={e => {
+            e.stopPropagation();
+            onSelect();
+          }}
+        >
+          <input type="checkbox" checked={selected} readOnly className="w-4 h-4 cursor-pointer accent-accent" />
+        </div>
+      )}
       <div className="p-5 flex-1 flex flex-col bg-gradient-to-b from-surface/50 to-transparent">
         {/* Header row */}
-        <div className="flex items-start justify-between mb-3">
+        <div className="flex items-start justify-between mb-3 pr-6">
           <span className={severityBadge(risk.severity)}>{risk.severity}</span>
           <span className="text-[10px] font-semibold uppercase tracking-widest text-muted">{risk.category}</span>
         </div>
 
-        <h3 className="text-base font-semibold text-text mb-1 line-clamp-2" title={risk.title}>
+        <h3 className="text-base font-semibold text-text mb-1 line-clamp-2 pr-2" title={risk.title}>
           {risk.title}
         </h3>
         <p className="text-xs text-muted leading-relaxed flex-1 mb-3">{risk.description || risk.message}</p>
@@ -241,6 +262,18 @@ const EngineeringHealthPage = () => {
   const fileFilter = searchParams.get('file');
   const listStartRef = useRef(null);
 
+  const handleClearFileFilter = useCallback(() => {
+    setSearchParams(
+      prev => {
+        const next = new URLSearchParams(prev);
+        next.delete('file');
+        next.delete('page');
+        return next;
+      },
+      { replace: true }
+    );
+  }, [setSearchParams]);
+
   const [loading, setLoading] = useState(true);
   const [model, setModel] = useState(null);
   const [insights, setInsights] = useState(null);
@@ -255,6 +288,63 @@ const EngineeringHealthPage = () => {
   // Local ignored IDs — mirrors what's in IndexedDB, updated optimistically
   const [ignoredIds, setIgnoredIds] = useState(new Set());
 
+  // Selection state for bulk actions
+  const [selectedRiskIds, setSelectedRiskIds] = useState(new Set());
+
+  const handleSelectRisk = riskId => {
+    setSelectedRiskIds(prev => {
+      const next = new Set(prev);
+      if (next.has(riskId)) next.delete(riskId);
+      else next.add(riskId);
+      return next;
+    });
+  };
+
+  const handleClearSelection = () => {
+    setSelectedRiskIds(new Set());
+  };
+
+  const handleBulkIgnore = async currentlyIgnored => {
+    const idsToProcess = Array.from(selectedRiskIds);
+    if (idsToProcess.length === 0) return;
+
+    // Optimistic UI update
+    setIgnoredIds(prev => {
+      const next = new Set(prev);
+      idsToProcess.forEach(id => {
+        if (currentlyIgnored) next.delete(id);
+        else next.add(id);
+      });
+      return next;
+    });
+    handleClearSelection();
+
+    try {
+      if (currentlyIgnored) {
+        await Promise.all(idsToProcess.map(id => repositoryApi.restoreRisk(repoId, id)));
+        addToast({
+          title: 'Risks Restored',
+          description: `${idsToProcess.length} risks are now active again.`,
+          type: 'success',
+        });
+      } else {
+        await Promise.all(idsToProcess.map(id => repositoryApi.ignoreRisk(repoId, id)));
+        addToast({ title: 'Risks Ignored', description: `${idsToProcess.length} risks suppressed.`, type: 'success' });
+      }
+    } catch (err) {
+      // Roll back
+      setIgnoredIds(prev => {
+        const next = new Set(prev);
+        idsToProcess.forEach(id => {
+          if (currentlyIgnored) next.add(id);
+          else next.delete(id);
+        });
+        return next;
+      });
+      addToast({ title: 'Action Failed', description: err.message, type: 'error' });
+    }
+  };
+
   // ── URL-synced UI State ──
   const activeAdrRiskId = searchParams.get('adr');
   const activeAdrRisk = useMemo(() => {
@@ -266,17 +356,43 @@ const EngineeringHealthPage = () => {
     );
   }, [activeAdrRiskId, model]);
 
-  const setActiveAdrRisk = risk => {
-    setSearchParams(
-      prev => {
-        const next = new URLSearchParams(prev);
-        if (risk) next.set('adr', risk.id);
-        else next.delete('adr');
-        return next;
-      },
-      { replace: true }
-    );
-  };
+  const setActiveAdrRisk = useCallback(
+    risk => {
+      if (risk) {
+        if (aiState.authState === 'unauthenticated') {
+          navigate('/auth/signin');
+          return;
+        }
+        if (aiState.quotaStatus === 'exhausted') {
+          addToast({
+            title: 'Quota Exceeded',
+            description: 'AI usage limit reached.',
+            type: 'error',
+          });
+          return;
+        }
+        if (aiState.status === 'offline') {
+          addToast({
+            title: 'AI Offline',
+            description: 'No AI provider configured.',
+            type: 'error',
+          });
+          return;
+        }
+      }
+
+      setSearchParams(
+        prev => {
+          const next = new URLSearchParams(prev);
+          if (risk) next.set('adr', risk.id);
+          else next.delete('adr');
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [aiState, navigate, addToast, setSearchParams]
+  );
 
   const explainRiskId = searchParams.get('explain');
   const explainRisk = useMemo(() => {
@@ -645,19 +761,56 @@ const EngineeringHealthPage = () => {
     ...(model.risks || []).filter(r => ignoredIds.has(r.id) && !(model.ignoredRisks || []).find(ir => ir.id === r.id)),
   ].filter(r => ignoredIds.has(r.id));
 
-  const filteredActive = activeRisks.filter(r => {
-    if (fileFilter && r.file !== fileFilter) return false;
-    if (categoryFilter && r.category !== categoryFilter) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const haystack = [r.title, r.description, r.file, r.category, ...(r.evidence?.instances?.map(i => i.name) || [])]
+  const applyFilters = risks => {
+    return risks.filter(r => {
+      if (fileFilter && r.file !== fileFilter) return false;
+      if (categoryFilter && r.category !== categoryFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const haystack = [
+          r.title,
+          r.description,
+          r.file,
+          r.category,
+          ...(r.evidence?.instances?.map(i => i.name) || []),
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    });
+  };
+
+  const filteredActive = applyFilters(activeRisks);
+  const filteredIgnored = applyFilters(ignoredRisks);
+
+  const searchMatchesInOtherFilesCount = (() => {
+    if (!fileFilter || !searchQuery.trim()) return 0;
+    const q = searchQuery.toLowerCase();
+    const sourceList = activeTab === 'active' ? activeRisks : ignoredRisks;
+    return sourceList.filter(r => {
+      if (categoryFilter && r.category !== categoryFilter) return false;
+      if (r.file === fileFilter) return false;
+      const haystack = [
+        r.title,
+        r.description,
+        r.file,
+        r.category,
+        ...(r.evidence?.instances?.map(i => i.name) || []),
+      ]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
-      if (!haystack.includes(q)) return false;
-    }
-    return true;
-  });
+      return haystack.includes(q);
+    }).length;
+  })();
+
+  const handleSelectAllVisible = () => {
+    const list = activeTab === 'active' ? filteredActive : filteredIgnored;
+    setSelectedRiskIds(new Set(list.map(r => r.id)));
+  };
 
   const deadCodeFiles = activeRisks.filter(r => r.title === 'Dead / Unreachable File').map(r => r.file);
   const clonesList = activeRisks
@@ -888,27 +1041,48 @@ const EngineeringHealthPage = () => {
         {/* ── Search bar + Risk Tabs ── */}
         <div ref={listStartRef} className="mb-4 border-b border-border scroll-mt-24">
           {/* Search & Per Page */}
-          <div className="flex items-center gap-3 mb-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted pointer-events-none" />
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 mb-4">
+            <div className="relative flex-1 flex items-center bg-surface border border-border rounded-lg px-3 py-2 sm:py-1.5 focus-within:border-accent/50 focus-within:ring-1 focus-within:ring-accent/20 transition-all min-w-0">
+              <Search className="w-3.5 h-3.5 text-muted shrink-0 mr-2 pointer-events-none" />
+              {fileFilter && (
+                <span className="inline-flex items-center gap-1 mr-2 px-2 py-0.5 rounded bg-accent/15 border border-accent/30 text-accent font-mono text-xs shrink-0 max-w-[110px] xs:max-w-[150px] sm:max-w-[200px] md:max-w-xs truncate">
+                  <span className="truncate" title={fileFilter}>
+                    {fileFilter.split('/').pop()}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleClearFileFilter}
+                    className="hover:bg-accent/25 rounded p-0.5 text-accent hover:text-text transition-colors shrink-0"
+                    title="Remove file scope (search all files)"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
               <input
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Search risks by title, file, or description..."
-                className="w-full bg-surface border border-border rounded-lg pl-9 pr-9 py-2 text-sm text-text placeholder-muted/60 focus:outline-none focus:border-accent/50 transition-colors"
+                placeholder={
+                  fileFilter
+                    ? 'Search within this file...'
+                    : 'Search risks by title, file, or description...'
+                }
+                className="w-full min-w-[70px] bg-transparent border-none outline-none text-sm text-text placeholder-muted/60"
               />
               {searchQuery && (
                 <button
+                  type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-text"
+                  className="text-muted hover:text-text ml-2 shrink-0 p-0.5 rounded"
+                  title="Clear search text"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
-            <div className="shrink-0 flex items-center gap-2 bg-surface border border-border rounded-lg px-3 py-2">
-              <span className="text-xs text-muted font-medium hidden sm:inline">Cards per page:</span>
+            <div className="self-end sm:self-auto shrink-0 flex items-center gap-2 bg-surface border border-border rounded-lg px-3 py-1.5 sm:py-2">
+              <span className="text-xs text-muted font-medium">Cards per page:</span>
               <select
                 value={ITEMS_PER_PAGE}
                 onChange={e => setItemsPerPage(e.target.value)}
@@ -929,90 +1103,217 @@ const EngineeringHealthPage = () => {
               </select>
             </div>
           </div>
-          <div className="flex items-center gap-6 mb-3">
-            {[
-              {
-                id: 'active',
-                label: 'Active Risks',
-                count: activeRisks.length,
-              },
-              { id: 'ignored', label: 'Ignored', count: ignoredRisks.length },
-            ].map(tab => (
+
+          {/* Search matches alert in other files */}
+          {fileFilter && searchQuery && searchMatchesInOtherFilesCount > 0 && (
+            <div className="mb-4 px-3.5 py-2.5 bg-accent/10 border border-accent/25 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-3 text-xs text-text">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-2 h-2 rounded-full bg-accent shrink-0 animate-pulse" />
+                <span className="break-words">
+                  Found <strong className="text-accent">{searchMatchesInOtherFilesCount}</strong> result{searchMatchesInOtherFilesCount > 1 ? 's' : ''} matching &ldquo;{searchQuery}&rdquo; in other files across the repository.
+                </span>
+              </div>
               <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`pb-3 text-sm font-medium flex items-center gap-2 border-b-2 transition-colors ${
-                  activeTab === tab.id ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-text'
-                }`}
+                type="button"
+                onClick={handleClearFileFilter}
+                className="w-full sm:w-auto px-3 py-1 bg-accent text-white rounded font-medium hover:bg-accent-hover transition-colors shrink-0 shadow-sm text-center"
               >
-                {tab.label}
-                <span
-                  className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                    activeTab === tab.id ? 'bg-accent/20 text-accent' : 'bg-panel border border-border text-muted'
+                Search All Files
+              </button>
+            </div>
+          )}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-6">
+              {[
+                {
+                  id: 'active',
+                  label: 'Active Risks',
+                  count: filteredActive.length,
+                },
+                { id: 'ignored', label: 'Ignored', count: filteredIgnored.length },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    handleClearSelection();
+                  }}
+                  className={`pb-3 text-sm font-medium flex items-center gap-2 border-b-2 transition-colors ${
+                    activeTab === tab.id ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-text'
                   }`}
                 >
-                  {tab.count}
-                </span>
-              </button>
-            ))}
-
-            {/* Category filter chips — only for active tab */}
-            {activeTab === 'active' && (
-              <div className="ml-auto flex flex-wrap gap-2 pb-3">
-                {fileFilter && (
-                  <button
-                    onClick={() => {
-                      navigate(`/explore/${repoId}/health`);
-                      setCategoryFilter(null);
-                    }}
-                    className="text-xs px-2 py-1 bg-surface border border-border rounded text-muted hover:text-text transition-colors flex items-center gap-1"
+                  {tab.label}
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                      activeTab === tab.id ? 'bg-accent/20 text-accent' : 'bg-panel border border-border text-muted'
+                    }`}
                   >
-                    <RefreshCw className="w-3 h-3" /> Clear Filters
-                  </button>
-                )}
-                {['ALL', 'QUALITY', 'COUPLING', 'DEPENDENCY', 'ARCHITECTURE', 'SIZE'].map(cat => {
-                  const isActive = cat === 'ALL' ? categoryFilter === null : categoryFilter === cat;
-                  const count =
-                    cat === 'ALL'
-                      ? activeRisks.filter(r => !fileFilter || r.file === fileFilter).length
-                      : activeRisks.filter(r => r.category === cat && (!fileFilter || r.file === fileFilter)).length;
-                  return (
-                    <button
-                      key={cat}
-                      onClick={() => setCategoryFilter(cat === 'ALL' ? null : cat)}
-                      className={`text-xs pl-3 pr-2 py-1 rounded border transition-all flex items-center gap-2 ${
-                        isActive
-                          ? 'bg-accent/20 border-accent/40 text-accent font-medium'
-                          : 'bg-surface border-border text-muted hover:text-text hover:border-text/30'
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* Category filter chips */}
+            <div className="flex flex-wrap items-center gap-2 pb-3 w-full sm:w-auto">
+              {fileFilter && (
+                <button
+                  onClick={() => {
+                    navigate(`/explore/${repoId}/health`);
+                    setCategoryFilter(null);
+                  }}
+                  className="text-xs px-2 py-1 bg-surface border border-border rounded text-muted hover:text-text transition-colors flex items-center gap-1"
+                >
+                  <RefreshCw className="w-3 h-3" /> Clear Filters
+                </button>
+              )}
+              {['ALL', 'QUALITY', 'COUPLING', 'DEPENDENCY', 'ARCHITECTURE', 'SIZE'].map(cat => {
+                const isActive = cat === 'ALL' ? categoryFilter === null : categoryFilter === cat;
+                const sourceList = activeTab === 'active' ? activeRisks : ignoredRisks;
+                const count =
+                  cat === 'ALL'
+                    ? sourceList.filter(r => !fileFilter || r.file === fileFilter).length
+                    : sourceList.filter(r => r.category === cat && (!fileFilter || r.file === fileFilter)).length;
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setCategoryFilter(cat === 'ALL' ? null : cat)}
+                    className={`text-xs pl-3 pr-2 py-1 rounded border transition-all flex items-center gap-2 ${
+                      isActive
+                        ? 'bg-accent/20 border-accent/40 text-accent font-medium'
+                        : 'bg-surface border-border text-muted hover:text-text hover:border-text/30'
+                    }`}
+                  >
+                    {cat === 'ALL' ? 'All' : cat}
+                    <span
+                      className={`px-1.5 py-0.5 rounded-full text-[10px] leading-none ${
+                        isActive ? 'bg-accent/30 text-accent' : 'bg-panel border border-border text-muted'
                       }`}
                     >
-                      {cat === 'ALL' ? 'All' : cat}
-                      <span
-                        className={`px-1.5 py-0.5 rounded-full text-[10px] leading-none ${
-                          isActive ? 'bg-accent/30 text-accent' : 'bg-panel border border-border text-muted'
-                        }`}
-                      >
-                        {count}
-                      </span>
-                    </button>
-                  );
-                })}
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {fileFilter && (
+            <div className="flex flex-wrap items-center gap-2 mb-3 text-xs">
+              <span className="text-muted">Filtered to file:</span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-accent/10 border border-accent/30 text-accent font-mono text-[11px] shadow-sm">
+                <span className="truncate max-w-xs sm:max-w-md">{fileFilter}</span>
+                <button
+                  type="button"
+                  onClick={handleClearFileFilter}
+                  className="hover:bg-accent/20 rounded p-0.5 text-accent hover:text-text transition-colors"
+                  title="Clear file filter"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </span>
+              <button
+                type="button"
+                onClick={handleClearFileFilter}
+                className="text-xs text-accent hover:underline font-medium ml-1"
+              >
+                Clear file filter to search all files
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* ── Selection & Bulk Actions Bar ── */}
+        {((activeTab === 'active' && filteredActive.length > 0) ||
+          (activeTab === 'ignored' && filteredIgnored.length > 0)) && (
+          <div
+            className={`mb-4 p-3 border rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm transition-colors ${selectedRiskIds.size > 0 ? 'bg-accent/10 border-accent/20' : 'bg-surface border-border'}`}
+          >
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleSelectAllVisible}
+                className="px-3 py-1.5 text-xs font-medium bg-panel hover:bg-panel/80 border border-border rounded text-text transition-colors shadow-sm"
+              >
+                Select All
+              </button>
+              {selectedRiskIds.size > 0 && (
+                <span className="text-sm font-medium text-text">
+                  {selectedRiskIds.size} risk{selectedRiskIds.size > 1 ? 's' : ''} selected
+                </span>
+              )}
+            </div>
+
+            {selectedRiskIds.size > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                {activeTab === 'active' && (
+                  <button
+                    onClick={() => handleBulkIgnore(false)}
+                    className="px-3 py-1.5 text-xs font-medium bg-panel hover:bg-panel/80 border border-border rounded text-text flex items-center gap-1 transition-colors"
+                  >
+                    <EyeOff className="w-3 h-3" /> Ignore Selected
+                  </button>
+                )}
+                {activeTab === 'ignored' && (
+                  <button
+                    onClick={() => handleBulkIgnore(true)}
+                    className="px-3 py-1.5 text-xs font-medium bg-panel hover:bg-panel/80 border border-border rounded text-text flex items-center gap-1 transition-colors"
+                  >
+                    <RotateCcw className="w-3 h-3" /> Restore Selected
+                  </button>
+                )}
+                <button
+                  onClick={handleClearSelection}
+                  className="px-3 py-1.5 text-xs font-medium bg-panel hover:bg-panel/80 border border-border rounded text-muted hover:text-text transition-colors"
+                >
+                  Clear Selection
+                </button>
               </div>
             )}
           </div>
-
-          {fileFilter && activeTab === 'active' && (
-            <p className="text-xs text-muted mb-3">
-              Filtered to file: <code className="text-text">{fileFilter}</code>
-            </p>
-          )}
-        </div>
+        )}
 
         {/* ── Risk Grid ── */}
         {activeTab === 'active' &&
           (filteredActive.length === 0 ? (
             <div className="rounded border border-border bg-panel p-8 text-center text-muted">
-              {fileFilter ? 'No engineering risks found for this file.' : 'No active risks detected.'}
+              {searchMatchesInOtherFilesCount > 0 ? (
+                <div className="max-w-md mx-auto flex flex-col items-center">
+                  <p className="text-text font-medium mb-1">
+                    No active risks matching &ldquo;{searchQuery}&rdquo; in {fileFilter.split('/').pop()}.
+                  </p>
+                  <p className="text-xs text-muted mb-4">
+                    However, {searchMatchesInOtherFilesCount} matching risk{searchMatchesInOtherFilesCount > 1 ? 's were' : ' was'} found across other files in the project.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleClearFileFilter}
+                    className="px-4 py-2 text-xs bg-accent text-white rounded-lg hover:bg-accent-hover transition-colors font-semibold inline-flex items-center gap-2 shadow"
+                  >
+                    Show {searchMatchesInOtherFilesCount} Result{searchMatchesInOtherFilesCount > 1 ? 's' : ''} Across All Files
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="mb-3">
+                    {fileFilter
+                      ? searchQuery
+                        ? `No active risks matching "${searchQuery}" in ${fileFilter.split('/').pop()}.`
+                        : 'No engineering risks found for this file.'
+                      : searchQuery
+                        ? `No active risks matching "${searchQuery}".`
+                        : 'No active risks detected.'}
+                  </p>
+                  {fileFilter && (
+                    <button
+                      type="button"
+                      onClick={handleClearFileFilter}
+                      className="px-3 py-1.5 text-xs bg-accent text-white rounded-md hover:bg-accent-hover transition-colors font-medium inline-flex items-center gap-1.5"
+                    >
+                      <X className="w-3.5 h-3.5" /> Clear File Filter & Search All Files
+                    </button>
+                  )}
+                </>
+              )}
             </div>
           ) : (
             <>
@@ -1027,6 +1328,8 @@ const EngineeringHealthPage = () => {
                     onExplainAi={handleExplainAi}
                     onIgnore={handleIgnoreToggle}
                     ignored={false}
+                    selected={selectedRiskIds.has(risk.id)}
+                    onSelect={() => handleSelectRisk(risk.id)}
                   />
                 ))}
               </div>
@@ -1093,14 +1396,47 @@ const EngineeringHealthPage = () => {
           ))}
 
         {activeTab === 'ignored' &&
-          (ignoredRisks.length === 0 ? (
+          (filteredIgnored.length === 0 ? (
             <div className="rounded border border-border bg-panel p-8 text-center text-muted">
-              No risks have been ignored yet.
+              {searchMatchesInOtherFilesCount > 0 ? (
+                <div className="max-w-md mx-auto flex flex-col items-center">
+                  <p className="text-text font-medium mb-1">
+                    No ignored risks matching &ldquo;{searchQuery}&rdquo; in {fileFilter.split('/').pop()}.
+                  </p>
+                  <p className="text-xs text-muted mb-4">
+                    However, {searchMatchesInOtherFilesCount} matching ignored risk{searchMatchesInOtherFilesCount > 1 ? 's were' : ' was'} found across other files in the project.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleClearFileFilter}
+                    className="px-4 py-2 text-xs bg-accent text-white rounded-lg hover:bg-accent-hover transition-colors font-semibold inline-flex items-center gap-2 shadow"
+                  >
+                    Show {searchMatchesInOtherFilesCount} Result{searchMatchesInOtherFilesCount > 1 ? 's' : ''} Across All Files
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="mb-3">
+                    {fileFilter || categoryFilter || searchQuery
+                      ? 'No ignored risks match the current filters.'
+                      : 'No risks have been ignored yet.'}
+                  </p>
+                  {fileFilter && (
+                    <button
+                      type="button"
+                      onClick={handleClearFileFilter}
+                      className="px-3 py-1.5 text-xs bg-accent text-white rounded-md hover:bg-accent-hover transition-colors font-medium inline-flex items-center gap-1.5"
+                    >
+                      <X className="w-3.5 h-3.5" /> Clear File Filter & Search All Files
+                    </button>
+                  )}
+                </>
+              )}
             </div>
           ) : (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {ignoredRisks.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map(risk => (
+                {filteredIgnored.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map(risk => (
                   <RiskCard
                     key={risk.id}
                     risk={risk}
@@ -1110,11 +1446,13 @@ const EngineeringHealthPage = () => {
                     onExplainAi={null}
                     onIgnore={handleIgnoreToggle}
                     ignored={true}
+                    selected={selectedRiskIds.has(risk.id)}
+                    onSelect={() => handleSelectRisk(risk.id)}
                   />
                 ))}
               </div>
 
-              {ignoredRisks.length > ITEMS_PER_PAGE && (
+              {filteredIgnored.length > ITEMS_PER_PAGE && (
                 <div className="flex items-center justify-center gap-4 mt-8">
                   <button
                     onClick={() => setCurrentPage(currentPage - 1)}
@@ -1124,11 +1462,11 @@ const EngineeringHealthPage = () => {
                     Previous
                   </button>
                   <span className="text-sm text-muted">
-                    Page {currentPage} of {Math.ceil(ignoredRisks.length / ITEMS_PER_PAGE)}
+                    Page {currentPage} of {Math.ceil(filteredIgnored.length / ITEMS_PER_PAGE)}
                   </span>
                   <button
                     onClick={() => setCurrentPage(currentPage + 1)}
-                    disabled={currentPage === Math.ceil(ignoredRisks.length / ITEMS_PER_PAGE)}
+                    disabled={currentPage === Math.ceil(filteredIgnored.length / ITEMS_PER_PAGE)}
                     className="px-3 py-1.5 bg-surface border border-border rounded text-sm hover:bg-surface/80 disabled:opacity-50"
                   >
                     Next
