@@ -25,7 +25,9 @@ export function calculateHotspots(analysis, graph, architectureModel, refactorin
   function addScore(filePath, points, reason) {
     const data = getOrInit(filePath);
     data.score += points;
-    data.reasons.push(reason);
+    if (reason && !data.reasons.includes(reason)) {
+      data.reasons.push(reason);
+    }
   }
 
   if (analysis?.files) {
@@ -33,13 +35,16 @@ export function calculateHotspots(analysis, graph, architectureModel, refactorin
       if (f.symbols && f.symbols.length > 30) {
         addScore(f.filePath, 10, 'Many symbols exported/defined');
       }
+      if (f.metrics?.hotspotQuadrant === 'CRITICAL_HOTSPOT') {
+        addScore(f.filePath, 35, `Behavioral Hotspot (churn ${f.metrics?.churnScore || 0}, CC ${f.metrics?.complexityScore || 0})`);
+      }
     });
   }
 
   if (graph?.nodes && graph?.edges) {
     graph.nodes.forEach(n => {
       if (n.type !== 'fileNode') return;
-      const filePath = n.data.filePath;
+      const filePath = n.data?.filePath || n.id.replace(/^file:/, '');
 
       let fanOut = 0;
       let fanIn = 0;
@@ -64,11 +69,38 @@ export function calculateHotspots(analysis, graph, architectureModel, refactorin
   }
 
   if (refactoringIntel?.candidates) {
+    const fileCandidateCounts = new Map();
     refactoringIntel.candidates.forEach(c => {
-      const weight = c.priority === 'critical' ? 40 : c.priority === 'high' ? 25 : 10;
+      const prio = c.priority || 'warning';
       c.files.forEach(filePath => {
-        addScore(filePath, weight, `Involved in ${c.priority} priority refactoring candidate`);
+        if (!fileCandidateCounts.has(filePath)) {
+          fileCandidateCounts.set(filePath, { critical: 0, high: 0, warning: 0 });
+        }
+        const counts = fileCandidateCounts.get(filePath);
+        if (counts[prio] !== undefined) counts[prio]++;
+        else counts.warning++;
       });
+    });
+
+    fileCandidateCounts.forEach((counts, filePath) => {
+      let weight = 0;
+      const parts = [];
+      if (counts.critical > 0) {
+        weight += Math.min(40, counts.critical * 20);
+        parts.push(`${counts.critical} critical`);
+      }
+      if (counts.high > 0) {
+        weight += Math.min(30, counts.high * 15);
+        parts.push(`${counts.high} high-priority`);
+      }
+      if (counts.warning > 0) {
+        weight += Math.min(20, counts.warning * 5);
+        parts.push(`${counts.warning} warning`);
+      }
+      if (parts.length > 0) {
+        const total = counts.critical + counts.high + counts.warning;
+        addScore(filePath, weight, `Involved in ${parts.join(', ')} refactoring candidate${total > 1 ? 's' : ''}`);
+      }
     });
   }
 
@@ -79,7 +111,7 @@ export function calculateHotspots(analysis, graph, architectureModel, refactorin
       hotspots.push({
         filePath,
         score: normalizedScore,
-        reasons: data.reasons,
+        reasons: Array.from(new Set(data.reasons)),
       });
     }
   });

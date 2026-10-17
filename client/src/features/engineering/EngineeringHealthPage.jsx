@@ -687,7 +687,11 @@ const EngineeringHealthPage = () => {
 
     let penalty = 0;
     for (const r of optimisticRisks) {
-      penalty += SEV_SCORE[r.severity] || 0;
+      let p = SEV_SCORE[r.severity] || 0;
+      if (r.category === 'COUPLING' || r.title?.includes('Coupling')) {
+        p = 1;
+      }
+      penalty += p;
     }
 
     const totalFiles = model.metrics?.totalFiles || 1;

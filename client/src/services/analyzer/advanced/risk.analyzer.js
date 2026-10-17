@@ -604,7 +604,15 @@ function analyzeCodeQualityRisks(analysis, graph) {
 function calculateScoreAndLevel(risks, totalFiles = 1) {
   let penalty = 0;
   for (const risk of risks) {
-    penalty += SEVERITY_PENALTY[risk.severity] || 0;
+    let p = SEVERITY_PENALTY[risk.severity] || 0;
+    // Significantly reduced penalty for coupling issues (both static & temporal coupling: 1 point instead of 5)
+    if (
+      risk.category === RISK_CATEGORIES.COUPLING ||
+      risk.title.includes('Coupling')
+    ) {
+      p = 1;
+    }
+    penalty += p;
   }
 
   // Normalize penalty by repository size (baseline: 25 files)

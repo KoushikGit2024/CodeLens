@@ -22,6 +22,8 @@ import {
   Sparkles,
   X,
   MessageSquare,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { useAIState, useAI } from '../../shared/context/AIContext';
 import { useRepository } from '../../shared/context/RepositoryContext';
@@ -29,6 +31,62 @@ import { useToast } from '../../shared/context/ToastContext';
 
 import OpenSourceButton from '../../shared/components/OpenSourceButton';
 import { tryMakeSourceRef } from '../../shared/navigation/sourceRef';
+
+function HotspotItem({ h }) {
+  const [expanded, setExpanded] = useState(false);
+  const reasons = h.reasons || [];
+  const previewReasons = expanded ? reasons : reasons.slice(0, 2);
+  const hasMore = reasons.length > 2;
+
+  return (
+    <div className="flex flex-col gap-1.5 pb-3 border-b border-text/5 last:border-0 last:pb-0">
+      <div className="flex items-center justify-between min-w-0">
+        <span className="text-xs font-mono text-text truncate max-w-[75%]" title={h.filePath}>
+          {h.filePath}
+        </span>
+        <span className="text-xs font-bold text-warning font-mono bg-warning/10 px-1.5 py-0.5 rounded">
+          {h.score}
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-1 items-center">
+        {previewReasons.map((r, idx) => (
+          <span
+            key={idx}
+            className="text-[10px] text-muted bg-surface border border-border px-1.5 py-0.5 rounded leading-tight"
+          >
+            {r}
+          </span>
+        ))}
+        {hasMore && (
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="text-[10px] text-accent hover:underline flex items-center gap-0.5 font-medium px-1 py-0.5"
+          >
+            {expanded ? (
+              <>
+                Collapse <ChevronUp className="w-3 h-3" />
+              </>
+            ) : (
+              <>
+                +{reasons.length - 2} more <ChevronDown className="w-3 h-3" />
+              </>
+            )}
+          </button>
+        )}
+      </div>
+      {h.filePath && (
+        <div className="self-end mt-0.5">
+          <OpenSourceButton
+            ref={tryMakeSourceRef({ filePath: h.filePath })}
+            label="View File"
+            className="!text-[10px] shrink-0 py-0.5"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function RepositoryIntelligencePage() {
   const { repoId } = useParams();
@@ -392,24 +450,7 @@ export default function RepositoryIntelligencePage() {
             {data.hotspots && data.hotspots.length > 0 ? (
               <div className="flex flex-col gap-3">
                 {data.hotspots.slice(0, 5).map((h, i) => (
-                  <div key={i} className="flex flex-col gap-1 pb-3 border-b border-text/5 last:border-0 last:pb-0">
-                    <div className="flex items-center justify-between min-w-0">
-                      <span className="text-xs font-mono text-text truncate max-w-[80%]" title={h.filePath}>
-                        {h.filePath}
-                      </span>
-                      <span className="text-xs font-bold text-warning">{h.score}</span>
-                    </div>
-                    <div className="flex justify-between items-end">
-                      <span className="text-[10px] text-muted leading-tight max-w-[80%]">{h.reasons.join(' • ')}</span>
-                      {h.filePath ? (
-                        <OpenSourceButton
-                          ref={tryMakeSourceRef({ filePath: h.filePath })}
-                          label="View File"
-                          className="!text-[10px] shrink-0"
-                        />
-                      ) : null}
-                    </div>
-                  </div>
+                  <HotspotItem key={i} h={h} />
                 ))}
               </div>
             ) : (
