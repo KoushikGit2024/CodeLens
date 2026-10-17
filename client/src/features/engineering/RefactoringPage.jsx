@@ -23,6 +23,9 @@ import {
   RefreshCw,
   AlertCircle,
   X,
+  Copy,
+  Check,
+  SplitSquareHorizontal,
 } from 'lucide-react';
 import { DiffEditor } from '@monaco-editor/react';
 import { ResizableLayout } from '../../shared/components/ResizableLayout';
@@ -33,6 +36,7 @@ import { repositoryApi } from '../../shared/api';
 import AiResponse from '../../shared/components/ai/AiResponse';
 import PageHeader from '../../shared/components/PageHeader';
 import OpenSourceButton from '../../shared/components/OpenSourceButton';
+import MetricInfoButton from '../../shared/components/MetricInfoButton';
 import { makeSourceRef, tryMakeSourceRef } from '../../shared/navigation/sourceRef';
 
 // Palette constants — all in sync with CSS variables
@@ -619,6 +623,150 @@ export default function RefactoringPage() {
   );
 }
 
+// ── Decomposition Blueprint View ─────────────────────────────────────────────
+/**
+ * Renders automated file decomposition blueprints generated via LCOM4 symbol clustering.
+ */
+const DecompositionBlueprintView = ({ blueprint }) => {
+  const [copiedPath, setCopiedPath] = useState(null);
+
+  if (!blueprint || !blueprint.clusters || blueprint.clusters.length <= 1) {
+    return null;
+  }
+
+  const handleCopy = path => {
+    navigator.clipboard.writeText(path);
+    setCopiedPath(path);
+    setTimeout(() => setCopiedPath(null), 2000);
+  };
+
+  const getCohesionStyle = rating => {
+    if (rating === 'High') return 'text-success bg-success/10 border-success/30';
+    if (rating === 'Moderate') return 'text-warning bg-warning/10 border-warning/30';
+    return 'text-danger bg-danger/10 border-danger/30';
+  };
+
+  return (
+    <div className="flex flex-col gap-3.5 p-5 rounded-2xl bg-panel border border-accent/30 shadow-lg relative overflow-hidden animate-in fade-in duration-200">
+      {/* Decorative gradient background flare */}
+      <div className="absolute top-0 right-0 w-80 h-36 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
+
+      {/* Header bar */}
+      <div className="flex items-start justify-between gap-3 pb-3 border-b border-border/60">
+        <div className="flex items-start gap-3">
+          <div className="p-2.5 rounded-xl bg-accent/10 text-accent border border-accent/20 shrink-0 mt-0.5">
+            <SplitSquareHorizontal className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <h3 className="text-sm font-bold text-text">Automated Decomposition Blueprint</h3>
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${getCohesionStyle(blueprint.cohesionRating)}`}>
+                Cohesion: {blueprint.cohesionRating}
+              </span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-surface border border-border text-muted">
+                LCOM4: {blueprint.lcom4}
+              </span>
+            </div>
+            <p className="text-xs text-muted leading-relaxed">
+              Symbol graph clustering identified {blueprint.clusterCount} single-responsibility modules across {blueprint.totalSymbols} symbols.
+            </p>
+          </div>
+        </div>
+
+        <MetricInfoButton
+          title="Lack of Cohesion of Methods (LCOM4)"
+          badge="Modular Decomposition"
+          formula="LCOM4 = Connected Components in Symbol Graph"
+          description="Formulated by Hitz & Montazeri. Measures whether callable functions and methods within a file share internal state or invoke each other. An LCOM4 score > 1 indicates multiple disconnected responsibilities in a single module."
+          bullets={[
+            'LCOM4 = 1: High cohesion. Methods form a single connected component and share unified responsibility.',
+            'LCOM4 = 2: Moderate cohesion. Contains two distinct functional clusters.',
+            'LCOM4 >= 3: Low cohesion (God-file). The file contains 3 or more completely independent routine clusters.'
+          ]}
+          resolution="Decompose the file into the suggested target modules shown in this blueprint to adhere strictly to the Single Responsibility Principle (SRP)."
+        />
+      </div>
+
+      {/* Target Files Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1">
+        {blueprint.clusters.map((cluster, idx) => (
+          <div
+            key={cluster.id || idx}
+            className="flex flex-col p-4 rounded-xl bg-surface/90 border border-border hover:border-accent/40 transition-all shadow-sm"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-accent/15 text-accent border border-accent/25">
+                {cluster.role}
+              </span>
+              <span className="text-[10px] font-mono text-muted/80">
+                ~{cluster.lineCountEstimate} LOC
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 p-2 rounded bg-panel border border-border/60 mb-2.5">
+              <span className="text-xs font-mono font-medium text-text truncate" title={cluster.targetPath}>
+                {cluster.targetFileName}
+              </span>
+              <button
+                type="button"
+                onClick={() => handleCopy(cluster.targetFileName)}
+                className="text-muted hover:text-accent p-1 rounded hover:bg-surface transition-colors shrink-0"
+                title="Copy proposed filename"
+              >
+                {copiedPath === cluster.targetFileName ? (
+                  <Check className="w-3.5 h-3.5 text-success" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5" />
+                )}
+              </button>
+            </div>
+
+            <p className="text-[11px] text-muted mb-3 leading-relaxed">
+              {cluster.rationale}
+            </p>
+
+            <div className="mt-auto">
+              <span className="text-[10px] uppercase font-bold text-muted/70 tracking-wider block mb-1.5">
+                Extracted Symbols ({cluster.symbolCount}):
+              </span>
+              <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto custom-scrollbar">
+                {cluster.symbols.map(sym => (
+                  <span
+                    key={sym}
+                    className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-panel border border-border text-text/80 truncate max-w-[180px]"
+                    title={sym}
+                  >
+                    {sym}()
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Migration Checklist */}
+      {blueprint.migrationSteps?.length > 0 && (
+        <div className="mt-1 p-3.5 rounded-xl bg-surface/60 border border-border/60">
+          <span className="text-[10px] uppercase tracking-wider font-bold text-muted block mb-2">
+            Automated Migration Checklist:
+          </span>
+          <div className="space-y-1.5">
+            {blueprint.migrationSteps.map((step, sIdx) => (
+              <div key={sIdx} className="flex items-start gap-2 text-xs text-muted/90">
+                <span className="w-4 h-4 rounded-full bg-accent/15 text-accent text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                  {sIdx + 1}
+                </span>
+                <span className="leading-snug">{step}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── Center Panel ──────────────────────────────────────────────────────────────
 /**
  * It fetches the change impact payload, then extracts the directly affected files,
@@ -1113,6 +1261,9 @@ function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }
           )}
         </div>
       </div>
+
+      {/* Decomposition Blueprint (LCOM4 Cohesion Clustering) */}
+      <DecompositionBlueprintView blueprint={candidate.decompositionBlueprint} />
 
       {/* Strategies */}
       {candidate.suggestedStrategies?.length > 0 && (

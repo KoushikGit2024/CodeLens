@@ -83,12 +83,23 @@ Format the output as JSON with the following structure:
   }
 
   static buildRefactoringStrategyPrompt(candidate) {
+    let blueprintText = '';
+    if (candidate.decompositionBlueprint?.clusters?.length > 1) {
+      blueprintText = `
+Architectural Decomposition Blueprint (LCOM4 = ${candidate.decompositionBlueprint.lcom4}, Cohesion: ${candidate.decompositionBlueprint.cohesionRating}):
+Proposed Split Files:
+${candidate.decompositionBlueprint.clusters.map(c => `  - ${c.targetFileName} (${c.role}): symbols [${c.symbols.join(', ')}] -> ${c.rationale}`).join('\n')}
+Migration Steps:
+${candidate.decompositionBlueprint.migrationSteps.map((s, idx) => `  ${idx + 1}. ${s}`).join('\n')}
+`;
+    }
+
     return `You are an expert software architect. Analyze the following refactoring candidate and provide a detailed strategy.
 Title: ${candidate.title}
 Summary: ${candidate.summary}
 Affected Files: ${candidate.files?.join(', ')}
 Severity: ${candidate.severity}
-
+${blueprintText}
 Generate a structured JSON response matching this exact schema:
 {
   "summary": "A 1-paragraph summary of the approach",
