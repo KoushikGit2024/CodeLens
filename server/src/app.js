@@ -8,13 +8,22 @@ const { globalRateLimiter } = require('./core/middleware/rate-limit.middleware')
 const app = express();
 
 // ── Middleware ────────────────────────────────────────────────────────────────
-const isProd = process.env.NODE_ENV === 'production';
-const allowedOrigins = isProd ? [process.env.FRONTEND_URL].filter(Boolean) : ['http://localhost:5173'];
+const configuredOrigins = (process.env.FRONTEND_URL || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+
+const allowedOrigins = [
+  ...configuredOrigins,
+  'https://codelens-rust.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
+];
 
 app.use(
   cors({
     origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.includes(origin) || allowedOrigins.some(ao => origin.endsWith('.vercel.app'))) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));

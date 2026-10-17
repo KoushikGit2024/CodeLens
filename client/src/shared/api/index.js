@@ -34,12 +34,20 @@ import { aiArtifactStore, buildCacheKey } from '../../services/storage/aiArtifac
 import { clearRepoBookmarks } from '../../services/storage/bookmark.store.js';
 import { ContextOrchestrator } from '../../services/analyzer/advanced/context.orchestrator.js';
 
+function getBaseUrl() {
+  const rawUrl = import.meta.env.VITE_API_URL;
+  if (import.meta.env.PROD && rawUrl) {
+    const cleanUrl = rawUrl.trim().replace(/\/+$/, '');
+    return cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`;
+  }
+  return '/api';
+}
+
 // It initiates the axios instance, then extracts the base configuration, and then it applies a timeout for LLM proxy calls.
 const api = axios.create({
-  baseURL: import.meta.env.PROD ? import.meta.env.VITE_API_URL : '/api',
+  baseURL: getBaseUrl(),
   timeout: 60_000,
 });
-console.log(import.meta.env.PROD ? import.meta.env.VITE_API_URL : '/api');
 api.interceptors.request.use(
   async config => {
     const {

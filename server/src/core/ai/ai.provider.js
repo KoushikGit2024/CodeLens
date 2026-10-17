@@ -341,7 +341,7 @@ async function generateAnswer(prompt) {
   const providers = getConfiguredProviders();
   if (providers.length === 0) {
     throw new ProviderUnavailableError(
-      'No AI provider is configured. Set LLM_API_KEY + LLM_PROJECT_ID, GEMINI_API_KEY, or OPENAI_API_KEY in your .env file.'
+      'No AI provider is configured. Set GROQ_API_KEY, GEMINI_API_KEY, OPENAI_API_KEY, or LLM_API_KEY + LLM_PROJECT_ID in your .env file.'
     );
   }
 

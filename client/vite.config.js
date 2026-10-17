@@ -1,23 +1,29 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
-export default defineConfig({
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
-  },
-  plugins: [react()],
-  server: {
-    port: 5173,
-    proxy: {
-      '/api': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  const apiUrl = env.VITE_API_URL || 'http://localhost:3001';
+  const proxyTarget = apiUrl.trim().replace(/\/api\/?$/, '').replace(/\/+$/, '') || 'http://localhost:3001';
+
+  return {
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src'),
       },
     },
-  },
+    plugins: [react()],
+    server: {
+      port: 5173,
+      proxy: {
+        '/api': {
+          target: proxyTarget,
+          changeOrigin: true,
+          secure: false,
+        },
+      },
+    },
   test: {
     environment: 'jsdom',
     setupFiles: ['./tests/setupTests.js'],
@@ -42,6 +48,7 @@ export default defineConfig({
       // 512 MB RSS cap — prevents OOM on dev machines
       execArgv: ['--max-old-space-size=512'],
     },
-    testTimeout: 30_000,
-  },
+      testTimeout: 30_000,
+    },
+  };
 });
