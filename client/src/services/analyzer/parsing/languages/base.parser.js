@@ -166,20 +166,5 @@ export class BaseParser {
       if (query) query.delete();
     }
   }
-
-  /**
-   * Counts AST nodes representing structural data like cyclomatic complexity.
-   */
-  calculateComplexity(rootNode, queryString) {
-    let query = null;
-    try {
-      const language = this.tsParser.getLanguage();
-      query = language.query(queryString);
-      return query.matches(rootNode).length;
-    } catch {
-      return 0;
-    } finally {
-      if (query) query.delete();
-    }
-  }
 }
+

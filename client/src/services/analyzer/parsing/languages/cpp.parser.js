@@ -23,7 +23,7 @@ import {
   createNamespace,
   SymbolKind,
 } from '../symbols.js';
-import { calculateComplexity } from '../../advanced/complexity.analyzer.js';
+import { analyzeComplexity } from '../../advanced/complexity.analyzer.js';
 import { generateStructuralHash } from '../../advanced/clone.analyzer.js';
 
 export class CppParser extends BaseParser {
@@ -263,7 +263,7 @@ export class CppParser extends BaseParser {
     }
 
     const params = this._extractParams(coreDeclarator, source);
-    const complexity = calculateComplexity(node);
+    const comp = analyzeComplexity(node);
     const hash = generateStructuralHash(node);
 
     if (isMethod) {
@@ -275,7 +275,10 @@ export class CppParser extends BaseParser {
           async: false,
           generator: false,
           params,
-          complexity,
+          complexity: comp.cyclomatic,
+          cognitiveComplexity: comp.cognitive,
+          nestingDepth: comp.maxNestingDepth,
+          maintainabilityIndex: comp.maintainabilityIndex,
           hash,
           location: locationFromNode(node),
         })
@@ -287,7 +290,10 @@ export class CppParser extends BaseParser {
           async: false,
           generator: false,
           params,
-          complexity,
+          complexity: comp.cyclomatic,
+          cognitiveComplexity: comp.cognitive,
+          nestingDepth: comp.maxNestingDepth,
+          maintainabilityIndex: comp.maintainabilityIndex,
           hash,
           location: locationFromNode(node),
         })

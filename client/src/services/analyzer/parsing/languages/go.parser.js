@@ -21,7 +21,7 @@ import {
   createStruct,
   createFunction,
 } from '../symbols.js';
-import { calculateComplexity } from '../../advanced/complexity.analyzer.js';
+import { analyzeComplexity } from '../../advanced/complexity.analyzer.js';
 import { generateStructuralHash } from '../../advanced/clone.analyzer.js';
 
 export class GoParser extends BaseParser {
@@ -234,7 +234,7 @@ export class GoParser extends BaseParser {
 
     const name = nodeText(nameNode, source);
     const params = this._extractParams(node, source);
-    const complexity = calculateComplexity(node);
+    const comp = analyzeComplexity(node);
     const hash = generateStructuralHash(node);
 
     symbols.push(
@@ -243,7 +243,10 @@ export class GoParser extends BaseParser {
         async: false,
         generator: false,
         params,
-        complexity,
+        complexity: comp.cyclomatic,
+        cognitiveComplexity: comp.cognitive,
+        nestingDepth: comp.maxNestingDepth,
+        maintainabilityIndex: comp.maintainabilityIndex,
         hash,
         location: locationFromNode(node),
       })
@@ -280,7 +283,7 @@ export class GoParser extends BaseParser {
     }
 
     const params = this._extractParams(node, source);
-    const complexity = calculateComplexity(node);
+    const comp = analyzeComplexity(node);
     const hash = generateStructuralHash(node);
 
     // Go methods are exported if they start with a capital letter
@@ -295,7 +298,10 @@ export class GoParser extends BaseParser {
         async: false,
         generator: false,
         params,
-        complexity,
+        complexity: comp.cyclomatic,
+        cognitiveComplexity: comp.cognitive,
+        nestingDepth: comp.maxNestingDepth,
+        maintainabilityIndex: comp.maintainabilityIndex,
         hash,
         location: locationFromNode(node),
       })

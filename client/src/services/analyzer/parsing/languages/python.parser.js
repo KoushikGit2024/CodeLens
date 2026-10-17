@@ -12,7 +12,7 @@
 
 import { BaseParser } from './base.parser.js';
 import { locationFromNode, createImport, createClass, createMethod, createFunction } from '../symbols.js';
-import { calculateComplexity } from '../../advanced/complexity.analyzer.js';
+import { analyzeComplexity } from '../../advanced/complexity.analyzer.js';
 import { generateStructuralHash } from '../../advanced/clone.analyzer.js';
 
 export class PythonParser extends BaseParser {
@@ -146,7 +146,7 @@ export class PythonParser extends BaseParser {
     const name = nodeText(nameNode, source);
     const isAsync = nodeText(node, source).startsWith('async');
     const params = this._extractParams(node, source);
-    const complexity = calculateComplexity(node);
+    const comp = analyzeComplexity(node);
     const hash = generateStructuralHash(node);
 
     symbols.push(
@@ -155,7 +155,10 @@ export class PythonParser extends BaseParser {
         async: isAsync,
         generator: false, // Too complex to detect without walking body for `yield`
         params,
-        complexity,
+        complexity: comp.cyclomatic,
+        cognitiveComplexity: comp.cognitive,
+        nestingDepth: comp.maxNestingDepth,
+        maintainabilityIndex: comp.maintainabilityIndex,
         hash,
         location: locationFromNode(node),
       })
@@ -175,7 +178,7 @@ export class PythonParser extends BaseParser {
     const params = this._extractParams(node, source);
     const decorators = this._extractDecorators(node, source);
     const isStatic = decorators.includes('staticmethod') || decorators.includes('classmethod');
-    const complexity = calculateComplexity(node);
+    const comp = analyzeComplexity(node);
     const hash = generateStructuralHash(node);
 
     symbols.push(
@@ -187,7 +190,10 @@ export class PythonParser extends BaseParser {
         generator: false,
         params,
         decorators,
-        complexity,
+        complexity: comp.cyclomatic,
+        cognitiveComplexity: comp.cognitive,
+        nestingDepth: comp.maxNestingDepth,
+        maintainabilityIndex: comp.maintainabilityIndex,
         hash,
         location: locationFromNode(node),
       })

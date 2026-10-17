@@ -11,6 +11,7 @@ vi.mock('isomorphic-git', () => ({
     TREE: vi.fn(),
     resolveRef: vi.fn(),
     readCommit: vi.fn(),
+    listBranches: vi.fn().mockResolvedValue([]),
   },
 }));
 
@@ -22,6 +23,7 @@ vi.mock('../../../../src/services/analyzer/repository/persistence.store', () => 
 describe('git.analyzer', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    git.listBranches.mockResolvedValue([]);
   });
 
   it('returns null if repo is missing .git folder', async () => {

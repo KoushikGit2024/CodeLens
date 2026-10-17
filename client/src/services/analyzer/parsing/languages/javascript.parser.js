@@ -33,7 +33,7 @@ import {
   SymbolKind,
 } from '../symbols';
 import { BaseParser } from './base.parser.js';
-import { calculateComplexity } from '../../advanced/complexity.analyzer.js';
+import { analyzeComplexity } from '../../advanced/complexity.analyzer.js';
 import { generateStructuralHash } from '../../advanced/clone.analyzer.js';
 
 export class JavaScriptParser extends BaseParser {
@@ -210,7 +210,7 @@ export class JavaScriptParser extends BaseParser {
     const isAsync = nodeHasChild(node, 'async');
     const isGen = node.type === 'generator_function_declaration';
     const params = this._extractParams(node, source);
-    const complexity = calculateComplexity(node);
+    const comp = analyzeComplexity(node);
     const hash = generateStructuralHash(node);
 
     symbols.push(
@@ -219,7 +219,10 @@ export class JavaScriptParser extends BaseParser {
         async: isAsync,
         generator: isGen,
         params,
-        complexity,
+        complexity: comp.cyclomatic,
+        cognitiveComplexity: comp.cognitive,
+        nestingDepth: comp.maxNestingDepth,
+        maintainabilityIndex: comp.maintainabilityIndex,
         hash,
         location: locationFromNode(node),
       })
@@ -244,7 +247,7 @@ export class JavaScriptParser extends BaseParser {
       const name = nodeText(nameNode, source);
       const isAsync = nodeHasChild(valueNode, 'async');
       const params = this._extractParams(valueNode, source);
-      const complexity = calculateComplexity(valueNode);
+      const comp = analyzeComplexity(valueNode);
       const hash = generateStructuralHash(valueNode);
 
       symbols.push(
@@ -252,7 +255,10 @@ export class JavaScriptParser extends BaseParser {
           name,
           async: isAsync,
           params,
-          complexity,
+          complexity: comp.cyclomatic,
+          cognitiveComplexity: comp.cognitive,
+          nestingDepth: comp.maxNestingDepth,
+          maintainabilityIndex: comp.maintainabilityIndex,
           hash,
           location: locationFromNode(child),
         })
@@ -296,7 +302,7 @@ export class JavaScriptParser extends BaseParser {
     const isAsync = nodeHasChild(node, 'async');
     const isGen = nodeHasChild(node, '*');
     const params = this._extractParams(node, source);
-    const complexity = calculateComplexity(node);
+    const comp = analyzeComplexity(node);
     const hash = generateStructuralHash(node);
 
     symbols.push(
@@ -307,7 +313,10 @@ export class JavaScriptParser extends BaseParser {
         async: isAsync,
         generator: isGen,
         params,
-        complexity,
+        complexity: comp.cyclomatic,
+        cognitiveComplexity: comp.cognitive,
+        nestingDepth: comp.maxNestingDepth,
+        maintainabilityIndex: comp.maintainabilityIndex,
         hash,
         location: locationFromNode(node),
       })

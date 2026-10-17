@@ -10,7 +10,7 @@ import {
   createFunction,
   createNamespace,
 } from '../symbols.js';
-import { calculateComplexity } from '../../advanced/complexity.analyzer.js';
+import { analyzeComplexity } from '../../advanced/complexity.analyzer.js';
 import { generateStructuralHash } from '../../advanced/clone.analyzer.js';
 
 export class SwiftParser extends BaseParser {
@@ -162,7 +162,7 @@ export class SwiftParser extends BaseParser {
     const name = this._nameOf(node, source);
     if (!name) return;
 
-    const complexity = calculateComplexity(node);
+    const comp = analyzeComplexity(node);
     const hash = generateStructuralHash(node);
 
     // Extract parameters
@@ -206,7 +206,10 @@ export class SwiftParser extends BaseParser {
           async: isAsync,
           generator: false,
           params,
-          complexity,
+          complexity: comp.cyclomatic,
+          cognitiveComplexity: comp.cognitive,
+          nestingDepth: comp.maxNestingDepth,
+          maintainabilityIndex: comp.maintainabilityIndex,
           hash,
           location: locationFromNode(node),
         })
@@ -218,7 +221,10 @@ export class SwiftParser extends BaseParser {
           async: isAsync,
           generator: false,
           params,
-          complexity,
+          complexity: comp.cyclomatic,
+          cognitiveComplexity: comp.cognitive,
+          nestingDepth: comp.maxNestingDepth,
+          maintainabilityIndex: comp.maintainabilityIndex,
           hash,
           location: locationFromNode(node),
         })

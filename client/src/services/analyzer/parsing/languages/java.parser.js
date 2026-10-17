@@ -20,7 +20,7 @@ import {
   createInterface,
   createConstructor,
 } from '../symbols.js';
-import { calculateComplexity } from '../../advanced/complexity.analyzer.js';
+import { analyzeComplexity } from '../../advanced/complexity.analyzer.js';
 import { generateStructuralHash } from '../../advanced/clone.analyzer.js';
 
 export class JavaParser extends BaseParser {
@@ -256,7 +256,7 @@ export class JavaParser extends BaseParser {
     const name = nodeText(nameNode, source);
     const modifiers = this._extractModifiers(node, source);
     const params = this._extractParams(node, source);
-    const complexity = calculateComplexity(node);
+    const comp = analyzeComplexity(node);
     const hash = generateStructuralHash(node);
 
     symbols.push(
@@ -268,7 +268,10 @@ export class JavaParser extends BaseParser {
         async: false,
         generator: false,
         params,
-        complexity,
+        complexity: comp.cyclomatic,
+        cognitiveComplexity: comp.cognitive,
+        nestingDepth: comp.maxNestingDepth,
+        maintainabilityIndex: comp.maintainabilityIndex,
         hash,
         location: locationFromNode(node),
       })

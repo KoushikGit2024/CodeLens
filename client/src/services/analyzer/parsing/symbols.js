@@ -52,13 +52,49 @@ export function createFunction({
   params = [],
   location,
   complexity = 1,
+  cognitiveComplexity = 0,
+  nestingDepth = 0,
+  maintainabilityIndex = 100,
   hash = null,
 }) {
-  return { kind: SymbolKind.FUNCTION, name, async: isAsync, generator, params, location, complexity, hash };
+  return {
+    kind: SymbolKind.FUNCTION,
+    name,
+    async: isAsync,
+    generator,
+    params,
+    location,
+    complexity,
+    cognitiveComplexity,
+    nestingDepth,
+    maintainabilityIndex,
+    hash,
+  };
 }
 
-export function createArrow({ name, async: isAsync = false, params = [], location, complexity = 1, hash = null }) {
-  return { kind: SymbolKind.ARROW, name, async: isAsync, params, location, complexity, hash };
+export function createArrow({
+  name,
+  async: isAsync = false,
+  params = [],
+  location,
+  complexity = 1,
+  cognitiveComplexity = 0,
+  nestingDepth = 0,
+  maintainabilityIndex = 100,
+  hash = null,
+}) {
+  return {
+    kind: SymbolKind.ARROW,
+    name,
+    async: isAsync,
+    params,
+    location,
+    complexity,
+    cognitiveComplexity,
+    nestingDepth,
+    maintainabilityIndex,
+    hash,
+  };
 }
 
 export function createClass({ name, superClass = null, location }) {
@@ -76,6 +112,9 @@ export function createMethod({
   location,
   decorators = [],
   complexity = 1,
+  cognitiveComplexity = 0,
+  nestingDepth = 0,
+  maintainabilityIndex = 100,
   hash = null,
 }) {
   return {
@@ -90,6 +129,9 @@ export function createMethod({
     location,
     decorators,
     complexity,
+    cognitiveComplexity,
+    nestingDepth,
+    maintainabilityIndex,
     hash,
   };
 }

@@ -20,7 +20,7 @@ import {
   createInterface,
   SymbolKind,
 } from '../symbols.js';
-import { calculateComplexity } from '../../advanced/complexity.analyzer.js';
+import { analyzeComplexity } from '../../advanced/complexity.analyzer.js';
 import { generateStructuralHash } from '../../advanced/clone.analyzer.js';
 
 export class KotlinParser extends BaseParser {
@@ -259,7 +259,7 @@ export class KotlinParser extends BaseParser {
     const visibility = this._visibilityFromModText(modText);
 
     const params = this._extractParams(node, source);
-    const complexity = calculateComplexity(node);
+    const comp = analyzeComplexity(node);
     const hash = generateStructuralHash(node);
 
     symbols.push(
@@ -271,7 +271,10 @@ export class KotlinParser extends BaseParser {
         async: isSuspend,
         generator: false,
         params,
-        complexity,
+        complexity: comp.cyclomatic,
+        cognitiveComplexity: comp.cognitive,
+        nestingDepth: comp.maxNestingDepth,
+        maintainabilityIndex: comp.maintainabilityIndex,
         hash,
         location: locationFromNode(node),
       })

@@ -22,7 +22,7 @@ import {
   createFunction,
   createNamespace,
 } from '../symbols.js';
-import { calculateComplexity } from '../../advanced/complexity.analyzer.js';
+import { analyzeComplexity } from '../../advanced/complexity.analyzer.js';
 import { generateStructuralHash } from '../../advanced/clone.analyzer.js';
 
 export class RustParser extends BaseParser {
@@ -240,7 +240,7 @@ export class RustParser extends BaseParser {
     // It checks the parameter array, then extracts the presence of 'self', and then it applies static or instance logic.
     const isStatic = className ? !params.some(p => p === 'self' || p.includes('self')) : false;
 
-    const complexity = calculateComplexity(node);
+    const comp = analyzeComplexity(node);
     const hash = generateStructuralHash(node);
 
     if (className) {
@@ -253,7 +253,10 @@ export class RustParser extends BaseParser {
           async: nodeText(node, source).startsWith('async'),
           generator: false,
           params,
-          complexity,
+          complexity: comp.cyclomatic,
+          cognitiveComplexity: comp.cognitive,
+          nestingDepth: comp.maxNestingDepth,
+          maintainabilityIndex: comp.maintainabilityIndex,
           hash,
           location: locationFromNode(node),
         })
@@ -265,7 +268,10 @@ export class RustParser extends BaseParser {
           async: nodeText(node, source).startsWith('async'),
           generator: false,
           params,
-          complexity,
+          complexity: comp.cyclomatic,
+          cognitiveComplexity: comp.cognitive,
+          nestingDepth: comp.maxNestingDepth,
+          maintainabilityIndex: comp.maintainabilityIndex,
           hash,
           location: locationFromNode(node),
         })

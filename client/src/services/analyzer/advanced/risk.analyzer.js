@@ -25,6 +25,9 @@ export const SEVERITY = {
 };
 
 const THRESHOLDS = {
+  // FILE_LINES_HIGH / _WARNING are static fallbacks used only when the repo has
+  // fewer than 4 files or all files have identical sizes — making IQR undefined.
+  // Normal detection uses computeSizeThresholds() with Tukey IQR fences instead.
   FILE_LINES_HIGH: 500,
   FILE_LINES_WARNING: 300,
   EXPORTS_WARNING: 15,
@@ -83,37 +86,146 @@ function createRisk(category, severity, title, description, file, evidence = {},
 }
 
 /**
- * It iterates over the AST files, then extracts line counts and exports,
- * and then it applies numerical thresholds to identify bloated files.
+ * It collects the line counts from every file, then computes the
+ * interquartile range (IQR) of the distribution, and then it derives
+ * dynamic outlier fences so large-file detection is relative to the
+ * actual codebase rather than a fixed hard-coded number.
+ *
+ * The classical Tukey outlier rules:
+ *   outer fence  (extreme outlier) = Q3 + 3.0 × IQR  → "Very large file"
+ *   inner fence  (mild outlier)    = Q3 + 1.5 × IQR  → "Large file"
+ *
+ * A minimum absolute floor prevents false positives on tiny repos
+ * where every file is under 100 lines.
+ */
+function computeSizeThresholds(files) {
+  const ABSOLUTE_FLOOR_HIGH = 300;    // never flag as "Very large" below this
+  const ABSOLUTE_FLOOR_WARNING = 150; // never flag as "Large" below this
+  const MIN_SAMPLE_SIZE = 4;          // need enough data for IQR to be meaningful
+
+  if (!files || files.length < MIN_SAMPLE_SIZE) {
+    // Fall back to legacy static thresholds for tiny repos
+    return {
+      high: THRESHOLDS.FILE_LINES_HIGH,
+      warning: THRESHOLDS.FILE_LINES_WARNING,
+      p50: 0,
+      p75: 0,
+      p25: 0,
+      iqr: 0,
+      method: 'static-fallback',
+    };
+  }
+
+  const counts = files
+    .map(f => f.lineCount || 0)
+    .filter(n => n > 0)
+    .sort((a, b) => a - b);
+
+  if (counts.length < MIN_SAMPLE_SIZE) {
+    return {
+      high: THRESHOLDS.FILE_LINES_HIGH,
+      warning: THRESHOLDS.FILE_LINES_WARNING,
+      p50: 0,
+      p75: 0,
+      p25: 0,
+      iqr: 0,
+      method: 'static-fallback',
+    };
+  }
+
+  const n = counts.length;
+
+  const quantile = q => {
+    const pos = q * (n - 1);
+    const lo = Math.floor(pos);
+    const hi = Math.ceil(pos);
+    if (lo === hi) return counts[lo];
+    return counts[lo] + (counts[hi] - counts[lo]) * (pos - lo);
+  };
+
+  const p25 = quantile(0.25);
+  const p50 = quantile(0.50);
+  const p75 = quantile(0.75);
+  const iqr = p75 - p25;
+
+  // When IQR is 0 (all files have identical sizes) fall back to statics
+  if (iqr === 0) {
+    return {
+      high: THRESHOLDS.FILE_LINES_HIGH,
+      warning: THRESHOLDS.FILE_LINES_WARNING,
+      p50,
+      p75,
+      p25,
+      iqr,
+      method: 'static-fallback-iqr-zero',
+    };
+  }
+
+  const innerFence = Math.round(p75 + 1.5 * iqr);
+  const outerFence = Math.round(p75 + 3.0 * iqr);
+
+  return {
+    high: Math.max(outerFence, ABSOLUTE_FLOOR_HIGH),
+    warning: Math.max(innerFence, ABSOLUTE_FLOOR_WARNING),
+    p50,
+    p75,
+    p25,
+    iqr,
+    method: 'iqr',
+  };
+}
+
+/**
+ * It iterates over the AST files, then computes dynamic size thresholds
+ * using IQR-based statistical outlier detection, and then it applies
+ * those repository-relative thresholds to identify bloated files.
  */
 function analyzeSizeRisks(analysis) {
   const risks = [];
 
   if (!analysis?.files) return risks;
 
+  const thresholds = computeSizeThresholds(analysis.files);
+
   for (const file of analysis.files) {
     const fileComplexity = (file.symbols || []).reduce((sum, sym) => sum + (sym.complexity || 0), 0);
 
-    if (file.lineCount > THRESHOLDS.FILE_LINES_HIGH && fileComplexity > THRESHOLDS.COMPLEXITY_HIGH) {
+    if (file.lineCount > thresholds.high && fileComplexity > THRESHOLDS.COMPLEXITY_HIGH) {
       risks.push(
         createRisk(
           RISK_CATEGORIES.SIZE,
           SEVERITY.HIGH,
           'Very large file',
-          `File is unusually large (${file.lineCount} lines) and complex (score: ${fileComplexity}), suggesting multiple responsibilities.`,
+          `At ${file.lineCount} lines this file is significantly larger than the rest of the codebase and carries high complexity (score: ${fileComplexity}). Consider splitting it into focused modules with single responsibilities.`,
           file.filePath,
-          { lineCount: file.lineCount, complexity: fileComplexity, threshold: THRESHOLDS.FILE_LINES_HIGH }
+          {
+            lineCount: file.lineCount,
+            complexity: fileComplexity,
+            threshold: thresholds.high,
+            p50: Math.round(thresholds.p50),
+            p75: Math.round(thresholds.p75),
+            iqr: Math.round(thresholds.iqr),
+            detectionMethod: thresholds.method,
+          }
         )
       );
-    } else if (file.lineCount > THRESHOLDS.FILE_LINES_WARNING && fileComplexity > THRESHOLDS.COMPLEXITY_WARNING) {
+    } else if (file.lineCount > thresholds.warning && fileComplexity > THRESHOLDS.COMPLEXITY_WARNING) {
       risks.push(
         createRisk(
           RISK_CATEGORIES.SIZE,
           SEVERITY.WARNING,
           'Large file',
-          `File is large (${file.lineCount} lines) with elevated complexity (score: ${fileComplexity}).`,
+          `At ${file.lineCount} lines this file is notably larger than most files in the repository and has elevated complexity (score: ${fileComplexity}). Review whether it can be decomposed into smaller, more focused units.`,
           file.filePath,
-          { lineCount: file.lineCount, complexity: fileComplexity, threshold: THRESHOLDS.FILE_LINES_WARNING }
+          {
+            lineCount: file.lineCount,
+            complexity: fileComplexity,
+            threshold: thresholds.warning,
+            p50: Math.round(thresholds.p50),
+            p75: Math.round(thresholds.p75),
+            iqr: Math.round(thresholds.iqr),
+            detectionMethod: thresholds.method,
+          }
         )
       );
     }
@@ -296,6 +408,9 @@ function analyzeCodeQualityRisks(analysis, graph) {
               name: sym.name,
               kind: sym.kind,
               complexity: sym.complexity,
+              cognitiveComplexity: sym.cognitiveComplexity || 0,
+              nestingDepth: sym.nestingDepth || 0,
+              maintainabilityIndex: sym.maintainabilityIndex || 100,
               // location comes directly from the AST parser (startLine / endLine)
               location: sym.location || null,
             };
@@ -311,22 +426,27 @@ function analyzeCodeQualityRisks(analysis, graph) {
   for (const [filePath, { high, warning }] of complexityByFile.entries()) {
     if (high.length > 0) {
       // Sort worst-first inside the grouped card
-      high.sort((a, b) => b.complexity - a.complexity);
+      high.sort((a, b) => (b.cognitiveComplexity || b.complexity) - (a.cognitiveComplexity || a.complexity));
       const worst = high[0];
+      const nestingDetail = worst.nestingDepth > 1 ? `, nesting depth: ${worst.nestingDepth}` : '';
+      const cognitiveDetail = worst.cognitiveComplexity > 0 ? ` (cognitive score: ${worst.cognitiveComplexity}${nestingDetail})` : '';
+
       risks.push(
         createRisk(
           RISK_CATEGORIES.QUALITY,
           SEVERITY.HIGH,
           'High Cyclomatic Complexity',
           high.length === 1
-            ? `${worst.kind} '${worst.name}' has a high complexity score of ${worst.complexity}. Consider refactoring.`
-            : `${high.length} blocks in this file have high complexity (worst: '${worst.name}' at ${worst.complexity}). Consider breaking them apart.`,
+            ? `${worst.kind} '${worst.name}' has a high complexity score of ${worst.complexity}${cognitiveDetail}. Consider refactoring into flatter helper functions.`
+            : `${high.length} blocks in this file have high complexity (worst: '${worst.name}' at ${worst.complexity}${cognitiveDetail}). Consider breaking them apart.`,
           filePath,
           {
             // Primary location for the single-instance case — the worst offender's block
             location: worst.location,
             // Full instances list for the UI to render each block independently
             instances: high,
+            worstCognitive: worst.cognitiveComplexity,
+            worstNesting: worst.nestingDepth,
           },
           // Stable name: all names joined so that if the set of bad functions changes the ID changes too
           high
@@ -338,20 +458,25 @@ function analyzeCodeQualityRisks(analysis, graph) {
     }
 
     if (warning.length > 0) {
-      warning.sort((a, b) => b.complexity - a.complexity);
+      warning.sort((a, b) => (b.cognitiveComplexity || b.complexity) - (a.cognitiveComplexity || a.complexity));
       const worst = warning[0];
+      const nestingDetail = worst.nestingDepth > 1 ? `, nesting depth: ${worst.nestingDepth}` : '';
+      const cognitiveDetail = worst.cognitiveComplexity > 0 ? ` (cognitive score: ${worst.cognitiveComplexity}${nestingDetail})` : '';
+
       risks.push(
         createRisk(
           RISK_CATEGORIES.QUALITY,
           SEVERITY.WARNING,
           'Elevated Complexity',
           warning.length === 1
-            ? `${worst.kind} '${worst.name}' has a complexity score of ${worst.complexity}.`
-            : `${warning.length} blocks in this file have elevated complexity (worst: '${worst.name}' at ${worst.complexity}).`,
+            ? `${worst.kind} '${worst.name}' has a complexity score of ${worst.complexity}${cognitiveDetail}.`
+            : `${warning.length} blocks in this file have elevated complexity (worst: '${worst.name}' at ${worst.complexity}${cognitiveDetail}).`,
           filePath,
           {
             location: worst.location,
             instances: warning,
+            worstCognitive: worst.cognitiveComplexity,
+            worstNesting: worst.nestingDepth,
           },
           warning
             .map(i => i.name)
@@ -374,19 +499,30 @@ function analyzeCodeQualityRisks(analysis, graph) {
         location: inst.location || null,
       }));
 
-      const filePaths = [...new Set(instances.map(i => i.filePath))];
+      const filePaths = clone.filePaths || [...new Set(instances.map(i => i.filePath))];
+      const fileCount = filePaths.length;
+      const linesInfo = clone.avgLines ? ` (~${clone.avgLines} lines each)` : '';
+
+      const description =
+        fileCount > 1
+          ? `Found ${clone.count} structurally identical functions${linesInfo} across ${fileCount} files. Extract to a shared utility to eliminate duplicate maintenance.`
+          : `Found ${clone.count} duplicate implementations${linesInfo} in this file. Consolidate into a shared helper function.`;
 
       risks.push(
         createRisk(
           RISK_CATEGORIES.QUALITY,
           SEVERITY.WARNING,
           'Structural Code Clone',
-          `Found ${clone.count} structurally identical blocks across ${filePaths.length} file(s). Extract to a shared utility to reduce duplication.`,
+          description,
           instances[0]?.filePath || null,
           {
             count: clone.count,
             // Full sibling list with locations so the UI can link to each one
             instances,
+            avgLines: clone.avgLines,
+            complexity: clone.maxComplexity,
+            linesDuplicated: clone.linesDuplicated,
+            detectionMethod: clone.thresholds?.method || 'statistical-iqr',
           },
           // Stable: hash of sorted file paths
           filePaths.sort().join('+')

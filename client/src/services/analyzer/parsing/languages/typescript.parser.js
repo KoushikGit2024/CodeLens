@@ -20,6 +20,8 @@
 
 import { JavaScriptParser } from './javascript.parser.js';
 import { locationFromNode, createClass, createMethod, createFunction } from '../symbols.js';
+import { analyzeComplexity } from '../../advanced/complexity.analyzer.js';
+import { generateStructuralHash } from '../../advanced/clone.analyzer.js';
 
 // We need the nodeText helper — reproduce it here (it is not exported from JavaScriptParser)
 function nodeText(node, source) {
@@ -174,6 +176,9 @@ export class TypeScriptParser extends JavaScriptParser {
       }
     }
 
+    const comp = analyzeComplexity(node);
+    const hash = generateStructuralHash(node);
+
     symbols.push(
       createMethod({
         name,
@@ -183,6 +188,11 @@ export class TypeScriptParser extends JavaScriptParser {
         generator: isGen,
         visibility,
         params,
+        complexity: comp.cyclomatic,
+        cognitiveComplexity: comp.cognitive,
+        nestingDepth: comp.maxNestingDepth,
+        maintainabilityIndex: comp.maintainabilityIndex,
+        hash,
         location: locationFromNode(node),
       })
     );
