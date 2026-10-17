@@ -24,6 +24,7 @@ import {
   X,
   Flame,
   GitCompare,
+  Scale,
 } from 'lucide-react';
 import { useRepository } from '../../shared/context/RepositoryContext';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
@@ -35,6 +36,7 @@ import { useAIState } from '../../shared/context/AIContext';
 import ADRPanel from './ADRPanel';
 import OpenSourceButton from '../../shared/components/OpenSourceButton';
 import { tryMakeSourceRef } from '../../shared/navigation/sourceRef';
+import MetricInfoButton from '../../shared/components/MetricInfoButton';
 
 // ── Severity helpers ──────────────────────────────────────────────────────────
 const SEV_BADGE = {
@@ -158,34 +160,62 @@ const RiskCard = ({
 
         {/* ── Tornhill Behavioral Hotspot breakdown ── */}
         {risk.evidence?.hotspotScore != null && (
-          <div className="mb-3 flex flex-wrap gap-1.5 text-[10px] font-mono">
-            <span className="px-2 py-0.5 rounded bg-danger/15 text-danger font-bold border border-danger/30 flex items-center gap-1">
-              <Flame className="w-3 h-3" /> Hotspot: {risk.evidence.hotspotScore}/100
-            </span>
-            <span className="px-2 py-0.5 rounded bg-surface border border-border text-muted">
-              Churn: {risk.evidence.churnScore}/100
-            </span>
-            <span className="px-2 py-0.5 rounded bg-surface border border-border text-muted">
-              Complexity: {risk.evidence.complexityScore}/100
-            </span>
-            {risk.evidence.quadrant && (
-              <span className="px-2 py-0.5 rounded bg-accent/15 text-accent font-semibold border border-accent/20">
-                {risk.evidence.quadrant.replace('_', ' ')}
+          <div className="mb-3 flex items-center justify-between flex-wrap gap-1.5 p-2 rounded bg-surface/60 border border-border/50 text-[10px] font-mono">
+            <div className="flex flex-wrap gap-1.5 items-center">
+              <span className="px-2 py-0.5 rounded bg-danger/15 text-danger font-bold border border-danger/30 flex items-center gap-1">
+                <Flame className="w-3 h-3" /> Hotspot: {risk.evidence.hotspotScore}/100
               </span>
-            )}
+              <span className="px-2 py-0.5 rounded bg-surface border border-border text-muted">
+                Churn: {risk.evidence.churnScore}/100
+              </span>
+              <span className="px-2 py-0.5 rounded bg-surface border border-border text-muted">
+                Complexity: {risk.evidence.complexityScore}/100
+              </span>
+              {risk.evidence.quadrant && (
+                <span className="px-2 py-0.5 rounded bg-accent/15 text-accent font-semibold border border-accent/20">
+                  {risk.evidence.quadrant.replace('_', ' ')}
+                </span>
+              )}
+            </div>
+            <MetricInfoButton
+              title="Tornhill Behavioral Hotspot Matrix"
+              badge="Forensic Software Analysis"
+              formula="Hotspot = (Churn × Complexity) / 100"
+              description="From Adam Tornhill's 'Your Code as a Crime Scene'. Combines modification velocity (git churn) with code complexity to pinpoint defect-dense hotspots."
+              bullets={[
+                'Active Critical Hotspot: Files with high churn and high complexity are the primary origin of bugs and defect leakage.',
+                'Stable Legacy: Complex files that rarely change pose low immediate risk.',
+                'Active Development: High churn but low complexity represents active feature development.'
+              ]}
+              resolution="Prioritize refactoring and adding unit tests to active critical hotspots before adding new features."
+            />
           </div>
         )}
 
         {/* ── Temporal Co-change breakdown ── */}
         {(risk.evidence?.coChangeSimilarity != null || risk.evidence?.jaccard != null) && (
           <div className="mb-3 p-2 rounded bg-surface border border-border/60">
-            <div className="flex items-center gap-2 text-[10px] font-mono mb-2">
-              <span className="px-2 py-0.5 rounded bg-warning/15 text-warning font-bold border border-warning/30 flex items-center gap-1">
-                <GitCompare className="w-3 h-3" /> Co-Change: {Math.round((risk.evidence.coChangeSimilarity ?? risk.evidence.jaccard) * 100)}%
-              </span>
-              <span className="text-muted text-[10px]">
-                {risk.evidence.coChangeCount ?? risk.evidence.sharedCommits} shared commits
-              </span>
+            <div className="flex items-center justify-between gap-2 text-[10px] font-mono mb-2">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded bg-warning/15 text-warning font-bold border border-warning/30 flex items-center gap-1">
+                  <GitCompare className="w-3 h-3" /> Co-Change: {Math.round((risk.evidence.coChangeSimilarity ?? risk.evidence.jaccard) * 100)}%
+                </span>
+                <span className="text-muted text-[10px]">
+                  {risk.evidence.coChangeCount ?? risk.evidence.sharedCommits} shared commits
+                </span>
+              </div>
+              <MetricInfoButton
+                title="Hidden Logical Coupling (Temporal Co-Change)"
+                badge="Git Mining"
+                formula="Jaccard = |Commits(A) ∩ Commits(B)| / |Commits(A) ∪ Commits(B)|"
+                description="Detects file pairs that frequently commit together in git history without having a direct static import statement."
+                bullets={[
+                  'Jaccard Similarity >= 40%: Statistical likelihood that changing one file requires changing the other.',
+                  'Missing Abstraction: Often indicates copy-pasted boilerplate, implicit schema contracts, or un-imported dependencies.',
+                  'Bulk Filtered: Mass formatting and bulk commits touching > 30 files are automatically excluded.'
+                ]}
+                resolution="Unify shared responsibilities into a single utility module or make dependencies explicit via typed imports."
+              />
             </div>
             {((risk.evidence.coupledFiles && risk.evidence.coupledFiles.length > 0) || risk.evidence.fileB) && (
               <div className="text-[11px] text-muted space-y-1">
@@ -204,6 +234,89 @@ const RiskCard = ({
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── Stable Dependencies Principle (SDP) breakdown ── */}
+        {risk.evidence?.sourceInstability != null && (
+          <div className="mb-3 p-2.5 rounded bg-surface border border-border/60 flex flex-col gap-2">
+            <div className="flex items-center justify-between text-[10px] font-mono">
+              <span className="px-2 py-0.5 rounded bg-warning/15 text-warning font-bold border border-warning/30 flex items-center gap-1">
+                <Scale className="w-3 h-3" /> SDP Violation (Stability Inversion)
+              </span>
+              <MetricInfoButton
+                title="Stable Dependencies Principle (SDP)"
+                badge="Clean Architecture"
+                formula="I = Ce / (Ca + Ce)"
+                description="Formulated by Robert C. Martin: modules should depend in the direction of stability. A stable module (relied on by many files) should not depend on a volatile module (one that changes easily)."
+                bullets={[
+                  'Afferent Coupling (Ca): Incoming dependencies. High Ca means the module is foundational and hard to change.',
+                  'Efferent Coupling (Ce): Outgoing dependencies. High Ce means the module has many reasons to change.',
+                  'Stability Inversion: If a stable core depends on a volatile leaf, volatile changes cascade backwards into the core, breaking all dependants.'
+                ]}
+                resolution="Apply the Dependency Inversion Principle (DIP). Define an interface/contract in the stable layer and have volatile modules implement it."
+              />
+            </div>
+            <div className="flex items-center gap-2 text-[11px] text-muted">
+              <div className="flex-1 p-2 rounded bg-panel border border-border">
+                <span className="text-[9px] uppercase font-bold text-success block mb-0.5">Stable Source Module</span>
+                <span className="font-mono text-[10px] text-text block truncate" title={risk.evidence.sourceFile}>
+                  {risk.evidence.sourceFile?.split('/').pop()}
+                </span>
+                <span className="text-[10px] font-mono text-muted">
+                  I: <strong className="text-success">{risk.evidence.sourceInstability}</strong> • Fan-in: {risk.evidence.sourceFanIn}
+                </span>
+              </div>
+              <ArrowRight className="w-4 h-4 text-warning shrink-0" />
+              <div className="flex-1 p-2 rounded bg-panel border border-border">
+                <span className="text-[9px] uppercase font-bold text-danger block mb-0.5">Volatile Target Module</span>
+                {(() => {
+                  const tgtRef = tryMakeSourceRef({ filePath: risk.evidence.targetFile });
+                  return tgtRef ? (
+                    <OpenSourceButton ref={tgtRef} variant="button" className="text-[10px] py-0.5 truncate w-full justify-start" />
+                  ) : (
+                    <span className="font-mono text-[10px] text-text block truncate" title={risk.evidence.targetFile}>
+                      {risk.evidence.targetFile?.split('/').pop()}
+                    </span>
+                  );
+                })()}
+                <span className="text-[10px] font-mono text-muted">
+                  I: <strong className="text-danger">{risk.evidence.targetInstability}</strong> • Fan-out: {risk.evidence.targetFanOut}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Statistical Coupling Breakdown (Tukey IQR) ── */}
+        {risk.evidence?.detectionMethod === 'iqr' && (
+          <div className="mb-3 flex items-center justify-between flex-wrap gap-1.5 p-2 rounded bg-surface/60 border border-border/50 text-[10px] font-mono">
+            <div className="flex flex-wrap gap-1.5 items-center">
+              <span className="px-2 py-0.5 rounded bg-accent/15 text-accent font-semibold border border-accent/20">
+                Tukey IQR Fence: {risk.evidence.threshold}
+              </span>
+              <span className="px-2 py-0.5 rounded bg-surface border border-border text-muted">
+                p50: {risk.evidence.p50}
+              </span>
+              <span className="px-2 py-0.5 rounded bg-surface border border-border text-muted">
+                p75: {risk.evidence.p75}
+              </span>
+              <span className="px-2 py-0.5 rounded bg-surface border border-border text-muted">
+                IQR: {risk.evidence.iqr}
+              </span>
+            </div>
+            <MetricInfoButton
+              title="Tukey IQR Coupling Fences"
+              badge="Statistical Outliers"
+              formula="Inner Fence = Q3 + 1.5 × IQR"
+              description="Dynamically computes quartile distributions of fan-in and fan-out across the codebase, identifying true relative bottlenecks rather than applying hardcoded numbers."
+              bullets={[
+                'Relative to Codebase: Adapts automatically whether analyzing a small 10-file microservice or a 5,000-file monolith.',
+                'Inner Fence (Warning): Files exceeding Q3 + 1.5 × IQR carry elevated architectural blast radius.',
+                'Outer Fence (High): Files exceeding Q3 + 3.0 × IQR are extreme central bottlenecks.'
+              ]}
+              resolution="Decompose oversized modules with high fan-out, and introduce facade or mediator patterns to reduce central coupling."
+            />
           </div>
         )}
 

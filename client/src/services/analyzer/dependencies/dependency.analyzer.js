@@ -191,31 +191,44 @@ export function getFileDependencies(graph, filePath) {
   const dependencies = [];
   const dependents = [];
   const externalPkgs = new Set();
+  const nodes = graph?.nodes || [];
 
-  for (const edge of graph.edges) {
+  for (const edge of graph?.edges || []) {
     if (edge.source === sourceId) {
-      const targetNode = graph.nodes.find(n => n.id === edge.target);
-      if (!targetNode) continue;
-
-      if (targetNode.type === 'fileNode') {
+      const targetNode = nodes.find(n => n.id === edge.target);
+      if (targetNode) {
+        if (targetNode.type === 'fileNode') {
+          dependencies.push({
+            filePath: targetNode.data.filePath,
+            evidence: edge.data,
+          });
+        } else if (targetNode.type === 'moduleNode') {
+          externalPkgs.add(targetNode.data.label);
+          dependencies.push({
+            package: targetNode.data.label,
+            evidence: edge.data,
+          });
+        }
+      } else if (edge.target.startsWith('file:')) {
         dependencies.push({
-          filePath: targetNode.data.filePath,
-          evidence: edge.data,
-        });
-      } else if (targetNode.type === 'moduleNode') {
-        externalPkgs.add(targetNode.data.label);
-        dependencies.push({
-          package: targetNode.data.label,
+          filePath: edge.target.replace(/^file:/, ''),
           evidence: edge.data,
         });
       }
     }
 
     if (edge.target === sourceId) {
-      const sourceNode = graph.nodes.find(n => n.id === edge.source);
-      if (sourceNode && sourceNode.type === 'fileNode') {
+      const sourceNode = nodes.find(n => n.id === edge.source);
+      if (sourceNode) {
+        if (sourceNode.type === 'fileNode') {
+          dependents.push({
+            filePath: sourceNode.data.filePath,
+            evidence: edge.data,
+          });
+        }
+      } else if (edge.source.startsWith('file:')) {
         dependents.push({
-          filePath: sourceNode.data.filePath,
+          filePath: edge.source.replace(/^file:/, ''),
           evidence: edge.data,
         });
       }

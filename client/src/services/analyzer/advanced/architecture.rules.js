@@ -35,6 +35,24 @@ export const ARCHITECTURE_RULES = [
       return srcComp.layer === 'Data' && (tgtComp.layer === 'Presentation' || tgtComp.layer === 'API');
     },
   },
+  {
+    id: 'rule-stable-dependencies',
+    name: 'Stable Dependencies Principle (SDP) Violation',
+    description: 'A stable component (low instability, high incoming coupling) should not depend on a more volatile component (high instability).',
+    severity: 'warning',
+    evaluate: (srcComp, tgtComp) => {
+      const srcMetrics = srcComp.metrics;
+      const tgtMetrics = tgtComp.metrics;
+      if (!srcMetrics || !tgtMetrics) return false;
+      // Stable component (I <= 0.3, Ca >= 2) depending on unstable component (I >= 0.7, Ce >= 2)
+      return (
+        srcMetrics.instability <= 0.3 &&
+        srcMetrics.afferentCoupling >= 2 &&
+        tgtMetrics.instability >= 0.7 &&
+        tgtMetrics.efferentCoupling >= 2
+      );
+    },
+  },
 ];
 
 /**
@@ -44,34 +62,49 @@ export const ARCHITECTURE_RULES = [
 export function validateArchitecture(components, edges) {
   const findings = [];
 
-  const compLayerMap = new Map();
+  const compMap = new Map();
   for (const comp of components) {
     // Key by label (= what relations use as source/target), not by node id
     const label = comp.data?.label ?? comp.id;
-    compLayerMap.set(label, comp.data?.layer ?? 'Core/Other');
+    compMap.set(label, comp);
   }
 
   for (const edge of edges) {
-    const srcLayer = compLayerMap.get(edge.source);
-    const tgtLayer = compLayerMap.get(edge.target);
+    const srcComp = compMap.get(edge.source);
+    const tgtComp = compMap.get(edge.target);
 
-    if (!srcLayer || !tgtLayer) continue;
+    if (!srcComp || !tgtComp) continue;
 
-    const srcCompMock = { name: edge.source, layer: srcLayer };
-    const tgtCompMock = { name: edge.target, layer: tgtLayer };
+    const srcLayer = srcComp.data?.layer ?? 'Core/Other';
+    const tgtLayer = tgtComp.data?.layer ?? 'Core/Other';
+
+    const srcCompMock = {
+      name: edge.source,
+      layer: srcLayer,
+      metrics: srcComp.data?.metrics,
+    };
+    const tgtCompMock = {
+      name: edge.target,
+      layer: tgtLayer,
+      metrics: tgtComp.data?.metrics,
+    };
 
     for (const rule of ARCHITECTURE_RULES) {
       if (rule.evaluate(srcCompMock, tgtCompMock)) {
-        // It detects a rule failure, then extracts the edge source, and then it applies the frontend finding format.
+        const message =
+          rule.id === 'rule-stable-dependencies'
+            ? `Stable Dependencies Principle violation: Stable component '${edge.source}' (I=${srcCompMock.metrics.instability}, Ca=${srcCompMock.metrics.afferentCoupling}) directly imports volatile component '${edge.target}' (I=${tgtCompMock.metrics.instability}, Ce=${tgtCompMock.metrics.efferentCoupling}).`
+            : `Boundary violation: ${edge.source} (${srcLayer}) directly imports ${edge.target} (${tgtLayer}).\nRule: ${rule.description}`;
+
         findings.push({
           ...createAnalysisFinding({
-            id: `ARCH-${rule.id}-${edge.source}`,
+            id: `ARCH-${rule.id}-${edge.source}-${edge.target}`,
             analyzerId: 'architecture',
             ruleId: rule.id,
             category: 'architecture',
             severity: rule.severity,
             title: rule.name,
-            message: `Boundary violation: ${edge.source} (${srcLayer}) directly imports ${edge.target} (${tgtLayer}).\nRule: ${rule.description}`,
+            message,
             filePath: edge.evidenceFile || edge.source,
             range: {
               startLine: 1,

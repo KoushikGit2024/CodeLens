@@ -9,6 +9,7 @@ import { getFileDependencies, detectCycles, getIsolatedFiles } from '../dependen
 import { detectClones } from './clone.analyzer.js';
 import { analyzeReachability } from './reachability.analyzer.js';
 import { classifyHotspot, HOTSPOT_QUADRANTS } from './git.analyzer.js';
+import { calculateInstability } from './architecture.analyzer.js';
 
 export const RISK_CATEGORIES = {
   SIZE: 'SIZE',
@@ -250,41 +251,332 @@ function analyzeSizeRisks(analysis) {
 }
 
 /**
+ * It computes dynamic Tukey IQR outlier fences for fan-in (in-degree) and fan-out (out-degree)
+ * across the repository, replacing rigid static constants with statistical distributions.
+ *
+ * Inner fence (warning outlier) = Q3 + 1.5 * IQR
+ * Outer fence (high outlier)    = Q3 + 3.0 * IQR
+ *
+ * Absolute minimum floors prevent false positives on small repositories:
+ *   Fan-in:  warning: 8,  high: 16
+ *   Fan-out: warning: 10, high: 20
+ *
+ * Fallback for small sample size (< 4 files) or IQR == 0:
+ *   Fan-in:  warning: 10, high: 20
+ *   Fan-out: warning: 15, high: 25
+ */
+export function computeCouplingThresholds(analysis, graph) {
+  const MIN_SAMPLE_SIZE = 4;
+  const ABSOLUTE_FLOOR_FAN_IN_HIGH = 16;
+  const ABSOLUTE_FLOOR_FAN_IN_WARNING = 8;
+  const ABSOLUTE_FLOOR_FAN_OUT_HIGH = 20;
+  const ABSOLUTE_FLOOR_FAN_OUT_WARNING = 10;
+
+  const fallback = {
+    fanIn: {
+      high: 20,
+      warning: 10,
+      p25: 0,
+      p50: 0,
+      p75: 0,
+      iqr: 0,
+      method: 'static-fallback',
+    },
+    fanOut: {
+      high: 25,
+      warning: 15,
+      p25: 0,
+      p50: 0,
+      p75: 0,
+      iqr: 0,
+      method: 'static-fallback',
+    },
+  };
+
+  const files = analysis?.files;
+  if (!files || files.length < MIN_SAMPLE_SIZE || !graph?.edges) {
+    return fallback;
+  }
+
+  const fanInMap = new Map();
+  const fanOutMap = new Map();
+
+  for (const f of files) {
+    fanInMap.set(f.filePath, 0);
+    fanOutMap.set(f.filePath, 0);
+  }
+
+  for (const edge of graph.edges) {
+    const s = (edge.source || '').replace(/^file:/, '');
+    const t = (edge.target || '').replace(/^file:/, '');
+    if (fanOutMap.has(s)) {
+      fanOutMap.set(s, fanOutMap.get(s) + 1);
+    }
+    if (fanInMap.has(t)) {
+      fanInMap.set(t, fanInMap.get(t) + 1);
+    }
+  }
+
+  const fanInCounts = Array.from(fanInMap.values()).sort((a, b) => a - b);
+  const fanOutCounts = Array.from(fanOutMap.values()).sort((a, b) => a - b);
+
+  const getQuantiles = counts => {
+    const n = counts.length;
+    if (n < MIN_SAMPLE_SIZE) return null;
+    const quantile = q => {
+      const pos = q * (n - 1);
+      const lo = Math.floor(pos);
+      const hi = Math.ceil(pos);
+      if (lo === hi) return counts[lo];
+      return counts[lo] + (counts[hi] - counts[lo]) * (pos - lo);
+    };
+    const p25 = quantile(0.25);
+    const p50 = quantile(0.50);
+    const p75 = quantile(0.75);
+    const iqr = p75 - p25;
+    return { p25, p50, p75, iqr };
+  };
+
+  const qIn = getQuantiles(fanInCounts);
+  const qOut = getQuantiles(fanOutCounts);
+
+  let fanInResult;
+  if (!qIn || qIn.iqr === 0) {
+    fanInResult = {
+      high: 20,
+      warning: 10,
+      p25: qIn?.p25 || 0,
+      p50: qIn?.p50 || 0,
+      p75: qIn?.p75 || 0,
+      iqr: qIn?.iqr || 0,
+      method: 'static-fallback-iqr-zero',
+    };
+  } else {
+    const inner = Math.round(qIn.p75 + 1.5 * qIn.iqr);
+    const outer = Math.round(qIn.p75 + 3.0 * qIn.iqr);
+    fanInResult = {
+      high: Math.max(outer, ABSOLUTE_FLOOR_FAN_IN_HIGH),
+      warning: Math.max(inner, ABSOLUTE_FLOOR_FAN_IN_WARNING),
+      p25: qIn.p25,
+      p50: qIn.p50,
+      p75: qIn.p75,
+      iqr: qIn.iqr,
+      method: 'iqr',
+    };
+  }
+
+  let fanOutResult;
+  if (!qOut || qOut.iqr === 0) {
+    fanOutResult = {
+      high: 25,
+      warning: 15,
+      p25: qOut?.p25 || 0,
+      p50: qOut?.p50 || 0,
+      p75: qOut?.p75 || 0,
+      iqr: qOut?.iqr || 0,
+      method: 'static-fallback-iqr-zero',
+    };
+  } else {
+    const inner = Math.round(qOut.p75 + 1.5 * qOut.iqr);
+    const outer = Math.round(qOut.p75 + 3.0 * qOut.iqr);
+    fanOutResult = {
+      high: Math.max(outer, ABSOLUTE_FLOOR_FAN_OUT_HIGH),
+      warning: Math.max(inner, ABSOLUTE_FLOOR_FAN_OUT_WARNING),
+      p25: qOut.p25,
+      p50: qOut.p50,
+      p75: qOut.p75,
+      iqr: qOut.iqr,
+      method: 'iqr',
+    };
+  }
+
+  return { fanIn: fanInResult, fanOut: fanOutResult };
+}
+
+/**
  * It maps file paths against the dependency graph, then extracts their node degrees,
- * and then it applies limits to flag high coupling bottlenecks.
+ * and then it applies dynamic Tukey IQR outlier fences to flag high coupling bottlenecks.
  */
 function analyzeCouplingRisks(analysis, graph) {
   const risks = [];
   if (!analysis?.files || !graph?.edges) return risks;
 
+  const thresholds = computeCouplingThresholds(analysis, graph);
+
   for (const file of analysis.files) {
     const deps = getFileDependencies(graph, file.filePath);
 
-    if (deps.dependentCount > THRESHOLDS.FAN_IN_WARNING) {
+    if (deps.dependentCount > thresholds.fanIn.high) {
+      risks.push(
+        createRisk(
+          RISK_CATEGORIES.COUPLING,
+          SEVERITY.HIGH,
+          'High fan-in (Central Bottleneck)',
+          `Many modules (${deps.dependentCount}) depend on this file (outer IQR fence: ${thresholds.fanIn.high}). Changes here carry high architectural blast radius.`,
+          file.filePath,
+          {
+            fanIn: deps.dependentCount,
+            threshold: thresholds.fanIn.high,
+            p50: Math.round(thresholds.fanIn.p50),
+            p75: Math.round(thresholds.fanIn.p75),
+            iqr: Math.round(thresholds.fanIn.iqr),
+            detectionMethod: thresholds.fanIn.method,
+          }
+        )
+      );
+    } else if (deps.dependentCount > thresholds.fanIn.warning) {
       risks.push(
         createRisk(
           RISK_CATEGORIES.COUPLING,
           SEVERITY.WARNING,
           'High fan-in (Central Module)',
-          `Many modules (${deps.dependentCount}) depend on this file. Changes here carry high impact.`,
+          `Many modules (${deps.dependentCount}) depend on this file (IQR fence: ${thresholds.fanIn.warning}). Changes here carry high impact.`,
           file.filePath,
-          { fanIn: deps.dependentCount, threshold: THRESHOLDS.FAN_IN_WARNING }
+          {
+            fanIn: deps.dependentCount,
+            threshold: thresholds.fanIn.warning,
+            p50: Math.round(thresholds.fanIn.p50),
+            p75: Math.round(thresholds.fanIn.p75),
+            iqr: Math.round(thresholds.fanIn.iqr),
+            detectionMethod: thresholds.fanIn.method,
+          }
         )
       );
     }
 
-    if (deps.dependencyCount > THRESHOLDS.FAN_OUT_WARNING) {
+    if (deps.dependencyCount > thresholds.fanOut.high) {
+      risks.push(
+        createRisk(
+          RISK_CATEGORIES.COUPLING,
+          SEVERITY.HIGH,
+          'High fan-out (Severe Dependency Bottleneck)',
+          `File depends on many other modules (${deps.dependencyCount}, outer IQR fence: ${thresholds.fanOut.high}), indicating high efferent coupling and fragility.`,
+          file.filePath,
+          {
+            fanOut: deps.dependencyCount,
+            threshold: thresholds.fanOut.high,
+            p50: Math.round(thresholds.fanOut.p50),
+            p75: Math.round(thresholds.fanOut.p75),
+            iqr: Math.round(thresholds.fanOut.iqr),
+            detectionMethod: thresholds.fanOut.method,
+          }
+        )
+      );
+    } else if (deps.dependencyCount > thresholds.fanOut.warning) {
       risks.push(
         createRisk(
           RISK_CATEGORIES.COUPLING,
           SEVERITY.WARNING,
           'High fan-out (Dependency Bottleneck)',
-          `File depends on many other modules (${deps.dependencyCount}), suggesting high coupling.`,
+          `File depends on many other modules (${deps.dependencyCount}, IQR fence: ${thresholds.fanOut.warning}), suggesting high coupling.`,
           file.filePath,
-          { fanOut: deps.dependencyCount, threshold: THRESHOLDS.FAN_OUT_WARNING }
+          {
+            fanOut: deps.dependencyCount,
+            threshold: thresholds.fanOut.warning,
+            p50: Math.round(thresholds.fanOut.p50),
+            p75: Math.round(thresholds.fanOut.p75),
+            iqr: Math.round(thresholds.fanOut.iqr),
+            detectionMethod: thresholds.fanOut.method,
+          }
         )
       );
     }
+  }
+
+  return risks;
+}
+
+/**
+ * It calculates Robert C. Martin's Instability Index (I = Ce / (Ca + Ce)) for all files,
+ * then checks for Stable Dependencies Principle (SDP) violations across file dependency edges.
+ *
+ * SDP Rule: Modules should depend in the direction of stability.
+ * Violation: A stable module (I <= 0.3, Ca >= 3) depends on a volatile module (I >= 0.7, Ce >= 3).
+ */
+function analyzeStabilityRisks(analysis, graph) {
+  const risks = [];
+  if (!analysis?.files || !graph?.edges) return risks;
+
+  const caMap = new Map();
+  const ceMap = new Map();
+
+  for (const f of analysis.files) {
+    caMap.set(f.filePath, 0);
+    ceMap.set(f.filePath, 0);
+  }
+
+  const internalEdges = [];
+  for (const edge of graph.edges) {
+    const s = (edge.source || '').replace(/^file:/, '');
+    const t = (edge.target || '').replace(/^file:/, '');
+    if (ceMap.has(s)) {
+      ceMap.set(s, ceMap.get(s) + 1);
+    }
+    if (caMap.has(t)) {
+      caMap.set(t, caMap.get(t) + 1);
+    }
+    if (caMap.has(s) && caMap.has(t) && s !== t) {
+      internalEdges.push({ source: s, target: t });
+    }
+  }
+
+  const stabilityMap = new Map();
+  for (const f of analysis.files) {
+    const ca = caMap.get(f.filePath) || 0;
+    const ce = ceMap.get(f.filePath) || 0;
+    const instability = calculateInstability(ca, ce);
+    stabilityMap.set(f.filePath, { ca, ce, instability });
+  }
+
+  const violations = [];
+  const seenPairs = new Set();
+
+  for (const { source, target } of internalEdges) {
+    const key = `${source}->${target}`;
+    if (seenPairs.has(key)) continue;
+    seenPairs.add(key);
+
+    const srcStat = stabilityMap.get(source);
+    const tgtStat = stabilityMap.get(target);
+    if (!srcStat || !tgtStat) continue;
+
+    if (
+      srcStat.instability <= 0.3 &&
+      srcStat.ca >= 3 &&
+      tgtStat.instability >= 0.7 &&
+      tgtStat.ce >= 3
+    ) {
+      violations.push({
+        source,
+        target,
+        srcStat,
+        tgtStat,
+      });
+    }
+  }
+
+  violations.sort((a, b) => (b.srcStat.ca + b.tgtStat.ce) - (a.srcStat.ca + a.tgtStat.ce));
+  const topViolations = violations.slice(0, 10);
+
+  for (const v of topViolations) {
+    risks.push(
+      createRisk(
+        RISK_CATEGORIES.ARCHITECTURE,
+        SEVERITY.WARNING,
+        'Stable Dependencies Principle Violation',
+        `Stable module '${v.source}' (Instability: ${v.srcStat.instability}, Fan-in: ${v.srcStat.ca}) directly imports volatile module '${v.target}' (Instability: ${v.tgtStat.instability}, Fan-out: ${v.tgtStat.ce}). According to SDP, modules should depend in the direction of stability.`,
+        v.source,
+        {
+          sourceFile: v.source,
+          targetFile: v.target,
+          sourceInstability: v.srcStat.instability,
+          sourceFanIn: v.srcStat.ca,
+          targetInstability: v.tgtStat.instability,
+          targetFanOut: v.tgtStat.ce,
+        },
+        `${v.source}>${v.target}>sdp`
+      )
+    );
   }
 
   return risks;
@@ -608,7 +900,8 @@ function calculateScoreAndLevel(risks, totalFiles = 1) {
     // Significantly reduced penalty for coupling issues (both static & temporal coupling: 1 point instead of 5)
     if (
       risk.category === RISK_CATEGORIES.COUPLING ||
-      risk.title.includes('Coupling')
+      risk.title.includes('Coupling') ||
+      risk.title.includes('Stable Dependencies')
     ) {
       p = 1;
     }
@@ -641,7 +934,14 @@ function determineHotspots(risks) {
 
   for (const risk of risks) {
     if (!risk.file) continue;
-    const penalty = SEVERITY_PENALTY[risk.severity] || 0;
+    let penalty = SEVERITY_PENALTY[risk.severity] || 0;
+    if (
+      risk.category === RISK_CATEGORIES.COUPLING ||
+      risk.title.includes('Coupling') ||
+      risk.title.includes('Stable Dependencies')
+    ) {
+      penalty = 1;
+    }
     fileScores.set(risk.file, (fileScores.get(risk.file) || 0) + penalty);
   }
 
@@ -776,6 +1076,7 @@ export function buildEngineeringRiskModel(analysis, graph, architecture, ignored
   const allRisks = [
     ...analyzeSizeRisks(analysis),
     ...analyzeCouplingRisks(analysis, graph),
+    ...analyzeStabilityRisks(analysis, graph),
     ...analyzeDependencyRisks(graph),
     ...analyzeArchitectureRisks(architecture),
     ...analyzeCodeQualityRisks(analysis, graph),

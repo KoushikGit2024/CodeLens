@@ -32,6 +32,7 @@ import { tryMakeSourceRef } from '../../shared/navigation/sourceRef';
 import { ExportDiagramButton } from '../../shared/components/ExportDiagramButton';
 import { useTheme } from '../../shared/context/ThemeContext';
 import GraphSearchUI from '../../shared/components/GraphSearchUI';
+import MetricInfoButton from '../../shared/components/MetricInfoButton';
 
 // ── Layer color map ───────────────────────────────────────────────────────
 
@@ -107,6 +108,31 @@ const ArchNode = ({ data }) => {
             }}
           >
             {data.layer}
+          </div>
+        )}
+        {!data.isExternal && data.metrics && data.metrics.instability != null && (
+          <div
+            style={{
+              fontSize: 9,
+              fontFamily: 'monospace',
+              color:
+                data.metrics.instability <= 0.3
+                  ? '#4ade80'
+                  : data.metrics.instability >= 0.7
+                    ? '#f87171'
+                    : '#fbbf24',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+              marginTop: 1,
+            }}
+            title={`Instability: ${data.metrics.instability.toFixed(2)} (Afferent Ca: ${data.metrics.afferentCoupling}, Efferent Ce: ${data.metrics.efferentCoupling})`}
+          >
+            <span>I: {data.metrics.instability.toFixed(2)}</span>
+            <span style={{ opacity: 0.5 }}>•</span>
+            <span style={{ opacity: 0.75 }}>
+              Ca:{data.metrics.afferentCoupling} Ce:{data.metrics.efferentCoupling}
+            </span>
           </div>
         )}
       </div>
@@ -337,6 +363,7 @@ function graphToFlow(components = [], relations = [], selectedId, violations = [
         isFocused: label === selectedId,
         isFaded: selectedId ? !connectedNodes.has(label) : false,
         health: c.health,
+        metrics: c.data?.metrics || null,
         exportBg: isViolating ? '#3d1a1a' : `${colors.bg}dd`,
         exportBorder: isViolating ? '#ff7b72' : colors.border,
         exportText: '#CBD5E8',
@@ -762,6 +789,58 @@ export default function ArchitecturePage() {
                               {compHealth.risks?.length > 0 && (
                                 <span className="text-[10px] text-muted">{compHealth.risks.length} Risk(s)</span>
                               )}
+                            </div>
+                          </div>
+                        )}
+
+                        {compData?.data?.metrics && compData.data.metrics.instability != null && (
+                          <div className="flex flex-col gap-1.5 mt-2 pt-2 border-t border-text/5">
+                            <div className="flex justify-between items-center">
+                              <span
+                                className="text-xs text-muted flex items-center gap-1"
+                                title="Robert C. Martin Instability Index = Ce / (Ca + Ce)"
+                              >
+                                Instability (I)
+                                <MetricInfoButton
+                                  title="Robert C. Martin Instability Index"
+                                  badge="Architecture Metric"
+                                  formula="I = Ce / (Ca + Ce)"
+                                  description="Measures how resilient this component is to change. Ranges from 0.0 (Maximally Stable) to 1.0 (Maximally Volatile)."
+                                  bullets={[
+                                    'Afferent Coupling (Ca): Number of other components that depend on this component. High Ca means changes here will ripple widely.',
+                                    'Efferent Coupling (Ce): Number of other components this component depends on. High Ce means external changes force changes here.',
+                                    'Stable (I <= 0.3): Core domains, models, and shared utilities. Should have few outgoing dependencies.',
+                                    'Volatile (I >= 0.7): Presentation views, UI pages, and controllers. Should have few incoming dependencies so they can change freely.'
+                                  ]}
+                                  resolution="Ensure dependencies flow from volatile components (high I) towards stable components (low I)."
+                                />
+                              </span>
+                              <span
+                                className="text-xs font-mono font-semibold"
+                                style={{
+                                  color:
+                                    compData.data.metrics.instability <= 0.3
+                                      ? '#4ade80'
+                                      : compData.data.metrics.instability >= 0.7
+                                        ? '#f87171'
+                                        : '#fbbf24',
+                                }}
+                              >
+                                {compData.data.metrics.instability.toFixed(2)}
+                                <span className="text-[10px] ml-1 font-normal text-muted">
+                                  (
+                                  {compData.data.metrics.instability <= 0.3
+                                    ? 'Stable'
+                                    : compData.data.metrics.instability >= 0.7
+                                      ? 'Volatile'
+                                      : 'Moderate'}
+                                  )
+                                </span>
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center text-[11px] text-muted">
+                              <span>Afferent (Ca / In): {compData.data.metrics.afferentCoupling}</span>
+                              <span>Efferent (Ce / Out): {compData.data.metrics.efferentCoupling}</span>
                             </div>
                           </div>
                         )}

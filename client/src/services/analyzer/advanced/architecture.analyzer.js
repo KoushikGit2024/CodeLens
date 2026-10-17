@@ -179,6 +179,23 @@ export function extractApiBoundaries(analysis) {
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
+ * It calculates Robert C. Martin's Instability Index (I) given
+ * afferent coupling (Ca) and efferent coupling (Ce).
+ * Formula: I = Ce / (Ca + Ce)
+ * Value ranges from 0.0 (maximally stable) to 1.0 (maximally volatile/flexible).
+ * If total coupling is 0, instability is 0.0.
+ *
+ * @param {number} ca - Afferent coupling (incoming dependencies)
+ * @param {number} ce - Efferent coupling (outgoing dependencies)
+ * @returns {number} Instability index rounded to 2 decimal places
+ */
+export function calculateInstability(ca = 0, ce = 0) {
+  const total = ca + ce;
+  if (total === 0) return 0;
+  return Math.round((ce / total) * 100) / 100;
+}
+
+/**
  * It integrates components and entry points, then extracts inter-component relations,
  * and then it applies the rule validator to generate the final ArchitectureModel.
  */
@@ -234,6 +251,39 @@ export function buildArchitectureModel(analysis, graph) {
       seen.add(key);
       uniqueRelations.push(rel);
     }
+  }
+
+  // ── Component-Level Coupling & Instability Index (Robert C. Martin) ───────────
+  // Ca (Afferent Coupling): number of external components depending on this component
+  // Ce (Efferent Coupling): number of external components this component depends on
+  const caMap = new Map();
+  const ceMap = new Map();
+  for (const compNode of components) {
+    const label = compNode.data.label;
+    caMap.set(label, 0);
+    ceMap.set(label, 0);
+  }
+
+  for (const rel of uniqueRelations) {
+    if (ceMap.has(rel.source)) {
+      ceMap.set(rel.source, ceMap.get(rel.source) + 1);
+    }
+    if (caMap.has(rel.target)) {
+      caMap.set(rel.target, caMap.get(rel.target) + 1);
+    }
+  }
+
+  for (const compNode of components) {
+    const label = compNode.data.label;
+    const ca = caMap.get(label) || 0;
+    const ce = ceMap.get(label) || 0;
+    const instability = calculateInstability(ca, ce);
+
+    compNode.data.metrics = {
+      afferentCoupling: ca,
+      efferentCoupling: ce,
+      instability,
+    };
   }
 
   const violations = validateArchitecture(components, uniqueRelations);
