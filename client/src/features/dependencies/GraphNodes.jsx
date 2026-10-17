@@ -19,7 +19,7 @@ export const CustomNode = React.memo(function CustomNode({ data }) {
 
   const hasCritical = data.findingsCount?.critical > 0;
   const shadowGlow = data.isFocused
-    ? '0 0 0 2px rgb(var(--color-accent)), 0 0 18px rgb(var(--color-accent) / 0.65)'
+    ? '0 4px 12px rgba(0, 0, 0, 0.35)'
     : data.isSearchMatch
       ? '0 0 8px rgb(var(--color-accent) / 0.55)'
       : hasCritical && !data.isFaded
@@ -43,8 +43,9 @@ export const CustomNode = React.memo(function CustomNode({ data }) {
   const dangerColor = 'rgb(var(--color-danger))';
 
   const heat = data.heatColor || accentColor;
+  const fileColor = heat;
   const defaultBorder = data.isFocused
-    ? `2px solid ${accentColor}`
+    ? `2px solid ${fileColor}`
     : data.isSearchMatch
       ? `2px solid ${accentColor}`
       : `1px solid ${alpha(data.heatColor || borderColor, data.isFaded ? 10 : 33)}`;

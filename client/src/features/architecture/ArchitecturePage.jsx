@@ -86,7 +86,7 @@ const ArchNode = ({ data }) => {
           style={{
             fontSize: 11,
             fontWeight: 700,
-            color: '#CBD5E8',
+            color: 'rgb(var(--color-text))',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -1073,7 +1073,7 @@ export default function ArchitecturePage() {
               proOptions={{ hideAttribution: true }}
               className="bg-transparent"
             >
-              <Background color="#1D2130" gap={20} size={1} variant="dots" />
+              <Background color={isLight ? '#00000014' : '#ffffff10'} gap={20} size={1} variant="dots" />
               <Controls
                 position="bottom-right"
                 className="bg-panel border-border"
@@ -1091,33 +1091,22 @@ export default function ArchitecturePage() {
 
               {/* Layer legend */}
               <div
-                className="export-element-legend"
+                className="export-element-legend bg-panel/95 border border-border rounded-lg shadow-md backdrop-blur-sm"
                 style={{
                   position: 'absolute',
                   bottom: isMobile ? 80 : 12,
                   left: 12,
                   zIndex: 10,
-                  background: 'rgba(17,19,24,0.93)',
-                  border: '1px solid #1D2130',
-                  borderRadius: 8,
                   padding: '8px 12px',
                 }}
               >
-                <div
-                  style={{
-                    fontSize: 9,
-                    color: '#6B7A99',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.08em',
-                    marginBottom: 6,
-                  }}
-                >
+                <div className="text-[9px] font-semibold text-muted uppercase tracking-wider mb-1.5">
                   Layers
                 </div>
                 {Object.entries(LAYER_COLORS)
                   .filter(([k]) => k !== 'External')
                   .map(([layer, { bg, border }]) => (
-                    <div key={layer} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                    <div key={layer} className="flex items-center gap-1.5 mb-1 last:mb-0">
                       <span
                         style={{
                           width: 8,
@@ -1129,7 +1118,7 @@ export default function ArchitecturePage() {
                           flexShrink: 0,
                         }}
                       />
-                      <span style={{ fontSize: 10, color: '#CBD5E8' }}>{layer}</span>
+                      <span className="text-[10px] text-text font-medium">{layer}</span>
                     </div>
                   ))}
               </div>
