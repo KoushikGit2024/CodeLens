@@ -531,8 +531,8 @@ function analyzeCodeQualityRisks(analysis, graph) {
     }
   }
 
-  // ── Dead / Unreachable Files ───────────────────────────────────────────────
-  const reachability = analyzeReachability(graph);
+  // ── Dead / Unreachable Files & Unused Exports ─────────────────────────────
+  const reachability = analyzeReachability(graph, analysis);
   if (reachability?.unreachableFiles) {
     for (const deadFile of reachability.unreachableFiles) {
       if (deadFile.startsWith('pkg:') || deadFile.startsWith('moduleNode')) continue;
@@ -545,7 +545,49 @@ function analyzeCodeQualityRisks(analysis, graph) {
           'Dead / Unreachable File',
           'This file is never imported by any other file in the repository.',
           rawPath,
-          {}
+          {},
+          rawPath
+        )
+      );
+    }
+  }
+
+  if (reachability?.unusedExports && reachability.unusedExports.length > 0) {
+    // Group unused exports by file
+    const byFile = new Map();
+    for (const exp of reachability.unusedExports) {
+      if (!byFile.has(exp.filePath)) {
+        byFile.set(exp.filePath, []);
+      }
+      byFile.get(exp.filePath).push(exp);
+    }
+
+    for (const [filePath, exportsList] of byFile.entries()) {
+      const first = exportsList[0];
+      const names = exportsList.map(e => `'${e.name}'`).join(', ');
+      const desc =
+        exportsList.length === 1
+          ? `Exported ${first.kind} '${first.name}' is never imported anywhere in the repository.`
+          : `${exportsList.length} exported symbols (${names}) are never imported anywhere in the repository.`;
+
+      risks.push(
+        createRisk(
+          RISK_CATEGORIES.QUALITY,
+          SEVERITY.WARNING,
+          exportsList.length === 1 ? 'Unused Exported Symbol' : 'Unused Exported Symbols',
+          desc,
+          filePath,
+          {
+            location: first.location,
+            instances: exportsList.map(e => ({
+              name: e.name,
+              kind: e.kind,
+              location: e.location,
+            })),
+            unusedCount: exportsList.length,
+            names: exportsList.map(e => e.name),
+          },
+          exportsList.map(e => e.name).sort().join('+')
         )
       );
     }
