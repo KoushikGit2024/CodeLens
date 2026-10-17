@@ -9,7 +9,7 @@ import {
   MoreVertical,
   Database,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Breadcrumbs from '../ui/Breadcrumbs';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import AIStatusIndicator from '../../features/assistant/AIStatusIndicator';
@@ -27,6 +27,36 @@ export default function RepositoryHeader() {
   const [reanalyzing, setReanalyzing] = useState(false);
   const [isRightMenuOpen, setIsRightMenuOpen] = useState(false);
   const { addToast } = useToast();
+
+  const headerRef = useRef(null);
+  const leftRef = useRef(null);
+  const rightRef = useRef(null);
+  const [availableWidth, setAvailableWidth] = useState(null);
+
+  const measureWidth = useCallback(() => {
+    if (!headerRef.current || !leftRef.current || !rightRef.current) return;
+    const headerW = headerRef.current.clientWidth;
+    const leftW = leftRef.current.offsetWidth;
+    const rightW = rightRef.current.offsetWidth;
+    // Leave safe padding between columns
+    const remaining = Math.max(0, headerW - leftW - rightW - 24);
+    setAvailableWidth(remaining);
+  }, []);
+
+  useEffect(() => {
+    measureWidth();
+    const ro = new ResizeObserver(() => {
+      measureWidth();
+    });
+    if (headerRef.current) ro.observe(headerRef.current);
+    if (leftRef.current) ro.observe(leftRef.current);
+    if (rightRef.current) ro.observe(rightRef.current);
+    window.addEventListener('resize', measureWidth);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measureWidth);
+    };
+  }, [measureWidth]);
 
   const isGloballyAnalyzing = !!livePhase || repo?.status === 'analyzing';
 
@@ -48,9 +78,26 @@ export default function RepositoryHeader() {
     }
   };
 
+  // Determine smart display text based on available width vs text length
+  const displayName = useMemo(() => {
+    if (!repo?.name) return '';
+    // If available width is tight (< 220px) and name has slash (e.g. owner/repo), show just the repo part
+    if (availableWidth !== null && availableWidth < 220 && repo.name.includes('/')) {
+      const parts = repo.name.split('/');
+      return parts[parts.length - 1];
+    }
+    return repo.name;
+  }, [repo?.name, availableWidth]);
+
+  // If available space is too narrow for even a short pill (< 70px), hide to prevent collision
+  const shouldShowTitle = availableWidth === null || availableWidth >= 70;
+
   return (
-    <header className="h-12 flex items-center px-2 sm:px-4 border-b border-border bg-panel shrink-0 gap-2 sm:gap-4 justify-between relative z-30">
-      <div className="flex items-center gap-2 sm:gap-4 min-w-0 z-10 flex-1">
+    <header
+      ref={headerRef}
+      className="h-12 flex items-center px-2 sm:px-4 border-b border-border bg-panel shrink-0 gap-2 sm:gap-4 justify-between relative z-30 overflow-hidden"
+    >
+      <div ref={leftRef} className="flex items-center gap-2 sm:gap-4 min-w-0 z-10 shrink max-w-[45%]">
         <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={() => {
@@ -92,27 +139,30 @@ export default function RepositoryHeader() {
       </div>
 
       {/* Center Project Name */}
-      <div className="flex-1 hidden md:flex justify-center min-w-0 px-2">
-        {repo?.name && (
-          <div className="group relative flex items-center justify-center cursor-default">
-            <div className="relative flex items-center justify-center px-5 py-1.5 rounded-md overflow-hidden bg-surface/80 border border-accent/15 transition-all duration-500 ease-out group-hover:border-accent/50 group-hover:bg-accent/[0.035] group-hover:shadow-[0_0_25px_rgba(var(--color-accent-rgb),0.18)] group-hover:-translate-y-px">
+      <div className="flex-1 hidden md:flex items-center justify-center min-w-0 px-2 overflow-hidden pointer-events-none">
+        {repo?.name && shouldShowTitle && (
+          <div
+            className="group relative flex items-center justify-center cursor-default min-w-0 max-w-full pointer-events-auto"
+            style={availableWidth ? { maxWidth: `${availableWidth}px` } : undefined}
+          >
+            <div className="relative flex items-center justify-center px-3 sm:px-4 py-1.5 rounded-md overflow-hidden bg-surface/80 border border-accent/15 transition-all duration-500 ease-out group-hover:border-accent/50 group-hover:bg-accent/[0.035] group-hover:shadow-[0_0_25px_rgba(var(--color-accent-rgb),0.18)] group-hover:-translate-y-px min-w-0 max-w-full">
               {/* Left reveal rail */}
               <span className="absolute left-0 top-1/2 -translate-y-1/2 h-[1px] w-0 bg-accent/70 shadow-[0_0_8px_rgba(var(--color-accent-rgb),0.7)] transition-all duration-500 ease-out group-hover:w-3" />
               {/* Right reveal rail */}
               <span className="absolute right-0 top-1/2 -translate-y-1/2 h-[1px] w-0 bg-accent/70 shadow-[0_0_8px_rgba(var(--color-accent-rgb),0.7)] transition-all duration-500 ease-out group-hover:w-3" />
               {/* Left bracket */}
-              <span className="relative z-10 w-0 overflow-hidden opacity-0 -translate-x-2 text-accent font-mono font-bold text-sm transition-all duration-400 ease-out group-hover:w-4 group-hover:opacity-100 group-hover:translate-x-0">
+              <span className="relative z-10 w-0 overflow-hidden opacity-0 -translate-x-2 text-accent font-mono font-bold text-sm transition-all duration-400 ease-out group-hover:w-4 group-hover:opacity-100 group-hover:translate-x-0 shrink-0">
                 &lt;
               </span>
               {/* Project name */}
               <span
-                className="relative z-10 mx-1 text-sm font-semibold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-text via-text to-text/70 truncate transition-all duration-500 ease-out group-hover:from-text group-hover:via-accent group-hover:to-text"
+                className="relative z-10 mx-1 text-sm font-semibold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-text via-text to-text/70 truncate min-w-0 transition-all duration-500 ease-out group-hover:from-text group-hover:via-accent group-hover:to-text"
                 title={repo.name}
               >
-                {repo.name}
+                {displayName}
               </span>
               {/* Right bracket */}
-              <span className="relative z-10 w-0 overflow-hidden opacity-0 translate-x-2 text-accent font-mono font-bold text-sm transition-all duration-400 ease-out group-hover:w-4 group-hover:opacity-100 group-hover:translate-x-0">
+              <span className="relative z-10 w-0 overflow-hidden opacity-0 translate-x-2 text-accent font-mono font-bold text-sm transition-all duration-400 ease-out group-hover:w-4 group-hover:opacity-100 group-hover:translate-x-0 shrink-0">
                 &gt;
               </span>
               {/* Symmetric sweep */}
@@ -126,7 +176,7 @@ export default function RepositoryHeader() {
         )}
       </div>
 
-      <div className="flex items-center gap-1.5 sm:gap-3 z-10 shrink-0">
+      <div ref={rightRef} className="flex items-center gap-1.5 sm:gap-3 z-10 shrink-0">
         {/* Desktop / Tablet Actions */}
         <div className="hidden md:flex items-center gap-3">
           <button

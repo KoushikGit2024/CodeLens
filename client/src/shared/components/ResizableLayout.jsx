@@ -13,6 +13,7 @@ export function ResizableLayout({ panels, className = 'h-full w-full' }) {
   });
 
   const draggingState = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const toggleCollapse = index => {
     setCollapsed(prev => {
@@ -36,6 +37,7 @@ export function ResizableLayout({ panels, className = 'h-full w-full' }) {
       startSizes: [...sizes],
       containerWidth: rect.width,
     };
+    setIsDragging(true);
 
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
@@ -86,6 +88,7 @@ export function ResizableLayout({ panels, className = 'h-full w-full' }) {
     document.body.style.userSelect = '';
     document.body.style.cursor = '';
     draggingState.current = null;
+    setIsDragging(false);
     window.removeEventListener('pointermove', handlePointerMove);
     window.removeEventListener('pointerup', handlePointerUp);
   }, [handlePointerMove]);
@@ -115,7 +118,9 @@ export function ResizableLayout({ panels, className = 'h-full w-full' }) {
           <React.Fragment key={panel.id || index}>
             <div
               style={flexStyle}
-              className="flex flex-col relative overflow-hidden transition-all duration-200 ease-in-out bg-surface"
+              className={`flex flex-col relative overflow-hidden bg-surface ${
+                isDragging ? '' : 'transition-all duration-200 ease-in-out'
+              }`}
             >
               {isCollapsed ? (
                 // --- COLLAPSED STATE ---

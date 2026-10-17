@@ -947,12 +947,14 @@ export default function ArchitecturePage() {
                 matchCount={searchQuery ? matchedNodes.length : null}
                 currentMatchIndex={currentMatchIndex}
               />
-              <ExportDiagramButton
-                elementRef={diagramRef}
-                filename={`architecture-diagram-${repoId.replace(/[^a-zA-Z0-9-]/g, '_')}`}
-                nodes={rfNodes}
-                edges={rfEdges}
-              />
+              {viewMode !== 'mermaid' && (
+                <ExportDiagramButton
+                  elementRef={diagramRef}
+                  filename={`architecture-diagram-${repoId.replace(/[^a-zA-Z0-9-]/g, '_')}`}
+                  nodes={rfNodes}
+                  edges={rfEdges}
+                />
+              )}
               <div className="flex bg-panel border border-border rounded-lg overflow-hidden p-0.5 shadow-sm">
                 <button
                   onClick={() => setViewMode('interactive')}

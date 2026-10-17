@@ -76,6 +76,19 @@ export default function MermaidViewer({ diagramStr, repoId }) {
     URL.revokeObjectURL(url);
   };
 
+  const handleDownloadMd = () => {
+    const dateStamp = new Date().toISOString().replace(/[:.]/g, '-').split('T').join('_');
+    const safeRepo = repoId.replace(/[^a-zA-Z0-9-]/g, '_');
+    const mdContent = `# Architecture Diagram\n\n\`\`\`mermaid\n${diagramStr}\n\`\`\`\n`;
+    const blob = new Blob([mdContent], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `architecture-${safeRepo}_${dateStamp}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="flex flex-col h-full w-full relative group">
       <div className="absolute bottom-20 sm:bottom-4 right-4 z-10 flex flex-col sm:flex-row items-end gap-2">
@@ -92,6 +105,13 @@ export default function MermaidViewer({ diagramStr, repoId }) {
           title="Download .mmd source"
         >
           <Download className="w-3.5 h-3.5" /> .mmd
+        </button>
+        <button
+          onClick={handleDownloadMd}
+          className="px-3 py-2 bg-panel border border-border rounded shadow hover:bg-surface text-xs font-medium text-muted hover:text-text flex items-center gap-1 transition-colors"
+          title="Download .md Markdown"
+        >
+          <Download className="w-3.5 h-3.5" /> .md
         </button>
         <button
           onClick={handleDownloadSvg}

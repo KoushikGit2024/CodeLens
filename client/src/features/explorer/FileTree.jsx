@@ -81,7 +81,7 @@ export function FileTree({
   highlightMatch = defaultHighlightMatch,
 }) {
   return (
-    <ul className="select-none">
+    <ul className="outline-none">
       {nodes.map(node => {
         if (searchTerm && !nodeMatchesSearch(node, searchTerm)) return null;
 

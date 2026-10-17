@@ -393,7 +393,7 @@ export default function UploadPage() {
       )}
 
       {/* ── Header ────────────────────────────────────────────────────────────── */}
-      <div className="w-full max-w-7xl mx-auto mb-6 md:mb-8 border-b border-border/50 pb-5 md:pb-6 shrink-0">
+      <div className="w-full max-w-7xl mx-auto mb-6 md:mb-8 border-b border-border/50 pb-5 md:pb-6 shrink-0 relative z-50">
         <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
           <div className="flex flex-col items-start text-left">
             <Logo
