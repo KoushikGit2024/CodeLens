@@ -31,7 +31,7 @@ import { ResizableLayout } from '../../shared/components/ResizableLayout';
 import ContextBreadcrumbs from '../../shared/components/ContextBreadcrumbs';
 
 // Import abstractions
-import { graphToFlow, couplingColor, NODE_W, NODE_H } from './graphUtils';
+import { graphToFlow, couplingColor, NODE_W, NODE_H, getForceLayout } from './graphUtils';
 import { nodeTypes, edgeTypes } from './GraphNodes';
 import { StatRow, FileDetailPanel, PackageDetailPanel } from './GraphSideBar';
 import { ExportDiagramButton } from '../../shared/components/ExportDiagramButton';
@@ -43,6 +43,29 @@ const LAYOUT_OPTIONS = [
   { key: 'force', label: 'Force', icon: Zap, tip: 'Physics-based organic layout' },
   { key: 'flat', label: 'Flat', icon: Layers, tip: 'Left-to-right hierarchical layout' },
 ];
+
+function Toggle({ checked, onChange, label, disabled = false, size = 'md' }) {
+  const isSm = size === 'sm';
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={onChange}
+      className={`relative inline-flex shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+        isSm ? 'w-6 h-3.5' : 'w-8 h-4'
+      } ${checked ? 'bg-accent' : 'bg-surface border border-border'} ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+    >
+      <span
+        className={`pointer-events-none inline-block rounded-full bg-text shadow-sm transition-transform ${
+          isSm ? 'w-3 h-3' : 'w-4 h-4'
+        } ${checked ? (isSm ? 'translate-x-2.5' : 'translate-x-4') : 'translate-x-0'}`}
+      />
+    </button>
+  );
+}
 
 export default function DependencyGraphPage() {
   const { theme } = useTheme();
@@ -60,16 +83,20 @@ export default function DependencyGraphPage() {
   const selected = searchParams.get('node');
   const setSelected = useCallback(
     val => {
-      setSearchParams(prev => {
-        const current = prev.get('node');
-        const next = typeof val === 'function' ? val(current) : val;
-        if (next) {
-          prev.set('node', next);
-        } else {
-          prev.delete('node');
-        }
-        return prev;
-      });
+      setSearchParams(
+        prev => {
+          const next = new URLSearchParams(prev);
+          const current = prev.get('node');
+          const nextVal = typeof val === 'function' ? val(current) : val;
+          if (nextVal) {
+            next.set('node', nextVal);
+          } else {
+            next.delete('node');
+          }
+          return next;
+        },
+        { replace: true }
+      );
     },
     [setSearchParams]
   );
@@ -80,9 +107,33 @@ export default function DependencyGraphPage() {
   const [visualExternal, setVisualExternal] = useState(false);
   const [isCalculatingGraph, setIsCalculatingGraph] = useState(false);
   const [showExternalWarningModal, setShowExternalWarningModal] = useState(false);
-  const [edgeStyle, setEdgeStyle] = useState('spring');
-  const [showChurn, setShowChurn] = useState(false);
-  const [spread, setSpread] = useState(50);
+  const [warnBeforeExternal, setWarnBeforeExternal] = useState(
+    () => sessionStorage.getItem('codeLens_hideExternalWarning') !== 'true'
+  );
+
+  const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+
+  const [edgeStyle, setEdgeStyle] = useState(() => {
+    return localStorage.getItem('codeLens_edgeStyle') || (prefersReducedMotion ? 'straight' : 'spring');
+  });
+  const [showChurn, setShowChurn] = useState(() => localStorage.getItem('codeLens_showChurn') === 'true');
+  const [spread, setSpread] = useState(() => {
+    const saved = localStorage.getItem('codeLens_spread');
+    return saved !== null && !isNaN(Number(saved)) ? Number(saved) : 50;
+  });
+  const [isSimPaused, setIsSimPaused] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem('codeLens_edgeStyle', edgeStyle);
+  }, [edgeStyle]);
+
+  useEffect(() => {
+    localStorage.setItem('codeLens_showChurn', String(showChurn));
+  }, [showChurn]);
+
+  useEffect(() => {
+    localStorage.setItem('codeLens_spread', String(spread));
+  }, [spread]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [matchedNodes, setMatchedNodes] = useState([]);
@@ -90,12 +141,19 @@ export default function DependencyGraphPage() {
   const [rfInstance, setRfInstance] = useState(null);
 
   const layoutType = searchParams.get('layout') || 'clustered';
-  const setLayoutType = type => {
-    setSearchParams(prev => {
-      prev.set('layout', type);
-      return prev;
-    });
-  };
+  const setLayoutType = useCallback(
+    type => {
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        next.set('layout', type);
+        return next;
+      });
+      if (window.innerWidth < 768) {
+        setMobileFiltersOpen(false);
+      }
+    },
+    [setSearchParams]
+  );
 
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   useEffect(() => {
@@ -110,8 +168,13 @@ export default function DependencyGraphPage() {
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const nodesRef = useRef(nodes);
+  nodesRef.current = nodes;
 
   const simRef = useRef(null);
+  const animFrameRef = useRef(null);
+  const spreadRef = useRef(spread);
+  spreadRef.current = spread;
   const graphRef = useRef(null);
 
   /**
@@ -146,8 +209,9 @@ export default function DependencyGraphPage() {
     if (!node) {
       setSearchParams(
         prev => {
-          prev.delete('node');
-          return prev;
+          const next = new URLSearchParams(prev);
+          next.delete('node');
+          return next;
         },
         { replace: true }
       );
@@ -193,7 +257,8 @@ export default function DependencyGraphPage() {
       }
 
       const lowerQuery = query.toLowerCase();
-      const matches = nodes
+      const currentNodes = nodesRef.current || [];
+      const matches = currentNodes
         .filter(n => {
           if (n.type === 'group') return false;
           return (
@@ -206,7 +271,7 @@ export default function DependencyGraphPage() {
       if (matches.length > 0) {
         setCurrentMatchIndex(1);
         if (rfInstance) {
-          const matchNode = nodes.find(n => n.id === matches[0]);
+          const matchNode = currentNodes.find(n => n.id === matches[0]);
           if (matchNode) {
             rfInstance.setCenter(
               matchNode.position.x + parseInt(matchNode.style?.width || 150) / 2,
@@ -219,7 +284,7 @@ export default function DependencyGraphPage() {
         setCurrentMatchIndex(0);
       }
     },
-    [nodes, rfInstance]
+    [rfInstance]
   );
 
   const handleNextMatch = useCallback(() => {
@@ -228,16 +293,17 @@ export default function DependencyGraphPage() {
     setCurrentMatchIndex(nextIdx);
 
     if (rfInstance) {
-      const matchNode = nodes.find(n => n.id === matchedNodes[nextIdx - 1]);
+      const matchNode = (nodesRef.current || []).find(n => n.id === matchedNodes[nextIdx - 1]);
       if (matchNode) {
+        const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
         rfInstance.setCenter(
           matchNode.position.x + parseInt(matchNode.style?.width || 150) / 2,
           matchNode.position.y + parseInt(matchNode.style?.height || 34) / 2,
-          { zoom: 1.2, duration: 800 }
+          { zoom: 1.2, duration: reduce ? 0 : 800 }
         );
       }
     }
-  }, [matchedNodes, currentMatchIndex, nodes, rfInstance]);
+  }, [matchedNodes, currentMatchIndex, rfInstance]);
 
   const handlePrevMatch = useCallback(() => {
     if (matchedNodes.length === 0) return;
@@ -245,21 +311,86 @@ export default function DependencyGraphPage() {
     setCurrentMatchIndex(prevIdx);
 
     if (rfInstance) {
-      const matchNode = nodes.find(n => n.id === matchedNodes[prevIdx - 1]);
+      const matchNode = (nodesRef.current || []).find(n => n.id === matchedNodes[prevIdx - 1]);
       if (matchNode) {
+        const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
         rfInstance.setCenter(
           matchNode.position.x + parseInt(matchNode.style?.width || 150) / 2,
           matchNode.position.y + parseInt(matchNode.style?.height || 34) / 2,
-          { zoom: 1.2, duration: 800 }
+          { zoom: 1.2, duration: reduce ? 0 : 800 }
         );
       }
     }
-  }, [matchedNodes, currentMatchIndex, nodes, rfInstance]);
+  }, [matchedNodes, currentMatchIndex, rfInstance]);
 
   const handleClearSearch = useCallback(() => {
     setSearchQuery('');
     setMatchedNodes([]);
     setCurrentMatchIndex(0);
+  }, []);
+
+  const focusNode = useCallback(
+    id => {
+      setSelected(id);
+      const n = (nodesRef.current || []).find(node => node.id === id);
+      if (n && rfInstance) {
+        const w = parseInt(n.style?.width || NODE_W, 10);
+        const h = parseInt(n.style?.height || NODE_H, 10);
+        const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+        rfInstance.setCenter(n.position.x + w / 2, n.position.y + h / 2, { zoom: 1.2, duration: reduce ? 0 : 600 });
+      }
+    },
+    [rfInstance, setSelected]
+  );
+
+  const toggleSelect = useCallback(
+    nodeId => {
+      setSelected(prev => (prev === nodeId ? null : nodeId));
+      if (isMobile) setMobileDetailOpen(true);
+    },
+    [setSelected, isMobile]
+  );
+
+  useEffect(() => {
+    if (!rfInstance || (nodesRef.current || []).length === 0) return;
+    const t = setTimeout(() => {
+      rfInstance.fitView({ padding: 0.15, duration: 500 });
+    }, 120);
+    return () => clearTimeout(t);
+  }, [layoutType, showExternalPackages, rfInstance]);
+
+  const applyForces = useCallback((sim, spreadVal) => {
+    // Rectangle half-diagonal for accurate collision radius
+    const R = Math.hypot(NODE_W / 2, NODE_H / 2) + 8; // ≈85px
+    // Link distance scales strongly with spread so nodes can breathe
+    const linkDist = NODE_W + 60 + spreadVal * 3.5;
+    // Centering force is intentionally very weak — let repulsion do the spreading
+    const centerStr = Math.max(0.002, 0.02 - spreadVal * 0.00018);
+
+    sim
+      .force('charge', forceManyBody().strength(-150 - spreadVal * 20).theta(0.85).distanceMax(3000))
+      .force('x', forceX(0).strength(centerStr))
+      .force('y', forceY(0).strength(centerStr))
+      .force('collide', forceCollide().radius(R).iterations(3).strength(0.85));
+
+    const linkForce = sim.force('link');
+    if (linkForce) {
+      linkForce.distance(linkDist).strength(0.4);
+    }
+    return sim;
+  }, []);
+
+  const stopSimulation = useCallback(() => {
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    if (simRef.current) {
+      simRef.current.on('tick', null);
+      simRef.current.on('end', null);
+      simRef.current.stop();
+      simRef.current = null;
+    }
   }, []);
 
   /**
@@ -288,6 +419,7 @@ export default function DependencyGraphPage() {
     } = graphToFlow(graph, selected, showExternalPackages, layoutType, edgeStyle, {
       showChurn,
       churnData: graph.gitChurn,
+      onSelect: toggleSelect,
     });
 
     if (matchedNodes.length > 0) {
@@ -308,15 +440,26 @@ export default function DependencyGraphPage() {
 
     setDirColorMap(dcm || new Map());
 
+    const MAX_FORCE_NODES = 800;
+
     if (layoutType === 'force') {
-      // If a simulation is already running, check if we actually need to restart it
+      if (rfNodes.length > MAX_FORCE_NODES) {
+        addToast({
+          title: 'Force Layout Exceeded Node Limit',
+          description: `Force layout is limited to ${MAX_FORCE_NODES} nodes for performance. Switched to Clustered layout.`,
+          type: 'warning',
+        });
+        setLayoutType('clustered');
+        return;
+      }
+
+      // If a simulation is already running and topology hasn't changed,
+      // update node and edge visual state (fading/highlighting) without disturbing the physics!
       if (simRef.current) {
         const currentSimNodes = simRef.current.nodes();
         const topologyChanged = currentSimNodes.length !== rfNodes.length;
 
         if (!topologyChanged) {
-          // Topology is the same (e.g., just clicking to select a node).
-          // Update visual state (fading/highlighting) without disturbing the physics engine!
           setNodes(currentNodes => {
             const updatedMap = new Map(rfNodes.map(n => [n.id, n]));
             return currentNodes.map(cn => {
@@ -331,7 +474,7 @@ export default function DependencyGraphPage() {
               return updated ? { ...ce, ...updated } : ce;
             });
           });
-          return; // Skip simulation restart
+          return; // Skip simulation restart, keep existing simulation running!
         }
 
         // Topology CHANGED (e.g., toggled external packages).
@@ -342,11 +485,10 @@ export default function DependencyGraphPage() {
           return old ? { ...n, position: { x: old.x, y: old.y } } : n;
         });
 
-        simRef.current.stop();
-        simRef.current = null;
+        stopSimulation();
         setNodes(initialNodes);
         setEdges(rfEdges);
-        rfNodes = initialNodes; // Ensure the rest of the block uses preserved positions
+        rfNodes = initialNodes;
       } else {
         setNodes(rfNodes);
         setEdges(rfEdges);
@@ -358,44 +500,60 @@ export default function DependencyGraphPage() {
         .filter(e => nodeIndex.has(e.source) && nodeIndex.has(e.target))
         .map(e => ({ source: nodeIndex.get(e.source), target: nodeIndex.get(e.target) }));
 
-      let frameId = null;
-      simRef.current = forceSimulation(simNodes)
-        .force('charge', forceManyBody())
+      let lastTickTime = 0;
+      const HEAVY_GRAPH = simNodes.length > 250;
+
+      const sim = forceSimulation(simNodes)
         .force('link', forceLink(simEdges))
         .force('center', forceCenter(0, 0))
-        .force('x', forceX(0))
-        .force('y', forceY(0))
-        .force('collide', forceCollide().radius(50))
-        .velocityDecay(0.6)
-        .alpha(1)
-        .on('tick', () => {
-          if (frameId) return;
-          frameId = requestAnimationFrame(() => {
-            frameId = null;
-            setNodes(currentNodes => {
-              return currentNodes.map(node => {
-                const idx = nodeIndex.get(node.id);
-                if (idx === undefined) return node;
-                const simNode = simNodes[idx];
-                const w = parseInt(node.style?.width ?? NODE_W, 10);
-                const h = parseInt(node.style?.height ?? NODE_H, 10);
-                return {
-                  ...node,
-                  position: { x: simNode.x - w / 2, y: simNode.y - h / 2 },
-                };
-              });
-            });
+        .velocityDecay(0.35)
+        .alphaMin(0.001)
+        .alphaDecay(0.02);
+
+      applyForces(sim, spreadRef.current);
+      simRef.current = sim;
+      setIsSimPaused(false);
+
+      const applyPositions = () => {
+        setNodes(currentNodes => {
+          return currentNodes.map(node => {
+            const idx = nodeIndex.get(node.id);
+            if (idx === undefined) return node;
+            const simNode = simNodes[idx];
+            const w = parseInt(node.style?.width ?? NODE_W, 10);
+            const h = parseInt(node.style?.height ?? NODE_H, 10);
+            return {
+              ...node,
+              position: { x: simNode.x - w / 2, y: simNode.y - h / 2 },
+            };
           });
         });
+      };
+
+      sim.on('tick', () => {
+        const now = performance.now();
+        const frameMs = HEAVY_GRAPH ? 50 : 33;
+        if (now - lastTickTime < frameMs || animFrameRef.current) return;
+        lastTickTime = now;
+        animFrameRef.current = requestAnimationFrame(() => {
+          animFrameRef.current = null;
+          applyPositions();
+        });
+      });
+
+      sim.on('end', () => {
+        if (animFrameRef.current) {
+          cancelAnimationFrame(animFrameRef.current);
+          animFrameRef.current = null;
+        }
+        applyPositions();
+      });
     } else {
-      if (simRef.current) {
-        simRef.current.stop();
-        simRef.current = null;
-      }
+      stopSimulation();
       setNodes(rfNodes);
       setEdges(rfEdges);
     }
-  }, [graph, selected, showExternalPackages, layoutType, edgeStyle, showChurn, matchedNodes]);
+  }, [graph, selected, showExternalPackages, layoutType, edgeStyle, showChurn, matchedNodes, applyForces, addToast, setLayoutType, stopSimulation, toggleSelect]);
 
   /**
    * It monitors the slider value, then extracts gravity and repulsion multipliers,
@@ -403,49 +561,43 @@ export default function DependencyGraphPage() {
    */
   useEffect(() => {
     if (layoutType === 'force' && simRef.current) {
-      const chargeStrength = -50 - spread * 15;
-      const gravityStrength = 0.15 - spread * 0.0013;
-      const linkDist = 30 + spread * 2;
-
-      simRef.current.force('charge', forceManyBody().strength(chargeStrength));
-      simRef.current.force('x', forceX(0).strength(gravityStrength));
-      simRef.current.force('y', forceY(0).strength(gravityStrength));
-
-      const linkForce = simRef.current.force('link');
-      if (linkForce) linkForce.distance(linkDist).strength(0.8);
-
-      simRef.current.alpha(0.3).restart();
+      applyForces(simRef.current, spread);
+      simRef.current.alpha(0.4).restart();
+      setIsSimPaused(false);
     }
-  }, [spread, layoutType]);
+  }, [spread, layoutType, applyForces]);
 
   useEffect(() => {
     return () => {
-      if (simRef.current) simRef.current.stop();
+      stopSimulation();
     };
-  }, []);
+  }, [stopSimulation]);
+
+  const dragStartPos = useRef(null);
+  const panePointerDownRef = useRef(null);
 
   const onNodeDragStart = useCallback(
     (event, node) => {
-      if (layoutType !== 'force' || !simRef.current) return;
-      simRef.current.alphaTarget(0.3).restart();
-      const simNode = simRef.current.nodes().find(n => n.id === node.id);
-      if (simNode) {
-        simNode.fx = simNode.x;
-        simNode.fy = simNode.y;
-      }
+      dragStartPos.current = { x: event.clientX, y: event.clientY };
     },
-    [layoutType]
+    []
   );
 
   const onNodeDrag = useCallback(
     (event, node) => {
       if (layoutType !== 'force' || !simRef.current) return;
-      const simNode = simRef.current.nodes().find(n => n.id === node.id);
-      const w = parseInt(node.style?.width ?? NODE_W, 10);
-      const h = parseInt(node.style?.height ?? NODE_H, 10);
-      if (simNode) {
-        simNode.fx = node.position.x + w / 2;
-        simNode.fy = node.position.y + h / 2;
+      if (
+        dragStartPos.current &&
+        Math.hypot((event.clientX || 0) - dragStartPos.current.x, (event.clientY || 0) - dragStartPos.current.y) > 5
+      ) {
+        simRef.current.alphaTarget(0.2).restart();
+        const simNode = simRef.current.nodes().find(n => n.id === node.id);
+        const w = parseInt(node.style?.width ?? NODE_W, 10);
+        const h = parseInt(node.style?.height ?? NODE_H, 10);
+        if (simNode) {
+          simNode.fx = node.position.x + w / 2;
+          simNode.fy = node.position.y + h / 2;
+        }
       }
     },
     [layoutType]
@@ -453,35 +605,74 @@ export default function DependencyGraphPage() {
 
   const onNodeDragStop = useCallback(
     (event, node) => {
+      const moved =
+        dragStartPos.current &&
+        Math.hypot((event.clientX || 0) - dragStartPos.current.x, (event.clientY || 0) - dragStartPos.current.y) > 5;
+      dragStartPos.current = null;
+
+      if (!moved) {
+        return;
+      }
+
       if (layoutType !== 'force' || !simRef.current) return;
       simRef.current.alphaTarget(0);
       const simNode = simRef.current.nodes().find(n => n.id === node.id);
       if (simNode) {
+        const w = parseInt(node.style?.width ?? NODE_W, 10);
+        const h = parseInt(node.style?.height ?? NODE_H, 10);
+        simNode.fx = node.position.x + w / 2;
+        simNode.fy = node.position.y + h / 2;
+      }
+    },
+    [layoutType]
+  );
+
+  const onNodeDoubleClick = useCallback(
+    (event, node) => {
+      if (layoutType !== 'force' || !simRef.current) return;
+      const simNode = simRef.current.nodes().find(n => n.id === node.id);
+      if (simNode) {
         simNode.fx = null;
         simNode.fy = null;
+        simRef.current.alpha(0.3).restart();
       }
     },
     [layoutType]
   );
 
   /**
-   * It catches node clicks, then extracts the specific file identifier,
-   * and then it applies a secondary API fetch to load detailed sidebar statistics.
+   * Fallback click handler for nodes without CustomNode pointer handling (e.g. Group nodes)
    */
   const onNodeClick = useCallback(
     (_ev, rfNode) => {
       if (rfNode.type === 'group') return;
-      const nodeId = rfNode.id;
-      setSelected(prev => (prev === nodeId ? null : nodeId));
-      if (isMobile) setMobileDetailOpen(true);
+      if (!rfNode.data?.onSelect) {
+        toggleSelect(rfNode.id);
+      }
     },
-    [setSelected, isMobile]
+    [toggleSelect]
   );
 
   const onPaneClick = useCallback(() => {
     setSelected(null);
     setFileInfo(null);
-  }, []);
+  }, [setSelected]);
+
+  useEffect(() => {
+    const handleKeyDown = e => {
+      if (e.key === 'Escape') {
+        setSelected(null);
+        setFileInfo(null);
+        handleClearSearch();
+      }
+      if (e.key === '/' && !/input|textarea|select/i.test(e.target.tagName)) {
+        e.preventDefault();
+        document.querySelector('[data-graph-search]')?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [setSelected, handleClearSearch]);
 
   const stats = useMemo(() => {
     if (!graph || graph.status === 'analyzing' || !graph.meta) return null;
@@ -637,6 +828,52 @@ export default function DependencyGraphPage() {
                   onChange={e => setSpread(Number(e.target.value))}
                   className="w-full accent-accent h-1.5 bg-border rounded-lg appearance-none cursor-pointer outline-none"
                 />
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/40 text-[10px]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!simRef.current) return;
+                      if (isSimPaused) {
+                        simRef.current.alpha(0.4).restart();
+                        setIsSimPaused(false);
+                      } else {
+                        simRef.current.stop();
+                        setIsSimPaused(true);
+                      }
+                    }}
+                    className="px-2 py-1 bg-surface border border-border rounded text-text hover:bg-text/5 transition-colors"
+                  >
+                    {isSimPaused ? '▶ Resume' : '⏸ Pause'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!simRef.current) return;
+                      const simNodes = simRef.current.nodes();
+                      const initialLayout = getForceLayout(simNodes);
+                      simNodes.forEach((n, i) => {
+                        if (initialLayout[i]?.position) {
+                          n.x = initialLayout[i].position.x;
+                          n.y = initialLayout[i].position.y;
+                        }
+                        n.vx = 0;
+                        n.vy = 0;
+                        n.fx = null;
+                        n.fy = null;
+                      });
+                      applyForces(simRef.current, spread);
+                      simRef.current.alpha(1).alphaTarget(0).restart();
+                      setIsSimPaused(false);
+                      if (rfInstance) {
+                        setTimeout(() => rfInstance.fitView({ padding: 0.2, duration: 400 }), 50);
+                      }
+                    }}
+                    title="Unpin all nodes and restart layout simulation"
+                    className="px-2 py-1 bg-surface border border-border rounded text-muted hover:text-text hover:bg-text/5 transition-colors"
+                  >
+                    ↺ Reset
+                  </button>
+                </div>
               </div>
             )}
           </section>
@@ -644,14 +881,11 @@ export default function DependencyGraphPage() {
           <section className="border-t border-border pt-3">
             <div className="flex items-center justify-between mb-1">
               <span className="text-text font-medium">Straight Edges</span>
-              <button
-                onClick={() => setEdgeStyle(prev => (prev === 'spring' ? 'straight' : 'spring'))}
-                className={`w-8 h-4 rounded-full transition-colors ${edgeStyle === 'straight' ? 'bg-accent' : 'bg-surface border border-border'}`}
-              >
-                <div
-                  className={`w-4 h-4 bg-text rounded-full shadow-sm transition-transform ${edgeStyle === 'straight' ? 'translate-x-4' : 'translate-x-0'} border`}
-                />
-              </button>
+              <Toggle
+                checked={edgeStyle === 'straight'}
+                onChange={() => setEdgeStyle(prev => (prev === 'spring' ? 'straight' : 'spring'))}
+                label="Toggle between springy and straight lines"
+              />
             </div>
             <p className="text-muted" style={{ fontSize: 10 }}>
               Toggle between springy and straight lines
@@ -661,14 +895,11 @@ export default function DependencyGraphPage() {
           <section className="border-t border-border pt-3">
             <div className="flex items-center justify-between mb-1">
               <span className="text-text font-medium">Git Churn overlay</span>
-              <button
-                onClick={() => setShowChurn(prev => !prev)}
-                className={`w-8 h-4 rounded-full transition-colors ${showChurn ? 'bg-accent' : 'bg-surface border border-border'}`}
-              >
-                <div
-                  className={`w-4 h-4 bg-text rounded-full shadow-sm transition-transform ${showChurn ? 'translate-x-4' : 'translate-x-0'} border`}
-                />
-              </button>
+              <Toggle
+                checked={showChurn}
+                onChange={() => setShowChurn(prev => !prev)}
+                label="Toggle Git Churn overlay"
+              />
             </div>
             <p className="text-muted" style={{ fontSize: 10 }}>
               Highlight files with high change frequency
@@ -680,8 +911,10 @@ export default function DependencyGraphPage() {
               <span className="text-text font-medium">Externals</span>
               <div className="flex items-center gap-2">
                 {isCalculatingGraph && <Loader2 className="w-3 h-3 text-muted animate-spin" />}
-                <button
-                  onClick={() => {
+                <Toggle
+                  checked={visualExternal}
+                  disabled={isCalculatingGraph}
+                  onChange={() => {
                     if (!visualExternal) {
                       if (sessionStorage.getItem('codeLens_hideExternalWarning') === 'true') {
                         setVisualExternal(true);
@@ -699,12 +932,8 @@ export default function DependencyGraphPage() {
                       setShowExternalPackages(false);
                     }
                   }}
-                  className={`w-8 h-4 rounded-full transition-colors ${visualExternal ? 'bg-accent' : 'bg-surface border border-border'}`}
-                >
-                  <div
-                    className={`w-4 h-4 bg-text rounded-full shadow-sm transition-transform ${visualExternal ? 'translate-x-4' : 'translate-x-0'} border`}
-                  />
-                </button>
+                  label="Toggle external packages"
+                />
               </div>
             </div>
             <p className="text-muted mb-2" style={{ fontSize: 10 }}>
@@ -712,19 +941,16 @@ export default function DependencyGraphPage() {
             </p>
             <div className="flex items-center justify-between mt-2">
               <span className="text-muted text-[10px]">Warn before enabling</span>
-              <button
-                onClick={() => {
-                  const current = sessionStorage.getItem('codeLens_hideExternalWarning') === 'true';
-                  sessionStorage.setItem('codeLens_hideExternalWarning', current ? 'false' : 'true');
-                  // force re-render by touching state
-                  setSpread(s => s + 0.0001 - 0.0001);
+              <Toggle
+                size="sm"
+                checked={warnBeforeExternal}
+                onChange={() => {
+                  const nextVal = !warnBeforeExternal;
+                  sessionStorage.setItem('codeLens_hideExternalWarning', nextVal ? 'false' : 'true');
+                  setWarnBeforeExternal(nextVal);
                 }}
-                className={`w-6 h-3 rounded-full transition-colors ${sessionStorage.getItem('codeLens_hideExternalWarning') !== 'true' ? 'bg-accent' : 'bg-surface border border-border'}`}
-              >
-                <div
-                  className={`w-3 h-3 bg-text rounded-full shadow-sm transition-transform ${sessionStorage.getItem('codeLens_hideExternalWarning') !== 'true' ? 'translate-x-3' : 'translate-x-0'} border`}
-                />
-              </button>
+                label="Warn before enabling external packages"
+              />
             </div>
           </section>
 
@@ -791,7 +1017,38 @@ export default function DependencyGraphPage() {
       minWidth: 300,
       collapsible: false,
       content: (
-        <div ref={graphRef} className="relative bg-surface shadow-inner h-full w-full">
+        <div
+          ref={graphRef}
+          className="relative bg-surface shadow-inner h-full w-full"
+          onPointerDown={e => {
+            // Ignore clicks originating from inside nodes or interactive UI overlays
+            if (
+              e.target.closest?.('.react-flow__node') ||
+              e.target.closest?.('.react-flow__controls') ||
+              e.target.closest?.('.react-flow__minimap') ||
+              e.target.closest?.('.export-element-breadcrumbs') ||
+              e.target.closest?.('button') ||
+              e.target.closest?.('input')
+            ) {
+              panePointerDownRef.current = null;
+              return;
+            }
+            panePointerDownRef.current = { x: e.clientX, y: e.clientY };
+          }}
+          onPointerUp={e => {
+            if (panePointerDownRef.current) {
+              const dist = Math.hypot(
+                (e.clientX || 0) - panePointerDownRef.current.x,
+                (e.clientY || 0) - panePointerDownRef.current.y
+              );
+              panePointerDownRef.current = null;
+              if (dist < 8) {
+                setSelected(null);
+                setFileInfo(null);
+              }
+            }
+          }}
+        >
           <div className="absolute top-3 left-3 right-3 z-30 pointer-events-none flex flex-col md:flex-row flex-wrap justify-between items-start md:items-center gap-3">
             <div className="export-element-breadcrumbs pointer-events-auto max-w-[80vw]">
               <ContextBreadcrumbs domain="Dependency Graph" activeNode={selected} onClear={() => setSelected(null)} />
@@ -820,8 +1077,22 @@ export default function DependencyGraphPage() {
               <Database className="w-12 h-12 text-muted" />
               <h2 className="text-text text-lg font-medium">No dependencies detected</h2>
               <p className="text-muted text-sm max-w-sm text-center">
-                No resolvable internal dependency relationships were found.
+                {searchQuery
+                  ? `No nodes match filter "${searchQuery}".`
+                  : 'No resolvable internal dependency relationships were found.'}
               </p>
+              {(searchQuery || selected) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleClearSearch();
+                    setSelected(null);
+                  }}
+                  className="px-3 py-1.5 text-xs bg-accent text-text rounded-md hover:bg-accent-hover transition-colors font-medium mt-2"
+                >
+                  Clear Filters & Search
+                </button>
+              )}
             </div>
           ) : (
             <ReactFlow
@@ -833,10 +1104,15 @@ export default function DependencyGraphPage() {
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               onNodeClick={onNodeClick}
+              onNodeDoubleClick={onNodeDoubleClick}
               onNodeDragStart={onNodeDragStart}
               onNodeDrag={onNodeDrag}
               onNodeDragStop={onNodeDragStop}
               onPaneClick={onPaneClick}
+              onEdgeClick={() => {
+                setSelected(null);
+                setFileInfo(null);
+              }}
               fitView
               fitViewOptions={{ padding: 0.15 }}
               className="bg-transparent"
@@ -845,10 +1121,11 @@ export default function DependencyGraphPage() {
               elementsSelectable={false}
               elevateEdgesOnSelect={false}
               nodesConnectable={false}
+              onlyRenderVisibleElements
               proOptions={{ hideAttribution: true }}
               defaultEdgeOptions={{ zIndex: 1 }}
             >
-              <Background color="#1D2130" gap={20} size={1} variant="dots" />
+              <Background color={isLight ? '#00000012' : '#ffffff10'} gap={20} size={1} variant="dots" />
               <Controls
                 position="bottom-left"
                 className="bg-panel border-border"
@@ -892,9 +1169,13 @@ export default function DependencyGraphPage() {
             </div>
           )}
 
-          {selected && !infoLoading && fileInfo && <FileDetailPanel info={fileInfo} repoId={repoId} graph={graph} />}
+          {selected && !infoLoading && fileInfo && (
+            <FileDetailPanel info={fileInfo} repoId={repoId} graph={graph} onSelectNode={focusNode} />
+          )}
 
-          {selected && !infoLoading && !fileInfo && <PackageDetailPanel nodeId={selected} graph={graph} />}
+          {selected && !infoLoading && !fileInfo && (
+            <PackageDetailPanel nodeId={selected} graph={graph} onSelectNode={focusNode} />
+          )}
         </div>
       ),
     },
@@ -1000,13 +1281,12 @@ export default function DependencyGraphPage() {
                 <input
                   type="checkbox"
                   id="dontShowAgain"
-                  className="accent-accent"
+                  className="accent-accent cursor-pointer"
+                  checked={!warnBeforeExternal}
                   onChange={e => {
-                    if (e.target.checked) {
-                      sessionStorage.setItem('codeLens_hideExternalWarning', 'true');
-                    } else {
-                      sessionStorage.setItem('codeLens_hideExternalWarning', 'false');
-                    }
+                    const hide = e.target.checked;
+                    sessionStorage.setItem('codeLens_hideExternalWarning', hide ? 'true' : 'false');
+                    setWarnBeforeExternal(!hide);
                   }}
                 />
                 <label htmlFor="dontShowAgain" className="text-xs text-muted cursor-pointer select-none">

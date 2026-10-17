@@ -4,26 +4,27 @@
  * It maps the incoming node properties, then extracts the custom aesthetic flags,
  * and then it applies them to render rich, interactive React Flow components.
  */
-import React from 'react';
+import React, { useRef, useCallback } from 'react';
 import { Handle, Position } from 'reactflow';
 import { File, Package, AlertCircle, Flame } from 'lucide-react';
 import { NODE_W, PKG_W } from './graphUtils';
 
-/** Read a CSS variable from the document root as an rgb() string */
-function cssVar(name) {
-  return `rgb(${getComputedStyle(document.documentElement).getPropertyValue(name).trim()})`;
-}
+/** Helper to blend any CSS color with alpha using CSS color-mix */
+const alpha = (color, pct) => `color-mix(in srgb, ${color} ${pct}%, transparent)`;
 
-export const CustomNode = ({ data }) => {
+export const CustomNode = React.memo(function CustomNode({ data }) {
   const isFile = data.nodeType === 'file' || data.nodeType === 'fileNode';
   const w = isFile ? NODE_W : PKG_W;
 
+
   const hasCritical = data.findingsCount?.critical > 0;
-  const shadowGlow = data.isSearchMatch
-    ? `0 0 8px ${cssVar('--color-accent')}88`
-    : hasCritical && !data.isFaded
-      ? '0 0 12px rgba(224, 82, 82, 0.35)'
-      : 'none';
+  const shadowGlow = data.isFocused
+    ? '0 0 0 2px rgb(var(--color-accent)), 0 0 18px rgb(var(--color-accent) / 0.65)'
+    : data.isSearchMatch
+      ? '0 0 8px rgb(var(--color-accent) / 0.55)'
+      : hasCritical && !data.isFaded
+        ? '0 0 12px rgba(224, 82, 82, 0.35)'
+        : 'none';
 
   // Churn overlay support
   const churnScore = data.churnScore || 0;
@@ -33,42 +34,86 @@ export const CustomNode = ({ data }) => {
   const churnColor =
     compositeRisk >= 85 ? '#ef4444' : compositeRisk >= 70 ? '#f97316' : churnScore >= 30 ? '#eab308' : null;
 
-  /**
-   * It evaluates the component props, then extracts the short directory strings,
-   * and then it applies the original clean layout aesthetics alongside the new risk badges.
-   */
-  const accentColor = cssVar('--color-accent');
-  const borderColor = cssVar('--color-border');
-  const panelColor = cssVar('--color-panel');
-  const surfaceColor = cssVar('--color-surface');
-  const textColor = cssVar('--color-text');
-  const mutedColor = cssVar('--color-muted');
-  const dangerColor = cssVar('--color-danger');
+  const accentColor = 'rgb(var(--color-accent))';
+  const borderColor = 'rgb(var(--color-border))';
+  const panelColor = 'rgb(var(--color-panel))';
+  const surfaceColor = 'rgb(var(--color-surface))';
+  const textColor = 'rgb(var(--color-text))';
+  const mutedColor = 'rgb(var(--color-muted))';
+  const dangerColor = 'rgb(var(--color-danger))';
 
-  const defaultBorder = data.isSearchMatch
+  const heat = data.heatColor || accentColor;
+  const defaultBorder = data.isFocused
     ? `2px solid ${accentColor}`
-    : data.isFocused
-      ? `2px solid ${data.heatColor || accentColor}`
-      : `1px solid ${data.heatColor || borderColor}${data.isFaded ? '18' : '55'}`;
+    : data.isSearchMatch
+      ? `2px solid ${accentColor}`
+      : `1px solid ${alpha(data.heatColor || borderColor, data.isFaded ? 10 : 33)}`;
+
+  const isHorizontal = data.layout === 'dagre' || data.layout === 'flat';
+
+
+  // Native pointer tracking — bypasses React Flow's drag-vs-click classification.
+  // Active when data.onSelect is provided.
+  const ptrDownRef = useRef(null);
+  const lastSelectTimeRef = useRef(0);
+
+  const handlePointerDown = useCallback(
+    e => {
+      if (!data.onSelect) return;
+      ptrDownRef.current = { x: e.clientX, y: e.clientY };
+    },
+    [data.onSelect]
+  );
+
+  const handlePointerUp = useCallback(
+    e => {
+      if (!data.onSelect || !ptrDownRef.current) return;
+      const dx = e.clientX - ptrDownRef.current.x;
+      const dy = e.clientY - ptrDownRef.current.y;
+      ptrDownRef.current = null;
+      // If the pointer moved < 8px, it was a tap/click, not a drag
+      if (Math.hypot(dx, dy) < 8) {
+        lastSelectTimeRef.current = Date.now();
+        e.stopPropagation();
+        data.onSelect(data.nodeId);
+      }
+    },
+    [data.onSelect, data.nodeId]
+  );
+
+  const handleClick = useCallback(
+    e => {
+      if (!data.onSelect) return;
+      e.stopPropagation();
+      if (Date.now() - lastSelectTimeRef.current < 150) return;
+      data.onSelect(data.nodeId);
+    },
+    [data.onSelect, data.nodeId]
+  );
 
   return (
     <div
       className="shadow-md rounded transition-all duration-150 relative"
+      onPointerDown={data.onSelect ? handlePointerDown : undefined}
+      onPointerUp={data.onSelect ? handlePointerUp : undefined}
+      onClick={data.onSelect ? handleClick : undefined}
       style={{
-        opacity: data.isFaded ? 0.1 : data.isSearchActive && !data.isSearchMatch ? 0.15 : 1,
+        opacity: data.isFaded ? 0.15 : data.isSearchActive && !data.isSearchMatch ? 0.15 : 1,
         width: w,
+        zIndex: data.isFocused ? 10 : 2,
         borderTop: defaultBorder,
         borderLeft: defaultBorder,
         borderRight: defaultBorder,
         borderBottom: showChurn && churnColor ? `${churnBorderThickness}px solid ${churnColor}` : defaultBorder,
         background: data.isFocused ? surfaceColor : panelColor,
         boxShadow: shadowGlow,
+        cursor: data.onSelect ? 'pointer' : 'default',
       }}
     >
-      <Handle type="target" position={Position.Top} style={{ opacity: 0 }} isConnectable={false} />
+      <Handle type="target" position={isHorizontal ? Position.Left : Position.Top} style={{ opacity: 0 }} isConnectable={false} />
       <div className="flex items-center gap-1.5 px-2 py-1.5" style={{ overflow: 'hidden' }}>
         {isFile ? (
-          <File className="w-3 h-3 shrink-0" style={{ color: data.heatColor || accentColor, minWidth: 12 }} />
+          <File className="w-3 h-3 shrink-0" style={{ color: heat, minWidth: 12 }} />
         ) : (
           <Package className="w-3 h-3 shrink-0 text-amber-400" style={{ minWidth: 12 }} />
         )}
@@ -112,15 +157,15 @@ export const CustomNode = ({ data }) => {
               padding: '0 4px',
               flexShrink: 0,
               lineHeight: '14px',
-              background: `${data.heatColor || accentColor}22`,
-              color: data.heatColor || accentColor,
+              background: alpha(heat, 15),
+              color: heat,
             }}
           >
             {data.degree}
           </span>
         )}
       </div>
-      <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} isConnectable={false} />
+      <Handle type="source" position={isHorizontal ? Position.Right : Position.Bottom} style={{ opacity: 0 }} isConnectable={false} />
 
       {hasCritical && !data.isCycling && (
         <div
@@ -173,42 +218,54 @@ export const CustomNode = ({ data }) => {
       )}
     </div>
   );
-};
+});
 
-export const GroupNode = ({ data }) => (
-  <div
-    style={{
-      width: '100%',
-      height: '100%',
-      border: `1.5px solid ${data.color}44`,
-      borderRadius: 12,
-      background: `${data.color}08`,
-    }}
-  >
+export const GroupNode = React.memo(function GroupNode({ data }) {
+  return (
     <div
-      className="absolute top-2 left-3 text-[10px] font-bold uppercase tracking-widest"
-      style={{ color: `${data.color}bb` }}
+      style={{
+        width: '100%',
+        height: '100%',
+        border: `1.5px solid ${alpha(data.color, 25)}`,
+        borderRadius: 12,
+        background: alpha(data.color, 4),
+      }}
     >
-      {data.label}
+      <div
+        className="absolute top-2 left-3 text-[10px] font-bold uppercase tracking-widest"
+        style={{ color: alpha(data.color, 75) }}
+      >
+        {data.label}
+      </div>
     </div>
-  </div>
-);
+  );
+});
 
-export const SpringEdge = ({ id, sourceX, sourceY, targetX, targetY, style = {}, markerEnd, data }) => {
+export const SpringEdge = React.memo(function SpringEdge({ id, sourceX, sourceY, targetX, targetY, style = {}, markerEnd, data }) {
   const dx = targetX - sourceX;
   const dy = targetY - sourceY;
-  const length = Math.sqrt(dx * dx + dy * dy);
+  const length = Math.hypot(dx, dy);
   if (length < 1) return null;
+
+  const transitionStyle = { ...style, fill: 'none' };
+
+  if (data?.isStraight) {
+    const pathD = `M ${sourceX},${sourceY} L ${targetX},${targetY}`;
+    return (
+      <>
+        <path id={id} className="react-flow__edge-path" d={pathD} style={transitionStyle} markerEnd={markerEnd} />
+        <path d={pathD} style={{ fill: 'none', stroke: 'transparent', strokeWidth: 12 }} />
+      </>
+    );
+  }
 
   const perpX = -dy / length;
   const perpY = dx / length;
-  const coils = Math.max(2, Math.round(length / 50));
-
-  // Force amplitude to 0 if straight lines are toggled, enabling smooth CSS transition of the path
-  const amplitude = data?.isStraight ? 0 : Math.min(6, length / (coils * 3));
-
-  const steps = coils * 16;
+  const coils = Math.max(2, Math.round(length / 60));
+  const amplitude = Math.min(6, length / (coils * 3));
+  const steps = coils * 8;
   const pts = [];
+
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
     const envelope = Math.sin(t * Math.PI);
@@ -218,16 +275,13 @@ export const SpringEdge = ({ id, sourceX, sourceY, targetX, targetY, style = {},
 
   const pathD = `M ${pts.join(' L ')}`;
 
-  // Remove the CSS transition on 'd' so edges don't lag behind nodes during force simulation
-  const transitionStyle = { ...style, fill: 'none' };
-
   return (
     <>
       <path id={id} className="react-flow__edge-path" d={pathD} style={transitionStyle} markerEnd={markerEnd} />
       <path d={pathD} style={{ fill: 'none', stroke: 'transparent', strokeWidth: 12 }} />
     </>
   );
-};
+});
 
 export const nodeTypes = { custom: CustomNode, group: GroupNode };
 export const edgeTypes = { spring: SpringEdge };

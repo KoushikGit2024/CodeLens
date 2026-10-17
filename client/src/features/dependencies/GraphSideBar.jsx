@@ -24,33 +24,39 @@ export function Chip({ label, color }) {
   return <span className={`border rounded px-1.5 py-0.5 ${cls}`}>{label}</span>;
 }
 
-export function DepEntry({ dep, repoId, reverse = false }) {
+export function DepEntry({ dep, repoId, reverse = false, onSelectNode }) {
   const name = dep.filePath ? dep.filePath.split('/').pop() : dep.package;
   const Icon = dep.package ? Package : File;
-  const color = dep.package ? 'text-amber-400' : 'text-accent';
+  const color = dep.package ? 'text-amber-400' : reverse ? 'text-green-400' : 'text-accent';
+  const targetId = dep.filePath
+    ? (dep.filePath.startsWith('file:') ? dep.filePath : `file:${dep.filePath}`)
+    : `module:${dep.package}`;
 
-  /**
-   * It evaluates the dependency entity, then extracts its routing data,
-   * and then it applies a link to navigate the codebase explorer.
-   */
   return (
-    <div className="flex items-center gap-1.5 py-1 group border-b border-text/5 last:border-0">
-      <Icon className={`w-3.5 h-3.5 ${color} shrink-0`} />
-      <span className="text-text text-xs font-mono truncate flex-1" title={dep.filePath || dep.package}>
-        {name}
-      </span>
+    <div className="flex items-center gap-1.5 py-1 group border-b border-text/5 last:border-0 hover:bg-surface/50 rounded px-1 transition-colors">
+      <button
+        type="button"
+        onClick={() => onSelectNode && onSelectNode(targetId)}
+        className="flex items-center gap-1.5 flex-1 min-w-0 text-left cursor-pointer focus:outline-none"
+        title={`Focus ${dep.filePath || dep.package} in graph`}
+      >
+        <Icon className={`w-3.5 h-3.5 ${color} shrink-0`} />
+        <span className="text-text text-xs font-mono truncate hover:text-accent transition-colors" title={dep.filePath || dep.package}>
+          {name}
+        </span>
+      </button>
       {dep.filePath && (
         <OpenSourceButton
           ref={makeSourceRef({ filePath: dep.filePath })}
           variant="icon"
-          className="opacity-0 group-hover:opacity-100 bg-surface border-border"
+          className="opacity-0 group-hover:opacity-100 bg-surface border-border shrink-0"
         />
       )}
     </div>
   );
 }
 
-export function FileDetailPanel({ info, repoId, graph }) {
+export function FileDetailPanel({ info, repoId, graph, onSelectNode }) {
   const nodeCycles = graph?.cycles?.filter(c => c.includes(info.id || `file:${info.filePath}`)) || [];
   const isIsolated = graph?.nodes?.find(n => n.id === `file:${info.filePath}`)?.data?.isIsolated;
 
@@ -67,10 +73,6 @@ export function FileDetailPanel({ info, repoId, graph }) {
     }
   };
 
-  /**
-   * It reads the contextual file information, then extracts specific metadata like cycles and health scores,
-   * and then it applies them to the detailed DOM elements.
-   */
   return (
     <div className="flex flex-col gap-4">
       <div>
@@ -98,8 +100,8 @@ export function FileDetailPanel({ info, repoId, graph }) {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Chip label={`${info.dependencyCount} deps`} color="accent" />
-        <Chip label={`${info.dependentCount} users`} color="success" />
+        <Chip label={`${info.dependencyCount} deps (imports)`} color="accent" />
+        <Chip label={`${info.dependentCount} users (imported by)`} color="success" />
         {info.health && (
           <span
             className={`border rounded px-2 py-1 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 ${getSeverityColor(info.health.severity)}`}
@@ -156,12 +158,17 @@ export function FileDetailPanel({ info, repoId, graph }) {
 
       {info.dependencies?.length > 0 && (
         <section className="bg-panel p-3 rounded-lg border border-border">
-          <p className="text-muted uppercase tracking-wider mb-2 text-[10px] font-bold">
-            Imports ({info.dependencyCount})
-          </p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-muted uppercase tracking-wider text-[10px] font-bold">
+              Imports ({info.dependencyCount})
+            </p>
+            <span className="text-[10px] text-accent font-medium flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-accent inline-block" /> Outgoing
+            </span>
+          </div>
           <div className="flex flex-col max-h-48 overflow-y-auto custom-scrollbar pr-1">
             {info.dependencies.map((dep, i) => (
-              <DepEntry key={i} dep={dep} repoId={repoId} />
+              <DepEntry key={i} dep={dep} repoId={repoId} onSelectNode={onSelectNode} />
             ))}
           </div>
         </section>
@@ -169,12 +176,17 @@ export function FileDetailPanel({ info, repoId, graph }) {
 
       {info.dependents.length > 0 && (
         <section className="bg-panel p-3 rounded-lg border border-border">
-          <p className="text-muted uppercase tracking-wider mb-2 text-[10px] font-bold">
-            Imported by ({info.dependentCount})
-          </p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-muted uppercase tracking-wider text-[10px] font-bold">
+              Imported by ({info.dependentCount})
+            </p>
+            <span className="text-[10px] text-green-400 font-medium flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-green-400 inline-block" /> Incoming
+            </span>
+          </div>
           <div className="flex flex-col max-h-48 overflow-y-auto custom-scrollbar pr-1">
             {info.dependents.map((dep, i) => (
-              <DepEntry key={i} dep={dep} reverse repoId={repoId} />
+              <DepEntry key={i} dep={dep} reverse repoId={repoId} onSelectNode={onSelectNode} />
             ))}
           </div>
         </section>
@@ -197,7 +209,7 @@ export function FileDetailPanel({ info, repoId, graph }) {
   );
 }
 
-export function PackageDetailPanel({ nodeId, graph }) {
+export function PackageDetailPanel({ nodeId, graph, onSelectNode }) {
   const node = graph?.nodes?.find(n => n.id === nodeId);
   if (!node) return null;
 
@@ -206,10 +218,6 @@ export function PackageDetailPanel({ nodeId, graph }) {
       .filter(e => e.target === nodeId)
       .map(e => graph.nodes.find(n => n.id === e.source)?.data?.filePath ?? e.source);
 
-    /**
-     * It checks for an external module node, then extracts the dependents from the edges,
-     * and then it applies them to the sidebar module view.
-     */
     return (
       <div className="flex flex-col gap-4">
         <div className="bg-panel p-4 rounded-lg border border-border">
@@ -226,12 +234,22 @@ export function PackageDetailPanel({ nodeId, graph }) {
               Imported by ({users.length})
             </p>
             <div className="flex flex-col max-h-64 overflow-y-auto custom-scrollbar pr-1">
-              {users.map((f, i) => (
-                <div key={i} className="flex items-center gap-2 py-1.5 border-b border-text/5 last:border-0">
-                  <File className="w-3.5 h-3.5 text-accent shrink-0" />
-                  <span className="text-text text-xs font-mono truncate">{f.split('/').pop()}</span>
-                </div>
-              ))}
+              {users.map((f, i) => {
+                const targetId = f.startsWith('file:') ? f : `file:${f}`;
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => onSelectNode && onSelectNode(targetId)}
+                    className="flex items-center gap-2 py-1.5 border-b border-text/5 last:border-0 hover:bg-surface/50 rounded px-1 text-left w-full cursor-pointer transition-colors group"
+                  >
+                    <File className="w-3.5 h-3.5 text-accent shrink-0" />
+                    <span className="text-text text-xs font-mono truncate group-hover:text-accent transition-colors">
+                      {f.split('/').pop()}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </section>
         )}

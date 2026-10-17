@@ -80,20 +80,25 @@ export function getDagreLayout(nodes, edges, direction = 'LR') {
  * and then it applies it as the initial starting point for the physics simulation.
  */
 export function getForceLayout(nodes) {
-  return nodes.map(n => ({
-    ...n,
-    position: {
-      x: (Math.random() - 0.5) * 600,
-      y: (Math.random() - 0.5) * 600,
-    },
-  }));
+  return nodes.map((n, i) => {
+    const angle = i * 2.399963; // Golden angle spiral
+    // Use generous radius: 90px × sqrt(i) so even 200 nodes start ~1270px apart
+    const r = 90 * Math.sqrt(i + 0.5);
+    return {
+      ...n,
+      position: {
+        x: Math.round(r * Math.cos(angle)),
+        y: Math.round(r * Math.sin(angle)),
+      },
+    };
+  });
 }
 
 /**
  * It groups nodes by directory, then extracts grid boundaries for each cluster,
  * and then it applies absolute coordinate positioning to visually separate folders.
  */
-export function getClusteredLayout(fileNodes, edges, dirColorMap) {
+export function getClusteredLayout(fileNodes, _edges, dirColorMap, pkgNodes = []) {
   const groups = {};
   for (const n of fileNodes) {
     const d = n.data.dir || '(root)';
@@ -109,6 +114,13 @@ export function getClusteredLayout(fileNodes, edges, dirColorMap) {
   const HEADER_H = 24;
   function optCols(count) {
     return Math.min(6, Math.max(1, Math.round(Math.sqrt(count))));
+  }
+
+  function optPkgCols(count) {
+    if (count <= 2) return 1;
+    if (count <= 6) return 2;
+    if (count <= 18) return 3;
+    return 4;
   }
 
   const sortedDirs = Object.keys(groups).sort();
@@ -164,6 +176,41 @@ export function getClusteredLayout(fileNodes, edges, dirColorMap) {
     });
   });
 
+  // Position External Packages in their own dedicated group cluster on the right
+  if (pkgNodes && pkgNodes.length > 0) {
+    const maxX = builtGroups.length > 0 ? Math.max(...builtGroups.map(g => groupPositions[g.dir].x + g.gW)) : 0;
+    const pkgGx = maxX > 0 ? maxX + 80 : 0;
+    const pkgGy = 0;
+    const pkgCols = optPkgCols(pkgNodes.length);
+    const pkgRows = Math.ceil(pkgNodes.length / pkgCols);
+    const pkgGW = pkgCols * (PKG_W + GAP_X) - GAP_X + PAD * 2;
+    const pkgGH = pkgRows * (PKG_H + GAP_Y) - GAP_Y + PAD * 2 + HEADER_H;
+    const pkgColor = '#d29922';
+
+    groupNodes.push({
+      id: '__group__external_packages',
+      type: 'group',
+      data: { label: 'External Packages', color: pkgColor },
+      position: { x: pkgGx, y: pkgGy },
+      style: { width: pkgGW, height: pkgGH, pointerEvents: 'none' },
+      selectable: false,
+      draggable: false,
+      zIndex: -100,
+    });
+
+    pkgNodes.forEach((n, i) => {
+      const col = i % pkgCols;
+      const row = Math.floor(i / pkgCols);
+      positionedNodes.push({
+        ...n,
+        position: {
+          x: pkgGx + PAD + col * (PKG_W + GAP_X),
+          y: pkgGy + HEADER_H + PAD + row * (PKG_H + GAP_Y),
+        },
+      });
+    });
+  }
+
   return [...groupNodes, ...positionedNodes];
 }
 
@@ -172,7 +219,7 @@ export function getClusteredLayout(fileNodes, edges, dirColorMap) {
  * and then it applies fading logic and routing to the selected layout generator.
  */
 export function graphToFlow(graph, selectedId, showExternalPackages, layoutType, edgeStyle = 'spring', options = {}) {
-  const { showChurn = false, churnData = null } = options;
+  const { showChurn = false, churnData = null, onSelect = null } = options;
 
   let fileNodes = graph.nodes.filter(n => n.type === 'fileNode' || n.type === 'file');
   let pkgNodes = showExternalPackages ? graph.nodes.filter(n => n.type === 'moduleNode' || n.type === 'package') : [];
@@ -190,30 +237,16 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
 
   const dirs = [...new Set(fileNodes.map(n => getDir(n.data?.filePath || n.filePath)))].sort();
   const dirColorMap = new Map(dirs.map((d, i) => [d, DIR_PALETTE[i % DIR_PALETTE.length]]));
+  if (showExternalPackages && pkgNodes.length > 0) {
+    dirColorMap.set('External Packages', '#d29922');
+  }
 
   const connectedNodes = new Set();
   if (selectedId) {
     connectedNodes.add(selectedId);
-    const adj = new Map();
     for (const e of edgesToRender) {
-      if (!adj.has(e.source)) adj.set(e.source, []);
-      if (!adj.has(e.target)) adj.set(e.target, []);
-      adj.get(e.source).push(e.target);
-      adj.get(e.target).push(e.source);
-    }
-    const queue = [selectedId];
-    let head = 0;
-    while (head < queue.length) {
-      const node = queue[head++];
-      const neighbors = adj.get(node);
-      if (neighbors) {
-        for (const neighbor of neighbors) {
-          if (!connectedNodes.has(neighbor)) {
-            connectedNodes.add(neighbor);
-            queue.push(neighbor);
-          }
-        }
-      }
+      if (e.source === selectedId) connectedNodes.add(e.target);
+      if (e.target === selectedId) connectedNodes.add(e.source);
     }
   }
 
@@ -221,6 +254,9 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
   for (const n of fileNodes) {
     dirMap.set(n.id, getDir(n.data?.filePath || n.filePath));
   }
+
+  const cycleSet = new Set((graph.cycles || []).flat());
+  const isoSet = new Set(graph.isolatedFiles || []);
 
   const rfFileNodes = fileNodes.map(n => {
     const rawPath = n.data?.filePath || n.filePath || '';
@@ -237,18 +273,21 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
       id: n.id,
       type: 'custom',
       data: {
+        nodeId: n.id,
+        onSelect,
         label: n.data?.label || rawPath.split('/').pop(),
         fullLabel: rawPath,
         nodeType: 'file',
         dir,
         shortDir,
+        layout: layoutType,
         dirColor: dirColorMap.get(dir),
         heatColor: couplingColor(degree, maxDegree),
         degree,
         isFaded,
         isFocused: n.id === selectedId,
-        isCycling: graph.cycles?.some(cycle => cycle.includes(n.id)) || false,
-        isIsolated: graph.isolatedFiles?.includes(n.id) || false,
+        isCycling: cycleSet.has(n.id),
+        isIsolated: isoSet.has(n.id),
         findingsCount: n.data?.findingsCount || { critical: 0, warning: 0 },
         healthScore: n.data?.healthScore || 100,
         // Churn overlay
@@ -272,9 +311,12 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
       id: n.id,
       type: 'custom',
       data: {
+        nodeId: n.id,
+        onSelect,
         label: n.data?.label || n.name || 'Unknown',
         fullLabel: n.data?.label || n.name || '',
         nodeType: 'package',
+        layout: layoutType,
         heatColor: '#d29922',
         degree,
         isFaded,
@@ -291,17 +333,28 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
   });
 
   const rfEdges = edgesToRender.map(e => {
-    const isFaded = selectedId ? !connectedNodes.has(e.source) || !connectedNodes.has(e.target) : false;
-    const isDirect = selectedId && (e.source === selectedId || e.target === selectedId);
+    const isOut = selectedId && e.source === selectedId; // outgoing (this file imports target)
+    const isIn = selectedId && e.target === selectedId; // incoming (target is imported by source)
+    const isDirect = isOut || isIn;
+    const isFaded = selectedId ? !isDirect : false;
     const isCjs = e.type === 'requires' || e.type === 'smoothstep';
 
     const sourceDir = dirMap.get(e.source);
     const targetDir = dirMap.get(e.target);
     const sameDir = sourceDir && targetDir && sourceDir === targetDir;
 
-    const strokeColor = isFaded ? '#ffffff08' : isDirect ? '#58a6ff' : sameDir ? '#7d8590' : '#58a6ff55';
+    // Outgoing = blue (#58a6ff), Incoming = green (#3fb950)
+    const strokeColor = isFaded
+      ? 'rgba(128, 128, 128, 0.12)'
+      : isOut
+        ? '#58a6ff'
+        : isIn
+          ? '#3fb950'
+          : sameDir
+            ? '#7d8590'
+            : '#58a6ff55';
     const strokeWidth = isFaded ? 0.5 : isDirect ? 2 : 0.8;
-    const opacity = isFaded ? 0.08 : isDirect ? 1 : sameDir ? 0.35 : 0.45;
+    const opacity = isFaded ? 0.18 : isDirect ? 1 : sameDir ? 0.35 : 0.45;
 
     return {
       id: `${e.source}->${e.target}`,
@@ -321,18 +374,14 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
           : undefined,
       label: isCjs && isDirect ? 'cjs' : undefined,
       labelStyle: { fill: '#6e7681', fontSize: 8, fontFamily: 'monospace' },
-      labelBgStyle: { fill: '#0d1117', fillOpacity: 0.7 },
+      labelBgStyle: { fill: 'var(--color-surface, #0d1117)', fillOpacity: 0.85 },
       data: { edgeType: e.type, isStraight: edgeStyle === 'straight' },
     };
   });
 
   if (layoutType === 'clustered') {
-    const layouted = getClusteredLayout(rfFileNodes, rfEdges, dirColorMap);
-    const positionedPkgNodes = rfPkgNodes.map((n, i) => ({
-      ...n,
-      position: { x: i * (PKG_W + 20), y: 1200 },
-    }));
-    return { rfNodes: [...layouted, ...positionedPkgNodes], rfEdges, dirColorMap };
+    const layouted = getClusteredLayout(rfFileNodes, rfEdges, dirColorMap, rfPkgNodes);
+    return { rfNodes: layouted, rfEdges, dirColorMap };
   } else if (layoutType === 'force') {
     const allRfNodes = [...rfFileNodes, ...rfPkgNodes];
     return { rfNodes: getForceLayout(allRfNodes), rfEdges, dirColorMap };
