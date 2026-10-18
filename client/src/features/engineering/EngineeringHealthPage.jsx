@@ -34,6 +34,7 @@ import PageHeader from '../../shared/components/PageHeader';
 import { useToast } from '../../shared/context/ToastContext';
 import { useAIState } from '../../shared/context/AIContext';
 import ADRPanel from './ADRPanel';
+import ConfirmAiModal from '../../shared/components/ai/ConfirmAiModal';
 import OpenSourceButton from '../../shared/components/OpenSourceButton';
 import { tryMakeSourceRef } from '../../shared/navigation/sourceRef';
 import MetricInfoButton from '../../shared/components/MetricInfoButton';
@@ -448,6 +449,8 @@ const EngineeringHealthPage = () => {
   const [isReanalyzing, setIsReanalyzing] = useState(false);
   const [explainLoading, setExplainLoading] = useState(false);
   const [explainResult, setExplainResult] = useState(null);
+  const [confirmInterpretationOpen, setConfirmInterpretationOpen] = useState(false);
+  const [pendingExplainRisk, setPendingExplainRisk] = useState(null);
   const { repo, livePhase } = useRepository();
   const isGloballyAnalyzing = !!livePhase || repo?.status === 'analyzing';
 
@@ -715,8 +718,8 @@ const EngineeringHealthPage = () => {
     [repoId, addToast]
   );
 
-  const handleExplainAi = useCallback(
-    async risk => {
+  const requestExplainAi = useCallback(
+    risk => {
       if (aiState.authState === 'unauthenticated') {
         navigate('/auth/signin');
         return;
@@ -737,6 +740,13 @@ const EngineeringHealthPage = () => {
         });
         return;
       }
+      setPendingExplainRisk(risk);
+    },
+    [aiState, navigate, addToast]
+  );
+
+  const executeExplainAi = useCallback(
+    async risk => {
       setExplainRisk(risk);
       setExplainResult(null);
       setExplainLoading(true);
@@ -746,6 +756,11 @@ const EngineeringHealthPage = () => {
           singleRisk: risk,
         });
         setExplainResult(res.data?.insights || null);
+        addToast({
+          title: 'Explanation Ready',
+          description: 'AI finding explanation generated.',
+          type: 'success',
+        });
       } catch (err) {
         addToast({
           title: 'Explanation Failed',
@@ -757,14 +772,31 @@ const EngineeringHealthPage = () => {
         setExplainLoading(false);
       }
     },
-    [aiState, repoId, navigate, addToast, setExplainRisk]
+    [repoId, addToast, setExplainRisk]
   );
 
-  useEffect(() => {
-    if (explainRisk && !explainResult && !explainLoading) {
-      handleExplainAi(explainRisk);
+  const executeGenerateInterpretation = useCallback(async () => {
+    setLoadingInsights(true);
+    try {
+      const res = await repositoryApi.getRisks(repoId, {
+        generateAi: true,
+      });
+      setInsights(res.data.insights);
+      addToast({
+        title: 'Interpretation Ready',
+        description: 'AI architecture insights generated.',
+        type: 'success',
+      });
+    } catch (err) {
+      addToast({
+        title: 'Generation Failed',
+        description: err.message || 'Failed to generate.',
+        type: 'error',
+      });
+    } finally {
+      setLoadingInsights(false);
     }
-  }, [explainRisk, explainResult, explainLoading, handleExplainAi]);
+  }, [repoId, addToast]);
 
   // ── Score helpers ───────────────────────────────────────────────────────────
   function getScoreColor(score) {
@@ -1261,32 +1293,30 @@ const EngineeringHealthPage = () => {
               let btnText = 'Generate AI Interpretation',
                 isDisabled = false,
                 title = '';
-              const handleGenerate = async () => {
+              const handleInitiateGenerateInterpretation = () => {
                 if (aiState.authState === 'unauthenticated') {
                   navigate('/auth/signin');
                   return;
                 }
-                setLoadingInsights(true);
-                try {
-                  const res = await repositoryApi.getRisks(repoId, {
-                    generateAi: true,
-                  });
-                  setInsights(res.data.insights);
+                if (aiState.quotaStatus === 'exhausted') {
                   addToast({
-                    title: 'Interpretation Generated',
-                    description: 'AI interpretation ready.',
-                    type: 'success',
-                  });
-                } catch (err) {
-                  addToast({
-                    title: 'Generation Failed',
-                    description: err.message || 'Failed to generate.',
+                    title: 'Quota Exceeded',
+                    description: 'AI usage limit reached.',
                     type: 'error',
                   });
-                } finally {
-                  setLoadingInsights(false);
+                  return;
                 }
+                if (aiState.status === 'offline') {
+                  addToast({
+                    title: 'AI Offline',
+                    description: 'No AI provider configured.',
+                    type: 'error',
+                  });
+                  return;
+                }
+                setConfirmInterpretationOpen(true);
               };
+
               if (aiState.status === 'loading') {
                 btnText = 'Loading...';
                 isDisabled = true;
@@ -1303,11 +1333,12 @@ const EngineeringHealthPage = () => {
               }
               return (
                 <button
-                  onClick={handleGenerate}
+                  onClick={handleInitiateGenerateInterpretation}
                   disabled={isDisabled}
                   title={title}
-                  className="px-4 py-2 bg-accent/20 text-accent rounded hover:bg-accent/30 transition-colors disabled:opacity-50"
+                  className="px-4 py-2 bg-accent/20 text-accent rounded hover:bg-accent/30 transition-colors disabled:opacity-50 flex items-center gap-2 font-medium text-sm"
                 >
+                  <Sparkles className="w-4 h-4" />
                   {btnText}
                 </button>
               );
@@ -1607,7 +1638,7 @@ const EngineeringHealthPage = () => {
                     repoId={repoId}
                     navigate={navigate}
                     onDraftAdr={setActiveAdrRisk}
-                    onExplainAi={handleExplainAi}
+                    onExplainAi={requestExplainAi}
                     onIgnore={handleIgnoreToggle}
                     ignored={false}
                     selected={selectedRiskIds.has(risk.id)}
@@ -1658,6 +1689,17 @@ const EngineeringHealthPage = () => {
                   {explainLoading && (
                     <div className="flex items-center gap-2 text-muted text-sm">
                       <Loader2 className="w-4 h-4 animate-spin" /> Generating explanation...
+                    </div>
+                  )}
+                  {!explainLoading && !explainResult && (
+                    <div className="flex items-center justify-between p-3.5 rounded-lg bg-panel border border-border">
+                      <span className="text-xs text-muted">Ready to generate explanation. Requires confirmation.</span>
+                      <button
+                        onClick={() => requestExplainAi(explainRisk)}
+                        className="px-3 py-1.5 bg-accent text-white rounded-lg text-xs font-medium flex items-center gap-1.5 hover:bg-accent-hover transition-colors shadow-sm"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" /> Explain with AI
+                      </button>
                     </div>
                   )}
                   {explainResult && (
@@ -1760,6 +1802,38 @@ const EngineeringHealthPage = () => {
       </div>
 
       <ADRPanel repoId={repoId} risk={activeAdrRisk} onClose={() => setActiveAdrRisk(null)} />
+
+      {/* Confirmation Modal for Full AI Architecture Interpretation */}
+      <ConfirmAiModal
+        isOpen={confirmInterpretationOpen}
+        onClose={() => setConfirmInterpretationOpen(false)}
+        onConfirm={() => {
+          setConfirmInterpretationOpen(false);
+          executeGenerateInterpretation();
+        }}
+        title="Generate AI Architecture Interpretation?"
+        subtitle="Synthesizing Repository Structural Metrics"
+        description="CodeLens will synthesize your codebase metrics (hotspots, co-change coupling, complex functions, and structural risks) and request an architectural interpretation from the AI provider."
+        tokenEstimate="~1,200 tokens"
+        confirmText="Confirm & Generate"
+      />
+
+      {/* Confirmation Modal for Individual Risk AI Explanation */}
+      <ConfirmAiModal
+        isOpen={!!pendingExplainRisk}
+        onClose={() => setPendingExplainRisk(null)}
+        onConfirm={() => {
+          const r = pendingExplainRisk;
+          setPendingExplainRisk(null);
+          executeExplainAi(r);
+        }}
+        title="Explain Risk with AI?"
+        subtitle={pendingExplainRisk ? `${pendingExplainRisk.category} · ${pendingExplainRisk.title}` : ''}
+        description={`CodeLens will extract the structural AST facts and context of this finding and request an AI explanation with root-cause insights and remediation options.`}
+        findingContext={pendingExplainRisk}
+        tokenEstimate="~500 tokens"
+        confirmText="Confirm & Explain"
+      />
     </div>
   );
 };

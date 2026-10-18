@@ -1,13 +1,42 @@
 import React, { useState, useEffect } from 'react';
-import { X, Copy, Download, RefreshCw, AlertCircle, FileText, Loader2 } from 'lucide-react';
+import { X, Copy, Download, RefreshCw, AlertCircle, FileText, Loader2, Sparkles } from 'lucide-react';
 import { repositoryApi } from '../../shared/api';
 import { useToast } from '../../shared/context/ToastContext';
+import ConfirmAiModal from '../../shared/components/ai/ConfirmAiModal';
+import { repositoryStore } from '../../services/analyzer/repository/repository.store.js';
+import { aiArtifactStore, buildCacheKey } from '../../services/storage/aiArtifact.store.js';
 
 export default function ADRPanel({ repoId, risk, onClose }) {
   const [adr, setAdr] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showRegenerateModal, setShowRegenerateModal] = useState(false);
   const { addToast } = useToast();
+
+  // Check for an existing cached ADR when risk changes, without automatically triggering AI generation
+  useEffect(() => {
+    setAdr(null);
+    setError(null);
+    let isMounted = true;
+    async function loadCached() {
+      if (!risk) return;
+      try {
+        const record = await repositoryStore.get(repoId).catch(() => null);
+        const cacheKey = buildCacheKey(repoId, 'adr', risk.id || risk.title || '');
+        const cached = await aiArtifactStore.get(cacheKey, record?.analysisVersion);
+        if (cached && isMounted) {
+          setAdr(prev => prev || cached);
+        }
+      } catch {
+        // ignore cache lookup errors
+      }
+    }
+    loadCached();
+    return () => {
+      isMounted = false;
+    };
+  }, [repoId, risk?.id]);
 
   const generate = async () => {
     setLoading(true);
@@ -15,18 +44,17 @@ export default function ADRPanel({ repoId, risk, onClose }) {
     try {
       const res = await repositoryApi.generateADR(repoId, risk);
       setAdr(res.data);
+      addToast({
+        title: 'ADR Draft Ready',
+        description: 'Architecture Decision Record drafted with AI.',
+        type: 'success',
+      });
     } catch (err) {
       setError(err.message || 'Failed to generate ADR');
     } finally {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (risk && !adr && !loading && !error) {
-      generate();
-    }
-  }, [risk]);
 
   const handleChange = (field, value) => {
     setAdr(prev => ({ ...prev, [field]: value }));
@@ -78,143 +106,218 @@ ${adr.evidence}
   if (!risk) return null;
 
   return (
-    <div className="fixed inset-y-0 right-0 w-[600px] max-w-[90vw] bg-surface border-l border-border shadow-2xl z-50 flex flex-col transform transition-transform duration-300">
-      <div className="h-12 px-4 border-b border-border flex items-center justify-between shrink-0 bg-panel">
-        <div className="flex items-center gap-2.5">
-          <FileText className="w-4 h-4 text-accent" />
-          <h2 className="text-sm font-semibold text-text">Draft Architecture Decision Record</h2>
-        </div>
-        <button
-          onClick={onClose}
-          className="p-1.5 text-muted hover:text-text rounded hover:bg-surface transition-colors"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-surface/50">
-        {loading ? (
-          <div className="h-full flex flex-col items-center justify-center text-muted">
-            <Loader2 className="w-8 h-8 animate-spin mb-4 text-accent" />
-            <p>Generating ADR context with AI...</p>
+    <>
+      <div className="fixed inset-y-0 right-0 w-[600px] max-w-[90vw] bg-surface border-l border-border shadow-2xl z-50 flex flex-col transform transition-transform duration-300">
+        <div className="h-12 px-4 border-b border-border flex items-center justify-between shrink-0 bg-panel">
+          <div className="flex items-center gap-2.5">
+            <FileText className="w-4 h-4 text-accent" />
+            <h2 className="text-sm font-semibold text-text">Draft Architecture Decision Record</h2>
           </div>
-        ) : error ? (
-          <div className="flex flex-col items-center justify-center p-6 bg-danger/10 border border-danger/30 rounded-lg text-danger">
-            <AlertCircle className="w-8 h-8 mb-2" />
-            <span className="font-semibold mb-2">Generation Failed</span>
-            <p className="text-sm text-center mb-4">{error}</p>
+          <button
+            onClick={onClose}
+            className="p-1.5 text-muted hover:text-text rounded hover:bg-surface transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-surface/50">
+          {loading ? (
+            <div className="h-full flex flex-col items-center justify-center text-muted">
+              <Loader2 className="w-8 h-8 animate-spin mb-4 text-accent" />
+              <p className="text-sm font-medium text-text">Generating ADR context with AI...</p>
+              <p className="text-xs text-muted mt-1">Analyzing finding, consequences, and alternatives</p>
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center p-6 bg-danger/10 border border-danger/30 rounded-lg text-danger">
+              <AlertCircle className="w-8 h-8 mb-2" />
+              <span className="font-semibold mb-2">Generation Failed</span>
+              <p className="text-sm text-center mb-4">{error}</p>
+              <button
+                onClick={() => setShowConfirmModal(true)}
+                className="px-4 py-2 bg-danger/20 hover:bg-danger/30 rounded transition-colors text-sm flex items-center gap-2"
+              >
+                <RefreshCw className="w-4 h-4" /> Retry with Confirmation
+              </button>
+            </div>
+          ) : adr ? (
+            <div className="flex flex-col gap-5">
+              <div>
+                <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1">Title</label>
+                <input
+                  value={adr.title || ''}
+                  onChange={e => handleChange('title', e.target.value)}
+                  className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm text-text focus:outline-none focus:border-accent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1">Status</label>
+                <select
+                  value={adr.status || 'Proposed'}
+                  onChange={e => handleChange('status', e.target.value)}
+                  className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm text-text focus:outline-none focus:border-accent"
+                >
+                  <option value="Proposed">Proposed</option>
+                  <option value="Accepted">Accepted</option>
+                  <option value="Rejected">Rejected</option>
+                  <option value="Deprecated">Deprecated</option>
+                  <option value="Superseded">Superseded</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1">Context</label>
+                <textarea
+                  value={adr.context || ''}
+                  onChange={e => handleChange('context', e.target.value)}
+                  rows={4}
+                  className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm text-text focus:outline-none focus:border-accent custom-scrollbar"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1">Decision</label>
+                <textarea
+                  value={adr.decision || ''}
+                  onChange={e => handleChange('decision', e.target.value)}
+                  rows={3}
+                  className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm text-text focus:outline-none focus:border-accent custom-scrollbar"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1">Consequences</label>
+                <textarea
+                  value={adr.consequences || ''}
+                  onChange={e => handleChange('consequences', e.target.value)}
+                  rows={4}
+                  className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm text-text focus:outline-none focus:border-accent custom-scrollbar"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1">Alternatives</label>
+                <textarea
+                  value={adr.alternatives || ''}
+                  onChange={e => handleChange('alternatives', e.target.value)}
+                  rows={3}
+                  className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm text-text focus:outline-none focus:border-accent custom-scrollbar"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1">Evidence</label>
+                <textarea
+                  value={adr.evidence || ''}
+                  onChange={e => handleChange('evidence', e.target.value)}
+                  rows={2}
+                  className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-accent custom-scrollbar text-muted"
+                />
+              </div>
+            </div>
+          ) : (
+            /* Pre-generation confirmation & overview view — protects from token waste */
+            <div className="flex flex-col h-full items-center justify-center p-6 text-center">
+              <div className="w-14 h-14 rounded-2xl bg-accent/15 border border-accent/30 flex items-center justify-center mb-5 text-accent shadow-inner">
+                <FileText className="w-7 h-7" />
+              </div>
+              <h3 className="text-base font-semibold text-text mb-2">Draft Architecture Decision Record</h3>
+              <p className="text-xs text-muted max-w-sm mb-6 leading-relaxed">
+                Synthesize this architectural finding into a structured markdown ADR (Status, Context, Decision, Consequences, and Alternatives) using AI.
+              </p>
+
+              {/* Finding Context Card */}
+              <div className="w-full max-w-md p-4 rounded-xl bg-panel border border-border text-left mb-6 flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-text truncate max-w-[260px]">{risk.title}</span>
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-accent/15 text-accent border border-accent/30 shrink-0">
+                    {risk.severity}
+                  </span>
+                </div>
+                {risk.file && (
+                  <div className="text-[11px] font-mono text-muted truncate">
+                    {risk.file}
+                  </div>
+                )}
+                <p className="text-xs text-muted/80 line-clamp-2 mt-1">
+                  {risk.description || risk.message}
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowConfirmModal(true)}
+                className="px-5 py-2.5 bg-accent hover:bg-accent-hover text-white rounded-xl text-sm font-medium transition-all shadow-lg shadow-accent/20 flex items-center gap-2 group cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4 transition-transform group-hover:scale-110" />
+                Draft ADR with AI
+              </button>
+              <span className="text-[11px] text-muted/70 mt-2.5 flex items-center gap-1">
+                ⚡ Requires confirmation · Consumes ~800 tokens
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 py-4 border-t border-border flex items-center justify-between shrink-0 bg-panel">
+          <button
+            onClick={() => setShowRegenerateModal(true)}
+            disabled={loading || !adr}
+            className="px-3 py-1.5 text-xs font-medium text-muted hover:text-text flex items-center gap-2 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Regenerate
+          </button>
+
+          <div className="flex items-center gap-3">
             <button
-              onClick={generate}
-              className="px-4 py-2 bg-danger/20 hover:bg-danger/30 rounded transition-colors text-sm flex items-center gap-2"
+              onClick={handleCopy}
+              disabled={loading || !adr}
+              className="px-4 py-2 bg-surface border border-border hover:bg-surface/80 rounded-md text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
             >
-              <RefreshCw className="w-4 h-4" /> Retry
+              <Copy className="w-4 h-4" /> Copy Markdown
+            </button>
+            <button
+              onClick={handleDownload}
+              disabled={loading || !adr}
+              className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" /> Download .md
             </button>
           </div>
-        ) : adr ? (
-          <div className="flex flex-col gap-5">
-            <div>
-              <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1">Title</label>
-              <input
-                value={adr.title || ''}
-                onChange={e => handleChange('title', e.target.value)}
-                className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm text-text focus:outline-none focus:border-accent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1">Status</label>
-              <select
-                value={adr.status || 'Proposed'}
-                onChange={e => handleChange('status', e.target.value)}
-                className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm text-text focus:outline-none focus:border-accent"
-              >
-                <option value="Proposed">Proposed</option>
-                <option value="Accepted">Accepted</option>
-                <option value="Rejected">Rejected</option>
-                <option value="Deprecated">Deprecated</option>
-                <option value="Superseded">Superseded</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1">Context</label>
-              <textarea
-                value={adr.context || ''}
-                onChange={e => handleChange('context', e.target.value)}
-                rows={4}
-                className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm text-text focus:outline-none focus:border-accent custom-scrollbar"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1">Decision</label>
-              <textarea
-                value={adr.decision || ''}
-                onChange={e => handleChange('decision', e.target.value)}
-                rows={3}
-                className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm text-text focus:outline-none focus:border-accent custom-scrollbar"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1">Consequences</label>
-              <textarea
-                value={adr.consequences || ''}
-                onChange={e => handleChange('consequences', e.target.value)}
-                rows={4}
-                className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm text-text focus:outline-none focus:border-accent custom-scrollbar"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1">Alternatives</label>
-              <textarea
-                value={adr.alternatives || ''}
-                onChange={e => handleChange('alternatives', e.target.value)}
-                rows={3}
-                className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm text-text focus:outline-none focus:border-accent custom-scrollbar"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-muted uppercase tracking-wider mb-1">Evidence</label>
-              <textarea
-                value={adr.evidence || ''}
-                onChange={e => handleChange('evidence', e.target.value)}
-                rows={2}
-                className="w-full bg-panel border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-accent custom-scrollbar text-muted"
-              />
-            </div>
-          </div>
-        ) : null}
-      </div>
-
-      <div className="px-6 py-4 border-t border-border flex items-center justify-between shrink-0 bg-panel">
-        <button
-          onClick={generate}
-          disabled={loading || !adr}
-          className="px-3 py-1.5 text-xs font-medium text-muted hover:text-text flex items-center gap-2 transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className="w-3.5 h-3.5" /> Regenerate
-        </button>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleCopy}
-            disabled={loading || !adr}
-            className="px-4 py-2 bg-surface border border-border hover:bg-surface/80 rounded-md text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
-          >
-            <Copy className="w-4 h-4" /> Copy Markdown
-          </button>
-          <button
-            onClick={handleDownload}
-            disabled={loading || !adr}
-            className="px-4 py-2 bg-accent hover:bg-accent-hover text-text rounded-md text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
-          >
-            <Download className="w-4 h-4" /> Download .md
-          </button>
         </div>
       </div>
-    </div>
+
+      {/* Confirmation Modal for initial generation */}
+      <ConfirmAiModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={() => {
+          setShowConfirmModal(false);
+          generate();
+        }}
+        title="Draft Architecture Decision Record?"
+        subtitle={`Finding: ${risk.title}`}
+        description="CodeLens will synthesize this finding's structural evidence, consequences, and alternative remediation paths into an industry-standard ADR document."
+        findingContext={risk}
+        tokenEstimate="~800 tokens"
+        confirmText="Confirm & Generate ADR"
+      />
+
+      {/* Confirmation Modal for regeneration */}
+      <ConfirmAiModal
+        isOpen={showRegenerateModal}
+        onClose={() => setShowRegenerateModal(false)}
+        onConfirm={() => {
+          setShowRegenerateModal(false);
+          generate();
+        }}
+        title="Regenerate Architecture Decision Record?"
+        subtitle="Overwrite Existing Draft"
+        description="This will re-run the AI synthesis for this finding and overwrite your current ADR draft with fresh recommendations, consuming additional tokens."
+        findingContext={risk}
+        tokenEstimate="~800 tokens"
+        confirmText="Confirm & Regenerate"
+      />
+    </>
   );
 }
