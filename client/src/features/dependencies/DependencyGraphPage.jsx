@@ -21,6 +21,8 @@ import {
   Info,
   RefreshCw,
   X,
+  CircleDot,
+  Compass,
 } from 'lucide-react';
 import { useRepository } from '../../shared/context/RepositoryContext';
 import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide, forceX, forceY } from 'd3-force';
@@ -31,7 +33,7 @@ import { ResizableLayout } from '../../shared/components/ResizableLayout';
 import ContextBreadcrumbs from '../../shared/components/ContextBreadcrumbs';
 
 // Import abstractions
-import { graphToFlow, couplingColor, NODE_W, NODE_H, getForceLayout } from './graphUtils';
+import { graphToFlow, couplingColor, NODE_W, NODE_H, getForceLayout, forceCluster } from './graphUtils';
 import { nodeTypes, edgeTypes } from './GraphNodes';
 import { StatRow, FileDetailPanel, PackageDetailPanel } from './GraphSideBar';
 import { ExportDiagramButton } from '../../shared/components/ExportDiagramButton';
@@ -122,6 +124,21 @@ export default function DependencyGraphPage() {
     return saved !== null && !isNaN(Number(saved)) ? Number(saved) : 50;
   });
   const [isSimPaused, setIsSimPaused] = useState(false);
+  const [forceNodeStyle, setForceNodeStyle] = useState(() => {
+    return localStorage.getItem('codeLens_forceNodeStyle') || 'cards';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('codeLens_forceNodeStyle', forceNodeStyle);
+  }, [forceNodeStyle]);
+
+  const [forceGrouping, setForceGrouping] = useState(() => {
+    return localStorage.getItem('codeLens_forceGrouping') || 'classic';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('codeLens_forceGrouping', forceGrouping);
+  }, [forceGrouping]);
 
   useEffect(() => {
     localStorage.setItem('codeLens_edgeStyle', edgeStyle);
@@ -175,6 +192,8 @@ export default function DependencyGraphPage() {
   const animFrameRef = useRef(null);
   const spreadRef = useRef(spread);
   spreadRef.current = spread;
+  const simNodeStyleRef = useRef(forceNodeStyle);
+  const simGroupingRef = useRef(forceGrouping);
   const graphRef = useRef(null);
 
   /**
@@ -359,26 +378,108 @@ export default function DependencyGraphPage() {
     return () => clearTimeout(t);
   }, [layoutType, showExternalPackages, rfInstance]);
 
-  const applyForces = useCallback((sim, spreadVal) => {
-    // Rectangle half-diagonal for accurate collision radius
-    const R = Math.hypot(NODE_W / 2, NODE_H / 2) + 8; // ≈85px
-    // Link distance scales strongly with spread so nodes can breathe
-    const linkDist = NODE_W + 60 + spreadVal * 3.5;
-    // Centering force is intentionally very weak — let repulsion do the spreading
-    const centerStr = Math.max(0.002, 0.02 - spreadVal * 0.00018);
+  const applyForces = useCallback(
+    (sim, spreadVal, nodeStyle = forceNodeStyle, grouping = forceGrouping) => {
+      const isDots = nodeStyle === 'dots';
+      const isIslands = grouping === 'islands';
 
-    sim
-      .force('charge', forceManyBody().strength(-150 - spreadVal * 20).theta(0.85).distanceMax(3000))
-      .force('x', forceX(0).strength(centerStr))
-      .force('y', forceY(0).strength(centerStr))
-      .force('collide', forceCollide().radius(R).iterations(3).strength(0.85));
+      if (!isIslands) {
+        // --- Early Force Normal Graph Logic (Classic) ---
+        // Proportionally scaled for dots vs cards
+        const linkDist = isDots ? 18 + spreadVal * 0.65 : NODE_W + 60 + spreadVal * 3.5;
+        const centerStr = isDots ? 0.025 : Math.max(0.002, 0.02 - spreadVal * 0.00018);
+        const chargeStr = isDots ? -15 - spreadVal * 2.0 : -150 - spreadVal * 20;
+        const R = Math.hypot(NODE_W / 2, NODE_H / 2) + 8; // ≈85px
 
-    const linkForce = sim.force('link');
-    if (linkForce) {
-      linkForce.distance(linkDist).strength(0.4);
-    }
-    return sim;
-  }, []);
+        sim
+          .force('charge', forceManyBody().strength(chargeStr).theta(0.85).distanceMax(3000))
+          .force('x', forceX(0).strength(centerStr))
+          .force('y', forceY(0).strength(centerStr))
+          .force(
+            'collide',
+            forceCollide()
+              .radius(d => {
+                if (isDots) {
+                  const deg = d.degree || 0;
+                  const r = Math.max(6, Math.min(18, Math.round(5 + Math.sqrt(deg) * 2.2)));
+                  return r + 3;
+                }
+                return R;
+              })
+              .iterations(3)
+              .strength(0.85)
+          )
+          .force('cluster', null);
+
+        const linkForce = sim.force('link');
+        if (linkForce) {
+          linkForce.distance(linkDist).strength(0.4);
+        }
+        return sim;
+      }
+
+      // --- Folder Islands Logic ---
+      // Dots are physically 6x smaller than cards, so gap and link scales are tuned down proportionally
+      const intraDist = isDots ? 14 + spreadVal * 0.28 : 60 + spreadVal * 1.2;
+      const interDist = isDots ? 50 + spreadVal * 1.0 : 420 + spreadVal * 7.0;
+
+      // Centering force keeps dots framed comfortably; cards spread widely
+      const centerStr = isDots ? 0.025 : Math.max(0.002, 0.015 - spreadVal * 0.00015);
+      const chargeStr = isDots ? -18 - spreadVal * 2.5 : -200 - spreadVal * 25;
+
+      // Minimum gap between directory island centers (scales with spread slider)
+      const clusterGap = isDots ? 75 + spreadVal * 1.2 : 500 + spreadVal * 6;
+      const clusterStr = isDots ? 0.42 : 0.35;
+
+      sim
+        .force('charge', forceManyBody().strength(chargeStr).theta(0.85).distanceMax(5000))
+        .force('x', forceX(0).strength(centerStr))
+        .force('y', forceY(0).strength(centerStr))
+        .force(
+          'collide',
+          forceCollide()
+            .radius(d => {
+              if (isDots) {
+                const deg = d.degree || 0;
+                const r = Math.max(6, Math.min(18, Math.round(5 + Math.sqrt(deg) * 2.2)));
+                return r + 4;
+              }
+              return Math.hypot(NODE_W / 2, NODE_H / 2) + 12; // ≈90px
+            })
+            .iterations(3)
+            .strength(0.85)
+        )
+        .force('cluster', forceCluster(clusterStr, clusterGap));
+
+      const linkForce = sim.force('link');
+      if (linkForce) {
+        // Hub link attenuation & folder affinity:
+        // Intra-island links keep files closely knit; cross-island links stretch loosely
+        linkForce
+          .distance(link => {
+            const s = typeof link.source === 'object' ? link.source : null;
+            const t = typeof link.target === 'object' ? link.target : null;
+            const sameDir = s?.dir && t?.dir && s.dir === t.dir;
+            return sameDir ? intraDist : interDist;
+          })
+          .strength(link => {
+            const s = typeof link.source === 'object' ? link.source : null;
+            const t = typeof link.target === 'object' ? link.target : null;
+            const sameDir = s?.dir && t?.dir && s.dir === t.dir;
+            if (sameDir) {
+              return 0.7; // Firm bond inside the island
+            }
+            // Cross-island links are heavily attenuated so hubs don't drag islands together
+            const sDeg = s?.degree || 1;
+            const tDeg = t?.degree || 1;
+            const minDeg = Math.min(sDeg, tDeg);
+            return Math.max(0.012, 0.1 / Math.sqrt(minDeg));
+          });
+      }
+      return sim;
+    },
+    [forceNodeStyle, forceGrouping]
+  );
 
   const stopSimulation = useCallback(() => {
     if (animFrameRef.current) {
@@ -420,6 +521,8 @@ export default function DependencyGraphPage() {
       showChurn,
       churnData: graph.gitChurn,
       onSelect: toggleSelect,
+      forceNodeStyle,
+      forceGrouping,
     });
 
     if (matchedNodes.length > 0) {
@@ -474,6 +577,19 @@ export default function DependencyGraphPage() {
               return updated ? { ...ce, ...updated } : ce;
             });
           });
+
+          // If node style or physics grouping changed, update forces and gently wake the simulation
+          const groupingChanged = simGroupingRef.current !== forceGrouping;
+          const styleChanged = simNodeStyleRef.current !== forceNodeStyle;
+
+          if (groupingChanged || styleChanged) {
+            simGroupingRef.current = forceGrouping;
+            simNodeStyleRef.current = forceNodeStyle;
+            applyForces(simRef.current, spreadRef.current, forceNodeStyle, forceGrouping);
+            simRef.current.alpha(0.35).restart();
+            setIsSimPaused(false);
+          }
+
           return; // Skip simulation restart, keep existing simulation running!
         }
 
@@ -494,7 +610,14 @@ export default function DependencyGraphPage() {
         setEdges(rfEdges);
       }
 
-      const simNodes = rfNodes.map(n => ({ id: n.id, x: n.position.x, y: n.position.y }));
+      const simNodes = rfNodes.map(n => ({
+        id: n.id,
+        x: n.position.x,
+        y: n.position.y,
+        dir: n.data?.dir,
+        degree: n.data?.degree || 0,
+        nodeType: n.data?.nodeType,
+      }));
       const nodeIndex = new Map(simNodes.map((n, i) => [n.id, i]));
       const simEdges = rfEdges
         .filter(e => nodeIndex.has(e.source) && nodeIndex.has(e.target))
@@ -510,7 +633,9 @@ export default function DependencyGraphPage() {
         .alphaMin(0.001)
         .alphaDecay(0.02);
 
-      applyForces(sim, spreadRef.current);
+      simNodeStyleRef.current = forceNodeStyle;
+      simGroupingRef.current = forceGrouping;
+      applyForces(sim, spreadRef.current, forceNodeStyle, forceGrouping);
       simRef.current = sim;
       setIsSimPaused(false);
 
@@ -553,7 +678,22 @@ export default function DependencyGraphPage() {
       setNodes(rfNodes);
       setEdges(rfEdges);
     }
-  }, [graph, selected, showExternalPackages, layoutType, edgeStyle, showChurn, matchedNodes, applyForces, addToast, setLayoutType, stopSimulation, toggleSelect]);
+  }, [
+    graph,
+    selected,
+    showExternalPackages,
+    layoutType,
+    edgeStyle,
+    showChurn,
+    forceNodeStyle,
+    forceGrouping,
+    matchedNodes,
+    applyForces,
+    addToast,
+    setLayoutType,
+    stopSimulation,
+    toggleSelect,
+  ]);
 
   /**
    * It monitors the slider value, then extracts gravity and repulsion multipliers,
@@ -561,11 +701,11 @@ export default function DependencyGraphPage() {
    */
   useEffect(() => {
     if (layoutType === 'force' && simRef.current) {
-      applyForces(simRef.current, spread);
+      applyForces(simRef.current, spread, forceNodeStyle, forceGrouping);
       simRef.current.alpha(0.4).restart();
       setIsSimPaused(false);
     }
-  }, [spread, layoutType, applyForces]);
+  }, [spread, layoutType, applyForces, forceNodeStyle, forceGrouping]);
 
   useEffect(() => {
     return () => {
@@ -815,19 +955,105 @@ export default function DependencyGraphPage() {
             </div>
 
             {layoutType === 'force' && (
-              <div className="mt-4 p-2 bg-surface/50 border border-border/50 rounded flex flex-col gap-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-muted text-xs font-medium">Node Spread</span>
-                  <span className="text-text font-mono text-[10px]">{spread}%</span>
+              <div className="mt-4 p-2.5 bg-surface/50 border border-border/50 rounded-lg flex flex-col gap-3">
+                {/* Physics Mode Selector (Classic vs Islands) */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted text-xs font-medium flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5 text-accent" />
+                      Physics
+                    </span>
+                    <span className="text-[10px] text-muted/80 font-mono capitalize">
+                      {forceGrouping === 'islands' ? 'Folder Islands' : 'Classic Normal'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 p-0.5 bg-panel border border-border/60 rounded-md gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setForceGrouping('classic')}
+                      className={`flex items-center justify-center gap-1.5 py-1 px-2 rounded text-[11px] font-medium transition-all ${
+                        forceGrouping === 'classic'
+                          ? 'bg-accent text-white shadow-sm'
+                          : 'text-muted hover:text-text hover:bg-surface/50'
+                      }`}
+                      title="Classic normal force graph based strictly on dependencies"
+                    >
+                      <Zap className="w-3 h-3" />
+                      Classic
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setForceGrouping('islands')}
+                      className={`flex items-center justify-center gap-1.5 py-1 px-2 rounded text-[11px] font-medium transition-all ${
+                        forceGrouping === 'islands'
+                          ? 'bg-accent text-white shadow-sm'
+                          : 'text-muted hover:text-text hover:bg-surface/50'
+                      }`}
+                      title="Group files by folder into organic visual islands"
+                    >
+                      <Compass className="w-3 h-3" />
+                      Islands
+                    </button>
+                  </div>
                 </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={spread}
-                  onChange={e => setSpread(Number(e.target.value))}
-                  className="w-full accent-accent h-1.5 bg-border rounded-lg appearance-none cursor-pointer outline-none"
-                />
+
+                {/* Node Style Selector (Cards vs Dots) */}
+                <div className="flex flex-col gap-1.5 pt-1 border-t border-border/40">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted text-xs font-medium flex items-center gap-1.5">
+                      <CircleDot className="w-3.5 h-3.5 text-accent" />
+                      Node Style
+                    </span>
+                    <span className="text-[10px] text-muted/80 font-mono capitalize">
+                      {forceNodeStyle === 'dots' ? 'Compact Dots' : 'Detailed Cards'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 p-0.5 bg-panel border border-border/60 rounded-md gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setForceNodeStyle('cards')}
+                      className={`flex items-center justify-center gap-1.5 py-1 px-2 rounded text-[11px] font-medium transition-all ${
+                        forceNodeStyle === 'cards'
+                          ? 'bg-accent text-white shadow-sm'
+                          : 'text-muted hover:text-text hover:bg-surface/50'
+                      }`}
+                      title="Display nodes as rectangular cards with file details"
+                    >
+                      <Layers className="w-3 h-3" />
+                      Cards
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setForceNodeStyle('dots')}
+                      className={`flex items-center justify-center gap-1.5 py-1 px-2 rounded text-[11px] font-medium transition-all ${
+                        forceNodeStyle === 'dots'
+                          ? 'bg-accent text-white shadow-sm'
+                          : 'text-muted hover:text-text hover:bg-surface/50'
+                      }`}
+                      title="Display nodes as compact celestial dots to declutter dense graphs"
+                    >
+                      <CircleDot className="w-3 h-3" />
+                      Dots
+                    </button>
+                  </div>
+                </div>
+
+                {/* Node Spread Slider */}
+                <div className="flex flex-col gap-1 pt-1 border-t border-border/40">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted text-xs font-medium">Node Spread</span>
+                    <span className="text-text font-mono text-[10px]">{spread}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={spread}
+                    onChange={e => setSpread(Number(e.target.value))}
+                    className="w-full accent-accent h-1.5 bg-border rounded-lg appearance-none cursor-pointer outline-none"
+                  />
+                </div>
+
                 <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/40 text-[10px]">
                   <button
                     type="button"
@@ -850,7 +1076,7 @@ export default function DependencyGraphPage() {
                     onClick={() => {
                       if (!simRef.current) return;
                       const simNodes = simRef.current.nodes();
-                      const initialLayout = getForceLayout(simNodes);
+                      const initialLayout = getForceLayout(simNodes, forceGrouping, forceNodeStyle);
                       simNodes.forEach((n, i) => {
                         if (initialLayout[i]?.position) {
                           n.x = initialLayout[i].position.x;
@@ -861,7 +1087,7 @@ export default function DependencyGraphPage() {
                         n.fx = null;
                         n.fy = null;
                       });
-                      applyForces(simRef.current, spread);
+                      applyForces(simRef.current, spread, forceNodeStyle, forceGrouping);
                       simRef.current.alpha(1).alphaTarget(0).restart();
                       setIsSimPaused(false);
                       if (rfInstance) {
@@ -871,7 +1097,7 @@ export default function DependencyGraphPage() {
                     title="Unpin all nodes and restart layout simulation"
                     className="px-2 py-1 bg-surface border border-border rounded text-muted hover:text-text hover:bg-text/5 transition-colors"
                   >
-                    ↺ Reset
+                    ↺ Restart
                   </button>
                 </div>
               </div>

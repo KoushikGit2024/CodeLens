@@ -44,6 +44,7 @@ export const CustomNode = React.memo(function CustomNode({ data }) {
 
   const heat = data.heatColor || accentColor;
   const fileColor = heat;
+  const isIslands = data.forceGrouping === 'islands';
   const defaultBorder = data.isFocused
     ? `2px solid ${fileColor}`
     : data.isSearchMatch
@@ -103,7 +104,11 @@ export const CustomNode = React.memo(function CustomNode({ data }) {
         width: w,
         zIndex: data.isFocused ? 10 : 2,
         borderTop: defaultBorder,
-        borderLeft: defaultBorder,
+        borderLeft: data.isFocused
+          ? `3px solid ${fileColor}`
+          : isIslands && data.dirColor
+            ? `3px solid ${data.dirColor}`
+            : defaultBorder,
         borderRight: defaultBorder,
         borderBottom: showChurn && churnColor ? `${churnBorderThickness}px solid ${churnColor}` : defaultBorder,
         background: data.isFocused ? surfaceColor : panelColor,
@@ -135,17 +140,23 @@ export const CustomNode = React.memo(function CustomNode({ data }) {
           </div>
           {isFile && data.shortDir && (
             <div
-              className="leading-tight"
+              className="leading-tight flex items-center gap-1"
               style={{
                 fontSize: 9,
                 overflow: 'hidden',
                 whiteSpace: 'nowrap',
                 textOverflow: 'ellipsis',
-                color: data.dirColor || mutedColor,
+                color: isIslands && data.dirColor ? data.dirColor : mutedColor,
               }}
               title={data.dir}
             >
-              {data.shortDir}
+              {isIslands && data.dirColor && (
+                <span
+                  className="w-1.5 h-1.5 rounded-full inline-block shrink-0"
+                  style={{ background: data.dirColor }}
+                />
+              )}
+              <span className="truncate">{data.shortDir}</span>
             </div>
           )}
         </div>
@@ -284,5 +295,142 @@ export const SpringEdge = React.memo(function SpringEdge({ id, sourceX, sourceY,
   );
 });
 
-export const nodeTypes = { custom: CustomNode, group: GroupNode };
+export const DotNode = React.memo(function DotNode({ data }) {
+  const [isHovered, setIsHovered] = React.useState(false);
+  const degree = data.degree || 0;
+  // Size dot based on connections (radius 6px to 18px)
+  const r = Math.max(6, Math.min(18, Math.round(5 + Math.sqrt(degree) * 2.2)));
+  const d = r * 2;
+
+  const accentColor = 'rgb(var(--color-accent))';
+  const isIslands = data.forceGrouping === 'islands';
+  const fileColor = isIslands ? data.dirColor || data.heatColor || accentColor : data.heatColor || accentColor;
+  const isFocused = data.isFocused;
+  const isSearchMatch = data.isSearchMatch;
+  const isFaded = data.isFaded || (data.isSearchActive && !isSearchMatch);
+  const hasCritical = data.findingsCount?.critical > 0;
+
+  // Show floating label only when hovered, selected, or search matched
+  const showLabel = isHovered || isFocused || isSearchMatch;
+
+  const ptrDownRef = useRef(null);
+  const lastSelectTimeRef = useRef(0);
+
+  const handlePointerDown = useCallback(
+    e => {
+      if (!data.onSelect) return;
+      ptrDownRef.current = { x: e.clientX, y: e.clientY };
+    },
+    [data.onSelect]
+  );
+
+  const handlePointerUp = useCallback(
+    e => {
+      if (!data.onSelect || !ptrDownRef.current) return;
+      const dx = e.clientX - ptrDownRef.current.x;
+      const dy = e.clientY - ptrDownRef.current.y;
+      ptrDownRef.current = null;
+      if (Math.hypot(dx, dy) < 8) {
+        lastSelectTimeRef.current = Date.now();
+        e.stopPropagation();
+        data.onSelect(data.nodeId);
+      }
+    },
+    [data.onSelect, data.nodeId]
+  );
+
+  const handleClick = useCallback(
+    e => {
+      if (!data.onSelect) return;
+      e.stopPropagation();
+      if (Date.now() - lastSelectTimeRef.current < 150) return;
+      data.onSelect(data.nodeId);
+    },
+    [data.onSelect, data.nodeId]
+  );
+
+  return (
+    <div
+      className="relative flex items-center justify-center transition-opacity duration-150"
+      style={{
+        width: d,
+        height: d,
+        opacity: isFaded ? 0.15 : 1,
+        zIndex: isFocused ? 20 : isHovered ? 15 : isSearchMatch ? 10 : 2,
+        cursor: data.onSelect ? 'pointer' : 'default',
+      }}
+      onPointerDown={data.onSelect ? handlePointerDown : undefined}
+      onPointerUp={data.onSelect ? handlePointerUp : undefined}
+      onClick={data.onSelect ? handleClick : undefined}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <Handle type="target" position={Position.Top} style={{ opacity: 0 }} isConnectable={false} />
+
+      {/* Circle dot */}
+      <div
+        className="w-full h-full rounded-full transition-transform duration-150"
+        style={{
+          background: fileColor,
+          border: isFocused ? `2px solid #ffffff` : `1.5px solid ${alpha(fileColor, 60)}`,
+          boxShadow: isFocused
+            ? `0 0 0 2px rgb(var(--color-surface)), 0 4px 12px rgba(0,0,0,0.4)`
+            : isSearchMatch
+              ? `0 0 0 2px rgb(var(--color-surface)), 0 0 8px ${accentColor}`
+              : `0 2px 6px ${alpha(fileColor, 45)}`,
+          transform: isHovered || isFocused ? 'scale(1.25)' : 'scale(1)',
+        }}
+      />
+
+      {/* Connection number badge inside dot */}
+      {degree > 0 && (
+        <span
+          className="absolute inset-0 flex items-center justify-center font-bold text-white select-none pointer-events-none leading-none"
+          style={{
+            fontSize: r >= 10 ? '9px' : r >= 8 ? '8px' : '7px',
+            textShadow: '0 1px 2px rgba(0,0,0,0.85)',
+          }}
+        >
+          {degree}
+        </span>
+      )}
+
+      {/* Critical Indicator Dot */}
+      {hasCritical && (
+        <span
+          className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-danger border border-surface shadow-sm"
+          title={`${data.findingsCount?.critical || 0} Critical Issues`}
+        />
+      )}
+
+      {/* Label Pill (only on hover / focus / search match) */}
+      {showLabel && (
+        <div
+          className={`absolute left-full ml-1.5 px-2 py-0.5 rounded text-[10px] whitespace-nowrap pointer-events-none shadow-md backdrop-blur-sm z-30 flex items-center gap-1 border ${
+            isFocused
+              ? 'bg-panel border-accent text-text font-semibold'
+              : isHovered
+                ? 'bg-panel/95 border-border text-text font-medium'
+                : 'bg-surface/85 border-border/50 text-muted font-normal text-[9px]'
+          }`}
+          style={{ transform: 'translateY(-50%)', top: '50%' }}
+        >
+          <span>{data.label}</span>
+          {degree > 0 && (
+            <span
+              className="text-[8px] px-1 rounded-full font-mono font-bold"
+              style={{ background: alpha(fileColor, 20), color: fileColor }}
+            >
+              {degree}
+            </span>
+          )}
+        </div>
+      )}
+
+      <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} isConnectable={false} />
+    </div>
+  );
+});
+
+export const nodeTypes = { custom: CustomNode, dot: DotNode, group: GroupNode };
 export const edgeTypes = { spring: SpringEdge };

@@ -79,11 +79,11 @@ export function getDagreLayout(nodes, edges, direction = 'LR') {
  * It iterates over the node array, then extracts a random bounded coordinate,
  * and then it applies it as the initial starting point for the physics simulation.
  */
-export function getForceLayout(nodes) {
+export function getClassicForceLayout(nodes, isDots = false) {
+  const stepR = isDots ? 26 : 90;
   return nodes.map((n, i) => {
     const angle = i * 2.399963; // Golden angle spiral
-    // Use generous radius: 90px × sqrt(i) so even 200 nodes start ~1270px apart
-    const r = 90 * Math.sqrt(i + 0.5);
+    const r = stepR * Math.sqrt(i + 0.5);
     return {
       ...n,
       position: {
@@ -92,6 +92,144 @@ export function getForceLayout(nodes) {
       },
     };
   });
+}
+
+export function getIslandForceLayout(nodes, isDots = false) {
+  // Group nodes by directory
+  const dirGroups = new Map();
+  nodes.forEach(n => {
+    const dir = n.dir || n.data?.dir || '(root)';
+    if (!dirGroups.has(dir)) dirGroups.set(dir, []);
+    dirGroups.get(dir).push(n);
+  });
+
+  const dirs = Array.from(dirGroups.keys());
+  const numDirs = dirs.length;
+
+  // Position cluster centers in an archipelago ring scaled for cards vs dots
+  const clusterCenters = new Map();
+  const baseRadius = isDots
+    ? Math.max(140, Math.sqrt(nodes.length) * 32)
+    : Math.max(450, Math.sqrt(nodes.length) * 110);
+
+  dirs.forEach((dir, i) => {
+    const angle = (2 * Math.PI * i) / (numDirs || 1);
+    clusterCenters.set(dir, {
+      x: Math.round(baseRadius * Math.cos(angle)),
+      y: Math.round(baseRadius * Math.sin(angle)),
+    });
+  });
+
+  return nodes.map(n => {
+    const dir = n.dir || n.data?.dir || '(root)';
+    const center = clusterCenters.get(dir) || { x: 0, y: 0 };
+    const members = dirGroups.get(dir) || [n];
+    const memberIdx = members.indexOf(n);
+    const subAngle = memberIdx * 2.399963;
+    const subRadius = isDots
+      ? Math.min(55, 11 * Math.sqrt(memberIdx + 1))
+      : Math.min(220, 36 * Math.sqrt(memberIdx + 1));
+
+    return {
+      ...n,
+      position: {
+        x: Math.round(center.x + subRadius * Math.cos(subAngle)),
+        y: Math.round(center.y + subRadius * Math.sin(subAngle)),
+      },
+    };
+  });
+}
+
+export function getForceLayout(nodes, mode = 'classic', nodeStyle = 'cards') {
+  const isDots = nodeStyle === 'dots';
+  if (mode === 'islands') {
+    return getIslandForceLayout(nodes, isDots);
+  }
+  return getClassicForceLayout(nodes, isDots);
+}
+
+/**
+ * Custom d3-force that gently pulls nodes belonging to the same folder
+ * toward their group centroid, forming natural visual constellations.
+ */
+export function forceCluster(strength = 0.35, clusterGap = 350) {
+  let nodes = [];
+
+  function force(alpha) {
+    if (alpha <= 0) return;
+    const centroids = new Map();
+
+    // 1. Compute directory centroids
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (!n.dir || n.dir === '(root)') continue;
+      let c = centroids.get(n.dir);
+      if (!c) {
+        c = { x: 0, y: 0, count: 0 };
+        centroids.set(n.dir, c);
+      }
+      c.x += n.x;
+      c.y += n.y;
+      c.count += 1;
+    }
+
+    // 2. Intra-cluster attraction: pull nodes toward their directory centroid
+    const pullFactor = strength * Math.max(0.25, alpha);
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (!n.dir || n.dir === '(root)') continue;
+      const c = centroids.get(n.dir);
+      if (c && c.count > 1) {
+        const cx = c.x / c.count;
+        const cy = c.y / c.count;
+        n.vx += (cx - n.x) * pullFactor;
+        n.vy += (cy - n.y) * pullFactor;
+      }
+    }
+
+    // 3. Inter-cluster repulsion: keep distinct directory islands pushed apart with wide ocean channels
+    const dirEntries = Array.from(centroids.entries());
+    const repulseAlpha = Math.max(0.2, alpha) * 0.35;
+    for (let i = 0; i < dirEntries.length; i++) {
+      for (let j = i + 1; j < dirEntries.length; j++) {
+        const [dirA, cA] = dirEntries[i];
+        const [dirB, cB] = dirEntries[j];
+        if (cA.count === 0 || cB.count === 0) continue;
+
+        const ax = cA.x / cA.count;
+        const ay = cA.y / cA.count;
+        const bx = cB.x / cB.count;
+        const by = cB.y / cB.count;
+
+        const dx = bx - ax;
+        const dy = by - ay;
+        const dist = Math.hypot(dx, dy) || 1;
+
+        if (dist < clusterGap) {
+          const push = ((clusterGap - dist) / dist) * repulseAlpha;
+          const px = dx * push;
+          const py = dy * push;
+
+          for (let k = 0; k < nodes.length; k++) {
+            const n = nodes[k];
+            if (n.dir === dirA) {
+              n.vx -= px;
+              n.vy -= py;
+            } else if (n.dir === dirB) {
+              n.vx += px;
+              n.vy += py;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  force.initialize = function (initialNodes) {
+    nodes = initialNodes;
+  };
+
+  return force;
 }
 
 /**
@@ -219,7 +357,13 @@ export function getClusteredLayout(fileNodes, _edges, dirColorMap, pkgNodes = []
  * and then it applies fading logic and routing to the selected layout generator.
  */
 export function graphToFlow(graph, selectedId, showExternalPackages, layoutType, edgeStyle = 'spring', options = {}) {
-  const { showChurn = false, churnData = null, onSelect = null } = options;
+  const {
+    showChurn = false,
+    churnData = null,
+    onSelect = null,
+    forceNodeStyle = 'cards',
+    forceGrouping = 'classic',
+  } = options;
 
   let fileNodes = graph.nodes.filter(n => n.type === 'fileNode' || n.type === 'file');
   let pkgNodes = showExternalPackages ? graph.nodes.filter(n => n.type === 'moduleNode' || n.type === 'package') : [];
@@ -228,12 +372,22 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
 
   const edgesToRender = graph.edges.filter(e => nodeIds.has(e.source) && nodeIds.has(e.target));
 
+  // 1. Internal file-to-file coupling metrics (strictly invariant of whether external packages are shown)
+  const fileNodeIds = new Set(fileNodes.map(n => n.id));
+  const internalFileEdges = graph.edges.filter(e => fileNodeIds.has(e.source) && fileNodeIds.has(e.target));
+  const internalDegreeMap = new Map();
+  for (const e of internalFileEdges) {
+    internalDegreeMap.set(e.source, (internalDegreeMap.get(e.source) || 0) + 1);
+    internalDegreeMap.set(e.target, (internalDegreeMap.get(e.target) || 0) + 1);
+  }
+  const maxFileDegree = internalDegreeMap.size === 0 ? 0 : Math.max(...Array.from(internalDegreeMap.values()));
+
+  // 2. Total visible renderable degree for edge routing and package counts
   const degreeMap = new Map();
   for (const e of edgesToRender) {
     degreeMap.set(e.source, (degreeMap.get(e.source) || 0) + 1);
     degreeMap.set(e.target, (degreeMap.get(e.target) || 0) + 1);
   }
-  const maxDegree = degreeMap.size === 0 ? 0 : Math.max(...Array.from(degreeMap.values()));
 
   const dirs = [...new Set(fileNodes.map(n => getDir(n.data?.filePath || n.filePath)))].sort();
   const dirColorMap = new Map(dirs.map((d, i) => [d, DIR_PALETTE[i % DIR_PALETTE.length]]));
@@ -258,20 +412,26 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
   const cycleSet = new Set((graph.cycles || []).flat());
   const isoSet = new Set(graph.isolatedFiles || []);
 
+  const isDotMode = layoutType === 'force' && forceNodeStyle === 'dots';
+
   const rfFileNodes = fileNodes.map(n => {
     const rawPath = n.data?.filePath || n.filePath || '';
     const dir = getDir(rawPath);
     const shortDir = dir === '(root)' ? '' : dir.split('/').pop();
-    const degree = degreeMap.get(n.id) || 0;
+    // Internal file degree is stable and does NOT fluctuate with external packages
+    const internalDegree = internalDegreeMap.get(n.id) || 0;
     const isFaded = selectedId ? !connectedNodes.has(n.id) : false;
 
     // Churn data keyed by filePath (without the 'file:' prefix)
     const churnScore = churnData?.churnScores?.[rawPath] || 0;
     const compositeRisk = n.data?.metrics?.compositeRisk || churnScore;
 
+    const dotR = Math.max(6, Math.min(18, Math.round(5 + Math.sqrt(internalDegree) * 2.2)));
+    const dotD = dotR * 2;
+
     return {
       id: n.id,
-      type: 'custom',
+      type: isDotMode ? 'dot' : 'custom',
       data: {
         nodeId: n.id,
         onSelect,
@@ -282,8 +442,8 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
         shortDir,
         layout: layoutType,
         dirColor: dirColorMap.get(dir),
-        heatColor: couplingColor(degree, maxDegree),
-        degree,
+        heatColor: couplingColor(internalDegree, maxFileDegree),
+        degree: internalDegree,
         isFaded,
         isFocused: n.id === selectedId,
         isCycling: cycleSet.has(n.id),
@@ -294,11 +454,12 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
         showChurn,
         churnScore,
         compositeRisk,
+        forceGrouping,
         exportBg: '#1e2335',
-        exportBorder: couplingColor(degree, maxDegree) || '#343B54',
+        exportBorder: couplingColor(internalDegree, maxFileDegree) || '#343B54',
         exportText: '#CBD5E8',
       },
-      style: { width: NODE_W, height: NODE_H },
+      style: isDotMode ? { width: dotD, height: dotD } : { width: NODE_W, height: NODE_H },
       position: { x: 0, y: 0 },
       zIndex: 2,
     };
@@ -307,9 +468,12 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
   const rfPkgNodes = pkgNodes.map(n => {
     const degree = degreeMap.get(n.id) || 0;
     const isFaded = selectedId ? !connectedNodes.has(n.id) : false;
+    const pkgR = Math.max(6, Math.min(18, Math.round(5 + Math.sqrt(degree) * 2.2)));
+    const pkgD = pkgR * 2;
+
     return {
       id: n.id,
-      type: 'custom',
+      type: isDotMode ? 'dot' : 'custom',
       data: {
         nodeId: n.id,
         onSelect,
@@ -322,11 +486,12 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
         isFaded,
         isFocused: n.id === selectedId,
         findingsCount: { critical: 0, warning: 0 },
+        forceGrouping,
         exportBg: '#111318',
         exportBorder: '#d29922',
         exportText: '#e3b341',
       },
-      style: { width: PKG_W, height: PKG_H },
+      style: isDotMode ? { width: pkgD, height: pkgD } : { width: PKG_W, height: PKG_H },
       position: { x: 0, y: 0 },
       zIndex: 2,
     };
@@ -343,7 +508,11 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
     const targetDir = dirMap.get(e.target);
     const sameDir = sourceDir && targetDir && sourceDir === targetDir;
 
+    const isForce = layoutType === 'force';
+    const isIslands = isForce && forceGrouping === 'islands';
+
     // Outgoing = blue (#58a6ff), Incoming = green (#3fb950)
+    // Unselected = neutral same-dir slate (#7d8590) or cross-dir blue (#58a6ff55)
     const strokeColor = isFaded
       ? 'rgba(128, 128, 128, 0.12)'
       : isOut
@@ -354,7 +523,21 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
             ? '#7d8590'
             : '#58a6ff55';
     const strokeWidth = isFaded ? 0.5 : isDirect ? 2 : 0.8;
-    const opacity = isFaded ? 0.18 : isDirect ? 1 : sameDir ? 0.35 : 0.45;
+    // In islands mode, dim cross-folder background noise; in classic mode, use the original classic opacity
+    const opacity = isFaded
+      ? 0.12
+      : isDirect
+        ? 1
+        : isIslands
+          ? sameDir
+            ? 0.50
+            : 0.10
+          : sameDir
+            ? 0.40
+            : isForce
+              ? 0.25
+              : 0.45;
+    const isStraight = edgeStyle === 'straight' || (isIslands && isDotMode && !isDirect);
 
     return {
       id: `${e.source}->${e.target}`,
@@ -375,7 +558,7 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
       label: isCjs && isDirect ? 'cjs' : undefined,
       labelStyle: { fill: '#6e7681', fontSize: 8, fontFamily: 'monospace' },
       labelBgStyle: { fill: 'var(--color-surface, #0d1117)', fillOpacity: 0.85 },
-      data: { edgeType: e.type, isStraight: edgeStyle === 'straight' },
+      data: { edgeType: e.type, isStraight },
     };
   });
 
@@ -384,7 +567,7 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
     return { rfNodes: layouted, rfEdges, dirColorMap };
   } else if (layoutType === 'force') {
     const allRfNodes = [...rfFileNodes, ...rfPkgNodes];
-    return { rfNodes: getForceLayout(allRfNodes), rfEdges, dirColorMap };
+    return { rfNodes: getForceLayout(allRfNodes, forceGrouping, forceNodeStyle), rfEdges, dirColorMap };
   } else {
     const allRfNodes = [...rfFileNodes, ...rfPkgNodes];
     return { rfNodes: getDagreLayout(allRfNodes, rfEdges, 'LR'), rfEdges, dirColorMap };
