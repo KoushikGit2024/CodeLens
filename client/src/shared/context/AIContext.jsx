@@ -12,24 +12,28 @@ import { useAuth } from './AuthContext';
 const AIContext = createContext();
 
 export function AIProvider({ children }) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [aiState, setAiState] = useState({
     status: 'loading', // 'loading', 'ready', 'offline', 'unavailable'
-    authState: 'unauthenticated',
+    authState: 'loading',
     quotaStatus: 'available',
     usage: null,
   });
 
   const checkStatus = useCallback(async () => {
+    // On page refresh, wait until AuthContext restores the user session from storage
+    if (authLoading) return;
+
     try {
       if (!user) {
         // If not logged in, just check health (public)
         const { configured } = await getAiHealth();
-        setAiState(prev => ({
-          ...prev,
+        setAiState({
           status: configured ? 'ready' : 'offline',
           authState: 'unauthenticated',
-        }));
+          quotaStatus: 'available',
+          usage: null,
+        });
         return;
       }
 
@@ -37,15 +41,20 @@ export function AIProvider({ children }) {
       const data = await getAiStatus();
       setAiState({
         status: data.providerConfigured ? 'ready' : 'offline',
-        authState: data.authState,
-        quotaStatus: data.quotaStatus,
-        usage: data.usage,
+        authState: data.authState || 'authenticated',
+        quotaStatus: data.quotaStatus || 'available',
+        usage: data.usage || null,
       });
     } catch (err) {
       console.warn('AI status check failed, falling back:', err.message);
-      setAiState(prev => ({ ...prev, status: 'offline' }));
+      setAiState({
+        status: 'offline',
+        authState: user ? 'authenticated' : 'unauthenticated',
+        quotaStatus: 'available',
+        usage: null,
+      });
     }
-  }, [user]);
+  }, [user, authLoading]);
 
   useEffect(() => {
     checkStatus();
@@ -62,7 +71,9 @@ export function AIProvider({ children }) {
 
   let effectiveState = aiState.status;
   if (aiState.status !== 'loading' && aiState.status !== 'connecting') {
-    if (aiState.authState === 'unauthenticated') {
+    if (aiState.authState === 'loading') {
+      effectiveState = 'loading';
+    } else if (aiState.authState === 'unauthenticated') {
       effectiveState = 'unauthenticated';
     } else if (aiState.status === 'offline') {
       effectiveState = 'offline';
@@ -222,10 +233,12 @@ export function useAI({ repoId, feature, contextData } = {}) {
         res = await repositoryApi.askQuestion(repoId, fullPrompt, null, optimisticMessages, reqOptions);
       }
 
-      const finalMessages = [
-        ...optimisticMessages,
-        { role: 'assistant', content: res.data.answer || res.data.response },
-      ];
+      const assistantContent =
+        typeof res.data?.answer === 'object' && res.data?.answer !== null
+          ? res.data.answer.summary || res.data.answer.text || JSON.stringify(res.data.answer)
+          : res.data?.answer || res.data?.response || '';
+
+      const finalMessages = [...optimisticMessages, { role: 'assistant', content: assistantContent }];
       setMessages(finalMessages);
 
       await chatStore.saveChat(repoId, feature, finalMessages);

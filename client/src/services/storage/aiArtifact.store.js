@@ -113,6 +113,49 @@ export const aiArtifactStore = {
   },
 
   /**
+   * Retrieve all cached ADRs for a specific repository.
+   *
+   * @param {string} repoId
+   * @returns {Promise<Array<{ cacheKey: string, data: object, cachedAt: number, analysisVersion: any }>>}
+   */
+  async listADRs(repoId) {
+    try {
+      const db = await getDB();
+      const tx = db.transaction('aiArtifacts', 'readonly');
+      const store = tx.objectStore('aiArtifacts');
+      let cursor = await store.openCursor();
+      const results = [];
+      const prefix = `${repoId}::adr::`;
+      while (cursor) {
+        if (cursor.key && String(cursor.key).startsWith(prefix)) {
+          results.push(cursor.value);
+        }
+        cursor = await cursor.continue();
+      }
+      await tx.done;
+      // Sort most recent first
+      return results.sort((a, b) => (b.cachedAt || 0) - (a.cachedAt || 0));
+    } catch (err) {
+      console.warn('[aiArtifactStore] listADRs failed (non-fatal):', err.message);
+      return [];
+    }
+  },
+
+  /**
+   * Explicitly update or persist an ADR in the artifact store.
+   */
+  async saveADR(cacheKey, data, opts = {}) {
+    return this.set(cacheKey, data, opts);
+  },
+
+  /**
+   * Delete an ADR by cacheKey.
+   */
+  async deleteADR(cacheKey) {
+    return this.invalidate(cacheKey);
+  },
+
+  /**
    * Evict all cached artifacts for a specific repository.
    * Call this when the repository is re-analyzed or deleted.
    * @param {string} repoId
@@ -124,7 +167,7 @@ export const aiArtifactStore = {
       const store = tx.objectStore('aiArtifacts');
       let cursor = await store.openCursor();
       while (cursor) {
-        if (cursor.key.startsWith(`${repoId}::`)) {
+        if (cursor.key && String(cursor.key).startsWith(`${repoId}::`)) {
           await cursor.delete();
         }
         cursor = await cursor.continue();

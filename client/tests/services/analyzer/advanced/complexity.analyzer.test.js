@@ -22,10 +22,7 @@ describe('complexity.analyzer', () => {
   describe('calculateComplexity (McCabe Cyclomatic)', () => {
     it('returns base complexity 1 for null or simple linear node', () => {
       expect(calculateComplexity(null)).toBe(1);
-      const linear = makeNode('statement_block', [
-        makeNode('expression_statement'),
-        makeNode('return_statement'),
-      ]);
+      const linear = makeNode('statement_block', [makeNode('expression_statement'), makeNode('return_statement')]);
       expect(calculateComplexity(linear)).toBe(1);
     });
 
@@ -87,11 +84,7 @@ describe('complexity.analyzer', () => {
     });
 
     it('increments for else_clause without additional nesting penalty', () => {
-      const ifWithElse = makeNode('statement_block', [
-        makeNode('if_statement', [
-          makeNode('else_clause'),
-        ]),
-      ]);
+      const ifWithElse = makeNode('statement_block', [makeNode('if_statement', [makeNode('else_clause')])]);
 
       const res = calculateCognitiveComplexity(ifWithElse);
       // if_statement: +1. else_clause: +1. Total = 2
@@ -101,20 +94,19 @@ describe('complexity.analyzer', () => {
 
   describe('calculateMaintainabilityIndex', () => {
     it('returns high score (~A rating) for small clean functions', () => {
-      const cleanNode = makeNode('statement_block', [
-        makeNode('return_statement'),
-      ], {}, 3);
+      const cleanNode = makeNode('statement_block', [makeNode('return_statement')], {}, 3);
 
       const mi = calculateMaintainabilityIndex(cleanNode, 0, 3);
       expect(mi).toBeGreaterThanOrEqual(80);
     });
 
     it('returns reduced score for high cognitive load and long files', () => {
-      const complexNode = makeNode('statement_block', [
-        makeNode('for_statement'),
-        makeNode('if_statement'),
-        makeNode('while_statement'),
-      ], {}, 120);
+      const complexNode = makeNode(
+        'statement_block',
+        [makeNode('for_statement'), makeNode('if_statement'), makeNode('while_statement')],
+        {},
+        120
+      );
 
       const mi = calculateMaintainabilityIndex(complexNode, 25, 120);
       expect(mi).toBeLessThan(70);
@@ -123,16 +115,12 @@ describe('complexity.analyzer', () => {
 
   describe('analyzeComplexity', () => {
     it('returns comprehensive composite metrics with rating', () => {
-      const node = makeNode('statement_block', [
-        makeNode('if_statement', [
-          makeNode('for_statement'),
-        ]),
-      ], {}, 10);
+      const node = makeNode('statement_block', [makeNode('if_statement', [makeNode('for_statement')])], {}, 10);
 
       const result = analyzeComplexity(node);
 
       expect(result.cyclomatic).toBe(3); // 1 base + 1 if + 1 for
-      expect(result.cognitive).toBe(3);  // 1 (if) + (1+1 for) = 3
+      expect(result.cognitive).toBe(3); // 1 (if) + (1+1 for) = 3
       expect(result.maxNestingDepth).toBe(2);
       expect(result.maintainabilityIndex).toBeGreaterThan(0);
       expect(['A', 'B', 'C', 'D', 'F']).toContain(result.rating);

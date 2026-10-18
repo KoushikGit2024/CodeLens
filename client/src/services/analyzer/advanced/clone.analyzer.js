@@ -97,17 +97,14 @@ function computeCloneThresholds(allFunctions) {
   }
 
   const p25 = quantile(sizes, 0.25);
-  const p50 = quantile(sizes, 0.50);
+  const p50 = quantile(sizes, 0.5);
   const p75 = quantile(sizes, 0.75);
   const iqr = p75 - p25;
 
   // Dynamic minimum line threshold:
   // In typical repositories, median function length is ~10-15 lines.
   // We scale the threshold proportionally to the median, clamped between 5 and 10 lines.
-  const dynamicMinLines = Math.max(
-    ABSOLUTE_MIN_LINES,
-    Math.min(10, Math.round(p50 * 0.5))
-  );
+  const dynamicMinLines = Math.max(ABSOLUTE_MIN_LINES, Math.min(10, Math.round(p50 * 0.5)));
 
   return {
     minLines: dynamicMinLines,
@@ -192,9 +189,7 @@ function detectClones(allFunctions = [], filePath = '') {
 
     // Calculate group metrics
     const lineSpans = group.map(fn => getFunctionLineSpan(fn)).filter(s => s > 0);
-    const avgLines = lineSpans.length > 0
-      ? Math.round(lineSpans.reduce((a, b) => a + b, 0) / lineSpans.length)
-      : 0;
+    const avgLines = lineSpans.length > 0 ? Math.round(lineSpans.reduce((a, b) => a + b, 0) / lineSpans.length) : 0;
 
     // Hard floor safeguard: If average lines <= 4, never treat as clone
     if (avgLines > 0 && avgLines <= 4) continue;

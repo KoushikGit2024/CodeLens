@@ -93,6 +93,64 @@ export function ResizableLayout({ panels, className = 'h-full w-full' }) {
     window.removeEventListener('pointerup', handlePointerUp);
   }, [handlePointerMove]);
 
+  const handleKeyDown = (e, resizerIndex) => {
+    const leftIndex = resizerIndex;
+    const rightIndex = resizerIndex + 1;
+
+    // Enter or Space toggles collapse if supported
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (collapsed[leftIndex]) {
+        toggleCollapse(leftIndex);
+      } else if (collapsed[rightIndex]) {
+        toggleCollapse(rightIndex);
+      } else if (panels[leftIndex].collapsible) {
+        toggleCollapse(leftIndex);
+      } else if (panels[rightIndex].collapsible) {
+        toggleCollapse(rightIndex);
+      }
+      return;
+    }
+
+    if (collapsed[leftIndex] || collapsed[rightIndex]) return;
+
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const containerWidth = rect.width || 1000;
+
+    const leftMinWidthPct = (panels[leftIndex].minWidth / containerWidth) * 100;
+    const rightMinWidthPct = (panels[rightIndex].minWidth / containerWidth) * 100;
+
+    const minLeftSize = leftMinWidthPct;
+    const maxLeftSize = sizes[leftIndex] + sizes[rightIndex] - rightMinWidthPct;
+
+    const step = e.shiftKey ? 5 : 1; // 5% jump with Shift, 1% standard
+
+    let newLeftSize = sizes[leftIndex];
+
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      newLeftSize = Math.max(minLeftSize, sizes[leftIndex] - step);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      newLeftSize = Math.min(maxLeftSize, sizes[leftIndex] + step);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      newLeftSize = minLeftSize;
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      newLeftSize = maxLeftSize;
+    } else {
+      return;
+    }
+
+    const newRightSize = sizes[leftIndex] + sizes[rightIndex] - newLeftSize;
+    const newSizes = [...sizes];
+    newSizes[leftIndex] = Math.max(0, newLeftSize);
+    newSizes[rightIndex] = Math.max(0, newRightSize);
+    setSizes(newSizes);
+  };
+
   useEffect(() => {
     return () => {
       window.removeEventListener('pointermove', handlePointerMove);
@@ -152,8 +210,28 @@ export function ResizableLayout({ panels, className = 'h-full w-full' }) {
             {/* The Resizer (between panels) */}
             {index < panels.length - 1 && (
               <div
+                role="separator"
+                tabIndex={0}
+                aria-orientation="vertical"
+                aria-valuenow={Math.round(sizes[index])}
+                aria-valuemin={
+                  containerRef.current
+                    ? Math.round((panels[index].minWidth / containerRef.current.getBoundingClientRect().width) * 100)
+                    : 10
+                }
+                aria-valuemax={
+                  containerRef.current
+                    ? Math.round(
+                        sizes[index] +
+                          sizes[index + 1] -
+                          (panels[index + 1].minWidth / containerRef.current.getBoundingClientRect().width) * 100
+                      )
+                    : 90
+                }
+                aria-label={`Resize divider between ${panels[index].title || 'Left panel'} and ${panels[index + 1].title || 'Right panel'}`}
                 onPointerDown={e => handlePointerDown(e, index)}
-                className={`relative w-3 -ml-[1.5px] -mr-[1.5px] flex flex-col items-center justify-center z-40 shrink-0
+                onKeyDown={e => handleKeyDown(e, index)}
+                className={`relative w-3 -ml-[1.5px] -mr-[1.5px] flex flex-col items-center justify-center z-10 shrink-0 touch-none outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 rounded-sm
                   ${collapsed[index] || collapsed[index + 1] ? 'cursor-default' : 'cursor-col-resize group'}
                 `}
               >
@@ -170,7 +248,7 @@ export function ResizableLayout({ panels, className = 'h-full w-full' }) {
 
                 {/* Collapse Buttons on Resizer */}
                 {!(collapsed[index] || collapsed[index + 1]) && (
-                  <div className="absolute top-6 left-1/2 flex flex-col gap-2 z-50">
+                  <div className="absolute top-6 left-1/2 flex flex-col gap-2 z-20">
                     {panels[index].collapsible && panels[index].collapseDirection === 'left' && (
                       <button
                         onClick={e => {

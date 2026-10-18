@@ -183,7 +183,7 @@ export default function RepositoryShell() {
           )}
 
           <RepositoryHeader />
-          <main className="flex-1 overflow-hidden relative flex flex-col min-h-0">
+          <main className="flex-1 overflow-hidden relative flex flex-col min-h-0 isolate">
             <RepositoryContentWrapper />
           </main>
         </div>

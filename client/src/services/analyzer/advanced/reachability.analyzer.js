@@ -114,9 +114,7 @@ function isExemptFile(filePath) {
 
   // Test files & directories
   const pathSegments = normalized.split('/');
-  if (
-    pathSegments.some(seg => ['tests', 'test', '__tests__', '__mocks__', 'spec', 'specs'].includes(seg))
-  ) {
+  if (pathSegments.some(seg => ['tests', 'test', '__tests__', '__mocks__', 'spec', 'specs'].includes(seg))) {
     return true;
   }
 
@@ -344,9 +342,4 @@ function analyzeReachability(graph, analysis = null) {
   };
 }
 
-export {
-  analyzeReachability,
-  detectUnusedExports,
-  isEntryPoint,
-  isExemptFile,
-};
+export { analyzeReachability, detectUnusedExports, isEntryPoint, isExemptFile };

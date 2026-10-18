@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { Sparkles, AlertTriangle, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Sparkles, X } from 'lucide-react';
 
 /**
  * ConfirmAiModal
@@ -11,12 +12,12 @@ export default function ConfirmAiModal({
   isOpen,
   onClose,
   onConfirm,
-  title = 'Confirm AI Action',
+  title = 'AI Analysis',
   subtitle,
   description,
   findingContext,
   tokenEstimate = '~800 tokens',
-  confirmText = 'Confirm & Generate',
+  confirmText = 'Proceed to AI',
   confirmIcon: ConfirmIcon = Sparkles,
   loading = false,
 }) {
@@ -31,8 +32,8 @@ export default function ConfirmAiModal({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+  const content = (
+    <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-background/70 backdrop-blur-sm transition-opacity"
@@ -63,41 +64,33 @@ export default function ConfirmAiModal({
 
         {/* Content Body */}
         <div className="p-6 flex flex-col gap-4">
-          {description && (
-            <p className="text-sm text-text leading-relaxed">
-              {description}
-            </p>
-          )}
+          {description && <p className="text-sm text-text leading-relaxed">{description}</p>}
 
           {findingContext && (
             <div className="p-3.5 rounded-xl bg-panel border border-border flex flex-col gap-1.5">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold text-text truncate max-w-[320px]">
-                  {findingContext.title}
-                </span>
+                <span className="text-xs font-semibold text-text truncate max-w-[320px]">{findingContext.title}</span>
                 {findingContext.severity && (
-                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-amber-500/15 text-amber-500 border border-amber-500/30 shrink-0">
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-surface border border-border text-muted shrink-0">
                     {findingContext.severity}
                   </span>
                 )}
               </div>
               {findingContext.file && (
-                <span className="text-[11px] font-mono text-muted truncate">
-                  {findingContext.file}
-                </span>
+                <span className="text-[11px] font-mono text-muted truncate">{findingContext.file}</span>
               )}
             </div>
           )}
 
-          {/* Token notice banner */}
-          <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-start gap-3">
-            <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+          {/* Process & Quota Overview */}
+          <div className="p-3.5 rounded-xl bg-surface border border-border flex items-start gap-3">
+            <div className="w-6 h-6 rounded-md bg-accent/10 border border-accent/20 flex items-center justify-center text-accent shrink-0 mt-0.5">
+              <Sparkles className="w-3.5 h-3.5" />
+            </div>
             <div className="flex-1 text-xs text-text/90 leading-relaxed">
-              <span className="font-semibold text-amber-500 block mb-0.5">
-                AI Token Consumption Warning
-              </span>
-              This action invokes the AI provider and deducts quota from your plan ({tokenEstimate}).
-              If you clicked by mistake, you can cancel now without spending tokens.
+              <span className="font-semibold text-text block mb-0.5">AI Process & Quota</span>
+              CodeLens will send the pre-analyzed facts to the AI provider to generate context-aware insights. This
+              action uses approximately {tokenEstimate} of your plan.
             </div>
           </div>
         </div>
@@ -123,4 +116,6 @@ export default function ConfirmAiModal({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(content, document.body) : content;
 }

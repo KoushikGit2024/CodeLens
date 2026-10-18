@@ -530,10 +530,10 @@ export function graphToFlow(graph, selectedId, showExternalPackages, layoutType,
         ? 1
         : isIslands
           ? sameDir
-            ? 0.50
-            : 0.10
+            ? 0.5
+            : 0.1
           : sameDir
-            ? 0.40
+            ? 0.4
             : isForce
               ? 0.25
               : 0.45;

@@ -10,10 +10,7 @@ describe('risk.analyzer - Statistical Coupling & Instability Index (SDP)', () =>
   describe('computeCouplingThresholds', () => {
     it('returns static fallback when fewer than 4 files are provided', () => {
       const mockAnalysis = {
-        files: [
-          { filePath: 'a.js' },
-          { filePath: 'b.js' },
-        ],
+        files: [{ filePath: 'a.js' }, { filePath: 'b.js' }],
       };
       const mockGraph = { edges: [] };
 

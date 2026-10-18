@@ -251,7 +251,9 @@ function parseCalendarDate(dateStr) {
       const candidate = result.candidates[0];
 
       expect(candidate.suggestedStrategies).toHaveLength(2);
-      expect(candidate.suggestedStrategies[0].action).toContain('Extract Atomic Sub-Components from `DashboardView.jsx`');
+      expect(candidate.suggestedStrategies[0].action).toContain(
+        'Extract Atomic Sub-Components from `DashboardView.jsx`'
+      );
       expect(candidate.suggestedStrategies[1].action).toContain('useDashboardView');
     });
 
@@ -288,9 +290,13 @@ function parseCalendarDate(dateStr) {
       const result = buildRefactoringIntelligence({ risks: [risk] }, { files: [] }, { nodes: [] });
       const candidate = result.candidates[0];
 
-      expect(candidate.suggestedStrategies[0].action).toContain('Decompose Complex Function `parseSyntaxTree` (Cognitive: 28)');
+      expect(candidate.suggestedStrategies[0].action).toContain(
+        'Decompose Complex Function `parseSyntaxTree` (Cognitive: 28)'
+      );
       expect(candidate.suggestedStrategies[0].description).toContain('line 42');
-      expect(candidate.suggestedStrategies[1].action).toContain('Invert Nested Branches with Guard Clauses (Flatten Depth: 5)');
+      expect(candidate.suggestedStrategies[1].action).toContain(
+        'Invert Nested Branches with Guard Clauses (Flatten Depth: 5)'
+      );
     });
 
     it('synthesizes cycle-specific strategies naming participating files in circular dependencies', () => {
@@ -310,4 +316,3 @@ function parseCalendarDate(dateStr) {
     });
   });
 });
-

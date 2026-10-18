@@ -46,6 +46,7 @@ import {
   FolderTree,
   Sparkles,
   Bookmark,
+  Trash2,
 } from 'lucide-react';
 import MonacoEditor from '@monaco-editor/react';
 import { repositoryApi } from '../../shared/api';
@@ -58,6 +59,7 @@ import AiMarkdown from '../../shared/components/ai/AiMarkdown';
 import ModuleDocumentation from './ModuleDocumentation';
 import { useAIState } from '../../shared/context/AIContext';
 import { useBookmark, addBookmark, removeBookmark, updateNote } from '../../services/storage/bookmark.store';
+import { chatStore } from '../../services/storage/chat.store';
 import { useToast } from '../../shared/context/ToastContext';
 
 // ── Monaco language map ───────────────────────────────────────────────────────
@@ -249,6 +251,7 @@ export default function ExplorerPage() {
     const fetchFile = async () => {
       setFileError(null);
       setFileLoading(true);
+      setModuleDocs(null);
       // Clear any risk-block highlight decorations from the previous file
       if (decorationsRef.current) {
         decorationsRef.current.clear();
@@ -272,8 +275,19 @@ export default function ExplorerPage() {
         if (!active) return;
 
         if (fileRes.status === 'fulfilled') {
-          const { content, language } = fileRes.value.data;
-          setFileContent({ content, language: monacoLanguage(selectedPath, language) });
+          const { content, language, resolvedPath } = fileRes.value.data;
+          const targetPath = resolvedPath || selectedPath;
+          if (resolvedPath && resolvedPath !== selectedPath) {
+            setSearchParams(
+              prev => {
+                const next = new URLSearchParams(prev);
+                next.set('path', resolvedPath);
+                return next;
+              },
+              { replace: true }
+            );
+          }
+          setFileContent({ content, language: monacoLanguage(targetPath, language) });
         } else {
           setFileError(fileRes.reason?.response?.data?.error || fileRes.reason?.message || 'Failed to load file');
         }
@@ -624,6 +638,7 @@ export default function ExplorerPage() {
         <div className="flex-1 h-full flex flex-col bg-panel">
           <AiPanel
             repoId={repoId}
+            filePath={selectedPath}
             getActiveContext={getActiveContext}
             onOpenFile={(filePath, line) => openFile(filePath, line)}
             onHighlightRange={(filePath, start, end) => {
@@ -839,10 +854,33 @@ function CodeViewer({
         </div>
       );
     } else if (error) {
+      const isNotFound = typeof error === 'string' && error.toLowerCase().includes('not found');
       content = (
-        <div className="flex-1 flex flex-col items-center justify-center gap-2 text-danger">
-          <AlertTriangle className="w-6 h-6" />
-          <p className="text-sm">{error}</p>
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-md mx-auto gap-4">
+          <div className="p-3 bg-danger/10 text-danger rounded-full border border-danger/20">
+            <AlertTriangle className="w-8 h-8" />
+          </div>
+          <div>
+            <h3 className="text-base font-semibold text-text mb-1">
+              {isNotFound ? 'File Not Found' : 'Failed to Load File'}
+            </h3>
+            <p className="text-xs font-mono text-muted bg-surface px-2.5 py-1 rounded mb-3 break-all border border-border inline-block max-w-full">
+              {filePath}
+            </p>
+            <p className="text-xs text-muted leading-relaxed">
+              {isNotFound
+                ? 'This file was referenced in historical git activity or commits, but is not present in the current repository tree (it may have been deleted, moved, or excluded).'
+                : error}
+            </p>
+          </div>
+          {onOpenMobileTree && (
+            <button
+              onClick={onOpenMobileTree}
+              className="px-4 py-2 bg-accent/10 text-accent hover:bg-accent/20 border border-accent/20 rounded text-xs font-medium transition-colors flex items-center gap-2"
+            >
+              <FolderTree className="w-4 h-4" /> Browse Active Files
+            </button>
+          )}
         </div>
       );
     } else if (!fileContent) {
@@ -965,15 +1003,57 @@ function CodeViewer({
 
 // ── AI Q&A Panel ──────────────────────────────────────────────────────────────
 
-function AiPanel({ repoId, onOpenFile, onHighlightRange, getActiveContext, onMobileClose }) {
+function AiPanel({ repoId, filePath, onOpenFile, onHighlightRange, getActiveContext, onMobileClose }) {
   const [messages, setMessages] = useState([]);
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
+  const abortControllerRef = useRef(null);
+
+  const chatKey = filePath ? `explorer:${filePath}` : 'explorer:repo';
+  const fileName = filePath ? filePath.split('/').pop() : null;
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    let mounted = true;
+    if (!repoId) return;
+
+    // Free any running AI request from previous file
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setLoading(false);
+    setMessages([]);
+
+    chatStore
+      .getChat(repoId, chatKey)
+      .then(history => {
+        if (mounted && Array.isArray(history)) {
+          setMessages(history);
+        }
+      })
+      .catch(err => {
+        console.error('Failed to load explorer chat history:', err);
+      });
+
+    return () => {
+      mounted = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, [repoId, chatKey]);
+
+  useEffect(() => {
+    if (typeof bottomRef.current?.scrollIntoView === 'function') {
+      bottomRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
+
+  const handleClearChat = async () => {
+    setMessages([]);
+    await chatStore.clearChat(repoId, chatKey).catch(() => {});
+  };
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -981,56 +1061,154 @@ function AiPanel({ repoId, onOpenFile, onHighlightRange, getActiveContext, onMob
     if (!q || loading) return;
 
     setQuestion('');
-    setMessages(prev => [...prev, { role: 'user', content: q }]);
+    const userMsg = { role: 'user', content: q };
+    const currentMessages = messages;
+    const updatedWithUser = [...currentMessages, userMsg];
+    setMessages(updatedWithUser);
+    chatStore.saveChat(repoId, chatKey, updatedWithUser).catch(() => {});
     setLoading(true);
+
+    abortControllerRef.current = new AbortController();
 
     try {
       const activeContext = getActiveContext ? getActiveContext() : null;
-      // Use the new Step 8 endpoint
-      const res = await repositoryApi.askQuestion(repoId, q, activeContext);
-      const ans = res.data.answer;
+      const res = await repositoryApi.askQuestion(repoId, q, activeContext, currentMessages, {
+        signal: abortControllerRef.current.signal,
+      });
 
-      setMessages(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: ans.summary + (ans.explanation ? `\n\n${ans.explanation}` : ''),
-          references: ans.references || [],
-          facts: ans.facts || [],
-          inferences: ans.inferences || [],
-          intent: res.data.intent,
-          isDeterministic: !res.data.requiresAi,
-        },
-      ]);
+      // Handle both structured { answer: ... } and direct proxy { response: "..." } payloads
+      const rawAns = res?.data?.answer || res?.data?.response || res?.data;
+      let ans = rawAns;
+
+      if (typeof rawAns === 'string') {
+        try {
+          const cleaned = rawAns
+            .trim()
+            .replace(/^```json\s*/i, '')
+            .replace(/^```\s*/, '')
+            .replace(/\s*```$/, '');
+          const parsed = JSON.parse(cleaned);
+          if (parsed && typeof parsed === 'object') {
+            ans = parsed;
+          }
+        } catch {
+          ans = { summary: rawAns };
+        }
+      }
+
+      if (!ans || typeof ans !== 'object') {
+        ans = { summary: String(ans || 'No response returned from assistant.') };
+      }
+
+      const summaryText = ans.summary || ans.answer || ans.text || (typeof rawAns === 'string' ? rawAns : '') || '';
+      const explanationText = ans.explanation || '';
+      const fullContent = summaryText + (explanationText ? `\n\n${explanationText}` : '');
+
+      const assistantMsg = {
+        role: 'assistant',
+        summary: summaryText,
+        explanation: explanationText,
+        content: fullContent,
+        references: Array.isArray(ans.references) ? ans.references : res?.data?.references || [],
+        facts: Array.isArray(ans.facts) ? ans.facts : res?.data?.facts || [],
+        inferences: Array.isArray(ans.inferences) ? ans.inferences : [],
+        intent: ans.intent || res?.data?.intent,
+        isDeterministic: res?.data?.requiresAi === false,
+      };
+
+      setMessages(prev => {
+        const next = [...prev, assistantMsg];
+        chatStore.saveChat(repoId, chatKey, next).catch(() => {});
+        return next;
+      });
     } catch (err) {
+      if (err.name === 'CanceledError' || err.name === 'AbortError') {
+        return;
+      }
       const msg = err?.response?.data?.error || err.message || 'Request failed';
-      setMessages(prev => [...prev, { role: 'error', content: msg }]);
+      const errorMsg = { role: 'error', content: msg };
+      setMessages(prev => {
+        const next = [...prev, errorMsg];
+        chatStore.saveChat(repoId, chatKey, next).catch(() => {});
+        return next;
+      });
     } finally {
       setLoading(false);
+      abortControllerRef.current = null;
     }
   }
 
   return (
     <>
       <div className="h-10 flex items-center justify-between px-3 border-b border-border shrink-0">
-        <span className="text-xs text-muted uppercase tracking-wider">Ask about this repo</span>
-        {onMobileClose && (
-          <button
-            onClick={onMobileClose}
-            className="xl:hidden p-1 bg-surface/50 rounded text-muted hover:text-text border border-border/50 shrink-0"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        )}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Brain className="w-3.5 h-3.5 text-accent shrink-0" />
+          <span className="text-xs font-medium text-text truncate" title={filePath || 'Repository Context'}>
+            {fileName ? `Ask about ${fileName}` : 'Ask about this repo'}
+          </span>
+          {fileName && (
+            <span className="text-[10px] text-muted bg-surface/70 px-1.5 py-0.5 rounded border border-border/40 font-mono hidden sm:inline">
+              File
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          {messages.length > 0 && (
+            <button
+              onClick={handleClearChat}
+              title={fileName ? `Clear conversation for ${fileName}` : 'Clear conversation'}
+              className="p-1 rounded text-muted hover:text-text hover:bg-surface/50 text-[11px] flex items-center gap-1 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {onMobileClose && (
+            <button
+              onClick={onMobileClose}
+              className="xl:hidden p-1 bg-surface/50 rounded text-muted hover:text-text border border-border/50 shrink-0"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3">
         {messages.length === 0 && (
-          <p className="text-xs text-muted text-center mt-6 leading-relaxed">
-            Ask a question about the codebase.
-            <br />
-            <span className="opacity-60">e.g. "How does authentication work?"</span>
-          </p>
+          <div className="flex flex-col items-center justify-center h-48 text-center px-2">
+            <MessageSquare className="w-8 h-8 text-muted/30 mb-2" />
+            <p className="text-xs text-text/90 font-medium">
+              {fileName ? `Ask about ${fileName}` : 'Ask about the codebase'}
+            </p>
+            <p className="text-[11px] text-muted mt-1 leading-relaxed max-w-[240px]">
+              {fileName ? (
+                <>
+                  Inquire about logic, functions, or dependencies in{' '}
+                  <span className="font-mono text-text/80">{fileName}</span>.
+                </>
+              ) : (
+                'Select a file to inspect, or ask a question about the repository.'
+              )}
+            </p>
+            {fileName && (
+              <div className="mt-3 flex flex-col gap-1.5 w-full max-w-[220px]">
+                <button
+                  type="button"
+                  onClick={() => setQuestion(`What is the primary responsibility of ${fileName}?`)}
+                  className="text-[10px] bg-surface/60 hover:bg-surface border border-border/60 hover:border-accent/40 rounded px-2 py-1 text-muted hover:text-text transition-colors text-left truncate"
+                >
+                  • What is the responsibility?
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQuestion(`Are there any potential risks or edge cases in ${fileName}?`)}
+                  className="text-[10px] bg-surface/60 hover:bg-surface border border-border/60 hover:border-accent/40 rounded px-2 py-1 text-muted hover:text-text transition-colors text-left truncate"
+                >
+                  • Any potential risks?
+                </button>
+              </div>
+            )}
+          </div>
         )}
 
         {messages.map((msg, i) => (

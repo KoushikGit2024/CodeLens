@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../shared/context/AuthContext';
 import { useAIState } from '../../shared/context/AIContext';
 import { ArrowLeft, User, LogOut, Loader2, Zap, Mail, Shield, Clock } from 'lucide-react';
@@ -13,6 +13,14 @@ export default function AccountPage() {
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
+  };
+
+  const handleGoBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/');
+    }
   };
 
   if (!user) {
@@ -32,9 +40,15 @@ export default function AccountPage() {
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto px-6 py-12">
           <div className="flex items-center gap-4 mb-8">
-            <Link to="/" className="p-2 hover:bg-panel rounded-full transition-colors">
+            <button
+              type="button"
+              onClick={handleGoBack}
+              className="p-2 hover:bg-panel rounded-full transition-colors cursor-pointer"
+              title="Go back"
+              aria-label="Go back"
+            >
               <ArrowLeft className="w-5 h-5 text-muted hover:text-text" />
-            </Link>
+            </button>
             <h1 className="text-2xl font-semibold">Account Settings</h1>
           </div>
 

@@ -101,9 +101,9 @@ function createRisk(category, severity, title, description, file, evidence = {},
  * where every file is under 100 lines.
  */
 function computeSizeThresholds(files) {
-  const ABSOLUTE_FLOOR_HIGH = 300;    // never flag as "Very large" below this
+  const ABSOLUTE_FLOOR_HIGH = 300; // never flag as "Very large" below this
   const ABSOLUTE_FLOOR_WARNING = 150; // never flag as "Large" below this
-  const MIN_SAMPLE_SIZE = 4;          // need enough data for IQR to be meaningful
+  const MIN_SAMPLE_SIZE = 4; // need enough data for IQR to be meaningful
 
   if (!files || files.length < MIN_SAMPLE_SIZE) {
     // Fall back to legacy static thresholds for tiny repos
@@ -146,7 +146,7 @@ function computeSizeThresholds(files) {
   };
 
   const p25 = quantile(0.25);
-  const p50 = quantile(0.50);
+  const p50 = quantile(0.5);
   const p75 = quantile(0.75);
   const iqr = p75 - p25;
 
@@ -331,7 +331,7 @@ export function computeCouplingThresholds(analysis, graph) {
       return counts[lo] + (counts[hi] - counts[lo]) * (pos - lo);
     };
     const p25 = quantile(0.25);
-    const p50 = quantile(0.50);
+    const p50 = quantile(0.5);
     const p75 = quantile(0.75);
     const iqr = p75 - p25;
     return { p25, p50, p75, iqr };
@@ -540,12 +540,7 @@ function analyzeStabilityRisks(analysis, graph) {
     const tgtStat = stabilityMap.get(target);
     if (!srcStat || !tgtStat) continue;
 
-    if (
-      srcStat.instability <= 0.3 &&
-      srcStat.ca >= 3 &&
-      tgtStat.instability >= 0.7 &&
-      tgtStat.ce >= 3
-    ) {
+    if (srcStat.instability <= 0.3 && srcStat.ca >= 3 && tgtStat.instability >= 0.7 && tgtStat.ce >= 3) {
       violations.push({
         source,
         target,
@@ -555,7 +550,7 @@ function analyzeStabilityRisks(analysis, graph) {
     }
   }
 
-  violations.sort((a, b) => (b.srcStat.ca + b.tgtStat.ce) - (a.srcStat.ca + a.tgtStat.ce));
+  violations.sort((a, b) => b.srcStat.ca + b.tgtStat.ce - (a.srcStat.ca + a.tgtStat.ce));
   const topViolations = violations.slice(0, 10);
 
   for (const v of topViolations) {
@@ -722,7 +717,8 @@ function analyzeCodeQualityRisks(analysis, graph) {
       high.sort((a, b) => (b.cognitiveComplexity || b.complexity) - (a.cognitiveComplexity || a.complexity));
       const worst = high[0];
       const nestingDetail = worst.nestingDepth > 1 ? `, nesting depth: ${worst.nestingDepth}` : '';
-      const cognitiveDetail = worst.cognitiveComplexity > 0 ? ` (cognitive score: ${worst.cognitiveComplexity}${nestingDetail})` : '';
+      const cognitiveDetail =
+        worst.cognitiveComplexity > 0 ? ` (cognitive score: ${worst.cognitiveComplexity}${nestingDetail})` : '';
 
       risks.push(
         createRisk(
@@ -754,7 +750,8 @@ function analyzeCodeQualityRisks(analysis, graph) {
       warning.sort((a, b) => (b.cognitiveComplexity || b.complexity) - (a.cognitiveComplexity || a.complexity));
       const worst = warning[0];
       const nestingDetail = worst.nestingDepth > 1 ? `, nesting depth: ${worst.nestingDepth}` : '';
-      const cognitiveDetail = worst.cognitiveComplexity > 0 ? ` (cognitive score: ${worst.cognitiveComplexity}${nestingDetail})` : '';
+      const cognitiveDetail =
+        worst.cognitiveComplexity > 0 ? ` (cognitive score: ${worst.cognitiveComplexity}${nestingDetail})` : '';
 
       risks.push(
         createRisk(
@@ -880,7 +877,10 @@ function analyzeCodeQualityRisks(analysis, graph) {
             unusedCount: exportsList.length,
             names: exportsList.map(e => e.name),
           },
-          exportsList.map(e => e.name).sort().join('+')
+          exportsList
+            .map(e => e.name)
+            .sort()
+            .join('+')
         )
       );
     }
@@ -952,6 +952,47 @@ function determineHotspots(risks) {
 }
 
 /**
+ * It resolves historical git commit file paths against current repository files.
+ * Handles relocated files (e.g. client/src/App.jsx -> client/src/app/App.jsx)
+ * and returns null if the file was deleted in git history.
+ */
+function resolveCurrentFilePath(rawPath, availablePaths) {
+  if (!rawPath || !availablePaths || availablePaths.size === 0) return null;
+  const norm = rawPath.replace(/\\/g, '/').replace(/^\/+/, '');
+  if (availablePaths.has(norm)) return norm;
+  if (availablePaths.has(rawPath)) return rawPath;
+
+  const targetBase = norm.split('/').pop();
+  const matches = [];
+  for (const p of availablePaths) {
+    if (p === norm || p.endsWith('/' + norm) || p.endsWith('/' + targetBase) || p === targetBase) {
+      matches.push(p);
+    }
+  }
+
+  if (matches.length === 1) return matches[0];
+  if (matches.length > 1) {
+    const parts = norm.split('/');
+    let best = matches[0];
+    let bestScore = -1;
+    for (const m of matches) {
+      const mParts = m.split('/');
+      let score = 0;
+      for (const pt of parts) {
+        if (mParts.includes(pt)) score++;
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        best = m;
+      }
+    }
+    return best;
+  }
+
+  return null;
+}
+
+/**
  * It reads the gitChurn data from the analysis object, then extracts files
  * exceeding churn thresholds, and then it applies composite risk scoring
  * to surface the highest-priority files for review.
@@ -961,15 +1002,18 @@ function analyzeChurnRisks(analysis, graph) {
   const gitChurn = analysis?.gitChurn;
   if (!gitChurn || !gitChurn.churnScores) return risks;
 
-  const filesList = Array.isArray(analysis?.files)
-    ? analysis.files
-    : Object.values(analysis?.files || {});
+  const filesList = Array.isArray(analysis?.files) ? analysis.files : Object.values(analysis?.files || {});
+  const availablePaths = new Set(filesList.map(f => f.filePath).filter(Boolean));
 
   // 1. Tornhill Behavioral Hotspot Matrix & Churn Evaluation
-  for (const [filePath, churnScore] of Object.entries(gitChurn.churnScores)) {
-    if (filePath.startsWith('.git/')) continue;
+  for (const [rawFilePath, churnScore] of Object.entries(gitChurn.churnScores)) {
+    if (rawFilePath.startsWith('.git/')) continue;
 
-    const fileNode = filesList.find(f => f.filePath === filePath);
+    // Resolve path against current repository files; skip if deleted
+    const resolvedPath = availablePaths.size > 0 ? resolveCurrentFilePath(rawFilePath, availablePaths) : rawFilePath;
+    if (!resolvedPath) continue;
+
+    const fileNode = filesList.find(f => f.filePath === resolvedPath);
     const complexity =
       fileNode?.metrics?.complexity ||
       (fileNode?.symbols ? fileNode.symbols.reduce((acc, s) => acc + (s.complexity || 0), 0) : 0);
@@ -985,15 +1029,16 @@ function analyzeChurnRisks(analysis, graph) {
           SEVERITY.CRITICAL,
           'Behavioral Hotspot (Critical Active Risk)',
           `File is in the top quadrant of the Tornhill Hotspot Matrix: high churn (${churnScore}/100) combined with high complexity (${complexityScore}/100, score: ${hotspot.hotspotScore}). Frequently modified complex code is the primary source of regressions and defect leakage.`,
-          filePath,
+          resolvedPath,
           {
             churnScore,
             complexityScore,
             hotspotScore: hotspot.hotspotScore,
             quadrant: hotspot.quadrant,
-            commitsModified: gitChurn.fileChurn?.[filePath] || 0,
+            commitsModified: gitChurn.fileChurn?.[rawFilePath] || 0,
+            originalPath: rawFilePath !== resolvedPath ? rawFilePath : undefined,
           },
-          `${filePath}>hotspot`
+          `${resolvedPath}>hotspot`
         )
       );
     } else if (compositeRisk >= THRESHOLDS.COMPOSITE_RISK_HIGH) {
@@ -1003,9 +1048,14 @@ function analyzeChurnRisks(analysis, graph) {
           SEVERITY.HIGH,
           'High Composite Risk (Churn + Complexity)',
           `This file has a composite risk score of ${compositeRisk}/100 (churn: ${churnScore}/100). Frequently modified complex files are hotspots for bugs.`,
-          filePath,
-          { churnScore, compositeRisk, commitsModified: gitChurn.fileChurn?.[filePath] || 0 },
-          `${filePath}>composite`
+          resolvedPath,
+          {
+            churnScore,
+            compositeRisk,
+            commitsModified: gitChurn.fileChurn?.[rawFilePath] || 0,
+            originalPath: rawFilePath !== resolvedPath ? rawFilePath : undefined,
+          },
+          `${resolvedPath}>composite`
         )
       );
     } else if (churnScore >= THRESHOLDS.CHURN_HIGH) {
@@ -1015,9 +1065,13 @@ function analyzeChurnRisks(analysis, graph) {
           SEVERITY.WARNING,
           'High Churn File',
           `This file is modified very frequently (churn score: ${churnScore}/100). Frequent changes may indicate unstable design or ongoing development.`,
-          filePath,
-          { churnScore, commitsModified: gitChurn.fileChurn?.[filePath] || 0 },
-          `${filePath}>churn`
+          resolvedPath,
+          {
+            churnScore,
+            commitsModified: gitChurn.fileChurn?.[rawFilePath] || 0,
+            originalPath: rawFilePath !== resolvedPath ? rawFilePath : undefined,
+          },
+          `${resolvedPath}>churn`
         )
       );
     }
@@ -1025,16 +1079,52 @@ function analyzeChurnRisks(analysis, graph) {
 
   // 2. Temporal Co-Change Coupling (Hidden Logical Coupling)
   if (gitChurn.coChanges && Array.isArray(gitChurn.coChanges)) {
-    // Cap to top 10 strongest couplings to avoid card explosion
-    const topCouplings = gitChurn.coChanges.slice(0, 10);
-    for (const co of topCouplings) {
+    // Resolve all co-changes against existing files in the current repository
+    const resolvedCouplings = [];
+    for (const co of gitChurn.coChanges) {
       const { fileA, fileB, sharedCommits, jaccard } = co;
       if (!fileA || !fileB) continue;
+
+      const resA = availablePaths.size > 0 ? resolveCurrentFilePath(fileA, availablePaths) : fileA;
+      const resB = availablePaths.size > 0 ? resolveCurrentFilePath(fileB, availablePaths) : fileB;
+
+      // Omit pairs where either file no longer exists or they resolve to the same file
+      if (!resA || !resB || resA === resB) continue;
+
+      resolvedCouplings.push({
+        fileA: resA,
+        fileB: resB,
+        rawA: fileA,
+        rawB: fileB,
+        sharedCommits,
+        jaccard,
+      });
+    }
+
+    // Deduplicate pairs (e.g. if different historical paths mapped to the same modern paths)
+    const seenPairs = new Set();
+    const uniqueCouplings = [];
+    for (const c of resolvedCouplings) {
+      const pairKey = [c.fileA, c.fileB].sort().join('<->');
+      if (seenPairs.has(pairKey)) continue;
+      seenPairs.add(pairKey);
+      uniqueCouplings.push(c);
+    }
+
+    // Cap to top 10 strongest couplings to avoid card explosion
+    const topCouplings = uniqueCouplings.slice(0, 10);
+    for (const co of topCouplings) {
+      const { fileA, fileB, sharedCommits, jaccard, rawA, rawB } = co;
 
       const hasDirectEdge = graph?.edges?.some(e => {
         const s = (e.source || '').replace(/^file:/, '');
         const t = (e.target || '').replace(/^file:/, '');
-        return (s === fileA && t === fileB) || (s === fileB && t === fileA);
+        return (
+          (s === fileA && t === fileB) ||
+          (s === fileB && t === fileA) ||
+          (rawA && s === rawA && t === rawB) ||
+          (rawA && s === rawB && t === rawA)
+        );
       });
 
       if (!hasDirectEdge) {
@@ -1053,6 +1143,8 @@ function analyzeChurnRisks(analysis, graph) {
               jaccard,
               coChangeCount: sharedCommits,
               coChangeSimilarity: jaccard,
+              originalFileA: rawA !== fileA ? rawA : undefined,
+              originalFileB: rawB !== fileB ? rawB : undefined,
             },
             `${fileA}+${fileB}>cochange`
           )
@@ -1099,18 +1191,30 @@ export function buildEngineeringRiskModel(analysis, graph, architecture, ignored
     warning: risks.filter(r => r.severity === SEVERITY.WARNING).length,
   };
 
+  const availablePaths = new Set(
+    (Array.isArray(analysis?.files) ? analysis.files : Object.values(analysis?.files || {}))
+      .map(f => f.filePath)
+      .filter(Boolean)
+  );
+
   const churnTable = analysis?.gitChurn?.churnScores
     ? Object.entries(analysis.gitChurn.churnScores)
         .filter(([fp]) => !fp.startsWith('.git/'))
-        .map(([filePath, churnScore]) => {
-          const fileNode = analysis.files?.find(f => f.filePath === filePath);
+        .map(([rawFilePath, churnScore]) => {
+          const resolvedPath =
+            availablePaths.size > 0 ? resolveCurrentFilePath(rawFilePath, availablePaths) : rawFilePath;
+          if (!resolvedPath) return null;
+          const fileNode = Array.isArray(analysis?.files)
+            ? analysis.files.find(f => f.filePath === resolvedPath)
+            : analysis?.files?.[resolvedPath];
           return {
-            filePath,
+            filePath: resolvedPath,
             churnScore,
             compositeRisk: fileNode?.metrics?.compositeRisk || churnScore,
-            commitsModified: analysis.gitChurn.fileChurn?.[filePath] || 0,
+            commitsModified: analysis.gitChurn.fileChurn?.[rawFilePath] || 0,
           };
         })
+        .filter(Boolean)
         .sort((a, b) => b.compositeRisk - a.compositeRisk)
         .slice(0, 20)
     : [];

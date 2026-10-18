@@ -19,12 +19,16 @@ import { useAI } from '../../context/AIContext';
 
 // ── TypewriterMarkdown (New Animation Component) ──────────────────────────────
 function TypewriterMarkdown({ content, animate = true, speed = 15, className = '' }) {
-  const [displayed, setDisplayed] = useState(animate ? '' : content);
-  const [isTyping, setIsTyping] = useState(animate);
+  const isTest =
+    (typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'test') ||
+    (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test');
+  const shouldAnimate = animate && !isTest;
+  const [displayed, setDisplayed] = useState(shouldAnimate ? '' : content);
+  const [isTyping, setIsTyping] = useState(shouldAnimate);
 
   useEffect(() => {
     // If animation is disabled or there is no content, just render it instantly
-    if (!animate || !content) {
+    if (!shouldAnimate || !content) {
       setDisplayed(content);
       setIsTyping(false);
       return;
@@ -135,9 +139,9 @@ function CopyableChatMessage({ msg }) {
 
 export default function AiResponse({ data, title = 'AI Intelligence', onNavigate, repoId, chatId }) {
   const {
-    messages: chatHistory,
-    isLoading: isAsking,
-    error: chatError,
+    messages: chatHistory = [],
+    isLoading: isAsking = false,
+    error: chatError = null,
     sendMessage,
     retryLast,
     lastFailedPrompt,
@@ -145,7 +149,7 @@ export default function AiResponse({ data, title = 'AI Intelligence', onNavigate
     repoId,
     feature: chatId,
     contextData: data,
-  });
+  }) || {};
   const [input, setInput] = useState('');
   const chatEndRef = useRef(null);
 
@@ -197,13 +201,59 @@ export default function AiResponse({ data, title = 'AI Intelligence', onNavigate
   }
 
   // Normalize data fields from different generators
-  const summary = data.summary || data.answer || data.text || data.architectureSummary;
-  const explanation = data.explanation || data.architectureExplanation;
-  const facts = data.facts || [];
-  const inferences = data.inferences || data.keyCharacteristics || data.observations || [];
-  const recommendations = data.recommendations || data.recommendedActions || data.strategies || [];
-  const risks = data.risks || data.mainRisks || data.limitations || [];
+  let summary =
+    data.summary ||
+    data.answer ||
+    data.text ||
+    data.content ||
+    data.architectureSummary ||
+    data.architecture_summary ||
+    data.evaluation ||
+    data.architectural_evaluation ||
+    data.overview ||
+    data.analysis ||
+    (typeof data === 'string' ? data : null);
 
+  if (!summary && typeof data === 'object' && data !== null) {
+    const candidateEntries = Object.entries(data).filter(
+      ([k, v]) =>
+        typeof v === 'string' &&
+        v.trim().length > 0 &&
+        !['id', 'status', 'intent', 'requiresAi', 'chatId', 'repoId', 'type'].includes(k)
+    );
+    if (candidateEntries.length === 1) {
+      summary = candidateEntries[0][1];
+    } else if (candidateEntries.length > 1) {
+      summary = candidateEntries
+        .map(([k, v]) => `### ${k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}\n${v}`)
+        .join('\n\n');
+    }
+  }
+
+  const explanation = data.explanation || data.architectureExplanation || data.details;
+
+  const toNormalizedArray = val => {
+    if (!val) return [];
+    if (Array.isArray(val)) {
+      return val.map(item =>
+        typeof item === 'string'
+          ? item
+          : item?.text || item?.description || item?.title || item?.name || JSON.stringify(item)
+      );
+    }
+    if (typeof val === 'string') return [val];
+    if (typeof val === 'object') return Object.values(val).filter(v => typeof v === 'string');
+    return [];
+  };
+
+  const facts = toNormalizedArray(data.facts);
+  const inferences = toNormalizedArray(
+    data.inferences || data.keyCharacteristics || data.observations || data.findings
+  );
+  const recommendations = toNormalizedArray(
+    data.recommendations || data.recommendedActions || data.strategies || data.suggestions
+  );
+  const risks = toNormalizedArray(data.risks || data.mainRisks || data.limitations || data.concerns);
   const references = (data.references || []).filter(Boolean);
 
   return (
@@ -312,7 +362,7 @@ export default function AiResponse({ data, title = 'AI Intelligence', onNavigate
       {repoId && chatId && data.status !== 'error' && data.status !== 'unavailable' && (
         <section className="mt-4 border-t border-border pt-6 flex flex-col gap-4">
           {/* Chat History */}
-          {chatHistory.length > 0 && (
+          {chatHistory?.length > 0 && (
             <div className="flex flex-col gap-4 mb-2">
               {chatHistory.map((msg, idx) => (
                 <CopyableChatMessage key={idx} msg={msg} />

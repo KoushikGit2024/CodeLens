@@ -8,15 +8,33 @@
 
 export class ContextOrchestrator {
   static buildArchitecturePrompt(model) {
-    return `You are a software architect analyzing a codebase.
-Provide a clear, 2-3 paragraph architectural evaluation based on these metrics.
+    const compLabels = (model.components || []).map(c => c.data?.label || c.id || c.name || 'Component').join(', ');
+    const entryPoints = (model.entryPoints || []).join(', ') || 'None detected';
+    const violationsCount = model.violations?.length || 0;
+    const relationsCount = model.relations?.length || 0;
 
-Components: ${model.components.map(c => c.data.label).join(', ')}
-Total Relations: ${model.relations.length}
-Boundary Violations: ${model.violations.length}
-Entry Points: ${model.entryPoints.join(', ')}
+    return `You are a Principal Software Architect analyzing a software repository.
+Analyze the following architectural model metrics:
 
-Evaluate the modularity, coupling, and any apparent risks based on the violations.`;
+Components: ${compLabels || 'None detected'}
+Total Relations: ${relationsCount}
+Boundary Violations: ${violationsCount}
+Entry Points: ${entryPoints}
+
+Provide an actionable architectural evaluation assessing modularity, component coupling, architectural boundaries, and structural risks.
+Produce a structured JSON response matching this schema:
+{
+  "summary": "2-3 comprehensive paragraphs providing an executive evaluation of the system modularity, coupling, and boundary integrity.",
+  "inferences": [
+    "Key architectural inference or pattern observed (e.g. Layered/Hexagonal, strong domain isolation, etc.)"
+  ],
+  "risks": [
+    "Specific architectural risk or boundary violation concern"
+  ],
+  "recommendations": [
+    "Concrete, prioritized action to improve modularity or resolve boundary violations"
+  ]
+}`;
   }
 
   static buildIntelligencePrompt(intelligence) {
@@ -68,17 +86,99 @@ Provide a 3-5 paragraph technical summary covering: overall codebase health, mai
   }
 
   static buildRisksPrompt(risks) {
-    return `You are a senior technical lead reviewing engineering health metrics.
-Overall Score: ${risks.score}
-Critical Risks: ${risks.risks.filter(r => r.severity === 'critical').length}
-High Risks: ${risks.risks.filter(r => r.severity === 'high').length}
-Total Hotspots: ${risks.hotspots.length}
+    const criticalList = (risks.risks || [])
+      .filter(r => r.severity === 'critical')
+      .slice(0, 10)
+      .map(
+        r => `- [${r.category || 'RISK'}] ${r.title} in ${r.file || 'Repository'}: ${r.description || r.message || ''}`
+      );
 
-Please provide a 2-3 paragraph interpretation of these metrics, highlighting what the most critical areas of concern might be and what a general mitigation strategy should look like.
-Format the output as JSON with the following structure:
+    const highList = (risks.risks || [])
+      .filter(r => r.severity === 'high')
+      .slice(0, 10)
+      .map(
+        r => `- [${r.category || 'RISK'}] ${r.title} in ${r.file || 'Repository'}: ${r.description || r.message || ''}`
+      );
+
+    const hotspots = (risks.hotspots || []).slice(0, 8).map(h => {
+      const fp = typeof h === 'string' ? h : h.file;
+      const q = typeof h === 'object' && h.quadrant ? ` (${h.quadrant})` : '';
+      const s = typeof h === 'object' && h.score ? ` [Score: ${h.score}]` : '';
+      return `- ${fp}${q}${s}`;
+    });
+
+    // Category breakdown
+    const categoryCounts = {};
+    (risks.risks || []).forEach(r => {
+      const cat = r.category || 'OTHER';
+      categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+    });
+    const categoryBreakdown = Object.entries(categoryCounts)
+      .map(([cat, count]) => `${cat}: ${count}`)
+      .join(', ');
+
+    return `You are a Principal Software Architect and Technical Director conducting an in-depth Engineering Health Review.
+
+## Repository Engineering Health Metrics
+- Overall Health Score: ${risks.score} / 100 (${risks.riskLevel || 'unhealthy'} tier)
+- Critical Risks: ${risks.risks?.filter(r => r.severity === 'critical').length || 0}
+- High Severity Risks: ${risks.risks?.filter(r => r.severity === 'high').length || 0}
+- Warning Risks: ${risks.risks?.filter(r => r.severity === 'warning').length || 0}
+- Issues by Category: ${categoryBreakdown || 'N/A'}
+
+## Key Behavioral Hotspots (High Churn + High Complexity)
+${hotspots.length > 0 ? hotspots.join('\n') : 'No behavioral hotspots identified.'}
+
+## Critical Findings
+${criticalList.length > 0 ? criticalList.join('\n') : 'No critical findings identified.'}
+
+## High Severity Findings
+${highList.length > 0 ? highList.join('\n') : 'No high severity findings identified.'}
+
+Perform an exhaustive, multi-faceted architectural evaluation. Provide concrete analysis referencing the specific files, hotspot modules, and categories identified above.
+
+Produce a JSON response matching the following schema:
 {
-  "summary": "High level interpretation text",
-  "limitations": "Potential limitations or risks text"
+  "summary": "3-4 detailed paragraphs analyzing the state of the codebase. Discuss why the overall score is what it is, the systemic drivers of fragility (e.g. coupling vs complexity vs churn), and the business/engineering consequences of inaction.",
+  "recommendations": [
+    "Immediate Priority 1: Concrete remediation action for the critical risks and named files (e.g. decoupling circular dependencies or decomposing god files).",
+    "Priority 2: Tactical refactoring recommendation targeting the behavioral hotspots.",
+    "Priority 3: Quality and test strategy to mitigate regression risks.",
+    "Priority 4: Architectural governance or pattern recommendation to prevent re-accumulation of technical debt."
+  ],
+  "observations": [
+    "Architectural Observation 1: In-depth analysis of coupling and structural dependencies across the detected components.",
+    "Architectural Observation 2: Analysis of code duplication, cognitive complexity spikes, or dead code patterns.",
+    "Architectural Observation 3: Assessment of churn velocity and behavioral instability in the hotspot modules."
+  ],
+  "limitations": "Technical debt constraints, team capacity considerations, and sequencing trade-offs (e.g. why a big-bang rewrite must be avoided in favor of incremental modular refactorings).",
+  "references": ["Array of the top affected file paths mentioned above"]
+}`;
+  }
+
+  static buildSingleRiskPrompt(risk) {
+    return `You are a Principal Software Architect analyzing an engineering risk or architectural finding.
+Finding Details:
+Title: ${risk.title}
+Category: ${risk.category || 'General'}
+Severity: ${risk.severity || 'Medium'}
+File: ${risk.file || 'N/A'}
+Description: ${risk.description || risk.message || 'N/A'}
+Evidence: ${risk.evidence || risk.details || 'N/A'}
+
+Analyze this finding in depth. Explain why this issue occurs, its architectural impact, and concrete recommendations to remediate it.
+Produce a structured JSON response matching this schema:
+{
+  "summary": "1-2 paragraphs explaining the root cause and architectural impact of this finding.",
+  "recommendations": [
+    "Step 1 or concrete mitigation recommendation",
+    "Step 2 or architectural pattern to apply"
+  ],
+  "observations": [
+    "Observation regarding coupling, complexity, or maintainability",
+    "Secondary risk or technical debt observation"
+  ],
+  "limitations": "Trade-offs or considerations when fixing this issue."
 }`;
   }
 

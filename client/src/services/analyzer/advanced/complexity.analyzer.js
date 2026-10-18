@@ -80,17 +80,7 @@ const NESTING_CONTAINER_TYPES = new Set([
   'method_definition',
 ]);
 
-const IGNORED_HALSTEAD_TYPES = new Set([
-  'comment',
-  ';',
-  ',',
-  '{',
-  '}',
-  '(',
-  ')',
-  '[',
-  ']',
-]);
+const IGNORED_HALSTEAD_TYPES = new Set(['comment', ';', ',', '{', '}', '(', ')', '[', ']']);
 
 // ── Cyclomatic Complexity ─────────────────────────────────────────────────────
 
@@ -107,7 +97,7 @@ function calculateComplexity(node) {
       cyclomatic++;
     } else if (n.type === 'binary_expression' || n.type === 'logical_expression' || n.type === 'boolean_operator') {
       const operatorNode = n.childForFieldName ? n.childForFieldName('operator') : null;
-      const op = operatorNode ? (operatorNode.text || operatorNode.type) : n.type;
+      const op = operatorNode ? operatorNode.text || operatorNode.type : n.type;
       if (op === '&&' || op === '||' || op === '??' || op === 'and' || op === 'or') {
         cyclomatic++;
       }
@@ -154,7 +144,7 @@ function calculateCognitiveComplexity(node) {
       cognitive += 1;
     } else if (n.type === 'binary_expression' || n.type === 'logical_expression' || n.type === 'boolean_operator') {
       const operatorNode = n.childForFieldName ? n.childForFieldName('operator') : null;
-      const op = operatorNode ? (operatorNode.text || operatorNode.type) : n.type;
+      const op = operatorNode ? operatorNode.text || operatorNode.type : n.type;
       if (op === '&&' || op === '||' || op === '??' || op === 'and' || op === 'or') {
         // Boolean operator sequences add +1 without nesting penalty
         cognitive += 1;
@@ -253,9 +243,4 @@ function analyzeComplexity(node) {
   };
 }
 
-export {
-  calculateComplexity,
-  calculateCognitiveComplexity,
-  calculateMaintainabilityIndex,
-  analyzeComplexity,
-};
+export { calculateComplexity, calculateCognitiveComplexity, calculateMaintainabilityIndex, analyzeComplexity };

@@ -59,8 +59,8 @@ async function processAiJob(jobId, req, finalPrompt, jsonMode, feature) {
     if (jsonMode) {
       const json = await aiService.generateStructuredResponse(finalPrompt);
       const responseText = JSON.stringify(json);
-      const estimatedInput = finalPrompt.length / 4;
-      const estimatedOutput = responseText.length / 4;
+      const estimatedInput = Math.ceil(finalPrompt.length / 4);
+      const estimatedOutput = Math.ceil(responseText.length / 4);
 
       await recordUsage(req, {
         provider: aiProvider.getProviderName(),
@@ -79,7 +79,9 @@ async function processAiJob(jobId, req, finalPrompt, jsonMode, feature) {
 
       activeJobs.set(jobId, { status: 'completed', result: responseText });
     } else {
-      const { text, usage } = await aiProvider.generateAnswer(finalPrompt);
+      const result = (await aiProvider.generateAnswer(finalPrompt)) || {};
+      const text = typeof result === 'string' ? result : result.text || '';
+      const usage = result.usage || null;
 
       await recordUsage(req, {
         provider: aiProvider.getProviderName(),
@@ -96,6 +98,8 @@ async function processAiJob(jobId, req, finalPrompt, jsonMode, feature) {
   } catch (error) {
     const isUnavailable = error.name === 'ProviderUnavailableError' || error.statusCode === 503;
 
+    console.error(`[AI Job ${jobId}] Failed:`, error);
+
     await recordUsage(req, {
       provider: aiProvider.getProviderName(),
       feature: feature || 'chat',
@@ -105,9 +109,19 @@ async function processAiJob(jobId, req, finalPrompt, jsonMode, feature) {
       errorMessage: error.message,
     });
 
+    // Sanitize user-facing error message to protect internal architecture, endpoints, and credentials
+    let userFacingError = 'AI service is temporarily unavailable. Please try again in a few moments.';
+    if (!aiProvider.isProviderConfigured()) {
+      userFacingError = 'No AI provider configured.';
+    } else if (isUnavailable || /high demand|503/i.test(error.message)) {
+      userFacingError = 'AI providers are currently unavailable due to high demand. Please try again in a few moments.';
+    } else if (/quota|rate limit|429|limit reached/i.test(error.message)) {
+      userFacingError = 'AI usage limit reached. Please try again later.';
+    }
+
     activeJobs.set(jobId, {
       status: 'failed',
-      error: isUnavailable ? 'AI providers are currently unavailable due to high demand.' : error.message,
+      error: userFacingError,
     });
   }
 

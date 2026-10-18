@@ -70,7 +70,8 @@ export async function buildContext(analysis, question, fileLoaderCallback, opts 
       fileAnalysis,
       cfg,
       startLine,
-      endLine
+      endLine,
+      isContextFile
     );
 
     if (totalChars + charsRead > cfg.maxSourceChars && !isContextFile) {
@@ -291,7 +292,16 @@ function expandWithDeps(scored, graph, maxFiles) {
  * It triggers the frontend loader callback, then extracts specific lines matching AST targets,
  * and then it applies string truncation to return a clean snippet.
  */
-async function loadSourceSnippet(item, fileLoaderCallback, terms, fileAnalysis, cfg, startLine = null, endLine = null) {
+async function loadSourceSnippet(
+  item,
+  fileLoaderCallback,
+  terms,
+  fileAnalysis,
+  cfg,
+  startLine = null,
+  endLine = null,
+  isContextFile = false
+) {
   try {
     const sourceStr = await fileLoaderCallback(item.path);
     if (!sourceStr) {
@@ -300,6 +310,7 @@ async function loadSourceSnippet(item, fileLoaderCallback, terms, fileAnalysis, 
     }
     const lines = sourceStr.split(/\r?\n/);
 
+    // 1. Explicit line range selection in Monaco editor
     if (startLine !== null && endLine !== null) {
       const idxStart = Math.max(0, startLine - 1);
       const idxEnd = Math.min(lines.length, endLine);
@@ -307,11 +318,49 @@ async function loadSourceSnippet(item, fileLoaderCallback, terms, fileAnalysis, 
       return item.source.length;
     }
 
+    // 2. Active file prioritization: when developer is viewing this file, load the full code if within budget
+    if (isContextFile) {
+      const maxActiveChars = Math.min(cfg.maxSourceChars * 0.85, 20_000);
+      if (sourceStr.length <= maxActiveChars) {
+        item.source = sourceStr;
+        return sourceStr.length;
+      }
+
+      // If active file is very large (>500 lines), prioritize code over oversized docblock headers
+      let startIdx = 0;
+      if (lines[0] && lines[0].trim().startsWith('/*')) {
+        let commentEnd = -1;
+        for (let i = 0; i < Math.min(60, lines.length); i++) {
+          if (lines[i].includes('*/')) {
+            commentEnd = i;
+            break;
+          }
+        }
+        if (commentEnd > 20) {
+          startIdx = commentEnd + 1;
+        }
+      }
+
+      let accumulated = '';
+      for (let i = startIdx; i < lines.length; i++) {
+        if (accumulated.length + lines[i].length + 1 > maxActiveChars) {
+          accumulated += '\n// [... Remaining lines omitted to fit context window ...]';
+          break;
+        }
+        accumulated += (accumulated ? '\n' : '') + lines[i];
+      }
+
+      item.source = accumulated;
+      return accumulated.length;
+    }
+
+    // 3. Compact file: fits entirely within double snippet size
     if (lines.length <= cfg.snippetLines * 2) {
       item.source = sourceStr;
       return sourceStr.length;
     }
 
+    // 4. Symbol match for query terms
     if (fileAnalysis && fileAnalysis.symbols && terms.length > 0) {
       const termsLower = terms.map(t => t.toLowerCase());
       const match = fileAnalysis.symbols.find(
@@ -326,7 +375,18 @@ async function loadSourceSnippet(item, fileLoaderCallback, terms, fileAnalysis, 
       }
     }
 
-    item.source = lines.slice(0, cfg.snippetLines).join('\n');
+    // 5. Secondary fallback: skip past oversized top docblock so code is captured
+    let startIdx = 0;
+    if (lines[0] && lines[0].trim().startsWith('/*')) {
+      for (let i = 0; i < Math.min(40, lines.length); i++) {
+        if (lines[i].includes('*/')) {
+          startIdx = i + 1;
+          break;
+        }
+      }
+    }
+
+    item.source = lines.slice(startIdx, startIdx + cfg.snippetLines).join('\n');
     return item.source.length;
   } catch (err) {
     console.warn(`[baseContext] Failed to read ${item.path}: ${err.message}`);
@@ -364,15 +424,22 @@ function extractImportSources(fileAnalysis) {
 export function buildPrompt(context) {
   const lines = [];
 
-  lines.push('You are CodeLens, a code intelligence assistant.');
-  lines.push("Answer the developer's question using ONLY the repository context provided below.");
-  lines.push('Rules:');
-  lines.push('- Do not invent files, functions, classes, or dependencies that are not shown.');
-  lines.push('- If the provided context is insufficient to answer fully, say so explicitly.');
-  lines.push('- Reference relevant files using the format [path/to/file.js].');
-  lines.push('- If you know the relevant line range, use [path/to/file.js:10-25].');
-  lines.push('- Prefer precise technical explanations over vague summaries.');
-  lines.push('- Distinguish what is shown in the code from what you are inferring.');
+  lines.push('You are CodeLens, an expert code intelligence pair-programmer.');
+  lines.push("Analyze the developer's question using the repository context and source files provided below.");
+  lines.push('Guidelines:');
+  lines.push(
+    '- Be direct, technical, and actionable. Jump straight into the explanation or answer without robotic intro phrases (do NOT start with "Based on the provided context" or "According to the repository context").'
+  );
+  lines.push(
+    '- Focus on actual implementation details, architecture, data flow, error handling, performance, and concrete code patterns.'
+  );
+  lines.push(
+    '- When asked for improvements, bugs, or refactoring, provide prioritized, actionable recommendations with code examples.'
+  );
+  lines.push(
+    '- Reference relevant files and locations using clickable links: [path/to/file.js] or [path/to/file.js:10-25].'
+  );
+  lines.push('- Distinguish verified code facts from logical architectural inferences.');
   lines.push('');
   lines.push(`Repository: ${context.repository.name}`);
   lines.push(`Total analysed files: ${context.repository.totalFiles}`);

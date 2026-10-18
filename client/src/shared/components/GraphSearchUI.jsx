@@ -49,7 +49,9 @@ export default function GraphSearchUI({ onSearch, onNext, onPrev, onClear, match
         className="flex-1 bg-transparent border-none outline-none text-sm text-text placeholder-muted/60 min-w-0"
       />
       {matchCount !== null && (
-        <span className={`text-[10px] whitespace-nowrap px-2 font-mono ${isZeroMatches ? 'text-danger' : 'text-muted'}`}>
+        <span
+          className={`text-[10px] whitespace-nowrap px-2 font-mono ${isZeroMatches ? 'text-danger' : 'text-muted'}`}
+        >
           {matchCount > 0 ? `${currentMatchIndex} / ${matchCount}` : '0 matches'}
         </span>
       )}

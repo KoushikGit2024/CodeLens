@@ -113,7 +113,8 @@ export default function DependencyGraphPage() {
     () => sessionStorage.getItem('codeLens_hideExternalWarning') !== 'true'
   );
 
-  const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+  const prefersReducedMotion =
+    typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
 
   const [edgeStyle, setEdgeStyle] = useState(() => {
     return localStorage.getItem('codeLens_edgeStyle') || (prefersReducedMotion ? 'straight' : 'spring');
@@ -314,7 +315,8 @@ export default function DependencyGraphPage() {
     if (rfInstance) {
       const matchNode = (nodesRef.current || []).find(n => n.id === matchedNodes[nextIdx - 1]);
       if (matchNode) {
-        const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+        const reduce =
+          typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
         rfInstance.setCenter(
           matchNode.position.x + parseInt(matchNode.style?.width || 150) / 2,
           matchNode.position.y + parseInt(matchNode.style?.height || 34) / 2,
@@ -332,7 +334,8 @@ export default function DependencyGraphPage() {
     if (rfInstance) {
       const matchNode = (nodesRef.current || []).find(n => n.id === matchedNodes[prevIdx - 1]);
       if (matchNode) {
-        const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+        const reduce =
+          typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
         rfInstance.setCenter(
           matchNode.position.x + parseInt(matchNode.style?.width || 150) / 2,
           matchNode.position.y + parseInt(matchNode.style?.height || 34) / 2,
@@ -355,7 +358,8 @@ export default function DependencyGraphPage() {
       if (n && rfInstance) {
         const w = parseInt(n.style?.width || NODE_W, 10);
         const h = parseInt(n.style?.height || NODE_H, 10);
-        const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+        const reduce =
+          typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
         rfInstance.setCenter(n.position.x + w / 2, n.position.y + h / 2, { zoom: 1.2, duration: reduce ? 0 : 600 });
       }
     },
@@ -716,12 +720,9 @@ export default function DependencyGraphPage() {
   const dragStartPos = useRef(null);
   const panePointerDownRef = useRef(null);
 
-  const onNodeDragStart = useCallback(
-    (event, node) => {
-      dragStartPos.current = { x: event.clientX, y: event.clientY };
-    },
-    []
-  );
+  const onNodeDragStart = useCallback((event, node) => {
+    dragStartPos.current = { x: event.clientX, y: event.clientY };
+  }, []);
 
   const onNodeDrag = useCallback(
     (event, node) => {

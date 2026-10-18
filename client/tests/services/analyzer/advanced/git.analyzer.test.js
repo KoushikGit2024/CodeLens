@@ -118,9 +118,7 @@ describe('git.analyzer', () => {
       ]);
 
       // Both commits touch fileA and fileB together
-      git.walk
-        .mockResolvedValueOnce(['fileA.js', 'fileB.js'])
-        .mockResolvedValueOnce(['fileA.js', 'fileB.js']);
+      git.walk.mockResolvedValueOnce(['fileA.js', 'fileB.js']).mockResolvedValueOnce(['fileA.js', 'fileB.js']);
 
       const result = await analyzeGitChurn('repo-123', vi.fn());
 
@@ -185,11 +183,7 @@ describe('git.analyzer', () => {
 
       // Dependency graph without edge between coupledA and coupledB
       const graph = {
-        nodes: [
-          { id: 'src/hotspot.js' },
-          { id: 'src/coupledA.js' },
-          { id: 'src/coupledB.js' },
-        ],
+        nodes: [{ id: 'src/hotspot.js' }, { id: 'src/coupledA.js' }, { id: 'src/coupledB.js' }],
         edges: [],
       };
 

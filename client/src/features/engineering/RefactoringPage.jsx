@@ -26,6 +26,11 @@ import {
   Copy,
   Check,
   SplitSquareHorizontal,
+  FileCode,
+  Boxes,
+  Globe,
+  Cpu,
+  Tag,
 } from 'lucide-react';
 import { DiffEditor } from '@monaco-editor/react';
 import { ResizableLayout } from '../../shared/components/ResizableLayout';
@@ -76,6 +81,326 @@ const formatCategory = category => {
     .replace(/([A-Z])/g, ' $1')
     .trim()
     .replace(/^./, str => str.toUpperCase());
+};
+
+// ── Cohesion & Formatting Helpers ─────────────────────────────────────────────
+const ROLE_BADGES = {
+  'Data Access & Network': {
+    label: 'Data Access & Network',
+    bg: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/25',
+    dot: 'bg-cyan-400',
+    icon: Database,
+  },
+  'Data Access': {
+    label: 'Data Access',
+    bg: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/25',
+    dot: 'bg-cyan-400',
+    icon: Database,
+  },
+  Network: {
+    label: 'Network',
+    bg: 'bg-blue-500/10 text-blue-400 border-blue-500/25',
+    dot: 'bg-blue-400',
+    icon: Globe,
+  },
+  'Core Domain & Orchestration': {
+    label: 'Core Domain & Orchestration',
+    bg: 'bg-purple-500/10 text-purple-400 border-purple-500/25',
+    dot: 'bg-purple-400',
+    icon: Cpu,
+  },
+  'Core Domain': {
+    label: 'Core Domain',
+    bg: 'bg-purple-500/10 text-purple-400 border-purple-500/25',
+    dot: 'bg-purple-400',
+    icon: Cpu,
+  },
+  Orchestration: {
+    label: 'Orchestration',
+    bg: 'bg-amber-500/10 text-amber-400 border-amber-500/25',
+    dot: 'bg-amber-400',
+    icon: GitBranch,
+  },
+  'Presentation & UI': {
+    label: 'Presentation & UI',
+    bg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25',
+    dot: 'bg-emerald-400',
+    icon: Layers,
+  },
+  'Formatting & Transformations': {
+    label: 'Formatting & Transformations',
+    bg: 'bg-sky-500/10 text-sky-400 border-sky-500/25',
+    dot: 'bg-sky-400',
+    icon: Wrench,
+  },
+  'Validation & Contracts': {
+    label: 'Validation & Contracts',
+    bg: 'bg-rose-500/10 text-rose-400 border-rose-500/25',
+    dot: 'bg-rose-400',
+    icon: AlertCircle,
+  },
+  'State & Event Handlers': {
+    label: 'State & Event Handlers',
+    bg: 'bg-violet-500/10 text-violet-400 border-violet-500/25',
+    dot: 'bg-violet-400',
+    icon: Boxes,
+  },
+};
+
+const getRoleMeta = role => {
+  if (ROLE_BADGES[role]) return ROLE_BADGES[role];
+  const lower = (role || '').toLowerCase();
+  for (const [key, meta] of Object.entries(ROLE_BADGES)) {
+    if (lower.includes(key.toLowerCase()) || key.toLowerCase().includes(lower)) {
+      return meta;
+    }
+  }
+  return {
+    label: role,
+    bg: 'bg-accent/10 text-accent border-accent/25',
+    dot: 'bg-accent',
+    icon: Tag,
+  };
+};
+
+function renderFormattedText(text, className = '') {
+  if (!text || typeof text !== 'string') return text;
+  const parts = text.split(/(`[^`]+`)/g);
+  return (
+    <span className={className}>
+      {parts.map((part, i) => {
+        if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
+          const code = part.slice(1, -1);
+          return (
+            <code
+              key={i}
+              className="px-1.5 py-0.5 mx-0.5 rounded text-[11px] font-mono bg-panel border border-border text-accent font-normal"
+            >
+              {code}
+            </code>
+          );
+        }
+        return part;
+      })}
+    </span>
+  );
+}
+
+function parseCohesionDetails(summary, blueprint, candidate) {
+  if (blueprint && blueprint.clusters?.length > 1) {
+    const roles = [...new Set(blueprint.clusters.map(c => c.role).filter(Boolean))];
+    return {
+      filePath: blueprint.originalFile || candidate?.mainFile || candidate?.files?.[0] || '',
+      lcom4: blueprint.lcom4 ?? 2,
+      totalSymbols: blueprint.totalSymbols ?? blueprint.clusters.reduce((acc, c) => acc + (c.symbols?.length || 0), 0),
+      clusterCount: blueprint.clusterCount ?? blueprint.clusters.length,
+      roles: roles.length > 0 ? roles : ['Core Domain'],
+      isCohesion: true,
+    };
+  }
+
+  if (typeof summary === 'string') {
+    const match = summary.match(
+      /File\s+`?([^`]+)`?\s+has low cohesion\s*\(LCOM4\s*=\s*(\d+)\)\.\s*Its\s*(\d+)\s*symbols divide into\s*(\d+)\s*single-purpose modules(?:\s*\(([^)]+)\))?/i
+    );
+    if (match) {
+      const filePath = match[1]?.trim();
+      const lcom4 = parseInt(match[2], 10);
+      const totalSymbols = parseInt(match[3], 10);
+      const clusterCount = parseInt(match[4], 10);
+      const rawRoles = match[5] || '';
+
+      const knownRoles = [
+        'Data Access & Network',
+        'Core Domain & Orchestration',
+        'Presentation & UI',
+        'State & Event Handlers',
+        'Formatting & Transformations',
+        'Validation & Contracts',
+      ];
+
+      const roles = [];
+      let remaining = rawRoles;
+      for (const kr of knownRoles) {
+        if (remaining.includes(kr)) {
+          roles.push(kr);
+          remaining = remaining.replace(kr, '');
+        }
+      }
+      if (roles.length === 0 && rawRoles) {
+        rawRoles.split(/[&,]/).forEach(r => {
+          const trimmed = r.trim();
+          if (trimmed) roles.push(trimmed);
+        });
+      }
+
+      return {
+        filePath: filePath || candidate?.mainFile || candidate?.files?.[0] || '',
+        lcom4,
+        totalSymbols,
+        clusterCount,
+        roles: [...new Set(roles)],
+        isCohesion: true,
+      };
+    }
+  }
+
+  return { isCohesion: false };
+}
+
+const CandidateCardSummary = ({ candidate }) => {
+  const cohesion = useMemo(
+    () => parseCohesionDetails(candidate.summary, candidate.decompositionBlueprint, candidate),
+    [candidate]
+  );
+
+  if (cohesion.isCohesion) {
+    return (
+      <div className="flex flex-col gap-1 mt-1">
+        <div className="flex items-center gap-1.5 text-[11px]">
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-danger/10 border border-danger/30 text-danger shrink-0">
+            LCOM4 {cohesion.lcom4}
+          </span>
+          <span className="text-[11px] text-muted truncate">
+            {cohesion.totalSymbols} symbols · {cohesion.clusterCount} modules
+          </span>
+        </div>
+        {cohesion.roles.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1 mt-0.5">
+            {cohesion.roles.slice(0, 3).map((r, i) => (
+              <span
+                key={i}
+                className="text-[9px] px-1.5 py-0.5 rounded bg-panel border border-border/70 text-muted font-medium"
+              >
+                {r}
+              </span>
+            ))}
+            {cohesion.roles.length > 3 && (
+              <span className="text-[9px] text-muted/70">+{cohesion.roles.length - 3}</span>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <p className="text-[11px] text-muted leading-relaxed line-clamp-2">{renderFormattedText(candidate.summary)}</p>
+  );
+};
+
+const CandidateCohesionBanner = ({ candidate, cohesion }) => {
+  const fileRef = tryMakeSourceRef({ filePath: cohesion.filePath });
+  const fileName = cohesion.filePath.split('/').pop();
+
+  return (
+    <div className="flex flex-col gap-3.5 p-4 rounded-xl bg-panel/75 border border-border shadow-sm">
+      {/* Top Row: File pill + Cohesion Status */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-surface border border-border font-mono text-xs text-text min-w-0 shadow-xs">
+            <FileCode className="w-3.5 h-3.5 text-accent shrink-0" />
+            <span className="font-semibold text-text truncate max-w-[280px]" title={cohesion.filePath}>
+              {fileName}
+            </span>
+            <span className="text-[11px] text-muted truncate hidden md:inline max-w-[260px]" title={cohesion.filePath}>
+              {cohesion.filePath}
+            </span>
+          </div>
+          {fileRef && (
+            <OpenSourceButton
+              ref={fileRef}
+              variant="button"
+              label="View Source"
+              className="text-xs px-2.5 py-1.5 rounded-lg bg-surface hover:bg-panel border border-border text-muted hover:text-text transition-colors"
+            />
+          )}
+        </div>
+
+        <span
+          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
+            cohesion.lcom4 >= 3
+              ? 'bg-danger/10 border-danger/30 text-danger'
+              : cohesion.lcom4 === 2
+                ? 'bg-warning/10 border-warning/30 text-warning'
+                : 'bg-success/10 border-success/30 text-success'
+          }`}
+        >
+          <AlertTriangle className="w-3.5 h-3.5" />
+          {cohesion.lcom4 >= 3
+            ? `Low Cohesion · God Class (LCOM4 = ${cohesion.lcom4})`
+            : `Moderate Cohesion (LCOM4 = ${cohesion.lcom4})`}
+        </span>
+      </div>
+
+      {/* Metrics 3-box Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+        <div className="flex items-center gap-3 p-3 rounded-lg bg-surface border border-border/70 shadow-xs">
+          <div className="p-2 rounded-lg bg-danger/10 text-danger border border-danger/20 shrink-0">
+            <Layers className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted font-medium">LCOM4 Disconnection</div>
+            <div className="text-sm font-bold text-text">{cohesion.lcom4} Clusters</div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 p-3 rounded-lg bg-surface border border-border/70 shadow-xs">
+          <div className="p-2 rounded-lg bg-accent/10 text-accent border border-accent/20 shrink-0">
+            <Boxes className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted font-medium">Symbol Footprint</div>
+            <div className="text-sm font-bold text-text">{cohesion.totalSymbols} Symbols</div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 p-3 rounded-lg bg-surface border border-border/70 shadow-xs">
+          <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0">
+            <SplitSquareHorizontal className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted font-medium">Target Decomposition</div>
+            <div className="text-sm font-bold text-text">{cohesion.clusterCount} Modules</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Role Tags Section */}
+      {cohesion.roles.length > 0 && (
+        <div className="flex flex-col gap-2 pt-2 border-t border-border/50">
+          <div className="text-[11px] font-semibold text-muted uppercase tracking-wider flex items-center gap-1.5">
+            <Tag className="w-3.5 h-3.5 text-accent" />
+            <span>Target Architectural Roles ({cohesion.roles.length}):</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {cohesion.roles.map((role, idx) => {
+              const meta = getRoleMeta(role);
+              const IconComp = meta.icon;
+              return (
+                <span
+                  key={idx}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border ${meta.bg}`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
+                  <IconComp className="w-3.5 h-3.5" />
+                  {role}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Diagnostic Summary Note */}
+      <p className="text-xs text-muted leading-relaxed pt-1">
+        This file exhibits <strong className="text-text font-semibold">low cohesion</strong>, dividing into{' '}
+        <strong className="text-text font-semibold">{cohesion.clusterCount} single-purpose modules</strong> across{' '}
+        <strong className="text-text font-semibold">{cohesion.totalSymbols} symbols</strong>. Splitting these unrelated
+        responsibilities into dedicated files will reduce cognitive load and prevent regression cascades.
+      </p>
+    </div>
+  );
 };
 
 // ── Code Peek ─────────────────────────────────────────────────────────────────
@@ -163,7 +488,7 @@ const CandidateCard = ({ candidate, isSelected, onSelect, priorityLevel }) => {
           )}
         </div>
       )}
-      {candidate.summary && <p className="text-[11px] text-muted leading-relaxed line-clamp-2">{candidate.summary}</p>}
+      {candidate.summary && <CandidateCardSummary candidate={candidate} />}
     </button>
   );
 };
@@ -660,7 +985,9 @@ const DecompositionBlueprintView = ({ blueprint }) => {
           <div>
             <div className="flex flex-wrap items-center gap-2 mb-1">
               <h3 className="text-sm font-bold text-text">Automated Decomposition Blueprint</h3>
-              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${getCohesionStyle(blueprint.cohesionRating)}`}>
+              <span
+                className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${getCohesionStyle(blueprint.cohesionRating)}`}
+              >
                 Cohesion: {blueprint.cohesionRating}
               </span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-surface border border-border text-muted">
@@ -668,7 +995,8 @@ const DecompositionBlueprintView = ({ blueprint }) => {
               </span>
             </div>
             <p className="text-xs text-muted leading-relaxed">
-              Symbol graph clustering identified {blueprint.clusterCount} single-responsibility modules across {blueprint.totalSymbols} symbols.
+              Symbol graph clustering identified {blueprint.clusterCount} single-responsibility modules across{' '}
+              {blueprint.totalSymbols} symbols.
             </p>
           </div>
         </div>
@@ -681,7 +1009,7 @@ const DecompositionBlueprintView = ({ blueprint }) => {
           bullets={[
             'LCOM4 = 1: High cohesion. Methods form a single connected component and share unified responsibility.',
             'LCOM4 = 2: Moderate cohesion. Contains two distinct functional clusters.',
-            'LCOM4 >= 3: Low cohesion (God-file). The file contains 3 or more completely independent routine clusters.'
+            'LCOM4 >= 3: Low cohesion (God-file). The file contains 3 or more completely independent routine clusters.',
           ]}
           resolution="Decompose the file into the suggested target modules shown in this blueprint to adhere strictly to the Single Responsibility Principle (SRP)."
         />
@@ -698,9 +1026,7 @@ const DecompositionBlueprintView = ({ blueprint }) => {
               <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-accent/15 text-accent border border-accent/25">
                 {cluster.role}
               </span>
-              <span className="text-[10px] font-mono text-muted/80">
-                ~{cluster.lineCountEstimate} LOC
-              </span>
+              <span className="text-[10px] font-mono text-muted/80">~{cluster.lineCountEstimate} LOC</span>
             </div>
 
             <div className="flex items-center justify-between gap-2 p-2 rounded bg-panel border border-border/60 mb-2.5">
@@ -721,9 +1047,7 @@ const DecompositionBlueprintView = ({ blueprint }) => {
               </button>
             </div>
 
-            <p className="text-[11px] text-muted mb-3 leading-relaxed">
-              {cluster.rationale}
-            </p>
+            <p className="text-[11px] text-muted mb-3 leading-relaxed">{cluster.rationale}</p>
 
             <div className="mt-auto">
               <span className="text-[10px] uppercase font-bold text-muted/70 tracking-wider block mb-1.5">
@@ -779,10 +1103,11 @@ function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }
   const [fixing, setFixing] = useState(false);
   const [fixResult, setFixResult] = useState(null);
   const [fixError, setFixError] = useState(null);
-
   const [generatingTests, setGeneratingTests] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [testError, setTestError] = useState(null);
+  const [merged, setMerged] = useState(false);
+  const [merging, setMerging] = useState(false);
 
   const { aiState } = useAIState();
 
@@ -791,7 +1116,37 @@ function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }
     setFixError(null);
     setTestResult(null);
     setTestError(null);
-  }, [candidate.id]);
+    setMerged(false);
+
+    let active = true;
+
+    // Restore cached AutoFix if already generated for this candidate
+    repositoryApi
+      .autoFixRefactoringCandidate(repoId, candidate.id, { checkCacheOnly: true })
+      .then(res => {
+        if (active && res?.data) {
+          setFixResult(res.data);
+          if (res.data.merged) {
+            setMerged(true);
+          }
+        }
+      })
+      .catch(() => {});
+
+    // Restore cached Test Suite if already generated
+    repositoryApi
+      .generateTestsRefactoringCandidate(repoId, candidate.id, { checkCacheOnly: true })
+      .then(res => {
+        if (active && res?.data) {
+          setTestResult(res.data);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, [repoId, candidate.id]);
 
   useEffect(() => {
     async function loadImpact() {
@@ -809,6 +1164,10 @@ function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }
   }, [repoId, candidate.id]);
 
   const priorityMeta = PRIORITY_META[candidate.priority] || PRIORITY_META.warning;
+  const cohesion = useMemo(
+    () => parseCohesionDetails(candidate.summary, candidate.decompositionBlueprint, candidate),
+    [candidate]
+  );
 
   return (
     <div className="max-w-4xl mx-auto w-full flex flex-col gap-5 pb-12">
@@ -826,14 +1185,28 @@ function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }
             </span>
           </div>
           <h1 className="text-xl font-semibold text-text mb-1.5">{candidate.title}</h1>
-          <p className="text-sm text-muted leading-relaxed">{candidate.summary}</p>
+          {!cohesion.isCohesion ? (
+            <div className="text-sm text-muted leading-relaxed">{renderFormattedText(candidate.summary)}</div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+              <span className="font-mono text-text bg-panel px-2 py-0.5 rounded border border-border">
+                {cohesion.filePath.split('/').pop()}
+              </span>
+              <span>•</span>
+              <span className="text-danger font-semibold">LCOM4 = {cohesion.lcom4}</span>
+              <span>•</span>
+              <span>
+                {cohesion.totalSymbols} symbols across {cohesion.clusterCount} target modules
+              </span>
+            </div>
+          )}
         </div>
         <div className="flex flex-col items-end gap-3 shrink-0">
           <div className="text-right">
             <div className="text-2xl  font-bold text-text">{candidate.priorityScore}</div>
             <div className="text-[10px] text-muted uppercase tracking-wide">Priority Score</div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2.5">
             <button
               onClick={async () => {
                 if (aiState.authState === 'unauthenticated') {
@@ -843,7 +1216,9 @@ function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }
                 setGeneratingTests(true);
                 setTestError(null);
                 try {
-                  const res = await repositoryApi.generateTestsRefactoringCandidate(repoId, candidate.id);
+                  const res = await repositoryApi.generateTestsRefactoringCandidate(repoId, candidate.id, {
+                    force: true,
+                  });
                   setTestResult(res.data);
                 } catch (err) {
                   setTestError(err?.response?.data?.error || err.message);
@@ -851,22 +1226,16 @@ function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }
                   setGeneratingTests(false);
                 }
               }}
-              disabled={
-                generatingTests ||
-                !!testResult ||
-                aiState.status === 'loading' ||
-                (aiState.authState !== 'unauthenticated' &&
-                  (aiState.status === 'offline' || aiState.quotaStatus === 'exhausted'))
-              }
+              disabled={generatingTests}
               title="Generate a baseline test suite before refactoring"
-              className="flex items-center gap-2 px-3 py-1.5 bg-surface border border-border hover:bg-panel disabled:opacity-40 text-text rounded text-sm font-medium transition-colors"
+              className="flex items-center gap-2 px-3.5 py-2 bg-surface border border-border hover:bg-panel hover:border-accent/40 text-text rounded-lg text-sm font-medium transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
             >
               {generatingTests ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin text-accent" />
               ) : (
                 <Database className="w-4 h-4 text-accent" />
               )}
-              {generatingTests ? 'Writing Tests...' : 'Generate Tests First'}
+              {generatingTests ? 'Writing Tests...' : testResult ? 'Regenerate Tests' : 'Generate Tests First'}
             </button>
             <button
               onClick={async () => {
@@ -877,41 +1246,37 @@ function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }
                 setFixing(true);
                 setFixError(null);
                 try {
-                  const res = await repositoryApi.autoFixRefactoringCandidate(repoId, candidate.id);
+                  const res = await repositoryApi.autoFixRefactoringCandidate(repoId, candidate.id, { force: true });
                   setFixResult(res.data);
+                  setMerged(!!res.data.merged);
                 } catch (err) {
                   setFixError(err?.response?.data?.error || err.message);
                 } finally {
                   setFixing(false);
                 }
               }}
-
-              disabled={
-                fixing ||
-                !!fixResult ||
-                aiState.status === 'loading' ||
-                (aiState.authState !== 'unauthenticated' &&
-                  (aiState.status === 'offline' || aiState.quotaStatus === 'exhausted'))
-              }
+              disabled={fixing}
               title={
-                aiState.status === 'offline'
-                  ? 'No AI provider configured'
-                  : aiState.quotaStatus === 'exhausted'
-                    ? 'AI quota exceeded'
-                    : ''
+                aiState.quotaStatus === 'exhausted'
+                  ? 'AI quota exceeded'
+                  : 'Automatically refactor this candidate using AI'
               }
-              className="flex items-center gap-2 px-3 py-1.5 bg-accent hover:bg-accent/80 disabled:opacity-40 text-text rounded text-sm font-medium transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/90 active:scale-95 text-white font-medium text-sm rounded-lg shadow-sm shadow-accent/25 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {fixing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
               {fixing
                 ? 'Auto-Fixing...'
                 : aiState.authState === 'unauthenticated'
                   ? 'Sign in to Auto-Fix'
-                  : 'Auto-Fix with AI'}
+                  : fixResult
+                    ? 'Regenerate Auto-Fix'
+                    : 'Auto-Fix with AI'}
             </button>
           </div>
         </div>
       </div>
+
+      {cohesion.isCohesion && <CandidateCohesionBanner candidate={candidate} cohesion={cohesion} />}
 
       {testError && (
         <div className="bg-danger/8 border border-danger/25 text-danger text-sm p-3 rounded flex items-center gap-2">
@@ -962,9 +1327,44 @@ function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }
                 <div className="text-xs  text-muted">{fixResult.file}</div>
               </div>
             </div>
-            <button className="bg-success/15 hover:bg-success/25 border border-success/30 text-success px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-2">
-              <CheckCircle className="w-4 h-4" /> Approve & Merge
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(fixResult.refactoredCode);
+                }}
+                className="bg-surface hover:bg-panel border border-border px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                title="Copy entire refactored file"
+              >
+                Copy Code
+              </button>
+              <button
+                onClick={async () => {
+                  setMerging(true);
+                  try {
+                    await repositoryApi.applyRefactoringFix(
+                      repoId,
+                      candidate.id,
+                      fixResult.file,
+                      fixResult.refactoredCode
+                    );
+                    setMerged(true);
+                  } catch (err) {
+                    console.error('Failed to merge fix:', err);
+                  } finally {
+                    setMerging(false);
+                  }
+                }}
+                disabled={merged || merging}
+                className={`px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-2 ${
+                  merged
+                    ? 'bg-success/20 text-success border border-success/40 cursor-default'
+                    : 'bg-success/15 hover:bg-success/25 border border-success/30 text-success'
+                }`}
+              >
+                {merging ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                {merged ? 'Merged into Repository' : 'Approve & Merge'}
+              </button>
+            </div>
           </div>
           <div className="flex-1 min-h-0 relative bg-surface">
             <DiffEditor
@@ -1359,7 +1759,9 @@ function CandidateDetail({ candidate, repoId, allCandidates, onSelectCandidate }
                       <div className="text-sm font-semibold text-text group-hover:text-accent transition-colors">
                         {other.title}
                       </div>
-                      <div className="text-[11px] text-muted line-clamp-1 mt-0.5">{other.summary}</div>
+                      <div className="text-[11px] text-muted line-clamp-1 mt-0.5">
+                        {renderFormattedText(other.summary)}
+                      </div>
                     </div>
                     <div className="flex flex-col items-end shrink-0 ml-4">
                       <span className="text-xs font-bold text-text">{other.priorityScore}</span>
@@ -1390,7 +1792,7 @@ function AiAdvisor({ candidate, repoId }) {
     setLoading(true);
     setInsights(null);
     try {
-      const data = await repositoryApi.getRefactoringInsights(repoId, candidate.id);
+      const data = await repositoryApi.getRefactoringInsights(repoId, candidate.id, { force: true });
       setInsights(data.data);
     } catch (err) {
       setInsights({ error: err?.response?.data?.error || err.message });
@@ -1400,9 +1802,25 @@ function AiAdvisor({ candidate, repoId }) {
   };
 
   useEffect(() => {
+    let mounted = true;
     setInsights(null);
     setLoading(false);
-  }, [candidate.id]);
+
+    if (candidate?.id && repoId) {
+      repositoryApi
+        .getRefactoringInsights(repoId, candidate.id, { checkCacheOnly: true })
+        .then(res => {
+          if (mounted && res?.data) {
+            setInsights(res.data);
+          }
+        })
+        .catch(() => {});
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [candidate?.id, repoId]);
 
   return (
     <div className="flex flex-col h-full bg-panel">

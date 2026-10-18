@@ -157,43 +157,122 @@ async function genericLlmProvider(prompt) {
   };
 }
 
+// ── Multi-model parser helper & model cooldown tracker ────────────────────────
+
+const DEFAULT_GEMINI_MODELS = [
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-exp',
+  'gemini-1.5-flash',
+  'gemini-1.5-flash-8b',
+  'gemini-1.5-pro',
+  'gemini-flash-latest',
+];
+
+const DEFAULT_GROQ_MODELS = [
+  'llama-3.3-70b-versatile',
+  'llama-3.1-8b-instant',
+  'mixtral-8x7b-32768',
+  'gemma2-9b-it',
+  'llama-3.2-11b-vision-preview',
+  'llama-3.2-3b-preview',
+  'llama3-70b-8192',
+  'llama3-8b-8192',
+  'qwen/qwen3.8-27b',
+];
+
+// In-memory model cooldown tracking (skips known rate-limited or unavailable models)
+const modelCooldowns = new Map();
+
+function isModelAvailable(providerKey, model) {
+  const key = `${providerKey}:${model}`;
+  const expiry = modelCooldowns.get(key);
+  if (!expiry) return true;
+  if (Date.now() > expiry) {
+    modelCooldowns.delete(key);
+    return true;
+  }
+  return false;
+}
+
+function setModelCooldown(providerKey, model, durationMs = 60000) {
+  const key = `${providerKey}:${model}`;
+  modelCooldowns.set(key, Date.now() + durationMs);
+}
+
+function parseModelList(envValue, defaultList) {
+  if (!envValue || typeof envValue !== 'string') return defaultList;
+  const parsed = envValue
+    .split(',')
+    .map(m => m.trim())
+    .filter(Boolean);
+  return parsed.length > 0 ? parsed : defaultList;
+}
+
 // ── Google Gemini provider ────────────────────────────────────────────────────
 
 async function geminiProvider(prompt) {
   const apiKey = process.env.GEMINI_API_KEY;
-  const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const allModels = parseModelList(process.env.GEMINI_MODEL, DEFAULT_GEMINI_MODELS);
 
-  const payload = {
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: {
-      temperature: 0.1,
-      maxOutputTokens: 8192,
-    },
-  };
-
-  const headers = { 'Content-Type': 'application/json' };
-  const resStr = await httpPost(url, JSON.stringify(payload), headers);
-  const data = JSON.parse(resStr);
-
-  if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
-    const usageMeta = data.usageMetadata || {};
-    const text = data.candidates[0].content.parts[0].text.trim();
-
-    const estimatedInput = estimateTokens(prompt);
-    const estimatedOutput = estimateTokens(text);
-
-    return {
-      text: text,
-      usage: {
-        input_tokens: usageMeta.promptTokenCount ?? estimatedInput,
-        output_tokens: usageMeta.candidatesTokenCount ?? estimatedOutput,
-        total_tokens: usageMeta.totalTokenCount ?? estimatedInput + estimatedOutput,
-        source: usageMeta.totalTokenCount != null ? 'provider_reported' : 'estimated',
-      },
-    };
+  // Try available models first, or all if all are cooling down
+  let modelsToTry = allModels.filter(m => isModelAvailable('gemini', m));
+  if (modelsToTry.length === 0) {
+    modelsToTry = allModels;
   }
-  throw new Error(`Unexpected Gemini response: ${resStr.slice(0, 200)}`);
+
+  const errors = [];
+
+  for (const model of modelsToTry) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const payload = {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 8192,
+        },
+      };
+
+      const headers = { 'Content-Type': 'application/json' };
+      const resStr = await httpPost(url, JSON.stringify(payload), headers);
+      const data = JSON.parse(resStr);
+
+      if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+        const usageMeta = data.usageMetadata || {};
+        const text = data.candidates[0].content.parts[0].text.trim();
+
+        const estimatedInput = estimateTokens(prompt);
+        const estimatedOutput = estimateTokens(text);
+
+        return {
+          text: text,
+          model: model,
+          usage: {
+            input_tokens: usageMeta.promptTokenCount ?? estimatedInput,
+            output_tokens: usageMeta.candidatesTokenCount ?? estimatedOutput,
+            total_tokens: usageMeta.totalTokenCount ?? estimatedInput + estimatedOutput,
+            source: usageMeta.totalTokenCount != null ? 'provider_reported' : 'estimated',
+          },
+        };
+      }
+      throw new Error(`Unexpected Gemini response: ${resStr.slice(0, 200)}`);
+    } catch (err) {
+      if (/rate limit|429|quota/i.test(err.message)) {
+        setModelCooldown('gemini', model, 60000);
+      } else if (/404|not found|deprecated/i.test(err.message)) {
+        setModelCooldown('gemini', model, 24 * 60 * 60 * 1000);
+      } else if (/503|unavailable|overloaded/i.test(err.message)) {
+        setModelCooldown('gemini', model, 30000);
+      }
+
+      console.warn(
+        `[CodeLens] Gemini model '${model}' failed: ${err.message}. Trying next available fallback model...`
+      );
+      errors.push(`${model}: ${err.message}`);
+    }
+  }
+
+  throw new Error(`All Gemini models failed: ${errors.join('; ')}`);
 }
 
 // ── OpenAI-Compatible provider ────────────────────────────────────────────────
@@ -201,41 +280,53 @@ async function geminiProvider(prompt) {
 async function openAiCompatibleProvider(prompt) {
   const apiKey = process.env.OPENAI_API_KEY;
   const url = process.env.OPENAI_API_URL || 'https://api.openai.com/v1/chat/completions';
-  const model = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
+  const models = parseModelList(process.env.OPENAI_MODEL, ['gpt-3.5-turbo']);
+  const errors = [];
 
-  const payload = {
-    model: model,
-    messages: [{ role: 'user', content: prompt }],
-    temperature: 0.1,
-    max_tokens: 4096,
-  };
+  for (const model of models) {
+    try {
+      const payload = {
+        model: model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.1,
+        max_tokens: 4096,
+      };
 
-  const headers = {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${apiKey}`,
-  };
+      const headers = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      };
 
-  const resStr = await httpPost(url, JSON.stringify(payload), headers);
-  const data = JSON.parse(resStr);
+      const resStr = await httpPost(url, JSON.stringify(payload), headers);
+      const data = JSON.parse(resStr);
 
-  if (data.choices && data.choices[0]?.message?.content) {
-    const usage = data.usage || {};
-    const text = data.choices[0].message.content.trim();
+      if (data.choices && data.choices[0]?.message?.content) {
+        const usage = data.usage || {};
+        const text = data.choices[0].message.content.trim();
 
-    const estimatedInput = estimateTokens(prompt);
-    const estimatedOutput = estimateTokens(text);
+        const estimatedInput = estimateTokens(prompt);
+        const estimatedOutput = estimateTokens(text);
 
-    return {
-      text: text,
-      usage: {
-        input_tokens: usage.prompt_tokens ?? estimatedInput,
-        output_tokens: usage.completion_tokens ?? estimatedOutput,
-        total_tokens: usage.total_tokens ?? estimatedInput + estimatedOutput,
-        source: usage.total_tokens != null ? 'provider_reported' : 'estimated',
-      },
-    };
+        return {
+          text: text,
+          usage: {
+            input_tokens: usage.prompt_tokens ?? estimatedInput,
+            output_tokens: usage.completion_tokens ?? estimatedOutput,
+            total_tokens: usage.total_tokens ?? estimatedInput + estimatedOutput,
+            source: usage.total_tokens != null ? 'provider_reported' : 'estimated',
+          },
+        };
+      }
+      throw new Error(`Unexpected OpenAI-compatible response: ${resStr.slice(0, 200)}`);
+    } catch (err) {
+      console.warn(
+        `[CodeLens] OpenAI-compatible model '${model}' failed: ${err.message}. Trying next fallback model...`
+      );
+      errors.push(`${model}: ${err.message}`);
+    }
   }
-  throw new Error(`Unexpected OpenAI-compatible response: ${resStr.slice(0, 200)}`);
+
+  throw new Error(`All OpenAI-compatible models failed: ${errors.join('; ')}`);
 }
 
 // ── Groq provider ─────────────────────────────────────────────────────────────
@@ -243,41 +334,75 @@ async function openAiCompatibleProvider(prompt) {
 async function groqProvider(prompt) {
   const apiKey = process.env.GROQ_API_KEY;
   const url = process.env.GROQ_API_URL || 'https://api.groq.com/openai/v1/chat/completions';
-  const model = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+  const allModels = parseModelList(process.env.GROQ_MODEL, DEFAULT_GROQ_MODELS);
 
-  const payload = {
-    model: model,
-    messages: [{ role: 'user', content: prompt }],
-    temperature: 0.1,
-    max_tokens: 4096,
-  };
-
-  const headers = {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${apiKey}`,
-  };
-
-  const resStr = await httpPost(url, JSON.stringify(payload), headers);
-  const data = JSON.parse(resStr);
-
-  if (data.choices && data.choices[0]?.message?.content) {
-    const usage = data.usage || {};
-    const text = data.choices[0].message.content.trim();
-
-    const estimatedInput = estimateTokens(prompt);
-    const estimatedOutput = estimateTokens(text);
-
-    return {
-      text: text,
-      usage: {
-        input_tokens: usage.prompt_tokens ?? estimatedInput,
-        output_tokens: usage.completion_tokens ?? estimatedOutput,
-        total_tokens: usage.total_tokens ?? estimatedInput + estimatedOutput,
-        source: usage.total_tokens != null ? 'provider_reported' : 'estimated',
-      },
-    };
+  // Try available models first, or all if all are cooling down
+  let modelsToTry = allModels.filter(m => isModelAvailable('groq', m));
+  if (modelsToTry.length === 0) {
+    modelsToTry = allModels;
   }
-  throw new Error(`Unexpected Groq response: ${resStr.slice(0, 200)}`);
+
+  const errors = [];
+
+  for (const model of modelsToTry) {
+    try {
+      // Set model-specific max_tokens to respect individual model OTPM and context limits
+      let maxTokens = 4096;
+      if (model.toLowerCase().includes('qwen')) {
+        maxTokens = 800; // Qwen on-demand has strict 1,000 OTPM
+      } else if (model.toLowerCase().includes('3.2-3b')) {
+        maxTokens = 2048;
+      }
+
+      const payload = {
+        model: model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.1,
+        max_tokens: maxTokens,
+      };
+
+      const headers = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      };
+
+      const resStr = await httpPost(url, JSON.stringify(payload), headers);
+      const data = JSON.parse(resStr);
+
+      if (data.choices && data.choices[0]?.message?.content) {
+        const usage = data.usage || {};
+        const text = data.choices[0].message.content.trim();
+
+        const estimatedInput = estimateTokens(prompt);
+        const estimatedOutput = estimateTokens(text);
+
+        return {
+          text: text,
+          model: model,
+          usage: {
+            input_tokens: usage.prompt_tokens ?? estimatedInput,
+            output_tokens: usage.completion_tokens ?? estimatedOutput,
+            total_tokens: usage.total_tokens ?? estimatedInput + estimatedOutput,
+            source: usage.total_tokens != null ? 'provider_reported' : 'estimated',
+          },
+        };
+      }
+      throw new Error(`Unexpected Groq response: ${resStr.slice(0, 200)}`);
+    } catch (err) {
+      if (/rate limit|429|quota|OTPM|TPM/i.test(err.message)) {
+        setModelCooldown('groq', model, 60000);
+      } else if (/404|not found|deprecated|decommissioned/i.test(err.message)) {
+        setModelCooldown('groq', model, 24 * 60 * 60 * 1000);
+      } else if (/503|unavailable|overloaded/i.test(err.message)) {
+        setModelCooldown('groq', model, 30000);
+      }
+
+      console.warn(`[CodeLens] Groq model '${model}' failed: ${err.message}. Trying next available fallback model...`);
+      errors.push(`${model}: ${err.message}`);
+    }
+  }
+
+  throw new Error(`All Groq models failed: ${errors.join('; ')}`);
 }
 
 // ── Provider registry (ordered fallback chain) ───────────────────────────────

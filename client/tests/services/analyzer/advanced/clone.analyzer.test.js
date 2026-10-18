@@ -87,7 +87,11 @@ describe('clone.analyzer', () => {
         child: i =>
           [
             { type: 'formal_parameters', childCount: 0, child: () => null },
-            { type: 'statement_block', childCount: 1, child: () => ({ type: 'return_statement', childCount: 0, child: () => null }) },
+            {
+              type: 'statement_block',
+              childCount: 1,
+              child: () => ({ type: 'return_statement', childCount: 0, child: () => null }),
+            },
           ][i],
       };
 
@@ -141,21 +145,19 @@ describe('clone.analyzer', () => {
       expect(emptyThresholds.minLines).toBe(5);
       expect(emptyThresholds.method).toBe('static-fallback');
 
-      const smallThresholds = computeCloneThresholds([
-        { location: { startLine: 1, endLine: 6 } },
-      ]);
+      const smallThresholds = computeCloneThresholds([{ location: { startLine: 1, endLine: 6 } }]);
       expect(smallThresholds.minLines).toBe(5);
       expect(smallThresholds.method).toBe('static-fallback');
     });
 
     it('computes statistical quartiles and clamps minLines at or above 5', () => {
       const functions = [
-        { location: { startLine: 1, endLine: 6 } },   // 6 lines
-        { location: { startLine: 1, endLine: 10 } },  // 10 lines
-        { location: { startLine: 1, endLine: 12 } },  // 12 lines
-        { location: { startLine: 1, endLine: 16 } },  // 16 lines
-        { location: { startLine: 1, endLine: 20 } },  // 20 lines
-        { location: { startLine: 1, endLine: 28 } },  // 28 lines
+        { location: { startLine: 1, endLine: 6 } }, // 6 lines
+        { location: { startLine: 1, endLine: 10 } }, // 10 lines
+        { location: { startLine: 1, endLine: 12 } }, // 12 lines
+        { location: { startLine: 1, endLine: 16 } }, // 16 lines
+        { location: { startLine: 1, endLine: 20 } }, // 20 lines
+        { location: { startLine: 1, endLine: 28 } }, // 28 lines
       ];
 
       const thresholds = computeCloneThresholds(functions);

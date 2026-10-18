@@ -25,7 +25,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
-import { useAIState, useAI } from '../../shared/context/AIContext';
+import { useAIState } from '../../shared/context/AIContext';
 import { useRepository } from '../../shared/context/RepositoryContext';
 import { useToast } from '../../shared/context/ToastContext';
 
@@ -44,9 +44,7 @@ function HotspotItem({ h }) {
         <span className="text-xs font-mono text-text truncate max-w-[75%]" title={h.filePath}>
           {h.filePath}
         </span>
-        <span className="text-xs font-bold text-warning font-mono bg-warning/10 px-1.5 py-0.5 rounded">
-          {h.score}
-        </span>
+        <span className="text-xs font-bold text-warning font-mono bg-warning/10 px-1.5 py-0.5 rounded">{h.score}</span>
       </div>
       <div className="flex flex-wrap gap-1 items-center">
         {previewReasons.map((r, idx) => (
@@ -98,22 +96,11 @@ export default function RepositoryIntelligencePage() {
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
   const [isAiPanelOpen, setIsAiPanelOpen] = useState(false);
+  const [aiInsights, setAiInsights] = useState(null);
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+  const [aiGenError, setAiGenError] = useState(null);
 
   const { aiState } = useAIState();
-
-  /**
-   * It registers the AI context hook, then extracts the IndexedDB chat history,
-   * and then it applies the messaging state to drive the side panel UI.
-   */
-  const {
-    messages: aiMessages,
-    isLoading: aiLoading,
-    error: aiError,
-    sendMessage,
-  } = useAI({ repoId, feature: 'intelligence' });
-
-  // The latest message in the array is our synthesized summary
-  const aiData = aiMessages.length > 0 ? aiMessages[aiMessages.length - 1].content : null;
 
   /**
    * It fetches the unified intelligence object, then extracts the specific metrics,
@@ -124,6 +111,9 @@ export default function RepositoryIntelligencePage() {
     try {
       const res = await repositoryApi.getIntelligence(repoId);
       setData(res.data.intelligence || res.data);
+      if (res.data?.insights) {
+        setAiInsights(res.data.insights);
+      }
 
       if (wasAnalyzing) {
         // It detects a recent extraction completion, then extracts a small delay, and then it applies it for a smooth UI transition.
@@ -160,21 +150,31 @@ export default function RepositoryIntelligencePage() {
       navigate('/auth/signin');
       return;
     }
+    setIsGeneratingAi(true);
+    setAiGenError(null);
+    setIsAiPanelOpen(true);
     try {
-      await sendMessage(
-        'Provide a comprehensive executive summary of this repository, including its architecture, tech stack, and overall engineering health.'
-      );
-      addToast({
-        title: 'AI Synthesis Complete',
-        description: 'Repository intelligence has been successfully generated.',
-        type: 'success',
-      });
+      const res = await repositoryApi.getIntelligence(repoId, { generateAi: true });
+      if (res?.data?.insights && (res.data.insights.summary || res.data.insights.facts?.length)) {
+        setAiInsights(res.data.insights);
+        addToast({
+          title: 'AI Synthesis Complete',
+          description: 'Repository intelligence has been successfully generated.',
+          type: 'success',
+        });
+      } else {
+        throw new Error('AI provider returned an empty overview payload.');
+      }
     } catch (err) {
+      const msg = err?.response?.data?.error || err.message || 'Failed to synthesize repository intelligence.';
+      setAiGenError(msg);
       addToast({
         title: 'AI Generation Failed',
-        description: err.message || 'Failed to synthesize data.',
+        description: msg,
         type: 'error',
       });
+    } finally {
+      setIsGeneratingAi(false);
     }
   };
 
@@ -504,7 +504,7 @@ export default function RepositoryIntelligencePage() {
                 handleUnderstandRepository();
               }}
               disabled={
-                aiLoading ||
+                isGeneratingAi ||
                 aiState.status === 'loading' ||
                 (aiState.authState !== 'unauthenticated' &&
                   (aiState.status === 'offline' || aiState.quotaStatus === 'exhausted'))
@@ -519,8 +519,18 @@ export default function RepositoryIntelligencePage() {
               className="bg-surface/30 border border-text/5 p-4 rounded hover:border-accent hover:bg-surface transition-all flex flex-col gap-2 text-left group disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="flex items-center gap-2 text-text font-medium group-hover:text-accent transition-colors">
-                <BookOpen className="w-4 h-4 text-accent" />
-                {aiState.authState === 'unauthenticated' ? 'Sign in to Understand Codebase' : 'Understand Codebase'}
+                {isGeneratingAi ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-accent" />
+                ) : (
+                  <BookOpen className="w-4 h-4 text-accent" />
+                )}
+                {isGeneratingAi
+                  ? 'Synthesizing Repository...'
+                  : aiInsights
+                    ? 'Review AI Overview'
+                    : aiState.authState === 'unauthenticated'
+                      ? 'Sign in to Understand Codebase'
+                      : 'Understand Codebase'}
               </div>
               <span className="text-xs text-muted">Generate an AI overview of the entire repository structure.</span>
             </button>
@@ -636,7 +646,7 @@ export default function RepositoryIntelligencePage() {
           <button
             onClick={handleUnderstandRepository}
             disabled={
-              aiLoading ||
+              isGeneratingAi ||
               aiState.status === 'loading' ||
               (aiState.authState !== 'unauthenticated' &&
                 (aiState.status === 'offline' || aiState.quotaStatus === 'exhausted'))
@@ -650,26 +660,38 @@ export default function RepositoryIntelligencePage() {
             }
             className="bg-accent text-text text-xs py-2.5 px-4 rounded-lg hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex justify-center items-center gap-2 font-medium"
           >
-            {aiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-            {aiLoading
+            {isGeneratingAi ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+            {isGeneratingAi
               ? 'Synthesizing...'
-              : aiState.authState === 'unauthenticated'
-                ? 'Sign in to Synthesize'
-                : 'Understand Repository'}
+              : aiInsights
+                ? 'Regenerate Overview'
+                : aiState.authState === 'unauthenticated'
+                  ? 'Sign in to Synthesize'
+                  : 'Understand Repository'}
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 pb-8 xl:pb-5 bg-panel">
-          {aiError && (
+          {aiGenError && (
             <div className="bg-danger/10 p-3 rounded border border-danger/20 mb-4">
               <p className="text-xs text-danger flex items-center gap-1 mb-1">
                 <AlertCircle className="w-3.5 h-3.5" /> AI Error
               </p>
-              <p className="text-[11px] text-danger/80">{aiError}</p>
+              <p className="text-[11px] text-danger/80">{aiGenError}</p>
             </div>
           )}
 
-          {!aiData && !aiLoading && !aiError && (
+          {isGeneratingAi && !aiInsights && (
+            <div className="h-full flex flex-col items-center justify-center text-center p-6 gap-3 text-muted">
+              <Loader2 className="w-6 h-6 text-accent animate-spin" />
+              <p className="text-xs font-medium text-text">Synthesizing repository metrics...</p>
+              <p className="text-[11px] text-muted max-w-[220px]">
+                Analyzing architecture layers, component coupling, and health risks.
+              </p>
+            </div>
+          )}
+
+          {!aiInsights && !isGeneratingAi && !aiGenError && (
             <div className="h-full flex flex-col items-center justify-center text-center p-6 gap-6">
               <div className="w-16 h-16 rounded-full bg-accent/5 flex items-center justify-center border border-accent/10 relative group">
                 <div className="absolute inset-0 rounded-full border border-accent/20 animate-[spin_4s_linear_infinite]" />
@@ -700,9 +722,15 @@ export default function RepositoryIntelligencePage() {
             </div>
           )}
 
-          {aiData && (
+          {aiInsights && (
             <div className="text-sm">
-              <AiResponse data={aiData} title={null} onNavigate={() => {}} repoId={repoId} chatId="repo-intelligence" />
+              <AiResponse
+                data={aiInsights}
+                title={null}
+                onNavigate={() => {}}
+                repoId={repoId}
+                chatId="repo-intelligence"
+              />
             </div>
           )}
         </div>

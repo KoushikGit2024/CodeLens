@@ -44,9 +44,9 @@ async function recordUsage(
 
     const supabase = getSupabaseClient();
 
-    let inputTokens = usage && usage.input_tokens != null ? usage.input_tokens : null;
-    let outputTokens = usage && usage.output_tokens != null ? usage.output_tokens : null;
-    let totalTokens = usage && usage.total_tokens != null ? usage.total_tokens : null;
+    let inputTokens = usage && usage.input_tokens != null ? Math.round(Number(usage.input_tokens)) : null;
+    let outputTokens = usage && usage.output_tokens != null ? Math.round(Number(usage.output_tokens)) : null;
+    let totalTokens = usage && usage.total_tokens != null ? Math.round(Number(usage.total_tokens)) : null;
     let tokenSource = usage && usage.source ? usage.source : 'estimated';
 
     // Provider gave nothing usable — fall back to a rough char-based estimate,
@@ -55,7 +55,7 @@ async function recordUsage(
       totalTokens = estimateTokens(promptChars) + estimateTokens(responseChars);
       tokenSource = 'estimated';
     }
-    if (totalTokens == null) totalTokens = 0;
+    if (totalTokens == null || isNaN(totalTokens)) totalTokens = 0;
 
     await supabase.from('ai_requests').insert({
       user_id: userId,
@@ -75,20 +75,23 @@ async function recordUsage(
     // Only successful, quota-checked requests count against the running total.
     if (status === 'success' && req.quota && req.quota.period) {
       const periodId = req.quota.period.id;
+      const safeTokens = Math.round(Number(totalTokens)) || 0;
       const { error } = await supabase.rpc('increment_usage_period', {
         p_period_id: periodId,
         p_requests: 1,
-        p_tokens: totalTokens,
+        p_tokens: safeTokens,
       });
 
       if (error) {
         // Fallback: non-atomic increment if the RPC function isn't installed yet.
         console.warn('[usage.recorder] increment_usage_period RPC failed, falling back:', error.message);
+        const currentRequests = Number(req.quota.period.ai_requests) || 0;
+        const currentTokens = Number(req.quota.period.ai_tokens) || 0;
         await supabase
           .from('usage_periods')
           .update({
-            ai_requests: req.quota.period.ai_requests + 1,
-            ai_tokens: req.quota.period.ai_tokens + totalTokens,
+            ai_requests: currentRequests + 1,
+            ai_tokens: Math.round(currentTokens + safeTokens),
           })
           .eq('id', periodId);
       }

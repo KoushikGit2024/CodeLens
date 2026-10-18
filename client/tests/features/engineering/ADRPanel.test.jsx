@@ -21,6 +21,7 @@ vi.mock('../../../src/shared/api', () => ({
 }));
 
 vi.mock('../../../src/services/analyzer/repository/repository.store.js', () => ({
+  get: vi.fn().mockResolvedValue({ analysisVersion: 1 }),
   repositoryStore: {
     get: vi.fn().mockResolvedValue({ analysisVersion: 1 }),
   },
@@ -51,9 +52,7 @@ describe('ADRPanel', () => {
   it('renders pre-generation overview and does NOT automatically generate ADR', async () => {
     const { repositoryApi } = await import('../../../src/shared/api');
 
-    render(
-      <ADRPanel repoId="repo-test" risk={mockRisk} onClose={vi.fn()} />
-    );
+    render(<ADRPanel repoId="repo-test" risk={mockRisk} onClose={vi.fn()} />);
 
     // Displays the finding title and pre-generation action
     expect(screen.getAllByText('Draft Architecture Decision Record').length).toBeGreaterThan(0);
@@ -67,23 +66,21 @@ describe('ADRPanel', () => {
   it('prompts confirmation modal when "Draft ADR with AI" is clicked, and calls generate only after confirm', async () => {
     const { repositoryApi } = await import('../../../src/shared/api');
 
-    render(
-      <ADRPanel repoId="repo-test" risk={mockRisk} onClose={vi.fn()} />
-    );
+    render(<ADRPanel repoId="repo-test" risk={mockRisk} onClose={vi.fn()} />);
 
     // Click "Draft ADR with AI"
     fireEvent.click(screen.getByText('Draft ADR with AI'));
 
-    // Confirmation modal should appear with token warning
-    expect(screen.getByText('Draft Architecture Decision Record?')).toBeInTheDocument();
-    expect(screen.getByText(/AI Token Consumption Warning/i)).toBeInTheDocument();
+    // Confirmation modal should appear with process overview
+    expect(screen.getAllByText('Draft Architecture Decision Record').length).toBeGreaterThan(1);
+    expect(screen.getByText(/AI Process & Quota/i)).toBeInTheDocument();
     expect(screen.getAllByText(/~800 tokens/i).length).toBeGreaterThan(0);
 
     // API should not have been called yet
     expect(repositoryApi.generateADR).not.toHaveBeenCalled();
 
     // Confirm generation
-    fireEvent.click(screen.getByText('Confirm & Generate ADR'));
+    fireEvent.click(screen.getByText('Proceed to AI'));
 
     await waitFor(() => {
       expect(repositoryApi.generateADR).toHaveBeenCalledTimes(1);
@@ -95,5 +92,29 @@ describe('ADRPanel', () => {
       expect(screen.getByDisplayValue('Refactor Circular Dependency')).toBeInTheDocument();
       expect(screen.getByDisplayValue('Extract shared interface into module C')).toBeInTheDocument();
     });
+  });
+
+  it('calls onClose when close buttons, backdrop, or Escape key are triggered', () => {
+    const onClose = vi.fn();
+
+    const { unmount } = render(<ADRPanel repoId="repo-test" risk={mockRisk} onClose={onClose} />);
+
+    // 1. Header close button
+    const headerCloseBtn = screen.getByLabelText('Close ADR panel');
+    expect(headerCloseBtn).toBeInTheDocument();
+    fireEvent.click(headerCloseBtn);
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    // 2. Footer close button
+    const footerCloseBtn = screen.getByRole('button', { name: 'Close' });
+    expect(footerCloseBtn).toBeInTheDocument();
+    fireEvent.click(footerCloseBtn);
+    expect(onClose).toHaveBeenCalledTimes(2);
+
+    // 3. Escape key
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(3);
+
+    unmount();
   });
 });

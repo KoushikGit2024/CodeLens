@@ -16,7 +16,6 @@ export const CustomNode = React.memo(function CustomNode({ data }) {
   const isFile = data.nodeType === 'file' || data.nodeType === 'fileNode';
   const w = isFile ? NODE_W : PKG_W;
 
-
   const hasCritical = data.findingsCount?.critical > 0;
   const shadowGlow = data.isFocused
     ? '0 4px 12px rgba(0, 0, 0, 0.35)'
@@ -52,7 +51,6 @@ export const CustomNode = React.memo(function CustomNode({ data }) {
       : `1px solid ${alpha(data.heatColor || borderColor, data.isFaded ? 10 : 33)}`;
 
   const isHorizontal = data.layout === 'dagre' || data.layout === 'flat';
-
 
   // Native pointer tracking — bypasses React Flow's drag-vs-click classification.
   // Active when data.onSelect is provided.
@@ -116,7 +114,12 @@ export const CustomNode = React.memo(function CustomNode({ data }) {
         cursor: data.onSelect ? 'pointer' : 'default',
       }}
     >
-      <Handle type="target" position={isHorizontal ? Position.Left : Position.Top} style={{ opacity: 0 }} isConnectable={false} />
+      <Handle
+        type="target"
+        position={isHorizontal ? Position.Left : Position.Top}
+        style={{ opacity: 0 }}
+        isConnectable={false}
+      />
       <div className="flex items-center gap-1.5 px-2 py-1.5" style={{ overflow: 'hidden' }}>
         {isFile ? (
           <File className="w-3 h-3 shrink-0" style={{ color: heat, minWidth: 12 }} />
@@ -177,7 +180,12 @@ export const CustomNode = React.memo(function CustomNode({ data }) {
           </span>
         )}
       </div>
-      <Handle type="source" position={isHorizontal ? Position.Right : Position.Bottom} style={{ opacity: 0 }} isConnectable={false} />
+      <Handle
+        type="source"
+        position={isHorizontal ? Position.Right : Position.Bottom}
+        style={{ opacity: 0 }}
+        isConnectable={false}
+      />
 
       {hasCritical && !data.isCycling && (
         <div
@@ -253,7 +261,16 @@ export const GroupNode = React.memo(function GroupNode({ data }) {
   );
 });
 
-export const SpringEdge = React.memo(function SpringEdge({ id, sourceX, sourceY, targetX, targetY, style = {}, markerEnd, data }) {
+export const SpringEdge = React.memo(function SpringEdge({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  style = {},
+  markerEnd,
+  data,
+}) {
   const dx = targetX - sourceX;
   const dy = targetY - sourceY;
   const length = Math.hypot(dx, dy);

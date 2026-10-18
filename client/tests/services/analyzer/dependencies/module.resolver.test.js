@@ -336,41 +336,29 @@ describe('resolveImport — subproject-aware alias resolution', () => {
   });
 
   test('resolves @/ alias without file extension', () => {
-    const result = resolve(
-      'client/tests/components/Button.test.jsx',
-      '@/components/Button',
-      ['client/src/components/Button.jsx']
-    );
+    const result = resolve('client/tests/components/Button.test.jsx', '@/components/Button', [
+      'client/src/components/Button.jsx',
+    ]);
     expect(result.kind).toBe('internal');
     expect(result.resolvedTo).toBe('client/src/components/Button.jsx');
   });
 
   test('resolves @/ alias pointing to index file in subproject', () => {
-    const result = resolve(
-      'client/tests/utils.test.js',
-      '@/utils',
-      ['client/src/utils/index.ts']
-    );
+    const result = resolve('client/tests/utils.test.js', '@/utils', ['client/src/utils/index.ts']);
     expect(result.kind).toBe('internal');
     expect(result.resolvedTo).toBe('client/src/utils/index.ts');
   });
 
   test('resolves ~/ alias in subproject', () => {
-    const result = resolve(
-      'client/src/features/featureA.js',
-      '~/shared/helpers',
-      ['client/src/shared/helpers.js']
-    );
+    const result = resolve('client/src/features/featureA.js', '~/shared/helpers', ['client/src/shared/helpers.js']);
     expect(result.kind).toBe('internal');
     expect(result.resolvedTo).toBe('client/src/shared/helpers.js');
   });
 
   test('fallback scan in knownFiles finds file matching src/${stripped} across repo', () => {
-    const result = resolve(
-      'tests/integration/deep.test.js',
-      '@/components/Navbar',
-      ['client/src/components/Navbar.jsx']
-    );
+    const result = resolve('tests/integration/deep.test.js', '@/components/Navbar', [
+      'client/src/components/Navbar.jsx',
+    ]);
     expect(result.kind).toBe('internal');
     expect(result.resolvedTo).toBe('client/src/components/Navbar.jsx');
   });
@@ -403,11 +391,7 @@ describe('resolveImport — scoped npm packages vs path aliases', () => {
   });
 
   test('unresolved ~/ alias returns "unresolved", NEVER "external"', () => {
-    const result = resolve(
-      'client/src/app.js',
-      '~/missing/module',
-      ['client/src/other.js']
-    );
+    const result = resolve('client/src/app.js', '~/missing/module', ['client/src/other.js']);
     expect(result.kind).toBe('unresolved');
     expect(result.resolvedTo).toBeNull();
   });
@@ -417,53 +401,32 @@ describe('resolveImport — scoped npm packages vs path aliases', () => {
 
 describe('resolveImport — multi-language subproject-aware resolution', () => {
   test('Python: resolves non-relative import within subproject', () => {
-    const result = resolve(
-      'server/tests/test_api.py',
-      'api.auth',
-      ['server/api/auth.py']
-    );
+    const result = resolve('server/tests/test_api.py', 'api.auth', ['server/api/auth.py']);
     expect(result.kind).toBe('internal');
     expect(result.resolvedTo).toBe('server/api/auth.py');
   });
 
   test('Python: resolves non-relative import to subproject src directory', () => {
-    const result = resolve(
-      'server/tests/test_api.py',
-      'api.auth',
-      ['server/src/api/auth.py']
-    );
+    const result = resolve('server/tests/test_api.py', 'api.auth', ['server/src/api/auth.py']);
     expect(result.kind).toBe('internal');
     expect(result.resolvedTo).toBe('server/src/api/auth.py');
   });
 
   test('C/C++: resolves header from subproject include directory', () => {
-    const result = resolve(
-      'client/src/main.cpp',
-      'utils/logger.h',
-      ['client/include/utils/logger.h']
-    );
+    const result = resolve('client/src/main.cpp', 'utils/logger.h', ['client/include/utils/logger.h']);
     expect(result.kind).toBe('internal');
     expect(result.resolvedTo).toBe('client/include/utils/logger.h');
   });
 
   test('Rust: resolves crate:: module to subproject src', () => {
-    const result = resolve(
-      'client/src/main.rs',
-      'crate::models::user',
-      ['client/src/models/user.rs']
-    );
+    const result = resolve('client/src/main.rs', 'crate::models::user', ['client/src/models/user.rs']);
     expect(result.kind).toBe('internal');
     expect(result.resolvedTo).toBe('client/src/models/user.rs');
   });
 
   test('Go: resolves package import to subproject directory', () => {
-    const result = resolve(
-      'server/cmd/main.go',
-      'pkg/database',
-      ['server/pkg/database.go']
-    );
+    const result = resolve('server/cmd/main.go', 'pkg/database', ['server/pkg/database.go']);
     expect(result.kind).toBe('internal');
     expect(result.resolvedTo).toBe('server/pkg/database.go');
   });
 });
-

@@ -360,7 +360,9 @@ export default function ImpactPage() {
       setImpact(impactRes.data);
       addToast({
         title: `Impact: ${(impactRes.data.riskTier || 'Complete').toUpperCase()}`,
-        description: impactRes.data.summary || `Identified ${impactRes.data.transitivelyAffectedFiles?.length || 0} transitive dependencies.`,
+        description:
+          impactRes.data.summary ||
+          `Identified ${impactRes.data.transitivelyAffectedFiles?.length || 0} transitive dependencies.`,
         type: impactRes.data.riskTier === 'critical' || impactRes.data.riskTier === 'high' ? 'warning' : 'success',
       });
     } catch (err) {
@@ -681,25 +683,34 @@ export default function ImpactPage() {
                 {impact.maxDepth > 0 && (
                   <div className="flex items-center justify-between text-[11px] text-muted">
                     <span>Propagation Depth</span>
-                    <span className="font-mono font-medium text-text">{impact.maxDepth} hop{impact.maxDepth !== 1 ? 's' : ''}</span>
+                    <span className="font-mono font-medium text-text">
+                      {impact.maxDepth} hop{impact.maxDepth !== 1 ? 's' : ''}
+                    </span>
                   </div>
                 )}
                 {impact.criticalHubFiles?.length > 0 && (
                   <div className="flex items-center justify-between text-[11px] text-amber-400/90 font-medium pt-1 border-t border-border/30">
                     <span>Critical Hubs</span>
-                    <span className="font-mono">{impact.criticalHubFiles.length} file{impact.criticalHubFiles.length !== 1 ? 's' : ''}</span>
+                    <span className="font-mono">
+                      {impact.criticalHubFiles.length} file{impact.criticalHubFiles.length !== 1 ? 's' : ''}
+                    </span>
                   </div>
                 )}
 
-                <div className="font-semibold text-text/90 border-t border-border/50 pt-2 mt-1 mb-0.5">Impact Legend</div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#da3633] shadow-[0_0_8px_rgba(218,54,51,0.6)]"></div> Changed Files ({impact.changedFiles?.length || 0})
+                <div className="font-semibold text-text/90 border-t border-border/50 pt-2 mt-1 mb-0.5">
+                  Impact Legend
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#d29922] shadow-[0_0_8px_rgba(210,153,34,0.6)]"></div> Directly Affected ({impact.directlyAffectedFiles?.length || 0})
+                  <div className="w-3 h-3 rounded-full bg-[#da3633] shadow-[0_0_8px_rgba(218,54,51,0.6)]"></div> Changed
+                  Files ({impact.changedFiles?.length || 0})
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#8957e5] shadow-[0_0_8px_rgba(137,87,229,0.6)]"></div> Transitively Affected ({impact.transitivelyAffectedFiles?.length || 0})
+                  <div className="w-3 h-3 rounded-full bg-[#d29922] shadow-[0_0_8px_rgba(210,153,34,0.6)]"></div>{' '}
+                  Directly Affected ({impact.directlyAffectedFiles?.length || 0})
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-[#8957e5] shadow-[0_0_8px_rgba(137,87,229,0.6)]"></div>{' '}
+                  Transitively Affected ({impact.transitivelyAffectedFiles?.length || 0})
                 </div>
               </div>
             </div>

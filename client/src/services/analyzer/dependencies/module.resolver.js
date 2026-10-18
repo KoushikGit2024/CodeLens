@@ -464,4 +464,3 @@ function scanKnownFilesForMatch({
 
   return bestMatch;
 }
-

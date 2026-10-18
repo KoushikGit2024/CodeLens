@@ -14,8 +14,6 @@ import {
   UploadCloud,
   ChevronDown,
   ChevronRight,
-  User,
-  LogIn,
   FolderTree,
   Bookmark,
   GitCommit,
@@ -24,7 +22,6 @@ import {
   X,
 } from 'lucide-react';
 import { Logo } from '../components/Logo';
-import { useAuth } from '../context/AuthContext';
 import { useRepository } from '../context/RepositoryContext';
 import clsx from 'clsx';
 
@@ -67,7 +64,7 @@ const NAV_GROUPS = [
   {
     id: 'pro_features',
     title: 'Advanced',
-    items: [{ id: 'semantic', label: 'Semantic Search', icon: Brain, to: 'semantic', isPro: true }],
+    items: [{ id: 'semantic', label: 'Semantic Search', icon: Brain, to: 'semantic' }],
   },
   {
     id: 'system',
@@ -79,7 +76,6 @@ const NAV_GROUPS = [
 export default function RepositorySidebar() {
   const { repoId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user } = useAuth();
   const { repo, livePhase } = useRepository();
   const isAnalyzing = repo?.status === 'analyzing' || !!livePhase;
 
@@ -313,64 +309,6 @@ export default function RepositorySidebar() {
             </>
           )}
         </NavLink>
-
-        {/* User Account / Auth Section */}
-        {user ? (
-          <NavLink
-            to="/account"
-            title={effectiveCollapsed ? 'Account Settings' : undefined}
-            className={({ isActive }) =>
-              clsx(
-                'flex items-center rounded-r text-[13px] transition-all duration-200 group min-w-0 border-l-2 mt-2',
-                effectiveCollapsed ? 'justify-center w-10 h-10' : 'gap-3 px-2.5 py-2 w-full',
-                isActive
-                  ? 'border-accent text-text font-medium bg-accent/[0.07]'
-                  : 'border-transparent text-muted hover:bg-text/[0.04] hover:text-text'
-              )
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <div
-                  className={clsx(
-                    'flex items-center justify-center rounded-full shrink-0 border border-border transition-all duration-300',
-                    effectiveCollapsed ? 'w-6 h-6' : 'w-[22px] h-[22px]',
-                    isActive ? 'bg-accent/20 border-accent/50' : 'bg-surface group-hover:border-muted'
-                  )}
-                >
-                  <User
-                    className={clsx('w-3.5 h-3.5', isActive ? 'text-accent' : 'text-muted group-hover:text-text')}
-                  />
-                </div>
-                {!effectiveCollapsed && (
-                  <span className="truncate" title={user.user_metadata?.full_name || 'Account'}>
-                    {user.user_metadata?.full_name || user.email || 'Account'}
-                  </span>
-                )}
-              </>
-            )}
-          </NavLink>
-        ) : (
-          // <NavLink
-          //   to="/auth/signin"
-          //7   title={collapsed ? "Sign In" : undefined}
-          //   className={({ isActive }) => clsx(
-          //     "flex items-center rounded-r text-[13px] transition-all duration-200 group min-w-0 border-l-2 mt-2",
-          //     collapsed ? "justify-center w-10 h-10" : "gap-3 px-2.5 py-2 w-full",
-          //     isActive
-          //       ? "border-accent text-text font-medium bg-accent/[0.07]"
-          //       : "border-transparent text-muted hover:bg-text/[0.04] hover:text-text"
-          //   )}
-          // >
-          //   {({ isActive }) => (
-          //     <>
-          //       <LogIn className={clsx(collapsed ? "w-5 h-5" : "w-[18px] h-[18px] shrink-0", "transition-all duration-300", isActive ? "text-accent" : "text-muted group-hover:text-text")} />
-          //       {!collapsed && <span className="truncate" title="Sign In">Sign In</span>}
-          //     </>
-          //   )}
-          // </NavLink>
-          <></>
-        )}
       </div>
     </aside>
   );

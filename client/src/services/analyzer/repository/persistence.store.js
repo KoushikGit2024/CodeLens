@@ -246,13 +246,67 @@ export async function saveFile(repoId, filePath, content) {
 }
 
 /**
+ * It resolves a file path against stored repository files, handling path relocations,
+ * normalized slashes, and legacy commit paths.
+ */
+export async function resolveFilePath(repoId, filePath) {
+  if (!repoId || !filePath) return null;
+  const db = await getDB();
+  const direct = await db.get('files', [repoId, filePath]);
+  if (direct) return filePath;
+
+  const norm = filePath.replace(/\\/g, '/').replace(/^\/+/, '');
+  const normFile = await db.get('files', [repoId, norm]);
+  if (normFile) return norm;
+
+  const allPaths = await listFilePaths(repoId);
+  const targetBase = norm.split('/').pop();
+  const suffixMatches = allPaths.filter(
+    p => p === norm || p.endsWith('/' + norm) || p.endsWith('/' + targetBase) || p === targetBase
+  );
+
+  if (suffixMatches.length === 1) {
+    return suffixMatches[0];
+  }
+
+  if (suffixMatches.length > 1) {
+    const parts = norm.split('/');
+    let best = suffixMatches[0];
+    let bestScore = 0;
+    for (const sm of suffixMatches) {
+      const smParts = sm.split('/');
+      let score = 0;
+      for (const p of parts) {
+        if (smParts.includes(p)) score++;
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        best = sm;
+      }
+    }
+    return best;
+  }
+
+  return null;
+}
+
+/**
  * It queries the file store, then extracts the specific text buffer,
+ * with fallback path resolution for relocated/renamed files,
  * and then it applies a string return or null fallback.
  */
 export async function loadFile(repoId, filePath) {
   const db = await getDB();
-  const file = await db.get('files', [repoId, filePath]);
-  return file ? file.content : null;
+  let file = await db.get('files', [repoId, filePath]);
+  if (file) return file.content;
+
+  const resolved = await resolveFilePath(repoId, filePath);
+  if (resolved && resolved !== filePath) {
+    file = await db.get('files', [repoId, resolved]);
+    if (file) return file.content;
+  }
+
+  return null;
 }
 
 /**

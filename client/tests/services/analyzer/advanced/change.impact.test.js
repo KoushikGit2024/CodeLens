@@ -63,11 +63,7 @@ describe('change.impact analyzer', () => {
       };
 
       const analysis = {
-        files: [
-          { filePath: 'src/db.js' },
-          { filePath: 'src/service.js' },
-          { filePath: 'src/client.js' },
-        ],
+        files: [{ filePath: 'src/db.js' }, { filePath: 'src/service.js' }, { filePath: 'src/client.js' }],
       };
 
       // Modifying db.js:

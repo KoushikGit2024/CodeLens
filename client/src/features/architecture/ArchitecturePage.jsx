@@ -116,11 +116,7 @@ const ArchNode = ({ data }) => {
               fontSize: 9,
               fontFamily: 'monospace',
               color:
-                data.metrics.instability <= 0.3
-                  ? '#4ade80'
-                  : data.metrics.instability >= 0.7
-                    ? '#f87171'
-                    : '#fbbf24',
+                data.metrics.instability <= 0.3 ? '#4ade80' : data.metrics.instability >= 0.7 ? '#f87171' : '#fbbf24',
               display: 'flex',
               alignItems: 'center',
               gap: 3,
@@ -461,6 +457,7 @@ export default function ArchitecturePage() {
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [isReanalyzing, setIsReanalyzing] = useState(false);
   const { repo, livePhase } = useRepository();
+  const isGloballyAnalyzing = !!livePhase || repo?.status === 'analyzing';
   const [aiError, setAiError] = useState(null);
   const [expandedComponents, setExpandedComponents] = useState(new Set());
 
@@ -502,12 +499,16 @@ export default function ArchitecturePage() {
     setAiError(null);
     try {
       const res = await repositoryApi.getArchitecture(repoId, { generateAi: true });
-      setData(prev => ({ ...prev, insights: res.data.insights }));
-      addToast({
-        title: 'Insights Generated',
-        description: 'Architecture insights have been successfully generated.',
-        type: 'success',
-      });
+      if (res?.data?.insights && (res.data.insights.summary || res.data.insights.facts?.length)) {
+        setData(prev => ({ ...prev, insights: res.data.insights }));
+        addToast({
+          title: 'Insights Generated',
+          description: 'Architecture insights have been successfully generated.',
+          type: 'success',
+        });
+      } else {
+        throw new Error('AI provider returned an empty insight payload.');
+      }
     } catch (err) {
       setAiError(err?.response?.data?.error || err.message || 'Failed to generate AI insights.');
       addToast({
@@ -810,7 +811,7 @@ export default function ArchitecturePage() {
                                     'Afferent Coupling (Ca): Number of other components that depend on this component. High Ca means changes here will ripple widely.',
                                     'Efferent Coupling (Ce): Number of other components this component depends on. High Ce means external changes force changes here.',
                                     'Stable (I <= 0.3): Core domains, models, and shared utilities. Should have few outgoing dependencies.',
-                                    'Volatile (I >= 0.7): Presentation views, UI pages, and controllers. Should have few incoming dependencies so they can change freely.'
+                                    'Volatile (I >= 0.7): Presentation views, UI pages, and controllers. Should have few incoming dependencies so they can change freely.',
                                   ]}
                                   resolution="Ensure dependencies flow from volatile components (high I) towards stable components (low I)."
                                 />
@@ -1100,9 +1101,7 @@ export default function ArchitecturePage() {
                   padding: '8px 12px',
                 }}
               >
-                <div className="text-[9px] font-semibold text-muted uppercase tracking-wider mb-1.5">
-                  Layers
-                </div>
+                <div className="text-[9px] font-semibold text-muted uppercase tracking-wider mb-1.5">Layers</div>
                 {Object.entries(LAYER_COLORS)
                   .filter(([k]) => k !== 'External')
                   .map(([layer, { bg, border }]) => (
@@ -1141,7 +1140,20 @@ export default function ArchitecturePage() {
       icon: <Sparkles />,
       content: (
         <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4 custom-scrollbar bg-panel h-full">
-          <p className="text-xs text-muted uppercase tracking-wider mb-2">AI Architectural Insights</p>
+          <div className="flex items-center justify-between mb-2 shrink-0">
+            <p className="text-xs text-muted uppercase tracking-wider">AI Architectural Insights</p>
+            {data?.insights && (
+              <button
+                onClick={handleGenerateAi}
+                disabled={isGeneratingAi}
+                className="text-[11px] text-accent hover:text-accent/80 transition-colors flex items-center gap-1 disabled:opacity-50"
+                title="Regenerate architecture insights"
+              >
+                {isGeneratingAi ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                <span>Regenerate</span>
+              </button>
+            )}
+          </div>
 
           {data?.insights ? (
             <AiResponse data={data.insights} title={null} repoId={repoId} chatId={`architecture-${repoId}`} />

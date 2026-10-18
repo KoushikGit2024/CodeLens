@@ -5,7 +5,10 @@ import {
   detectEntryPoints,
   buildArchitectureModel,
 } from '../../../../src/services/analyzer/advanced/architecture.analyzer.js';
-import { validateArchitecture, ARCHITECTURE_RULES } from '../../../../src/services/analyzer/advanced/architecture.rules.js';
+import {
+  validateArchitecture,
+  ARCHITECTURE_RULES,
+} from '../../../../src/services/analyzer/advanced/architecture.rules.js';
 
 describe('architecture.analyzer - Instability & Component Modeling', () => {
   describe('calculateInstability', () => {
@@ -46,12 +49,24 @@ describe('architecture.analyzer - Instability & Component Modeling', () => {
       const mockGraph = {
         nodes: [
           { id: 'file:src/core/model.js', type: 'fileNode', data: { filePath: 'src/core/model.js' } },
-          { id: 'file:src/services/user.service.js', type: 'fileNode', data: { filePath: 'src/services/user.service.js' } },
-          { id: 'file:src/controllers/user.controller.js', type: 'fileNode', data: { filePath: 'src/controllers/user.controller.js' } },
+          {
+            id: 'file:src/services/user.service.js',
+            type: 'fileNode',
+            data: { filePath: 'src/services/user.service.js' },
+          },
+          {
+            id: 'file:src/controllers/user.controller.js',
+            type: 'fileNode',
+            data: { filePath: 'src/controllers/user.controller.js' },
+          },
         ],
         edges: [
           { source: 'file:src/services/user.service.js', target: 'file:src/core/model.js', type: 'default' },
-          { source: 'file:src/controllers/user.controller.js', target: 'file:src/services/user.service.js', type: 'default' },
+          {
+            source: 'file:src/controllers/user.controller.js',
+            target: 'file:src/services/user.service.js',
+            type: 'default',
+          },
         ],
       };
 

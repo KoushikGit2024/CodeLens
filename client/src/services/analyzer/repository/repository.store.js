@@ -135,3 +135,14 @@ export async function clearAnalysis(id) {
   await persistence.saveMeta(existing);
   await persistence.removeAnalysis(id);
 }
+
+export const repositoryStore = {
+  initializeStore,
+  set,
+  get,
+  all,
+  remove,
+  clearAnalysis,
+};
+
+export default repositoryStore;

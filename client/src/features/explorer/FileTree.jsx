@@ -185,8 +185,12 @@ function FileTreeNode({
           // Calculate the target scroll position to place the node in the upper-middle (~33% from top)
           const targetScroll = container.scrollTop + relativeTop - containerRect.height * 0.33;
 
-          container.scrollTo({ top: targetScroll, behavior: 'smooth' });
-        } else {
+          if (typeof container.scrollTo === 'function') {
+            container.scrollTo({ top: targetScroll, behavior: 'smooth' });
+          } else {
+            container.scrollTop = targetScroll;
+          }
+        } else if (typeof node.scrollIntoView === 'function') {
           // Fallback if no container is found
           node.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }

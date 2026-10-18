@@ -36,7 +36,11 @@ export function calculateHotspots(analysis, graph, architectureModel, refactorin
         addScore(f.filePath, 10, 'Many symbols exported/defined');
       }
       if (f.metrics?.hotspotQuadrant === 'CRITICAL_HOTSPOT') {
-        addScore(f.filePath, 35, `Behavioral Hotspot (churn ${f.metrics?.churnScore || 0}, CC ${f.metrics?.complexityScore || 0})`);
+        addScore(
+          f.filePath,
+          35,
+          `Behavioral Hotspot (churn ${f.metrics?.churnScore || 0}, CC ${f.metrics?.complexityScore || 0})`
+        );
       }
     });
   }

@@ -95,7 +95,7 @@ export default function RepositoryHeader() {
   return (
     <header
       ref={headerRef}
-      className="h-12 flex items-center px-2 sm:px-4 border-b border-border bg-panel shrink-0 gap-2 sm:gap-4 justify-between relative z-30 overflow-visible"
+      className="h-12 flex items-center px-2 sm:px-4 border-b border-border bg-panel shrink-0 gap-2 sm:gap-4 justify-between relative z-40 overflow-visible"
     >
       <div ref={leftRef} className="flex items-center gap-2 sm:gap-4 min-w-0 z-10 shrink max-w-[45%]">
         <div className="flex items-center gap-1 shrink-0">

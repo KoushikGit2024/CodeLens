@@ -150,7 +150,11 @@ export const REFACTORING_STRATEGIES = {
       action: 'Decompose by Cohesion (LCOM4)',
       description:
         'The module contains disconnected method clusters that do not share state or call each other. Extract each cluster into a dedicated single-responsibility file according to the decomposition blueprint.',
-      expectedBenefits: ['Drastically improves cohesion', 'Enables isolated unit testing', 'Eliminates God-file antipattern'],
+      expectedBenefits: [
+        'Drastically improves cohesion',
+        'Enables isolated unit testing',
+        'Eliminates God-file antipattern',
+      ],
       risks: ['Requires updating consumer imports or maintaining a barrel re-export'],
     },
     {
@@ -174,11 +178,18 @@ function detectFileRole(filePath) {
   const ext = fileName.includes('.') ? '.' + fileName.split('.').pop() : '';
 
   return {
-    isComponent: ext === '.jsx' || ext === '.tsx' || ext === '.vue' || lower.includes('/components/') || lower.includes('/views/') || lower.includes('/pages/'),
+    isComponent:
+      ext === '.jsx' ||
+      ext === '.tsx' ||
+      ext === '.vue' ||
+      lower.includes('/components/') ||
+      lower.includes('/views/') ||
+      lower.includes('/pages/'),
     isController: lower.includes('controller') || lower.includes('/controllers/') || lower.includes('/routes/'),
     isService: lower.includes('service') || lower.includes('/services/'),
     isHook: fileName.startsWith('use') || lower.includes('/hooks/'),
-    isUtility: lower.includes('util') || lower.includes('helper') || lower.includes('/utils/') || lower.includes('/helpers/'),
+    isUtility:
+      lower.includes('util') || lower.includes('helper') || lower.includes('/utils/') || lower.includes('/helpers/'),
     isParser: lower.includes('parser') || lower.includes('/parsing/'),
   };
 }
@@ -210,9 +221,7 @@ export function getStrategiesForRisk(risk, context = {}) {
         `Transforms LCOM4 from ${blueprint.lcom4} to optimal cohesive score of 1.0`,
         'Enables independent unit test files per responsibility',
       ],
-      risks: [
-        `Requires updating imports or re-exporting symbols from \`${fileName}\` for backwards compatibility`,
-      ],
+      risks: [`Requires updating imports or re-exporting symbols from \`${fileName}\` for backwards compatibility`],
     });
 
     strategies.push({
@@ -223,9 +232,7 @@ export function getStrategiesForRisk(risk, context = {}) {
         'Zero merge conflicts in existing caller files',
         'Transparent architectural improvement',
       ],
-      risks: [
-        'Maintains one additional indirection layer',
-      ],
+      risks: ['Maintains one additional indirection layer'],
     });
 
     return strategies;

@@ -93,11 +93,9 @@ describe('reachability.analyzer', () => {
           { id: 'src/used.js' },
           { id: 'src/dead.js' },
           { id: 'src/helper.test.js' }, // exempt test
-          { id: 'vite.config.js' },     // exempt config
+          { id: 'vite.config.js' }, // exempt config
         ],
-        edges: [
-          { source: 'src/index.js', target: 'src/used.js' },
-        ],
+        edges: [{ source: 'src/index.js', target: 'src/used.js' }],
       };
 
       const res = analyzeReachability(graph);
@@ -169,15 +167,11 @@ describe('reachability.analyzer', () => {
       const files = [
         {
           filePath: 'src/index.js',
-          symbols: [
-            { kind: 'export', name: 'publicApiFunction', exportType: 'named' },
-          ],
+          symbols: [{ kind: 'export', name: 'publicApiFunction', exportType: 'named' }],
         },
         {
           filePath: 'src/utils.test.js',
-          symbols: [
-            { kind: 'export', name: 'testHelper', exportType: 'named' },
-          ],
+          symbols: [{ kind: 'export', name: 'testHelper', exportType: 'named' }],
         },
       ];
 
@@ -241,22 +235,14 @@ describe('reachability.analyzer', () => {
           {
             filePath: 'src/orphaned.js',
             lineCount: 50,
-            symbols: [
-              { kind: 'function', name: 'orphanFunc', complexity: 1, location: { startLine: 1, endLine: 10 } },
-            ],
+            symbols: [{ kind: 'function', name: 'orphanFunc', complexity: 1, location: { startLine: 1, endLine: 10 } }],
           },
         ],
       };
 
       const graph = {
-        nodes: [
-          { id: 'src/main.js' },
-          { id: 'src/service.js' },
-          { id: 'src/orphaned.js' },
-        ],
-        edges: [
-          { source: 'src/main.js', target: 'src/service.js' },
-        ],
+        nodes: [{ id: 'src/main.js' }, { id: 'src/service.js' }, { id: 'src/orphaned.js' }],
+        edges: [{ source: 'src/main.js', target: 'src/service.js' }],
       };
 
       const model = buildEngineeringRiskModel(analysis, graph, {});
@@ -275,4 +261,3 @@ describe('reachability.analyzer', () => {
     });
   });
 });
-

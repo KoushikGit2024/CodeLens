@@ -104,10 +104,7 @@ export function computeCoChange(fileCommitMap, minShared = 2, minJaccard = 0.4) 
 
   const fileEntries = Object.entries(fileCommitMap)
     .filter(([file]) => !isIgnoredForCoChange(file))
-    .map(([file, commits]) => [
-      file,
-      commits instanceof Set ? commits : new Set(commits),
-    ]);
+    .map(([file, commits]) => [file, commits instanceof Set ? commits : new Set(commits)]);
 
   const coChanges = [];
 
@@ -143,9 +140,7 @@ export function computeCoChange(fileCommitMap, minShared = 2, minJaccard = 0.4) 
   }
 
   // Sort descending by Jaccard coefficient, then shared commits count, capped to top 50
-  return coChanges
-    .sort((a, b) => b.jaccard - a.jaccard || b.sharedCommits - a.sharedCommits)
-    .slice(0, 50);
+  return coChanges.sort((a, b) => b.jaccard - a.jaccard || b.sharedCommits - a.sharedCommits).slice(0, 50);
 }
 
 // ── Primary Engine ────────────────────────────────────────────────────────────

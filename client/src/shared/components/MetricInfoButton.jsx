@@ -158,17 +158,15 @@ export default function MetricInfoButton({
             {/* Formula */}
             {formula && (
               <div className="mb-2.5 p-2 rounded bg-surface/80 border border-border/50 font-mono text-[11px] text-accent flex items-center justify-between">
-                <span className="text-[9px] uppercase text-muted tracking-widest font-sans font-semibold">Formula:</span>
+                <span className="text-[9px] uppercase text-muted tracking-widest font-sans font-semibold">
+                  Formula:
+                </span>
                 <span className="font-bold">{formula}</span>
               </div>
             )}
 
             {/* Description */}
-            {description && (
-              <p className="text-[11px] text-muted leading-relaxed mb-2.5">
-                {description}
-              </p>
-            )}
+            {description && <p className="text-[11px] text-muted leading-relaxed mb-2.5">{description}</p>}
 
             {/* Bullet Breakdown */}
             {bullets.length > 0 && (

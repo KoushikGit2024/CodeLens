@@ -97,4 +97,53 @@ describe('aiArtifactStore', () => {
     // Cleanup
     await aiArtifactStore.invalidate(kOther);
   });
+
+  describe('ADR management (listADRs, saveADR, deleteADR)', () => {
+    it('listADRs retrieves all ADRs for the repo sorted newest first', async () => {
+      const adr1Key = buildCacheKey(REPO_ID, 'adr', 'finding-1');
+      const adr2Key = buildCacheKey(REPO_ID, 'adr', 'finding-2');
+      const docKey = buildCacheKey(REPO_ID, 'module_doc', 'src/b.js');
+      const otherRepoAdr = buildCacheKey('other-repo', 'adr', 'finding-1');
+
+      await aiArtifactStore.set(adr1Key, { id: '1', title: 'ADR 1', status: 'Proposed' });
+      // Small pause to guarantee different timestamps
+      await new Promise(r => setTimeout(r, 10));
+      await aiArtifactStore.set(adr2Key, { id: '2', title: 'ADR 2', status: 'Accepted' });
+      await aiArtifactStore.set(docKey, { summary: 'Doc' });
+      await aiArtifactStore.set(otherRepoAdr, { id: '3', title: 'Other Repo ADR' });
+
+      const list = await aiArtifactStore.listADRs(REPO_ID);
+      expect(list.length).toBe(2);
+      // Newest first
+      expect(list[0].data.title).toBe('ADR 2');
+      expect(list[1].data.title).toBe('ADR 1');
+
+      // Cleanup
+      await aiArtifactStore.invalidate(adr1Key);
+      await aiArtifactStore.invalidate(adr2Key);
+      await aiArtifactStore.invalidate(docKey);
+      await aiArtifactStore.invalidate(otherRepoAdr);
+    });
+
+    it('saveADR updates an existing ADR', async () => {
+      const key = buildCacheKey(REPO_ID, 'adr', 'finding-update');
+      await aiArtifactStore.set(key, { id: 'u1', title: 'Original Title', status: 'Proposed' });
+
+      await aiArtifactStore.saveADR(key, { id: 'u1', title: 'Updated Title', status: 'Accepted' });
+      const updated = await aiArtifactStore.get(key);
+      expect(updated.title).toBe('Updated Title');
+      expect(updated.status).toBe('Accepted');
+
+      await aiArtifactStore.invalidate(key);
+    });
+
+    it('deleteADR removes the ADR from store', async () => {
+      const key = buildCacheKey(REPO_ID, 'adr', 'finding-delete');
+      await aiArtifactStore.set(key, { id: 'del', title: 'To Delete' });
+      expect(await aiArtifactStore.get(key)).not.toBeNull();
+
+      await aiArtifactStore.deleteADR(key);
+      expect(await aiArtifactStore.get(key)).toBeNull();
+    });
+  });
 });

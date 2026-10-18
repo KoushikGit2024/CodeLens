@@ -42,7 +42,7 @@ const MODEL_DETAILS = {
     features: 'Top-tier performance on the MTEB leaderboard for small models.',
     bestFor: 'High accuracy retrieval tasks.',
   },
-  'Xenova/nomic-embed-text-v1.5': {
+  'Xenova/nomic-embed-text-v1': {
     size: '~550MB',
     arch: 'Nomic BERT',
     features: 'Massive 8192-token context window. Requires high system RAM.',
@@ -114,9 +114,13 @@ export default function SemanticSearchPage() {
       setIsInitialized(true);
     } catch (error) {
       console.error(error);
+      let desc = error?.message || 'An unexpected error occurred during semantic indexing.';
+      if (desc.includes('Unauthorized access') || desc.includes('401')) {
+        desc = `Failed to download model weights from Hugging Face for "${selectedModel}". Please try another model (e.g. all-MiniLM-L6-v2) or check your connection.`;
+      }
       addToast({
         title: 'Initialization Failed',
-        description: error.message || 'An unexpected error occurred during semantic indexing.',
+        description: desc,
         type: 'error',
       });
       setInitStatus('');
@@ -180,12 +184,7 @@ export default function SemanticSearchPage() {
               <Network className="w-7 h-7 sm:w-8 sm:h-8 text-accent" />
             </div>
             <div className="text-left">
-              <h2 className="text-xl sm:text-2xl font-medium tracking-tight text-text mb-2 flex items-center gap-3">
-                Semantic Search{' '}
-                <span className="text-[10px] font-bold px-2 py-0.5 bg-accent/20 text-accent rounded border border-accent/30 uppercase tracking-wider">
-                  Pro
-                </span>
-              </h2>
+              <h2 className="text-xl sm:text-2xl font-medium tracking-tight text-text mb-2">Semantic Search</h2>
               <p className="text-muted text-sm sm:text-base leading-relaxed">
                 Upgrade your search from exact keywords to natural language. Find where "user authentication happens" or
                 "database connections are pooled" using a highly-optimized local AI model.
@@ -233,7 +232,7 @@ export default function SemanticSearchPage() {
                     </option>
                     <option value="Xenova/multi-qa-MiniLM-L6-cos-v1">multi-qa-MiniLM-L6 (Q&A Optimized, ~91MB)</option>
                     <option value="Xenova/bge-small-en-v1.5">bge-small-en-v1.5 (High Accuracy, ~133MB)</option>
-                    <option value="Xenova/nomic-embed-text-v1.5">nomic-embed-text-v1.5 (Deep Context, ~550MB)</option>
+                    <option value="Xenova/nomic-embed-text-v1">nomic-embed-text-v1 (Deep Context, ~550MB)</option>
                   </select>
                   <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted group-hover:text-accent transition-colors">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -321,12 +320,7 @@ export default function SemanticSearchPage() {
               <Network className="w-6 h-6 text-accent" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold flex items-center gap-2">
-                Semantic Search{' '}
-                <span className="text-[10px] font-bold px-1.5 py-0.5 bg-accent/20 text-accent rounded flex items-center uppercase tracking-wider">
-                  Pro
-                </span>
-              </h2>
+              <h2 className="text-xl font-semibold">Semantic Search</h2>
               <p className="text-xs text-muted">Ask what the code does, not just what it says.</p>
             </div>
           </div>

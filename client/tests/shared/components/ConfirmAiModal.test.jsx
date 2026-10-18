@@ -4,9 +4,7 @@ import ConfirmAiModal from '../../../src/shared/components/ai/ConfirmAiModal';
 
 describe('ConfirmAiModal', () => {
   it('renders nothing when isOpen is false', () => {
-    const { container } = render(
-      <ConfirmAiModal isOpen={false} onClose={vi.fn()} onConfirm={vi.fn()} />
-    );
+    const { container } = render(<ConfirmAiModal isOpen={false} onClose={vi.fn()} onConfirm={vi.fn()} />);
     expect(container.firstChild).toBeNull();
   });
 
@@ -36,14 +34,7 @@ describe('ConfirmAiModal', () => {
     const onConfirm = vi.fn();
     const onClose = vi.fn();
 
-    render(
-      <ConfirmAiModal
-        isOpen={true}
-        onClose={onClose}
-        onConfirm={onConfirm}
-        confirmText="Confirm Action"
-      />
-    );
+    render(<ConfirmAiModal isOpen={true} onClose={onClose} onConfirm={onConfirm} confirmText="Confirm Action" />);
 
     fireEvent.click(screen.getByText('Confirm Action'));
     expect(onConfirm).toHaveBeenCalledTimes(1);
@@ -54,13 +45,7 @@ describe('ConfirmAiModal', () => {
     const onConfirm = vi.fn();
     const onClose = vi.fn();
 
-    render(
-      <ConfirmAiModal
-        isOpen={true}
-        onClose={onClose}
-        onConfirm={onConfirm}
-      />
-    );
+    render(<ConfirmAiModal isOpen={true} onClose={onClose} onConfirm={onConfirm} />);
 
     fireEvent.click(screen.getByText('Cancel'));
     expect(onClose).toHaveBeenCalledTimes(1);

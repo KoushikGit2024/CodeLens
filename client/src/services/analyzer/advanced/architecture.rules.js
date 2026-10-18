@@ -38,7 +38,8 @@ export const ARCHITECTURE_RULES = [
   {
     id: 'rule-stable-dependencies',
     name: 'Stable Dependencies Principle (SDP) Violation',
-    description: 'A stable component (low instability, high incoming coupling) should not depend on a more volatile component (high instability).',
+    description:
+      'A stable component (low instability, high incoming coupling) should not depend on a more volatile component (high instability).',
     severity: 'warning',
     evaluate: (srcComp, tgtComp) => {
       const srcMetrics = srcComp.metrics;

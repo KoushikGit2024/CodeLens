@@ -146,12 +146,7 @@ export function analyzeChangeImpact(analysis, graph, changedFiles = []) {
 
   const blastRadiusScore = Math.round(totalWeightedScore * 10) / 10;
   const totalAffectedCount = directlyAffectedFiles.size + transitivelyAffectedFiles.size;
-  const riskTier = determineRiskTier(
-    totalAffectedCount,
-    blastRadiusScore,
-    maxDepth,
-    criticalHubFiles.length
-  );
+  const riskTier = determineRiskTier(totalAffectedCount, blastRadiusScore, maxDepth, criticalHubFiles.length);
 
   // Step 4: Map architectural components / layers touched
   const affectedComponents = new Set();
@@ -173,9 +168,10 @@ export function analyzeChangeImpact(analysis, graph, changedFiles = []) {
   // Step 5: Construct Findings & Summary
   const findings = [];
   if (riskTier === 'high' || riskTier === 'critical') {
-    const hubNote = criticalHubFiles.length > 0
-      ? ` Crosses ${criticalHubFiles.length} critical hub file(s) including ${criticalHubFiles[0].filePath}.`
-      : '';
+    const hubNote =
+      criticalHubFiles.length > 0
+        ? ` Crosses ${criticalHubFiles.length} critical hub file(s) including ${criticalHubFiles[0].filePath}.`
+        : '';
 
     findings.push(
       createAnalysisFinding({

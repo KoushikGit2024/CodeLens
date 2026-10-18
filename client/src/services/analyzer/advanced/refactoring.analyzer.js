@@ -140,9 +140,29 @@ export const ARCHETYPE_ROLES = {
     role: 'Data Access & Network',
     suffix: '.service',
     keywords: [
-      'fetch', 'get', 'post', 'put', 'delete', 'query', 'find', 'load',
-      'request', 'save', 'db', 'client', 'http', 'api', 'sync', 'download',
-      'upload', 'endpoint', 'axios', 'storage', 'read', 'write', 'store'
+      'fetch',
+      'get',
+      'post',
+      'put',
+      'delete',
+      'query',
+      'find',
+      'load',
+      'request',
+      'save',
+      'db',
+      'client',
+      'http',
+      'api',
+      'sync',
+      'download',
+      'upload',
+      'endpoint',
+      'axios',
+      'storage',
+      'read',
+      'write',
+      'store',
     ],
     rationale: 'Encapsulates data fetching, persistence, and external network interactions.',
   },
@@ -150,9 +170,22 @@ export const ARCHETYPE_ROLES = {
     role: 'Formatting & Transformations',
     suffix: '.formatters',
     keywords: [
-      'format', 'parse', 'convert', 'serialize', 'deserialize', 'sanitize',
-      'transform', 'to', 'normalize', 'print', 'stringify', 'truncate',
-      'encode', 'decode', 'pretty', 'slugify'
+      'format',
+      'parse',
+      'convert',
+      'serialize',
+      'deserialize',
+      'sanitize',
+      'transform',
+      'to',
+      'normalize',
+      'print',
+      'stringify',
+      'truncate',
+      'encode',
+      'decode',
+      'pretty',
+      'slugify',
     ],
     rationale: 'Pure data transformation and formatting utilities with zero side effects.',
   },
@@ -160,8 +193,20 @@ export const ARCHETYPE_ROLES = {
     role: 'Validation & Contracts',
     suffix: '.validators',
     keywords: [
-      'validate', 'check', 'is', 'has', 'assert', 'verify', 'schema',
-      'ensure', 'match', 'detect', 'can', 'should', 'test', 'rule'
+      'validate',
+      'check',
+      'is',
+      'has',
+      'assert',
+      'verify',
+      'schema',
+      'ensure',
+      'match',
+      'detect',
+      'can',
+      'should',
+      'test',
+      'rule',
     ],
     rationale: 'Input sanitization, schema validation rules, and contract enforcement.',
   },
@@ -169,9 +214,25 @@ export const ARCHETYPE_ROLES = {
     role: 'Presentation & UI',
     suffix: '.component',
     keywords: [
-      'render', 'view', 'component', 'use', 'hook', 'card', 'modal',
-      'button', 'screen', 'page', 'draw', 'layout', 'paint', 'display',
-      'badge', 'icon', 'style', 'header', 'footer'
+      'render',
+      'view',
+      'component',
+      'use',
+      'hook',
+      'card',
+      'modal',
+      'button',
+      'screen',
+      'page',
+      'draw',
+      'layout',
+      'paint',
+      'display',
+      'badge',
+      'icon',
+      'style',
+      'header',
+      'footer',
     ],
     rationale: 'User interface components, templates, and view rendering logic.',
   },
@@ -179,8 +240,21 @@ export const ARCHETYPE_ROLES = {
     role: 'State & Event Handlers',
     suffix: '.handlers',
     keywords: [
-      'handle', 'on', 'dispatch', 'action', 'reducer', 'event', 'mutate',
-      'emit', 'listen', 'trigger', 'callback', 'click', 'change', 'submit', 'press'
+      'handle',
+      'on',
+      'dispatch',
+      'action',
+      'reducer',
+      'event',
+      'mutate',
+      'emit',
+      'listen',
+      'trigger',
+      'callback',
+      'click',
+      'change',
+      'submit',
+      'press',
     ],
     rationale: 'Event handling, action dispatching, and state machine transitions.',
   },
@@ -188,23 +262,81 @@ export const ARCHETYPE_ROLES = {
     role: 'Core Domain & Orchestration',
     suffix: '.core',
     keywords: [
-      'process', 'execute', 'calculate', 'compute', 'evaluate', 'orchestrate',
-      'manager', 'coordinator', 'pipeline', 'engine', 'run', 'main'
+      'process',
+      'execute',
+      'calculate',
+      'compute',
+      'evaluate',
+      'orchestrate',
+      'manager',
+      'coordinator',
+      'pipeline',
+      'engine',
+      'run',
+      'main',
     ],
     rationale: 'High-level business rules and primary workflow coordination.',
   },
 };
 
 const STOP_WORDS = new Set([
-  'the', 'and', 'for', 'with', 'from', 'get', 'set', 'let', 'var', 'const',
-  'func', 'function', 'class', 'method', 'arrow', 'item', 'data', 'info',
-  'object', 'value', 'type', 'result', 'temp', 'param', 'params', 'args'
+  'the',
+  'and',
+  'for',
+  'with',
+  'from',
+  'get',
+  'set',
+  'let',
+  'var',
+  'const',
+  'func',
+  'function',
+  'class',
+  'method',
+  'arrow',
+  'item',
+  'data',
+  'info',
+  'object',
+  'value',
+  'type',
+  'result',
+  'temp',
+  'param',
+  'params',
+  'args',
 ]);
 
 const ACTION_VERBS = new Set([
-  'fetch', 'get', 'set', 'save', 'update', 'delete', 'create', 'remove', 'add',
-  'format', 'parse', 'convert', 'render', 'handle', 'on', 'process', 'check', 'validate',
-  'make', 'build', 'show', 'hide', 'open', 'close', 'init', 'start', 'stop', 'reset'
+  'fetch',
+  'get',
+  'set',
+  'save',
+  'update',
+  'delete',
+  'create',
+  'remove',
+  'add',
+  'format',
+  'parse',
+  'convert',
+  'render',
+  'handle',
+  'on',
+  'process',
+  'check',
+  'validate',
+  'make',
+  'build',
+  'show',
+  'hide',
+  'open',
+  'close',
+  'init',
+  'start',
+  'stop',
+  'reset',
 ]);
 
 function escapeRegex(str) {
@@ -456,7 +588,10 @@ export function clusterSymbolsByCohesion(symbols, fileContent = '', originalPath
     } else if (index === 0 && bestRoleKey === 'CORE_DOMAIN') {
       targetFileName = cleanOrig.split('/').pop() || 'index' + ext;
     } else {
-      const baseName = cleanOrig.split('/').pop().replace(/\.[^/.]+$/, '');
+      const baseName = cleanOrig
+        .split('/')
+        .pop()
+        .replace(/\.[^/.]+$/, '');
       targetFileName = `${baseName}${archetype.suffix}${ext}`;
     }
 
@@ -595,7 +730,9 @@ export function buildRefactoringIntelligence(engineeringRiskModel, analysis, gra
 
     let summaryText = risk.description;
     if (decompositionBlueprint && decompositionBlueprint.clusters?.length > 1) {
-      summaryText = `File \`${targetFilePath}\` has low cohesion (LCOM4 = ${decompositionBlueprint.lcom4}). Its ${decompositionBlueprint.totalSymbols} symbols divide into ${decompositionBlueprint.clusterCount} single-purpose modules (${decompositionBlueprint.clusters.map(c => c.role).slice(0, 2).join(' & ')}).`;
+      const uniqueRoles = [...new Set(decompositionBlueprint.clusters.map(c => c.role).filter(Boolean))];
+      const roleText = uniqueRoles.length > 0 ? uniqueRoles.slice(0, 3).join(', ') : 'Multiple Responsibilities';
+      summaryText = `File \`${targetFilePath}\` has low cohesion (LCOM4 = ${decompositionBlueprint.lcom4}). Its ${decompositionBlueprint.totalSymbols} symbols divide into ${decompositionBlueprint.clusterCount} single-purpose modules (${roleText}).`;
     }
 
     const candidate = {

@@ -29,7 +29,9 @@ export function DepEntry({ dep, repoId, reverse = false, onSelectNode }) {
   const Icon = dep.package ? Package : File;
   const color = dep.package ? 'text-amber-400' : reverse ? 'text-green-400' : 'text-accent';
   const targetId = dep.filePath
-    ? (dep.filePath.startsWith('file:') ? dep.filePath : `file:${dep.filePath}`)
+    ? dep.filePath.startsWith('file:')
+      ? dep.filePath
+      : `file:${dep.filePath}`
     : `module:${dep.package}`;
 
   return (
@@ -41,7 +43,10 @@ export function DepEntry({ dep, repoId, reverse = false, onSelectNode }) {
         title={`Focus ${dep.filePath || dep.package} in graph`}
       >
         <Icon className={`w-3.5 h-3.5 ${color} shrink-0`} />
-        <span className="text-text text-xs font-mono truncate hover:text-accent transition-colors" title={dep.filePath || dep.package}>
+        <span
+          className="text-text text-xs font-mono truncate hover:text-accent transition-colors"
+          title={dep.filePath || dep.package}
+        >
           {name}
         </span>
       </button>
@@ -134,7 +139,9 @@ export function FileDetailPanel({ info, repoId, graph, onSelectNode }) {
             {(info.health.hotspot.churnScore != null || info.health.hotspot.complexityScore != null) && (
               <div className="flex items-center gap-2 mt-1.5 text-[10px] font-mono text-muted">
                 {info.health.hotspot.churnScore != null && <span>Churn: {info.health.hotspot.churnScore}/100</span>}
-                {info.health.hotspot.complexityScore != null && <span>CC: {info.health.hotspot.complexityScore}/100</span>}
+                {info.health.hotspot.complexityScore != null && (
+                  <span>CC: {info.health.hotspot.complexityScore}/100</span>
+                )}
               </div>
             )}
           </div>

@@ -97,40 +97,72 @@ async function executeWithTimeout(asyncFn, timeoutMs) {
   }
 }
 
+function cleanJsonString(str) {
+  return (
+    str
+      // Remove trailing commas before } or ]
+      .replace(/,\s*([}\]])/g, '$1')
+      // Remove invisible control / zero-width characters
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+  );
+}
+
 function extractAndParseJSON(rawText) {
-  let text = rawText.trim();
+  let text = (rawText || '').trim();
 
-  // Strip markdown code blocks
-  if (text.startsWith('```json')) {
-    text = text.replace(/^```json\s*/, '');
-  } else if (text.startsWith('```')) {
-    text = text.replace(/^```\s*/, '');
-  }
-  if (text.endsWith('```')) {
-    text = text.replace(/\s*```$/, '');
+  // 1. Try markdown code block extraction
+  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (codeBlockMatch) {
+    const candidate = codeBlockMatch[1].trim();
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      try {
+        return JSON.parse(cleanJsonString(candidate));
+      } catch {
+        // continue
+      }
+    }
   }
 
-  // Attempt to parse
+  // 2. Strip leading/trailing backticks if any
+  text = text
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/, '')
+    .trim();
+
+  // 3. Direct parse attempt
   try {
     return JSON.parse(text);
-  } catch (error) {
-    // If it fails, try to aggressively extract the JSON object/array
-    const firstBrace = text.indexOf('{');
-    const lastBrace = text.lastIndexOf('}');
-    const firstBracket = text.indexOf('[');
-    const lastBracket = text.lastIndexOf(']');
-
-    let extracted = text;
-    if (firstBrace >= 0 && lastBrace >= 0 && (firstBracket === -1 || firstBrace < firstBracket)) {
-      extracted = text.substring(firstBrace, lastBrace + 1);
-    } else if (firstBracket >= 0 && lastBracket >= 0) {
-      extracted = text.substring(firstBracket, lastBracket + 1);
-    }
-
+  } catch {
+    // 4. Try cleaned direct
     try {
-      return JSON.parse(extracted);
-    } catch (fallbackError) {
-      throw new Error(`Failed to parse AI JSON response: ${error.message}. Response was: ${text.slice(0, 200)}...`);
+      return JSON.parse(cleanJsonString(text));
+    } catch {
+      // 5. Aggressive brace/bracket extraction
+      const firstBrace = text.indexOf('{');
+      const lastBrace = text.lastIndexOf('}');
+      const firstBracket = text.indexOf('[');
+      const lastBracket = text.lastIndexOf(']');
+
+      let extracted = text;
+      if (firstBrace >= 0 && lastBrace >= 0 && (firstBracket === -1 || firstBrace < firstBracket)) {
+        extracted = text.substring(firstBrace, lastBrace + 1);
+      } else if (firstBracket >= 0 && lastBracket >= 0) {
+        extracted = text.substring(firstBracket, lastBracket + 1);
+      }
+
+      try {
+        return JSON.parse(extracted);
+      } catch {
+        try {
+          return JSON.parse(cleanJsonString(extracted));
+        } catch (fallbackError) {
+          throw new Error(
+            `Failed to parse AI JSON response: ${fallbackError.message}. Response was: ${text.slice(0, 200)}...`
+          );
+        }
+      }
     }
   }
 }

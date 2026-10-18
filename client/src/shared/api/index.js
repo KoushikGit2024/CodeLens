@@ -33,12 +33,13 @@ import {
 import { aiArtifactStore, buildCacheKey } from '../../services/storage/aiArtifact.store.js';
 import { clearRepoBookmarks } from '../../services/storage/bookmark.store.js';
 import { ContextOrchestrator } from '../../services/analyzer/advanced/context.orchestrator.js';
+import { sanitizeAiError } from '../utils/aiError.js';
 
 function getBaseUrl() {
   const rawUrl = import.meta.env.VITE_API_URL;
-  if (import.meta.env.PROD && rawUrl) {
-    const cleanUrl = rawUrl.trim().replace(/\/+$/, '');
-    return cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`;
+  if (import.meta.env.PROD) {
+    const targetUrl = (rawUrl || 'https://codelens-server-cktb.onrender.com').trim().replace(/\/+$/, '');
+    return targetUrl.endsWith('/api') ? targetUrl : `${targetUrl}/api`;
   }
   return '/api';
 }
@@ -50,9 +51,22 @@ const api = axios.create({
 });
 api.interceptors.request.use(
   async config => {
-    const {
+    let {
       data: { session },
     } = await supabase.auth.getSession();
+
+    // If session token is expired or within 60s of expiring, proactively refresh it
+    if (session && session.expires_at && session.expires_at * 1000 < Date.now() + 60000) {
+      try {
+        const { data: refreshData, error: refreshErr } = await supabase.auth.refreshSession();
+        if (!refreshErr && refreshData?.session) {
+          session = refreshData.session;
+        }
+      } catch {
+        // Fall back to existing session
+      }
+    }
+
     if (session?.access_token) {
       config.headers.Authorization = `Bearer ${session.access_token}`;
     }
@@ -76,13 +90,34 @@ api.interceptors.response.use(
           return { ...response, status: 200, data: { response: pollRes.data.result } };
         }
         if (pollRes.data.status === 'failed') {
-          return Promise.reject(new Error(pollRes.data.error || 'AI Job failed.'));
+          const sanitized = sanitizeAiError(pollRes.data.error || 'AI Job failed.');
+          const err = new Error(sanitized.message);
+          err.aiError = sanitized;
+          return Promise.reject(err);
         }
       }
     }
     return response;
   },
-  error => {
+  async error => {
+    const originalRequest = error.config;
+    if (
+      error.response?.status === 401 &&
+      error.response?.data?.error === 'Invalid or expired token' &&
+      originalRequest &&
+      !originalRequest._retry
+    ) {
+      originalRequest._retry = true;
+      try {
+        const { data: refreshData, error: refreshErr } = await supabase.auth.refreshSession();
+        if (!refreshErr && refreshData?.session?.access_token) {
+          originalRequest.headers.Authorization = `Bearer ${refreshData.session.access_token}`;
+          return api(originalRequest);
+        }
+      } catch {
+        // Refresh failed, proceed with original error rejection
+      }
+    }
     return Promise.reject(error);
   }
 );
@@ -434,10 +469,11 @@ export const repositoryApi = {
    * and then it applies a language mapping heuristic for the Monaco editor.
    */
   async getFile(id, filePath) {
-    const content = await persistenceStore.loadFile(id, filePath);
+    const resolvedPath = (await persistenceStore.resolveFilePath(id, filePath)) || filePath;
+    const content = await persistenceStore.loadFile(id, resolvedPath);
     if (content === null) throw new Error('File not found');
 
-    const ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase();
+    const ext = resolvedPath.slice(resolvedPath.lastIndexOf('.')).toLowerCase();
     const EXT_TO_LANG = {
       '.js': 'javascript',
       '.mjs': 'javascript',
@@ -470,7 +506,7 @@ export const repositoryApi = {
     };
     const language = EXT_TO_LANG[ext] || 'plaintext';
 
-    return { data: { content, language } };
+    return { data: { content, language, resolvedPath } };
   },
 
   async getDependencyGraph(id) {
@@ -520,7 +556,9 @@ export const repositoryApi = {
     const engineeringHealth = buildEngineeringRiskModel(record.analysis, graph, architecture);
 
     const fileRisks = engineeringHealth.risks.filter(r => r.file === filePath);
-    const hotspot = engineeringHealth.hotspots.find(h => (typeof h === 'string' ? h === filePath : h.file === filePath));
+    const hotspot = engineeringHealth.hotspots.find(h =>
+      typeof h === 'string' ? h === filePath : h.file === filePath
+    );
     const hotspotRisk = fileRisks.find(r => r.title.startsWith('Behavioral Hotspot'));
 
     let severity = 'healthy';
@@ -560,7 +598,8 @@ export const repositoryApi = {
   },
 
   async getArchitecture(id, options = {}) {
-    const record = await repositoryStore.get(id);
+    const repoId = id;
+    const record = await repositoryStore.get(repoId);
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
     const architecture = record.analysis.architecture || buildArchitectureModel(record.analysis, record.analysis.graph);
     const health = buildEngineeringRiskModel(record.analysis, record.analysis.graph, architecture);
@@ -593,25 +632,103 @@ export const repositoryApi = {
       entryPoints: architecture.entryPoints || [],
     };
 
-    if (options.generateAi) {
-      const prompt = ContextOrchestrator.buildArchitecturePrompt(model);
+    const cacheKey = buildCacheKey(repoId, 'architecture_insights');
 
-      const aiResponse = await api.post('/ai/chat', { prompt, jsonMode: true });
-      let insights = null;
+    if (!options.generateAi) {
       try {
-        const raw = (aiResponse.data.response || '')
-          .trim()
-          .replace(/^```json\s*/i, '')
-          .replace(/^```\s*/, '')
-          .replace(/\s*```$/, '');
-        insights = JSON.parse(raw);
-      } catch (e) {
-        insights = { summary: aiResponse.data.response };
+        const cached = await aiArtifactStore.get(cacheKey, record?.analysisVersion);
+        if (cached) {
+          return { data: { model, insights: cached } };
+        }
+      } catch {
+        // non-fatal cache read
       }
-      return { data: { model, insights } };
+      return { data: { model } };
     }
 
-    return { data: { model } };
+    const prompt = ContextOrchestrator.buildArchitecturePrompt(model);
+    const aiResponse = await api.post('/ai/chat', { prompt, jsonMode: true });
+    let parsed = null;
+    try {
+      const raw = (aiResponse.data.response || '')
+        .trim()
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/, '')
+        .replace(/\s*```$/, '');
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      parsed = { summary: aiResponse.data.response };
+    }
+
+    // Robust extraction of summary from any returned shape
+    let summaryText =
+      parsed?.summary ||
+      parsed?.evaluation ||
+      parsed?.architectural_evaluation ||
+      parsed?.architecture_summary ||
+      parsed?.architectureSummary ||
+      parsed?.overview ||
+      parsed?.analysis ||
+      parsed?.response ||
+      (typeof parsed === 'string' ? parsed : '');
+
+    if (!summaryText && parsed && typeof parsed === 'object') {
+      const parts = Object.entries(parsed)
+        .filter(
+          ([k, v]) =>
+            typeof v === 'string' && !['status', 'id', 'intent', 'requiresAi'].includes(k) && v.trim().length > 0
+        )
+        .map(([k, v]) => `### ${k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}\n${v}`);
+      if (parts.length > 0) {
+        summaryText = parts.join('\n\n');
+      }
+    }
+
+    const toArray = val => {
+      if (!val) return [];
+      if (Array.isArray(val))
+        return val.map(v => (typeof v === 'string' ? v : v?.text || v?.description || JSON.stringify(v)));
+      if (typeof val === 'string') return [val];
+      if (typeof val === 'object') return Object.values(val).filter(v => typeof v === 'string');
+      return [];
+    };
+
+    const normalizedInferences = toArray(
+      parsed?.inferences || parsed?.observations || parsed?.findings || parsed?.keyCharacteristics
+    );
+    const normalizedRisks = toArray(parsed?.risks || parsed?.limitations || parsed?.concerns);
+    const normalizedRecommendations = toArray(
+      parsed?.recommendations || parsed?.recommendedActions || parsed?.strategies
+    );
+
+    // Deterministic structural facts straight from local analysis
+    const facts = [
+      `${model.components.length} component(s) detected across repository layers`,
+      `${model.relations.length} inter-component relation(s) mapped`,
+      model.violations.length > 0
+        ? `${model.violations.length} boundary violation(s) detected`
+        : 'Zero architecture boundary violations detected',
+      model.entryPoints.length > 0
+        ? `Identified entry point(s): ${model.entryPoints.slice(0, 3).join(', ')}`
+        : 'No explicit entry points detected',
+    ];
+
+    const insights = {
+      summary: summaryText || 'Architectural evaluation generated successfully.',
+      facts,
+      inferences: normalizedInferences,
+      risks: normalizedRisks,
+      recommendations: normalizedRecommendations,
+      references: model.entryPoints || [],
+    };
+
+    try {
+      await aiArtifactStore.set(cacheKey, insights, { analysisVersion: record?.analysisVersion });
+    } catch {
+      // non-fatal cache write
+    }
+
+    return { data: { model, insights } };
   },
 
   async getIntelligence(repoId, options = {}) {
@@ -621,27 +738,44 @@ export const repositoryApi = {
     const architecture = record.analysis.architecture || buildArchitectureModel(record.analysis, record.analysis.graph);
     const intelligence = buildRepositoryIntelligence(record.analysis, record.analysis.graph, architecture);
 
-    if (options.generateAi) {
-      const prompt = ContextOrchestrator.buildIntelligencePrompt(intelligence);
+    const cacheKey = buildCacheKey(repoId, 'intelligence_insights');
 
-      const aiResponse = await api.post('/ai/chat', { prompt });
-      const insights = {
-        summary: aiResponse.data.response,
-        facts: [
-          `${intelligence.repository.fileCount} files analyzed across ${intelligence.architecture.components} architectural component(s)`,
-          `${intelligence.dependencies.nodes} nodes, ${intelligence.dependencies.edges} edges in the dependency graph`,
-          intelligence.dependencies.cycles > 0
-            ? `${intelligence.dependencies.cycles} circular dependency cycle(s) detected — requires attention`
-            : 'No circular dependencies detected',
-          `Engineering health score: ${intelligence.engineeringHealth.score}/100 (${intelligence.engineeringHealth.critical} critical, ${intelligence.engineeringHealth.high} high issues)`,
-          `${intelligence.refactoring.candidateCount} refactoring candidate(s) identified`,
-        ],
-        references: (intelligence.hotspots || []).slice(0, 5).map(h => h.filePath),
-      };
-      return { data: { intelligence, insights } };
+    if (!options.generateAi) {
+      try {
+        const cached = await aiArtifactStore.get(cacheKey, record?.analysisVersion);
+        if (cached) {
+          return { data: { intelligence, insights: cached } };
+        }
+      } catch {
+        // non-fatal
+      }
+      return { data: { intelligence } };
     }
 
-    return { data: { intelligence } };
+    const prompt = ContextOrchestrator.buildIntelligencePrompt(intelligence);
+    const aiResponse = await api.post('/ai/chat', { prompt });
+    const summary = aiResponse.data.response || aiResponse.data.answer || 'Repository intelligence overview generated.';
+    const insights = {
+      summary,
+      facts: [
+        `${intelligence.repository.fileCount} files analyzed across ${intelligence.architecture.components} architectural component(s)`,
+        `${intelligence.dependencies.nodes} nodes, ${intelligence.dependencies.edges} edges in the dependency graph`,
+        intelligence.dependencies.cycles > 0
+          ? `${intelligence.dependencies.cycles} circular dependency cycle(s) detected — requires attention`
+          : 'No circular dependencies detected',
+        `Engineering health score: ${intelligence.engineeringHealth.score}/100 (${intelligence.engineeringHealth.critical} critical, ${intelligence.engineeringHealth.high} high issues)`,
+        `${intelligence.refactoring.candidateCount} refactoring candidate(s) identified`,
+      ],
+      references: (intelligence.hotspots || []).slice(0, 5).map(h => h.filePath),
+    };
+
+    try {
+      await aiArtifactStore.set(cacheKey, insights, { analysisVersion: record?.analysisVersion });
+    } catch {
+      // non-fatal
+    }
+
+    return { data: { intelligence, insights } };
   },
 
   async getRisks(repoId, options = {}) {
@@ -652,27 +786,55 @@ export const repositoryApi = {
     const ignoredRiskIds = await persistenceStore.getIgnoredRiskIds(repoId);
     const risks = buildEngineeringRiskModel(record.analysis, record.analysis.graph, architecture, ignoredRiskIds);
 
-    if (options.generateAi) {
-      const prompt = ContextOrchestrator.buildRisksPrompt(risks);
-      const aiResponse = await api.post('/ai/chat', { prompt, jsonMode: true });
-      let insights = null;
+    const cacheKey = buildCacheKey(repoId, 'health_interpretation');
+
+    if (!options.generateAi) {
       try {
-        const raw = (aiResponse.data.response || '')
-          .trim()
-          .replace(/^```json\s*/i, '')
-          .replace(/^```\s*/, '')
-          .replace(/\s*```$/, '');
-        insights = JSON.parse(raw);
-      } catch (e) {
-        insights = { summary: aiResponse.data.response };
+        const cached = await aiArtifactStore.get(cacheKey, record?.analysisVersion);
+        if (cached) {
+          return { data: { ...risks, insights: cached } };
+        }
+      } catch {
+        // non-fatal
       }
-      return { data: { ...risks, insights } };
+      return { data: risks };
     }
 
-    return { data: risks };
+    const prompt = options.singleRisk
+      ? ContextOrchestrator.buildSingleRiskPrompt(options.singleRisk)
+      : ContextOrchestrator.buildRisksPrompt(risks);
+    const aiResponse = await api.post('/ai/chat', { prompt, jsonMode: true });
+    let insights = null;
+    try {
+      const raw = (aiResponse.data.response || '')
+        .trim()
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/, '')
+        .replace(/\s*```$/, '');
+      insights = JSON.parse(raw);
+    } catch (e) {
+      insights = { summary: aiResponse.data.response };
+    }
+
+    if (insights && typeof insights === 'object') {
+      const toArr = v => (Array.isArray(v) ? v : typeof v === 'string' && v.trim() ? [v] : []);
+      insights.recommendations = toArr(insights.recommendations || insights.recommendedActions);
+      insights.observations = toArr(insights.observations || insights.inferences);
+      insights.references = toArr(insights.references);
+    }
+
+    try {
+      if (!options.singleRisk && insights) {
+        await aiArtifactStore.set(cacheKey, insights, { analysisVersion: record?.analysisVersion });
+      }
+    } catch {
+      // non-fatal
+    }
+
+    return { data: { ...risks, insights } };
   },
 
-  async getRefactoringInsights(repoId, candidateId) {
+  async getRefactoringInsights(repoId, candidateId, options = {}) {
     const record = await repositoryStore.get(repoId);
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
     const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
@@ -681,6 +843,23 @@ export const repositoryApi = {
 
     const candidate = refactoring.candidates.find(c => c.id === candidateId);
     if (!candidate) throw new Error('Candidate not found');
+
+    const cacheKey = buildCacheKey(repoId, 'refactor_strategy', candidateId);
+
+    if (!options.force) {
+      try {
+        const cached = await aiArtifactStore.get(cacheKey, record?.analysisVersion);
+        if (cached) {
+          return { data: cached };
+        }
+      } catch {
+        // non-fatal
+      }
+    }
+
+    if (options.checkCacheOnly) {
+      return { data: null };
+    }
 
     const prompt = ContextOrchestrator.buildRefactoringStrategyPrompt(candidate);
 
@@ -694,8 +873,17 @@ export const repositoryApi = {
         .replace(/\s*```$/, '');
       insights = JSON.parse(raw);
     } catch (e) {
-      throw new Error('Failed to parse AI response as JSON.');
+      insights = { summary: res.data.response };
     }
+
+    try {
+      if (insights) {
+        await aiArtifactStore.set(cacheKey, insights, { analysisVersion: record?.analysisVersion });
+      }
+    } catch {
+      // non-fatal
+    }
+
     return { data: insights };
   },
 
@@ -731,7 +919,7 @@ export const repositoryApi = {
     return { data: impact };
   },
 
-  async autoFixRefactoringCandidate(repoId, candidateId) {
+  async autoFixRefactoringCandidate(repoId, candidateId, options = {}) {
     const record = await repositoryStore.get(repoId);
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
 
@@ -744,6 +932,23 @@ export const repositoryApi = {
     if (!candidate.files || candidate.files.length === 0) throw new Error('No files associated with this candidate');
 
     const targetFile = candidate.files[0];
+    const cacheKey = buildCacheKey(repoId, 'autofix', candidateId);
+
+    if (!options.force) {
+      try {
+        const cached = await aiArtifactStore.get(cacheKey, record?.analysisVersion);
+        if (cached) {
+          return { data: cached };
+        }
+      } catch {
+        // non-fatal
+      }
+    }
+
+    if (options.checkCacheOnly) {
+      return { data: null };
+    }
+
     const originalCode = await persistenceStore.loadFile(repoId, targetFile);
     if (!originalCode) throw new Error(`Could not load source file ${targetFile}`);
 
@@ -864,10 +1069,29 @@ export const repositoryApi = {
       refactoredCode = refactoredChunk;
     }
 
-    return { data: { originalCode, refactoredCode, file: targetFile } };
+    const result = { originalCode, refactoredCode, file: targetFile };
+    try {
+      await aiArtifactStore.set(cacheKey, result, { analysisVersion: record?.analysisVersion });
+    } catch {
+      // non-fatal
+    }
+
+    return { data: result };
   },
 
-  async generateTestsRefactoringCandidate(repoId, candidateId) {
+  async applyRefactoringFix(repoId, candidateId, filePath, refactoredCode) {
+    await persistenceStore.saveFile(repoId, filePath, refactoredCode);
+    const cacheKey = buildCacheKey(repoId, 'autofix', candidateId);
+    try {
+      const existing = (await aiArtifactStore.get(cacheKey)) || {};
+      await aiArtifactStore.set(cacheKey, { ...existing, merged: true, mergedAt: Date.now() });
+    } catch {
+      // non-fatal
+    }
+    return { success: true };
+  },
+
+  async generateTestsRefactoringCandidate(repoId, candidateId, options = {}) {
     const record = await repositoryStore.get(repoId);
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Graph not available');
 
@@ -880,6 +1104,23 @@ export const repositoryApi = {
     if (!candidate.files || candidate.files.length === 0) throw new Error('No files associated with this candidate');
 
     const targetFile = candidate.files[0];
+    const cacheKey = buildCacheKey(repoId, 'autofix_tests', candidateId);
+
+    if (!options.force) {
+      try {
+        const cached = await aiArtifactStore.get(cacheKey, record?.analysisVersion);
+        if (cached) {
+          return { data: cached };
+        }
+      } catch {
+        // non-fatal
+      }
+    }
+
+    if (options.checkCacheOnly) {
+      return { data: null };
+    }
+
     const originalCode = await persistenceStore.loadFile(repoId, targetFile);
     if (!originalCode) throw new Error(`Could not load source file ${targetFile}`);
 
@@ -896,7 +1137,14 @@ export const repositoryApi = {
       testCode = responseText;
     }
 
-    return { data: { originalCode, testCode, file: targetFile } };
+    const result = { originalCode, testCode, file: targetFile };
+    try {
+      await aiArtifactStore.set(cacheKey, result, { analysisVersion: record?.analysisVersion });
+    } catch {
+      // non-fatal
+    }
+
+    return { data: result };
   },
 
   // ── AI Prompt Endpoints ──────────────────────────────────────────────────────
@@ -909,9 +1157,14 @@ export const repositoryApi = {
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Analysis not available');
 
     const fileLoaderCallback = path => persistenceStore.loadFile(id, path);
-    const { contextData } = await buildQuestionContext(record.analysis, question, fileLoaderCallback, activeContext);
+    const { contextData, routing } = await buildQuestionContext(
+      record.analysis,
+      question,
+      fileLoaderCallback,
+      activeContext
+    );
 
-    return contextData;
+    return { ...contextData, routing };
   },
 
   /**
@@ -936,7 +1189,7 @@ export const repositoryApi = {
   },
 
   /**
-   * Legacy wrapper for standard flow.
+   * Legacy wrapper for standard flow with deterministic bypass and metadata attachment.
    */
   async askQuestion(id, question, activeContext, history = [], options = {}) {
     const isFirstTurn = !history || history.length === 0;
@@ -947,7 +1200,29 @@ export const repositoryApi = {
     }
 
     const contextData = await this.buildAIContext(id, question, activeContext);
-    return this.askQuestionWithContext(contextData, question, history, options);
+    if (contextData?.routing && contextData.routing.requiresAi === false) {
+      return {
+        data: {
+          answer: {
+            summary: contextData.facts.join('\n\n') || 'Deterministic answer computed.',
+            facts: contextData.facts || [],
+          },
+          intent: contextData.routing.intent,
+          requiresAi: false,
+        },
+      };
+    }
+
+    const res = await this.askQuestionWithContext(contextData, question, history, options);
+    return {
+      ...res,
+      data: {
+        ...(typeof res?.data === 'object' ? res.data : { response: res?.data }),
+        facts: contextData?.facts || [],
+        intent: contextData?.routing?.intent,
+        requiresAi: true,
+      },
+    };
   },
 
   async getOverviewDocumentation(id, options = {}) {
@@ -956,6 +1231,18 @@ export const repositoryApi = {
 
     const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
     const context = buildOverviewContext(record.analysis, record.analysis.graph, architecture);
+
+    const cacheKey = buildCacheKey(id, 'overview_doc');
+    if (!options.force) {
+      try {
+        const cached = await aiArtifactStore.get(cacheKey, record.analysisVersion);
+        if (cached) {
+          return { data: { facts: context, aiInterpretation: cached, fromCache: true } };
+        }
+      } catch {
+        // non-fatal
+      }
+    }
 
     if (options.generateAi) {
       const prompt = buildOverviewPrompt(context);
@@ -973,6 +1260,11 @@ export const repositoryApi = {
       } catch (e) {
         console.warn('[getOverviewDocumentation] Failed to parse AI JSON:', e.message);
       }
+
+      if (aiInterpretation) {
+        await aiArtifactStore.set(cacheKey, aiInterpretation, { analysisVersion: record.analysisVersion });
+      }
+
       return { data: { facts: context, aiInterpretation } };
     }
 
@@ -1011,21 +1303,44 @@ export const repositoryApi = {
     return { data: adr };
   },
 
+  async listADRs(repoId) {
+    const list = await aiArtifactStore.listADRs(repoId);
+    return { data: list };
+  },
+
+  async saveADR(repoId, contextKey, adrData) {
+    const record = await repositoryStore.get(repoId).catch(() => null);
+    const cacheKey = buildCacheKey(repoId, 'adr', contextKey || adrData.id || adrData.title || '');
+    await aiArtifactStore.saveADR(cacheKey, adrData, { analysisVersion: record?.analysisVersion });
+    return { data: adrData, cacheKey };
+  },
+
+  async deleteADR(cacheKey) {
+    await aiArtifactStore.deleteADR(cacheKey);
+    return { success: true };
+  },
+
   async getModuleDocumentation(id, path, options = {}) {
     const record = await repositoryStore.get(id);
     if (!record || !record.analysis || !record.analysis.graph) throw new Error('Analysis not available');
 
+    const resolvedPath = (await persistenceStore.resolveFilePath(id, path)) || path;
     const architecture = buildArchitectureModel(record.analysis, record.analysis.graph);
-    const context = buildModuleContext(record.analysis, record.analysis.graph, architecture, path);
+    const context = buildModuleContext(record.analysis, record.analysis.graph, architecture, resolvedPath);
+
+    const cacheKey = buildCacheKey(id, 'module_doc', resolvedPath);
+    if (!options.force) {
+      try {
+        const cached = await aiArtifactStore.get(cacheKey, record.analysisVersion);
+        if (cached) {
+          return { data: { facts: context, aiInterpretation: cached, fromCache: true } };
+        }
+      } catch {
+        // non-fatal
+      }
+    }
 
     if (options.generateAi) {
-      // ── Cache check (before calling the AI proxy) ────────────────────────
-      const cacheKey = buildCacheKey(id, 'module_doc', path);
-      const cached = await aiArtifactStore.get(cacheKey, record.analysisVersion);
-      if (cached) {
-        return { data: { facts: context, aiInterpretation: cached, fromCache: true } };
-      }
-
       const prompt = buildModulePrompt(context);
       const aiResponse = await api.post(`/ai/chat`, { prompt, jsonMode: true });
       let aiInterpretation = null;
@@ -1085,9 +1400,11 @@ export const getRefactoringIntelligence = id => repositoryApi.getRefactoringInte
 export const getRefactoringCandidate = (id, candidateId) =>
   repositoryApi.getRefactoringIntelligence(id).then(res => res.data.candidates.find(c => c.id === candidateId));
 export const getRefactoringImpact = (id, candidateId) => repositoryApi.getChangeImpact(id).then(res => res.data);
-export const autoFixRefactoringCandidate = (id, candidateId) =>
-  repositoryApi.autoFixRefactoringCandidate(id, candidateId).then(res => res.data);
-export const generateTestsRefactoringCandidate = (id, candidateId) =>
-  repositoryApi.generateTestsRefactoringCandidate(id, candidateId).then(res => res.data);
+export const autoFixRefactoringCandidate = (id, candidateId, options) =>
+  repositoryApi.autoFixRefactoringCandidate(id, candidateId, options).then(res => res.data);
+export const applyRefactoringFix = (id, candidateId, filePath, refactoredCode) =>
+  repositoryApi.applyRefactoringFix(id, candidateId, filePath, refactoredCode).then(res => res.data);
+export const generateTestsRefactoringCandidate = (id, candidateId, options) =>
+  repositoryApi.generateTestsRefactoringCandidate(id, candidateId, options).then(res => res.data);
 
 export default api;

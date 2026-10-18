@@ -25,6 +25,8 @@ import {
   Flame,
   GitCompare,
   Scale,
+  BookOpen,
+  AlertCircle,
 } from 'lucide-react';
 import { useRepository } from '../../shared/context/RepositoryContext';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
@@ -34,10 +36,15 @@ import PageHeader from '../../shared/components/PageHeader';
 import { useToast } from '../../shared/context/ToastContext';
 import { useAIState } from '../../shared/context/AIContext';
 import ADRPanel from './ADRPanel';
+import ADRRegistryModal from './ADRRegistryModal';
+import ExplainFindingPanel from './ExplainFindingPanel';
+import { downloadEngineeringHealthReport } from './healthReport.generator';
+
 import ConfirmAiModal from '../../shared/components/ai/ConfirmAiModal';
 import OpenSourceButton from '../../shared/components/OpenSourceButton';
 import { tryMakeSourceRef } from '../../shared/navigation/sourceRef';
 import MetricInfoButton from '../../shared/components/MetricInfoButton';
+import { sanitizeAiError } from '../../shared/utils/aiError.js';
 
 // ── Severity helpers ──────────────────────────────────────────────────────────
 const SEV_BADGE = {
@@ -100,6 +107,7 @@ const RiskCard = ({
   ignored = false,
   selected = false,
   onSelect,
+  onSearchId,
 }) => {
   const [expanded, setExpanded] = useState(false);
 
@@ -149,14 +157,27 @@ const RiskCard = ({
         </h3>
         <p className="text-xs text-muted leading-relaxed flex-1 mb-3">{risk.description || risk.message}</p>
 
-        {/* Stable risk ID badge for reference */}
-        <div className="mb-3">
-          <span
-            className="text-[9px] font-mono text-muted/50 select-all"
-            title="Stable risk ID — persists across re-analyses"
+        {/* Stable risk ID badge for reference & 1-click ID search */}
+        <div className="mb-3 flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={e => {
+              e.stopPropagation();
+              const shortId = risk.id?.slice(5, 13) || risk.id;
+              if (onSearchId) onSearchId(shortId);
+              if (navigator.clipboard?.writeText) {
+                navigator.clipboard.writeText(shortId).catch(() => {});
+              }
+            }}
+            className="text-[9px] font-mono text-muted/70 hover:text-accent bg-surface/80 hover:bg-accent/15 border border-border/50 hover:border-accent/40 rounded px-1.5 py-0.5 select-all cursor-pointer transition-all inline-flex items-center gap-1 group/id"
+            title={`Click to filter by Risk ID: ${risk.id?.slice(5, 13) || risk.id} (also copies to clipboard)`}
           >
-            Risk Id: {risk.id?.slice(5, 13)}
-          </span>
+            <span className="text-muted/50 font-normal">Risk ID:</span>
+            <span className="font-semibold text-text group-hover/id:text-accent font-mono">
+              {risk.id?.slice(5, 13) || risk.id}
+            </span>
+            <Copy className="w-2.5 h-2.5 opacity-40 group-hover/id:opacity-100 ml-0.5 transition-opacity" />
+          </button>
         </div>
 
         {/* ── Tornhill Behavioral Hotspot breakdown ── */}
@@ -186,7 +207,7 @@ const RiskCard = ({
               bullets={[
                 'Active Critical Hotspot: Files with high churn and high complexity are the primary origin of bugs and defect leakage.',
                 'Stable Legacy: Complex files that rarely change pose low immediate risk.',
-                'Active Development: High churn but low complexity represents active feature development.'
+                'Active Development: High churn but low complexity represents active feature development.',
               ]}
               resolution="Prioritize refactoring and adding unit tests to active critical hotspots before adding new features."
             />
@@ -199,7 +220,8 @@ const RiskCard = ({
             <div className="flex items-center justify-between gap-2 text-[10px] font-mono mb-2">
               <div className="flex items-center gap-2">
                 <span className="px-2 py-0.5 rounded bg-warning/15 text-warning font-bold border border-warning/30 flex items-center gap-1">
-                  <GitCompare className="w-3 h-3" /> Co-Change: {Math.round((risk.evidence.coChangeSimilarity ?? risk.evidence.jaccard) * 100)}%
+                  <GitCompare className="w-3 h-3" /> Co-Change:{' '}
+                  {Math.round((risk.evidence.coChangeSimilarity ?? risk.evidence.jaccard) * 100)}%
                 </span>
                 <span className="text-muted text-[10px]">
                   {risk.evidence.coChangeCount ?? risk.evidence.sharedCommits} shared commits
@@ -213,21 +235,26 @@ const RiskCard = ({
                 bullets={[
                   'Jaccard Similarity >= 40%: Statistical likelihood that changing one file requires changing the other.',
                   'Missing Abstraction: Often indicates copy-pasted boilerplate, implicit schema contracts, or un-imported dependencies.',
-                  'Bulk Filtered: Mass formatting and bulk commits touching > 30 files are automatically excluded.'
+                  'Bulk Filtered: Mass formatting and bulk commits touching > 30 files are automatically excluded.',
                 ]}
                 resolution="Unify shared responsibilities into a single utility module or make dependencies explicit via typed imports."
               />
             </div>
             {((risk.evidence.coupledFiles && risk.evidence.coupledFiles.length > 0) || risk.evidence.fileB) && (
               <div className="text-[11px] text-muted space-y-1">
-                <span className="text-[10px] uppercase font-semibold text-text/60 block">Coupled Files (No Import Edge):</span>
+                <span className="text-[10px] uppercase font-semibold text-text/60 block">
+                  Coupled Files (No Import Edge):
+                </span>
                 <div className="flex flex-wrap gap-1 mt-1">
                   {(risk.evidence.coupledFiles || [risk.evidence.fileB]).map(cf => {
                     const cRef = tryMakeSourceRef({ filePath: cf });
                     return cRef ? (
                       <OpenSourceButton key={cf} ref={cRef} variant="button" className="text-[10px] py-0.5" />
                     ) : (
-                      <span key={cf} className="px-1.5 py-0.5 rounded bg-panel text-muted font-mono text-[10px] border border-border">
+                      <span
+                        key={cf}
+                        className="px-1.5 py-0.5 rounded bg-panel text-muted font-mono text-[10px] border border-border"
+                      >
                         {cf}
                       </span>
                     );
@@ -253,7 +280,7 @@ const RiskCard = ({
                 bullets={[
                   'Afferent Coupling (Ca): Incoming dependencies. High Ca means the module is foundational and hard to change.',
                   'Efferent Coupling (Ce): Outgoing dependencies. High Ce means the module has many reasons to change.',
-                  'Stability Inversion: If a stable core depends on a volatile leaf, volatile changes cascade backwards into the core, breaking all dependants.'
+                  'Stability Inversion: If a stable core depends on a volatile leaf, volatile changes cascade backwards into the core, breaking all dependants.',
                 ]}
                 resolution="Apply the Dependency Inversion Principle (DIP). Define an interface/contract in the stable layer and have volatile modules implement it."
               />
@@ -265,7 +292,8 @@ const RiskCard = ({
                   {risk.evidence.sourceFile?.split('/').pop()}
                 </span>
                 <span className="text-[10px] font-mono text-muted">
-                  I: <strong className="text-success">{risk.evidence.sourceInstability}</strong> • Fan-in: {risk.evidence.sourceFanIn}
+                  I: <strong className="text-success">{risk.evidence.sourceInstability}</strong> • Fan-in:{' '}
+                  {risk.evidence.sourceFanIn}
                 </span>
               </div>
               <ArrowRight className="w-4 h-4 text-warning shrink-0" />
@@ -274,7 +302,11 @@ const RiskCard = ({
                 {(() => {
                   const tgtRef = tryMakeSourceRef({ filePath: risk.evidence.targetFile });
                   return tgtRef ? (
-                    <OpenSourceButton ref={tgtRef} variant="button" className="text-[10px] py-0.5 truncate w-full justify-start" />
+                    <OpenSourceButton
+                      ref={tgtRef}
+                      variant="button"
+                      className="text-[10px] py-0.5 truncate w-full justify-start"
+                    />
                   ) : (
                     <span className="font-mono text-[10px] text-text block truncate" title={risk.evidence.targetFile}>
                       {risk.evidence.targetFile?.split('/').pop()}
@@ -282,7 +314,8 @@ const RiskCard = ({
                   );
                 })()}
                 <span className="text-[10px] font-mono text-muted">
-                  I: <strong className="text-danger">{risk.evidence.targetInstability}</strong> • Fan-out: {risk.evidence.targetFanOut}
+                  I: <strong className="text-danger">{risk.evidence.targetInstability}</strong> • Fan-out:{' '}
+                  {risk.evidence.targetFanOut}
                 </span>
               </div>
             </div>
@@ -314,7 +347,7 @@ const RiskCard = ({
               bullets={[
                 'Relative to Codebase: Adapts automatically whether analyzing a small 10-file microservice or a 5,000-file monolith.',
                 'Inner Fence (Warning): Files exceeding Q3 + 1.5 × IQR carry elevated architectural blast radius.',
-                'Outer Fence (High): Files exceeding Q3 + 3.0 × IQR are extreme central bottlenecks.'
+                'Outer Fence (High): Files exceeding Q3 + 3.0 × IQR are extreme central bottlenecks.',
               ]}
               resolution="Decompose oversized modules with high fan-out, and introduce facade or mediator patterns to reduce central coupling."
             />
@@ -447,10 +480,25 @@ const EngineeringHealthPage = () => {
   const [error, setError] = useState(null);
   const [loadingInsights, setLoadingInsights] = useState(false);
   const [isReanalyzing, setIsReanalyzing] = useState(false);
-  const [explainLoading, setExplainLoading] = useState(false);
-  const [explainResult, setExplainResult] = useState(null);
   const [confirmInterpretationOpen, setConfirmInterpretationOpen] = useState(false);
-  const [pendingExplainRisk, setPendingExplainRisk] = useState(null);
+  const [adrRegistryOpen, setAdrRegistryOpen] = useState(false);
+  const [selectedAdrFromRegistry, setSelectedAdrFromRegistry] = useState(null);
+  const [adrCount, setAdrCount] = useState(0);
+
+  const refreshAdrCount = useCallback(async () => {
+    if (!repoId) return;
+    try {
+      const res = await repositoryApi.listADRs(repoId);
+      setAdrCount(res.data?.length || 0);
+    } catch {
+      // non-fatal
+    }
+  }, [repoId]);
+
+  useEffect(() => {
+    refreshAdrCount();
+  }, [refreshAdrCount]);
+
   const { repo, livePhase } = useRepository();
   const isGloballyAnalyzing = !!livePhase || repo?.status === 'analyzing';
 
@@ -543,8 +591,8 @@ const EngineeringHealthPage = () => {
         if (aiState.status === 'offline') {
           addToast({
             title: 'AI Offline',
-            description: 'No AI provider configured.',
-            type: 'error',
+            description: 'No AI provider configured. Deterministic metrics remain available offline.',
+            type: 'warning',
           });
           return;
         }
@@ -663,6 +711,9 @@ const EngineeringHealthPage = () => {
       setLoading(true);
       const riskData = await repositoryApi.getRisks(repoId);
       setModel(riskData.data);
+      if (riskData.data?.insights) {
+        setInsights(riskData.data.insights);
+      }
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     } finally {
@@ -718,63 +769,6 @@ const EngineeringHealthPage = () => {
     [repoId, addToast]
   );
 
-  const requestExplainAi = useCallback(
-    risk => {
-      if (aiState.authState === 'unauthenticated') {
-        navigate('/auth/signin');
-        return;
-      }
-      if (aiState.quotaStatus === 'exhausted') {
-        addToast({
-          title: 'Quota Exceeded',
-          description: 'AI usage limit reached.',
-          type: 'error',
-        });
-        return;
-      }
-      if (aiState.status === 'offline') {
-        addToast({
-          title: 'AI Offline',
-          description: 'No AI provider configured.',
-          type: 'error',
-        });
-        return;
-      }
-      setPendingExplainRisk(risk);
-    },
-    [aiState, navigate, addToast]
-  );
-
-  const executeExplainAi = useCallback(
-    async risk => {
-      setExplainRisk(risk);
-      setExplainResult(null);
-      setExplainLoading(true);
-      try {
-        const res = await repositoryApi.getRisks(repoId, {
-          generateAi: true,
-          singleRisk: risk,
-        });
-        setExplainResult(res.data?.insights || null);
-        addToast({
-          title: 'Explanation Ready',
-          description: 'AI finding explanation generated.',
-          type: 'success',
-        });
-      } catch (err) {
-        addToast({
-          title: 'Explanation Failed',
-          description: err.message,
-          type: 'error',
-        });
-        setExplainRisk(null);
-      } finally {
-        setExplainLoading(false);
-      }
-    },
-    [repoId, addToast, setExplainRisk]
-  );
-
   const executeGenerateInterpretation = useCallback(async () => {
     setLoadingInsights(true);
     try {
@@ -788,10 +782,11 @@ const EngineeringHealthPage = () => {
         type: 'success',
       });
     } catch (err) {
+      const sanitized = sanitizeAiError(err);
       addToast({
-        title: 'Generation Failed',
-        description: err.message || 'Failed to generate.',
-        type: 'error',
+        title: sanitized.title || 'Generation Failed',
+        description: sanitized.message,
+        type: sanitized.type === 'offline' ? 'warning' : 'error',
       });
     } finally {
       setLoadingInsights(false);
@@ -854,26 +849,30 @@ const EngineeringHealthPage = () => {
     }
   }, [model]);
 
-  // ── Download report ─────────────────────────────────────────────────────────
-  const downloadReport = () => {
+  // ── Download comprehensive engineering health report ───────────────────────
+  const downloadReport = async () => {
     if (!model) return;
-    let md = `# Engineering Health Report\n\n`;
-    md += `**Score**: ${effectiveScore()}/100\n\n`;
-    md += `## Active Risks\n`;
-    model.risks.forEach(r => {
-      md += `### ${r.title}\n- **Severity**: ${r.severity}\n- **Category**: ${r.category}\n- **File**: ${r.file || '—'}\n- **ID**: ${r.id}\n\n`;
-    });
-    const blob = new Blob([md], { type: 'text/markdown' });
-    const safeRepo = repoId.replace(/[^a-zA-Z0-9-]/g, '_');
-    const dateStamp = new Date().toISOString().replace(/[:.]/g, '-').split('T').join('_');
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `engineering_health_${safeRepo}_${dateStamp}.md`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    try {
+      await downloadEngineeringHealthReport({
+        model,
+        repoId,
+        score: effectiveScore(),
+        ignoredIds,
+        insights,
+        repositoryApi,
+      });
+      addToast({
+        title: 'Report Downloaded',
+        description: 'Comprehensive health audit report with diagrams and roadmaps exported.',
+        type: 'success',
+      });
+    } catch (err) {
+      addToast({
+        title: 'Export Failed',
+        description: err.message,
+        type: 'error',
+      });
+    }
   };
 
   // ── Early returns ───────────────────────────────────────────────────────────
@@ -965,22 +964,56 @@ const EngineeringHealthPage = () => {
 
   const applyFilters = risks => {
     return risks.filter(r => {
-      if (fileFilter && r.file !== fileFilter) return false;
-      if (categoryFilter && r.category !== categoryFilter) return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
+      const rawQ = (searchQuery || '').trim();
+      if (rawQ) {
+        const q = rawQ.toLowerCase();
+        // Clean query: strip "risk id:", "risk id", "id:", "risk_", "risk-", "#", and extra whitespace
+        const cleanId = q.replace(/^(risk\s*id[:\s]*|id[:\s]*|risk[-_]|#)/i, '').replace(/\s+/g, '');
+        const rId = (r.id || '').toLowerCase();
+        const rShortId = rId.replace(/^risk[-_]/, '');
+        const rSlice = rId.length >= 13 ? rId.slice(5, 13) : rShortId;
+
+        // Exact or prefix/substring match on the unique Risk ID
+        const isIdMatch =
+          Boolean(cleanId) &&
+          (rId === cleanId ||
+            rShortId === cleanId ||
+            rSlice === cleanId ||
+            rId.startsWith(cleanId) ||
+            rShortId.startsWith(cleanId) ||
+            rSlice.startsWith(cleanId) ||
+            rId.includes(cleanId) ||
+            rShortId.includes(cleanId));
+
+        // When a user searches for a risk by ID snippet (e.g. "ed58"), match immediately!
+        // This ensures ID search is never blocked by an active fileFilter or categoryFilter.
+        if (isIdMatch) {
+          return true;
+        }
+
+        // Standard scoped filters apply for general text search
+        if (fileFilter && r.file !== fileFilter) return false;
+        if (categoryFilter && r.category !== categoryFilter) return false;
+
         const haystack = [
+          r.id,
           r.title,
           r.description,
+          r.message,
           r.file,
           r.category,
+          r.severity,
           ...(r.evidence?.instances?.map(i => i.name) || []),
         ]
           .filter(Boolean)
           .join(' ')
           .toLowerCase();
-        if (!haystack.includes(q)) return false;
+
+        return haystack.includes(q);
       }
+
+      if (fileFilter && r.file !== fileFilter) return false;
+      if (categoryFilter && r.category !== categoryFilter) return false;
       return true;
     });
   };
@@ -990,16 +1023,26 @@ const EngineeringHealthPage = () => {
 
   const searchMatchesInOtherFilesCount = (() => {
     if (!fileFilter || !searchQuery.trim()) return 0;
-    const q = searchQuery.toLowerCase();
+    const q = searchQuery.toLowerCase().trim();
+    const cleanId = q.replace(/^(risk\s*id[:\s]*|id[:\s]*|risk[-_]|#)/i, '').replace(/\s+/g, '');
     const sourceList = activeTab === 'active' ? activeRisks : ignoredRisks;
     return sourceList.filter(r => {
       if (categoryFilter && r.category !== categoryFilter) return false;
       if (r.file === fileFilter) return false;
+      const rId = (r.id || '').toLowerCase();
+      const rShortId = rId.replace(/^risk[-_]/, '');
+      const rSlice = rId.length >= 13 ? rId.slice(5, 13) : rShortId;
+      if (cleanId && (rId.includes(cleanId) || rShortId.includes(cleanId) || rSlice.includes(cleanId))) {
+        return true;
+      }
       const haystack = [
+        r.id,
         r.title,
         r.description,
+        r.message,
         r.file,
         r.category,
+        r.severity,
         ...(r.evidence?.instances?.map(i => i.name) || []),
       ]
         .filter(Boolean)
@@ -1057,12 +1100,25 @@ const EngineeringHealthPage = () => {
               <h1 className="text-3xl font-bold text-text leading-tight">Engineering Health</h1>
               <p className="mt-2 text-muted">{model.summary}</p>
             </div>
-            <button
-              onClick={downloadReport}
-              className="flex shrink-0 items-center gap-2 px-3 py-1.5 bg-text/5 border border-text/10 hover:bg-text/10 text-text rounded text-sm font-medium transition-colors"
-            >
-              <Download className="w-4 h-4" /> Download Report
-            </button>
+            <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+              <button
+                onClick={() => setAdrRegistryOpen(true)}
+                className="flex items-center gap-2 px-3.5 py-1.5 bg-accent/15 border border-accent/30 hover:bg-accent/25 text-accent rounded text-sm font-medium transition-colors shadow-xs cursor-pointer group"
+                title="Quick access to all generated Architecture Decision Records"
+              >
+                <BookOpen className="w-4 h-4 transition-transform group-hover:scale-110" />
+                <span>ADR Registry</span>
+                <span className="text-[11px] font-semibold px-1.5 py-0.2 rounded-full bg-accent/25 border border-accent/35 text-accent">
+                  {adrCount}
+                </span>
+              </button>
+              <button
+                onClick={downloadReport}
+                className="flex items-center gap-2 px-3 py-1.5 bg-text/5 border border-text/10 hover:bg-text/10 text-text rounded text-sm font-medium transition-colors cursor-pointer"
+              >
+                <Download className="w-4 h-4" /> Download Report
+              </button>
+            </div>
           </div>
           <div className="text-left md:text-right shrink-0 border-t md:border-t-0 border-border/50 pt-4 md:pt-0 w-full md:w-auto">
             <div className="text-sm font-medium text-muted uppercase tracking-wider mb-1">Health Score</div>
@@ -1116,12 +1172,17 @@ const EngineeringHealthPage = () => {
                   <Flame className="w-5 h-5" />
                   <h3 className="font-semibold text-text">Behavioral Hotspots ({hotspotList.length})</h3>
                 </div>
-                <p className="text-sm text-muted mb-3">High churn & high complexity files prone to defect regressions (Tornhill Matrix).</p>
+                <p className="text-sm text-muted mb-3">
+                  High churn & high complexity files prone to defect regressions (Tornhill Matrix).
+                </p>
                 <div className="max-h-40 overflow-y-auto space-y-2 custom-scrollbar">
                   {hotspotList.map((h, i) => {
                     const ref = tryMakeSourceRef({ filePath: h.file });
                     return (
-                      <div key={i} className="flex items-center justify-between text-xs bg-surface px-2.5 py-1.5 rounded gap-2">
+                      <div
+                        key={i}
+                        className="flex items-center justify-between text-xs bg-surface px-2.5 py-1.5 rounded gap-2"
+                      >
                         <div className="flex-1 min-w-0">
                           {ref ? (
                             <OpenSourceButton ref={ref} variant="button" className="truncate text-[11px] py-0" />
@@ -1149,7 +1210,9 @@ const EngineeringHealthPage = () => {
                   <GitCompare className="w-5 h-5" />
                   <h3 className="font-semibold text-text">Hidden Logical Couplings ({coChangeList.length})</h3>
                 </div>
-                <p className="text-sm text-muted mb-3">Files frequently co-modified across commits without static imports.</p>
+                <p className="text-sm text-muted mb-3">
+                  Files frequently co-modified across commits without static imports.
+                </p>
                 <div className="max-h-40 overflow-y-auto space-y-2 custom-scrollbar">
                   {coChangeList.map((c, i) => {
                     const refA = tryMakeSourceRef({ filePath: c.file });
@@ -1194,9 +1257,7 @@ const EngineeringHealthPage = () => {
                             {Math.round(c.similarity * 100)}% match
                           </span>
                           {c.count > 0 && (
-                            <span className="text-[9px] text-muted font-mono hidden sm:inline">
-                              {c.count} commits
-                            </span>
+                            <span className="text-[9px] text-muted font-mono hidden sm:inline">{c.count} commits</span>
                           )}
                         </div>
                       </div>
@@ -1272,7 +1333,25 @@ const EngineeringHealthPage = () => {
 
         {/* ── AI panel ── */}
         {insights && (
-          <div className="mb-8 rounded-lg border border-accent/30 bg-accent/10 p-6">
+          <div className="mb-8 rounded-lg border border-accent/30 bg-accent/10 p-6 relative">
+            <div className="flex items-center justify-between mb-4 pb-2 border-b border-accent/20">
+              <span className="text-xs font-semibold uppercase tracking-wider text-accent flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4" /> AI Architecture & Health Insights
+              </span>
+              <button
+                onClick={() => setConfirmInterpretationOpen(true)}
+                disabled={loadingInsights}
+                className="flex items-center gap-1.5 text-xs text-muted hover:text-accent transition-colors disabled:opacity-50 px-2 py-1 rounded hover:bg-accent/10"
+                title="Regenerate with fresh AI synthesis"
+              >
+                {loadingInsights ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5" />
+                )}
+                Regenerate
+              </button>
+            </div>
             <AiResponse
               repoId={repoId}
               chatId={`health-${repoId}`}
@@ -1280,9 +1359,14 @@ const EngineeringHealthPage = () => {
                 summary: insights.summary,
                 recommendations: insights.recommendations,
                 inferences: insights.observations,
-                risks: insights.limitations ? [insights.limitations] : [],
+                risks: insights.limitations
+                  ? Array.isArray(insights.limitations)
+                    ? insights.limitations
+                    : [insights.limitations]
+                  : [],
+                references: insights.references || [],
               }}
-              title="AI Architecture Insights"
+              title={null}
             />
           </div>
         )}
@@ -1309,8 +1393,8 @@ const EngineeringHealthPage = () => {
                 if (aiState.status === 'offline') {
                   addToast({
                     title: 'AI Offline',
-                    description: 'No AI provider configured.',
-                    type: 'error',
+                    description: 'No AI provider configured. Deterministic metrics remain available offline.',
+                    type: 'warning',
                   });
                   return;
                 }
@@ -1377,9 +1461,7 @@ const EngineeringHealthPage = () => {
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder={
-                  fileFilter
-                    ? 'Search within this file...'
-                    : 'Search risks by title, file, or description...'
+                  fileFilter ? 'Search within this file...' : 'Search risks by ID, title, file, or description...'
                 }
                 className="w-full min-w-[70px] bg-transparent border-none outline-none text-sm text-text placeholder-muted/60"
               />
@@ -1394,26 +1476,38 @@ const EngineeringHealthPage = () => {
                 </button>
               )}
             </div>
-            <div className="self-end sm:self-auto shrink-0 flex items-center gap-2 bg-surface border border-border rounded-lg px-3 py-1.5 sm:py-2">
-              <span className="text-xs text-muted font-medium">Cards per page:</span>
-              <select
-                value={ITEMS_PER_PAGE}
-                onChange={e => setItemsPerPage(e.target.value)}
-                className="bg-transparent text-sm text-text outline-none cursor-pointer hover:text-accent transition-colors"
+            <div className="self-end sm:self-auto shrink-0 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setAdrRegistryOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 sm:py-2 bg-panel border border-border hover:border-accent/60 hover:bg-surface rounded-lg text-xs font-medium text-text transition-colors cursor-pointer shadow-xs"
+                title="Open ADR Registry & search all drafted decision records"
               >
-                <option value="10" className="bg-panel">
-                  10
-                </option>
-                <option value="20" className="bg-panel">
-                  20
-                </option>
-                <option value="50" className="bg-panel">
-                  50
-                </option>
-                <option value="1000000" className="bg-panel">
-                  All
-                </option>
-              </select>
+                <BookOpen className="w-3.5 h-3.5 text-accent" />
+                <span>ADRs ({adrCount})</span>
+              </button>
+
+              <div className="flex items-center gap-2 bg-surface border border-border rounded-lg px-3 py-1.5 sm:py-2">
+                <span className="text-xs text-muted font-medium">Cards per page:</span>
+                <select
+                  value={ITEMS_PER_PAGE}
+                  onChange={e => setItemsPerPage(e.target.value)}
+                  className="bg-transparent text-sm text-text outline-none cursor-pointer hover:text-accent transition-colors"
+                >
+                  <option value="10" className="bg-panel">
+                    10
+                  </option>
+                  <option value="20" className="bg-panel">
+                    20
+                  </option>
+                  <option value="50" className="bg-panel">
+                    50
+                  </option>
+                  <option value="1000000" className="bg-panel">
+                    All
+                  </option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -1423,7 +1517,9 @@ const EngineeringHealthPage = () => {
               <div className="flex items-center gap-2 min-w-0">
                 <span className="w-2 h-2 rounded-full bg-accent shrink-0 animate-pulse" />
                 <span className="break-words">
-                  Found <strong className="text-accent">{searchMatchesInOtherFilesCount}</strong> result{searchMatchesInOtherFilesCount > 1 ? 's' : ''} matching &ldquo;{searchQuery}&rdquo; in other files across the repository.
+                  Found <strong className="text-accent">{searchMatchesInOtherFilesCount}</strong> result
+                  {searchMatchesInOtherFilesCount > 1 ? 's' : ''} matching &ldquo;{searchQuery}&rdquo; in other files
+                  across the repository.
                 </span>
               </div>
               <button
@@ -1595,14 +1691,34 @@ const EngineeringHealthPage = () => {
                     No active risks matching &ldquo;{searchQuery}&rdquo; in {fileFilter.split('/').pop()}.
                   </p>
                   <p className="text-xs text-muted mb-4">
-                    However, {searchMatchesInOtherFilesCount} matching risk{searchMatchesInOtherFilesCount > 1 ? 's were' : ' was'} found across other files in the project.
+                    However, {searchMatchesInOtherFilesCount} matching risk
+                    {searchMatchesInOtherFilesCount > 1 ? 's were' : ' was'} found across other files in the project.
                   </p>
                   <button
                     type="button"
                     onClick={handleClearFileFilter}
                     className="px-4 py-2 text-xs bg-accent text-white rounded-lg hover:bg-accent-hover transition-colors font-semibold inline-flex items-center gap-2 shadow"
                   >
-                    Show {searchMatchesInOtherFilesCount} Result{searchMatchesInOtherFilesCount > 1 ? 's' : ''} Across All Files
+                    Show {searchMatchesInOtherFilesCount} Result{searchMatchesInOtherFilesCount > 1 ? 's' : ''} Across
+                    All Files
+                  </button>
+                </div>
+              ) : searchQuery && filteredIgnored.length > 0 ? (
+                <div className="max-w-md mx-auto flex flex-col items-center">
+                  <div className="w-10 h-10 rounded-full bg-accent/15 flex items-center justify-center text-accent mb-3">
+                    <Search className="w-5 h-5" />
+                  </div>
+                  <p className="text-text font-medium mb-1">No active risks matching &ldquo;{searchQuery}&rdquo;.</p>
+                  <p className="text-xs text-muted mb-4">
+                    Found <strong className="text-accent">{filteredIgnored.length}</strong> matching risk
+                    {filteredIgnored.length > 1 ? 's' : ''} in your <strong>Ignored</strong> list.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('ignored')}
+                    className="px-4 py-2 text-xs bg-accent text-white rounded-lg hover:bg-accent-hover transition-colors font-semibold inline-flex items-center gap-2 shadow"
+                  >
+                    View {filteredIgnored.length} Result{filteredIgnored.length > 1 ? 's' : ''} in Ignored Tab &rarr;
                   </button>
                 </div>
               ) : (
@@ -1638,11 +1754,12 @@ const EngineeringHealthPage = () => {
                     repoId={repoId}
                     navigate={navigate}
                     onDraftAdr={setActiveAdrRisk}
-                    onExplainAi={requestExplainAi}
+                    onExplainAi={setExplainRisk}
                     onIgnore={handleIgnoreToggle}
                     ignored={false}
                     selected={selectedRiskIds.has(risk.id)}
                     onSelect={() => handleSelectRisk(risk.id)}
+                    onSearchId={setSearchQuery}
                   />
                 ))}
               </div>
@@ -1668,54 +1785,6 @@ const EngineeringHealthPage = () => {
                   </button>
                 </div>
               )}
-
-              {/* Inline AI explanation panel */}
-              {explainRisk && (
-                <div className="mt-6 rounded-lg border border-accent/30 bg-accent/5 p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-semibold text-accent flex items-center gap-2">
-                      <Sparkles className="w-4 h-4" /> AI Explanation — {explainRisk.title}
-                    </span>
-                    <button
-                      onClick={() => {
-                        setExplainRisk(null);
-                        setExplainResult(null);
-                      }}
-                      className="text-muted hover:text-text text-xs"
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                  {explainLoading && (
-                    <div className="flex items-center gap-2 text-muted text-sm">
-                      <Loader2 className="w-4 h-4 animate-spin" /> Generating explanation...
-                    </div>
-                  )}
-                  {!explainLoading && !explainResult && (
-                    <div className="flex items-center justify-between p-3.5 rounded-lg bg-panel border border-border">
-                      <span className="text-xs text-muted">Ready to generate explanation. Requires confirmation.</span>
-                      <button
-                        onClick={() => requestExplainAi(explainRisk)}
-                        className="px-3 py-1.5 bg-accent text-white rounded-lg text-xs font-medium flex items-center gap-1.5 hover:bg-accent-hover transition-colors shadow-sm"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" /> Explain with AI
-                      </button>
-                    </div>
-                  )}
-                  {explainResult && (
-                    <AiResponse
-                      repoId={repoId}
-                      chatId={`health-explain-${explainRisk.id}`}
-                      data={{
-                        summary: explainResult.summary,
-                        recommendations: explainResult.recommendations,
-                        inferences: explainResult.observations,
-                      }}
-                      title="AI Explanation"
-                    />
-                  )}
-                </div>
-              )}
             </>
           ))}
 
@@ -1728,14 +1797,34 @@ const EngineeringHealthPage = () => {
                     No ignored risks matching &ldquo;{searchQuery}&rdquo; in {fileFilter.split('/').pop()}.
                   </p>
                   <p className="text-xs text-muted mb-4">
-                    However, {searchMatchesInOtherFilesCount} matching ignored risk{searchMatchesInOtherFilesCount > 1 ? 's were' : ' was'} found across other files in the project.
+                    However, {searchMatchesInOtherFilesCount} matching ignored risk
+                    {searchMatchesInOtherFilesCount > 1 ? 's were' : ' was'} found across other files in the project.
                   </p>
                   <button
                     type="button"
                     onClick={handleClearFileFilter}
                     className="px-4 py-2 text-xs bg-accent text-white rounded-lg hover:bg-accent-hover transition-colors font-semibold inline-flex items-center gap-2 shadow"
                   >
-                    Show {searchMatchesInOtherFilesCount} Result{searchMatchesInOtherFilesCount > 1 ? 's' : ''} Across All Files
+                    Show {searchMatchesInOtherFilesCount} Result{searchMatchesInOtherFilesCount > 1 ? 's' : ''} Across
+                    All Files
+                  </button>
+                </div>
+              ) : searchQuery && filteredActive.length > 0 ? (
+                <div className="max-w-md mx-auto flex flex-col items-center">
+                  <div className="w-10 h-10 rounded-full bg-accent/15 flex items-center justify-center text-accent mb-3">
+                    <Search className="w-5 h-5" />
+                  </div>
+                  <p className="text-text font-medium mb-1">No ignored risks matching &ldquo;{searchQuery}&rdquo;.</p>
+                  <p className="text-xs text-muted mb-4">
+                    Found <strong className="text-accent">{filteredActive.length}</strong> matching risk
+                    {filteredActive.length > 1 ? 's' : ''} in your <strong>Active Risks</strong> list.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('active')}
+                    className="px-4 py-2 text-xs bg-accent text-white rounded-lg hover:bg-accent-hover transition-colors font-semibold inline-flex items-center gap-2 shadow"
+                  >
+                    View {filteredActive.length} Result{filteredActive.length > 1 ? 's' : ''} in Active Risks &rarr;
                   </button>
                 </div>
               ) : (
@@ -1767,11 +1856,12 @@ const EngineeringHealthPage = () => {
                     repoId={repoId}
                     navigate={navigate}
                     onDraftAdr={setActiveAdrRisk}
-                    onExplainAi={null}
+                    onExplainAi={setExplainRisk}
                     onIgnore={handleIgnoreToggle}
                     ignored={true}
                     selected={selectedRiskIds.has(risk.id)}
                     onSelect={() => handleSelectRisk(risk.id)}
+                    onSearchId={setSearchQuery}
                   />
                 ))}
               </div>
@@ -1801,7 +1891,39 @@ const EngineeringHealthPage = () => {
           ))}
       </div>
 
-      <ADRPanel repoId={repoId} risk={activeAdrRisk} onClose={() => setActiveAdrRisk(null)} />
+      {/* ADR Panel: Opened either for a specific risk finding or directly with a selected ADR */}
+      <ADRPanel
+        key={selectedAdrFromRegistry?.id || activeAdrRisk?.id || (selectedAdrFromRegistry ? 'adr-reg' : 'adr-risk')}
+        repoId={repoId}
+        risk={activeAdrRisk}
+        initialAdr={selectedAdrFromRegistry}
+        onClose={() => {
+          setActiveAdrRisk(null);
+          setSelectedAdrFromRegistry(null);
+          refreshAdrCount();
+        }}
+        onOpenRegistry={() => setAdrRegistryOpen(true)}
+      />
+
+      {/* Quick Access ADR Registry & Search Modal */}
+      <ADRRegistryModal
+        isOpen={adrRegistryOpen}
+        onClose={() => {
+          setAdrRegistryOpen(false);
+          refreshAdrCount();
+        }}
+        repoId={repoId}
+        onSelectAdr={adr => {
+          setAdrRegistryOpen(false);
+          setSelectedAdrFromRegistry(adr);
+          // Check if this ADR corresponds to a known risk finding in the active model
+          const matchingRisk =
+            model?.risks?.find(r => r.id === adr.id || r.title === adr.title) ||
+            model?.ignoredRisks?.find(r => r.id === adr.id || r.title === adr.title) ||
+            null;
+          setActiveAdrRisk(matchingRisk);
+        }}
+      />
 
       {/* Confirmation Modal for Full AI Architecture Interpretation */}
       <ConfirmAiModal
@@ -1811,28 +1933,24 @@ const EngineeringHealthPage = () => {
           setConfirmInterpretationOpen(false);
           executeGenerateInterpretation();
         }}
-        title="Generate AI Architecture Interpretation?"
+        title="Generate AI Architecture Interpretation"
         subtitle="Synthesizing Repository Structural Metrics"
         description="CodeLens will synthesize your codebase metrics (hotspots, co-change coupling, complex functions, and structural risks) and request an architectural interpretation from the AI provider."
         tokenEstimate="~1,200 tokens"
-        confirmText="Confirm & Generate"
+        confirmText="Proceed to AI"
       />
 
-      {/* Confirmation Modal for Individual Risk AI Explanation */}
-      <ConfirmAiModal
-        isOpen={!!pendingExplainRisk}
-        onClose={() => setPendingExplainRisk(null)}
-        onConfirm={() => {
-          const r = pendingExplainRisk;
-          setPendingExplainRisk(null);
-          executeExplainAi(r);
+      {/* AI Finding Explanation Slide-out Panel */}
+      <ExplainFindingPanel
+        key={explainRisk?.id || 'explain-panel'}
+        isOpen={!!explainRisk}
+        risk={explainRisk}
+        repoId={repoId}
+        onClose={() => setExplainRisk(null)}
+        onDraftAdr={risk => {
+          setExplainRisk(null);
+          setActiveAdrRisk(risk);
         }}
-        title="Explain Risk with AI?"
-        subtitle={pendingExplainRisk ? `${pendingExplainRisk.category} · ${pendingExplainRisk.title}` : ''}
-        description={`CodeLens will extract the structural AST facts and context of this finding and request an AI explanation with root-cause insights and remediation options.`}
-        findingContext={pendingExplainRisk}
-        tokenEstimate="~500 tokens"
-        confirmText="Confirm & Explain"
       />
     </div>
   );

@@ -68,9 +68,10 @@ async function quotaMiddleware(req, res, next) {
 
     if (userErr || !userRowData) {
       // Auto-provision a public.users row if Supabase Auth Trigger didn't do it
+      const email = req.user.email || `user_${userId.slice(0, 8)}@codelens.local`;
       const { data: newUser, error: insertErr } = await supabase
         .from('users')
-        .insert({ id: userId, plan_id: 'free', status: 'active' })
+        .insert({ id: userId, email, plan_id: 'free', status: 'active' })
         .select('plan_id, status')
         .single();
 
