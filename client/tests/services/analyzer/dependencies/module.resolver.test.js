@@ -12,6 +12,7 @@ import {
   resolveAllImports,
   buildKnownFilesSet,
   classifySpecifier,
+  getSubproject,
   RESOLUTION_EXTENSIONS,
 } from '@/services/analyzer/dependencies/module.resolver.js';
 
@@ -299,3 +300,170 @@ describe('RESOLUTION_EXTENSIONS', () => {
     );
   });
 });
+
+// ── getSubproject ────────────────────────────────────────────────────────────
+
+describe('getSubproject', () => {
+  test('identifies top-level subproject', () => {
+    expect(getSubproject('client/tests/services/analyzer/analyzer.integration.test.js')).toBe('client');
+    expect(getSubproject('server/src/app.js')).toBe('server');
+  });
+
+  test('identifies monorepo package dirs (packages/*, apps/*)', () => {
+    expect(getSubproject('packages/ui/src/Button.tsx')).toBe('packages/ui');
+    expect(getSubproject('apps/web/src/main.ts')).toBe('apps/web');
+  });
+
+  test('returns empty string for root project files', () => {
+    expect(getSubproject('src/index.js')).toBe('');
+    expect(getSubproject('lib/utils.js')).toBe('');
+    expect(getSubproject('index.js')).toBe('');
+    expect(getSubproject('')).toBe('');
+  });
+});
+
+// ── Subproject-aware Alias Resolution ────────────────────────────────────────
+
+describe('resolveImport — subproject-aware alias resolution', () => {
+  test('resolves @/ alias from client test to client/src/ file with exact match', () => {
+    const result = resolve(
+      'client/tests/services/analyzer/analyzer.integration.test.js',
+      '@/services/analyzer/analyzer.worker.js',
+      ['client/src/services/analyzer/analyzer.worker.js']
+    );
+    expect(result.kind).toBe('internal');
+    expect(result.resolvedTo).toBe('client/src/services/analyzer/analyzer.worker.js');
+  });
+
+  test('resolves @/ alias without file extension', () => {
+    const result = resolve(
+      'client/tests/components/Button.test.jsx',
+      '@/components/Button',
+      ['client/src/components/Button.jsx']
+    );
+    expect(result.kind).toBe('internal');
+    expect(result.resolvedTo).toBe('client/src/components/Button.jsx');
+  });
+
+  test('resolves @/ alias pointing to index file in subproject', () => {
+    const result = resolve(
+      'client/tests/utils.test.js',
+      '@/utils',
+      ['client/src/utils/index.ts']
+    );
+    expect(result.kind).toBe('internal');
+    expect(result.resolvedTo).toBe('client/src/utils/index.ts');
+  });
+
+  test('resolves ~/ alias in subproject', () => {
+    const result = resolve(
+      'client/src/features/featureA.js',
+      '~/shared/helpers',
+      ['client/src/shared/helpers.js']
+    );
+    expect(result.kind).toBe('internal');
+    expect(result.resolvedTo).toBe('client/src/shared/helpers.js');
+  });
+
+  test('fallback scan in knownFiles finds file matching src/${stripped} across repo', () => {
+    const result = resolve(
+      'tests/integration/deep.test.js',
+      '@/components/Navbar',
+      ['client/src/components/Navbar.jsx']
+    );
+    expect(result.kind).toBe('internal');
+    expect(result.resolvedTo).toBe('client/src/components/Navbar.jsx');
+  });
+});
+
+// ── Scoped npm packages vs path aliases ───────────────────────────────────────
+
+describe('resolveImport — scoped npm packages vs path aliases', () => {
+  test('@scope/pkg is external', () => {
+    const result = resolve('client/src/App.jsx', '@tanstack/react-query', []);
+    expect(result.kind).toBe('external');
+    expect(result.resolvedTo).toBeNull();
+  });
+
+  test('@org/pkg is external', () => {
+    const result = resolve('server/src/server.js', '@aws-sdk/client-s3', []);
+    expect(result.kind).toBe('external');
+    expect(result.resolvedTo).toBeNull();
+  });
+
+  test('unresolved @/ alias returns "unresolved", NEVER "external"', () => {
+    const result = resolve(
+      'client/tests/services/analyzer/analyzer.integration.test.js',
+      '@/nonexistent/missing.worker.js',
+      ['client/src/other.js']
+    );
+    expect(result.kind).toBe('unresolved');
+    expect(result.resolvedTo).toBeNull();
+    expect(result.reason).toContain('Cannot resolve');
+  });
+
+  test('unresolved ~/ alias returns "unresolved", NEVER "external"', () => {
+    const result = resolve(
+      'client/src/app.js',
+      '~/missing/module',
+      ['client/src/other.js']
+    );
+    expect(result.kind).toBe('unresolved');
+    expect(result.resolvedTo).toBeNull();
+  });
+});
+
+// ── Multi-language Subproject-Aware Resolution ───────────────────────────────
+
+describe('resolveImport — multi-language subproject-aware resolution', () => {
+  test('Python: resolves non-relative import within subproject', () => {
+    const result = resolve(
+      'server/tests/test_api.py',
+      'api.auth',
+      ['server/api/auth.py']
+    );
+    expect(result.kind).toBe('internal');
+    expect(result.resolvedTo).toBe('server/api/auth.py');
+  });
+
+  test('Python: resolves non-relative import to subproject src directory', () => {
+    const result = resolve(
+      'server/tests/test_api.py',
+      'api.auth',
+      ['server/src/api/auth.py']
+    );
+    expect(result.kind).toBe('internal');
+    expect(result.resolvedTo).toBe('server/src/api/auth.py');
+  });
+
+  test('C/C++: resolves header from subproject include directory', () => {
+    const result = resolve(
+      'client/src/main.cpp',
+      'utils/logger.h',
+      ['client/include/utils/logger.h']
+    );
+    expect(result.kind).toBe('internal');
+    expect(result.resolvedTo).toBe('client/include/utils/logger.h');
+  });
+
+  test('Rust: resolves crate:: module to subproject src', () => {
+    const result = resolve(
+      'client/src/main.rs',
+      'crate::models::user',
+      ['client/src/models/user.rs']
+    );
+    expect(result.kind).toBe('internal');
+    expect(result.resolvedTo).toBe('client/src/models/user.rs');
+  });
+
+  test('Go: resolves package import to subproject directory', () => {
+    const result = resolve(
+      'server/cmd/main.go',
+      'pkg/database',
+      ['server/pkg/database.go']
+    );
+    expect(result.kind).toBe('internal');
+    expect(result.resolvedTo).toBe('server/pkg/database.go');
+  });
+});
+
